@@ -30,7 +30,7 @@ WHERE
   AND (sqlc.narg('start_time') IS NULL OR timestamp >= sqlc.narg('start_time'))
   AND (sqlc.narg('end_time') IS NULL OR timestamp <= sqlc.narg('end_time'))
 ORDER BY timestamp DESC
-LIMIT ? OFFSET ?;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountLogs :one
 SELECT COUNT(*) FROM logs;

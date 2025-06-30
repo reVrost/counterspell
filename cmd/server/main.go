@@ -56,6 +56,14 @@ func main() {
 	api.GET("/traces", apiHandler.QueryTraces)
 	api.GET("/traces/:trace_id", apiHandler.GetTraceDetails)
 
+	// Add health endpoint (no auth required)
+	e.GET("/microscope/health", func(c echo.Context) error {
+		return c.JSON(200, map[string]string{
+			"status":  "healthy",
+			"service": "microscope",
+		})
+	})
+
 	// Add example route for testing
 	e.GET("/hello", helloHandler)
 	e.GET("/slow", slowHandler)

@@ -106,12 +106,12 @@ func (q *Queries) GetLogs(ctx context.Context, arg GetLogsParams) ([]Log, error)
 const getLogsWithFilters = `-- name: GetLogsWithFilters :many
 SELECT id, timestamp, level, message, trace_id, span_id, attributes FROM logs
 WHERE 
-  (?3 IS NULL OR level = ?3)
-  AND (?4 IS NULL OR trace_id = ?4)
-  AND (?5 IS NULL OR timestamp >= ?5)
-  AND (?6 IS NULL OR timestamp <= ?6)
+  (?1 IS NULL OR level = ?1)
+  AND (?2 IS NULL OR trace_id = ?2)
+  AND (?3 IS NULL OR timestamp >= ?3)
+  AND (?4 IS NULL OR timestamp <= ?4)
 ORDER BY timestamp DESC
-LIMIT ? OFFSET ?
+LIMIT ?6 OFFSET ?5
 `
 
 type GetLogsWithFiltersParams struct {
@@ -119,8 +119,8 @@ type GetLogsWithFiltersParams struct {
 	TraceID   interface{}
 	StartTime interface{}
 	EndTime   interface{}
-	Limit     int64
 	Offset    int64
+	Limit     int64
 }
 
 func (q *Queries) GetLogsWithFilters(ctx context.Context, arg GetLogsWithFiltersParams) ([]Log, error) {
@@ -129,8 +129,8 @@ func (q *Queries) GetLogsWithFilters(ctx context.Context, arg GetLogsWithFilters
 		arg.TraceID,
 		arg.StartTime,
 		arg.EndTime,
-		arg.Limit,
 		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err

@@ -100,21 +100,37 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 		}
 		countParams := db.CountLogsWithFiltersParams{}
 
+		// Set nullable parameters - use nil for empty, value for present
 		if level != "" {
 			params.Level = level
 			countParams.Level = level
+		} else {
+			params.Level = nil
+			countParams.Level = nil
 		}
+		
 		if traceID != "" {
 			params.TraceID = traceID
 			countParams.TraceID = traceID
+		} else {
+			params.TraceID = nil
+			countParams.TraceID = nil
 		}
+		
 		if startTime != "" {
 			params.StartTime = startTime
 			countParams.StartTime = startTime
+		} else {
+			params.StartTime = nil
+			countParams.StartTime = nil
 		}
+		
 		if endTime != "" {
 			params.EndTime = endTime
 			countParams.EndTime = endTime
+		} else {
+			params.EndTime = nil
+			countParams.EndTime = nil
 		}
 
 		logs, err = h.queries.GetLogsWithFilters(ctx, params)

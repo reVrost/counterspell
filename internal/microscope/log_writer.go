@@ -27,6 +27,8 @@ type SQLiteLogWriter struct {
 	batchSize int
 	done      chan struct{}
 	wg        sync.WaitGroup
+	closed    bool
+	closeMu   sync.RWMutex
 }
 
 // NewSQLiteLogWriter creates a new log writer
@@ -46,6 +48,13 @@ func NewSQLiteLogWriter(database *sql.DB) *SQLiteLogWriter {
 
 // Write implements io.Writer
 func (w *SQLiteLogWriter) Write(p []byte) (n int, err error) {
+	w.closeMu.RLock()
+	if w.closed {
+		w.closeMu.RUnlock()
+		return 0, sql.ErrConnDone
+	}
+	w.closeMu.RUnlock()
+
 	var logEntry map[string]interface{}
 	if err := json.Unmarshal(p, &logEntry); err != nil {
 		return len(p), nil
@@ -126,7 +135,10 @@ func (w *SQLiteLogWriter) processBatch(batch []LogData) {
 func (w *SQLiteLogWriter) convertLogEntry(entry map[string]interface{}) LogData {
 	logData := LogData{}
 
+	// Check both "time" and "timestamp" fields
 	if timestamp, ok := entry["time"].(string); ok {
+		logData.Timestamp = timestamp
+	} else if timestamp, ok := entry["timestamp"].(string); ok {
 		logData.Timestamp = timestamp
 	} else {
 		logData.Timestamp = time.Now().Format(time.RFC3339Nano)
@@ -140,6 +152,8 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]interface{}) LogData 
 
 	if message, ok := entry["message"].(string); ok {
 		logData.Message = message
+	} else {
+		logData.Message = "unknown"
 	}
 
 	if traceID, ok := entry["trace_id"].(string); ok && traceID != "" {
@@ -152,7 +166,7 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]interface{}) LogData 
 
 	attributes := make(map[string]interface{})
 	for key, value := range entry {
-		if key != "time" && key != "level" && key != "message" && key != "trace_id" && key != "span_id" {
+		if key != "time" && key != "timestamp" && key != "level" && key != "message" && key != "trace_id" && key != "span_id" {
 			attributes[key] = value
 		}
 	}
@@ -168,6 +182,14 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]interface{}) LogData 
 
 // Close shuts down the writer
 func (w *SQLiteLogWriter) Close() error {
+	w.closeMu.Lock()
+	if w.closed {
+		w.closeMu.Unlock()
+		return nil
+	}
+	w.closed = true
+	w.closeMu.Unlock()
+
 	close(w.done)
 	
 	done := make(chan struct{})
