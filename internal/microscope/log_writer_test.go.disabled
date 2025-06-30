@@ -1,0 +1,377 @@
+package microscope
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"testing"
+	"time"
+
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/your-github-username/microscope/internal/db"
+)
+
+func setupLogTestDB(t *testing.T) *sql.DB {
+	database, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+
+	// Create the logs table
+	_, err = database.Exec(`
+		CREATE TABLE logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp TEXT NOT NULL,
+			level TEXT NOT NULL,
+			message TEXT NOT NULL,
+			trace_id TEXT,
+			span_id TEXT,
+			attributes TEXT
+		);
+		CREATE INDEX idx_logs_timestamp ON logs(timestamp);
+		CREATE INDEX idx_logs_level ON logs(level);
+		CREATE INDEX idx_logs_trace_id ON logs(trace_id);
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test table: %v", err)
+	}
+
+	return database
+}
+
+func TestSQLiteLogWriter_Write(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+	defer writer.Close()
+
+	// Create a test log entry as JSON (similar to what zerolog would produce)
+	logEntry := map[string]interface{}{
+		"time":     "2024-01-15T10:30:00.123Z",
+		"level":    "info",
+		"message":  "Test log message",
+		"trace_id": "1234567890abcdef1234567890abcdef",
+		"span_id":  "1234567890abcdef",
+		"user":     "test-user",
+		"endpoint": "/api/test",
+	}
+
+	logJSON, _ := json.Marshal(logEntry)
+
+	// Write the log entry
+	n, err := writer.Write(logJSON)
+	if err != nil {
+		t.Fatalf("Failed to write log: %v", err)
+	}
+	if n != len(logJSON) {
+		t.Errorf("Expected to write %d bytes, wrote %d", len(logJSON), n)
+	}
+
+	// Give time for async processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify log was written to database
+	queries := db.New(database)
+	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("Failed to query logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Errorf("Expected 1 log entry, got %d", len(logs))
+	}
+
+	log := logs[0]
+	if log.Level != "info" {
+		t.Errorf("Expected level 'info', got '%s'", log.Level)
+	}
+	if log.Message != "Test log message" {
+		t.Errorf("Expected message 'Test log message', got '%s'", log.Message)
+	}
+	if !log.TraceID.Valid || log.TraceID.String != "1234567890abcdef1234567890abcdef" {
+		t.Errorf("Expected trace_id '1234567890abcdef1234567890abcdef', got '%s'", log.TraceID.String)
+	}
+	if !log.SpanID.Valid || log.SpanID.String != "1234567890abcdef" {
+		t.Errorf("Expected span_id '1234567890abcdef', got '%s'", log.SpanID.String)
+	}
+
+	// Check attributes contain the additional fields
+	var attrs map[string]interface{}
+	if err := json.Unmarshal([]byte(log.Attributes.String), &attrs); err != nil {
+		t.Fatalf("Failed to parse attributes: %v", err)
+	}
+	if attrs["user"] != "test-user" {
+		t.Errorf("Expected user 'test-user', got '%v'", attrs["user"])
+	}
+	if attrs["endpoint"] != "/api/test" {
+		t.Errorf("Expected endpoint '/api/test', got '%v'", attrs["endpoint"])
+	}
+}
+
+func TestSQLiteLogWriter_WriteWithoutTraceContext(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+	defer writer.Close()
+
+	// Create a log entry without trace context
+	logEntry := map[string]interface{}{
+		"time":    "2024-01-15T10:30:00.123Z",
+		"level":   "error",
+		"message": "Error without trace",
+		"error":   "something went wrong",
+	}
+
+	logJSON, _ := json.Marshal(logEntry)
+
+	// Write the log entry
+	_, err := writer.Write(logJSON)
+	if err != nil {
+		t.Fatalf("Failed to write log: %v", err)
+	}
+
+	// Give time for async processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify log was written
+	queries := db.New(database)
+	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("Failed to query logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Errorf("Expected 1 log entry, got %d", len(logs))
+	}
+
+	log := logs[0]
+	if log.Level != "error" {
+		t.Errorf("Expected level 'error', got '%s'", log.Level)
+	}
+	if log.TraceID.Valid {
+		t.Errorf("Expected trace_id to be null, got '%s'", log.TraceID.String)
+	}
+	if log.SpanID.Valid {
+		t.Errorf("Expected span_id to be null, got '%s'", log.SpanID.String)
+	}
+
+	// Check attributes contain the error field
+	var attrs map[string]interface{}
+	if err := json.Unmarshal([]byte(log.Attributes.String), &attrs); err != nil {
+		t.Fatalf("Failed to parse attributes: %v", err)
+	}
+	if attrs["error"] != "something went wrong" {
+		t.Errorf("Expected error 'something went wrong', got '%v'", attrs["error"])
+	}
+}
+
+func TestSQLiteLogWriter_InvalidJSON(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+	defer writer.Close()
+
+	// Write invalid JSON - should not crash
+	invalidJSON := []byte("not valid json {")
+	n, err := writer.Write(invalidJSON)
+	
+	// Should return success (writer is resilient)
+	if err != nil {
+		t.Errorf("Expected no error for invalid JSON, got: %v", err)
+	}
+	if n != len(invalidJSON) {
+		t.Errorf("Expected to return length %d, got %d", len(invalidJSON), n)
+	}
+
+	// Give time for processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Should not have any logs in database
+	queries := db.New(database)
+	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("Failed to query logs: %v", err)
+	}
+
+	if len(logs) != 0 {
+		t.Errorf("Expected 0 log entries for invalid JSON, got %d", len(logs))
+	}
+}
+
+func TestSQLiteLogWriter_BatchProcessing(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+	defer writer.Close()
+
+	// Write many log entries to test batching
+	numLogs := 250 // More than batch size (100)
+	for i := 0; i < numLogs; i++ {
+		logEntry := map[string]interface{}{
+			"time":    "2024-01-15T10:30:00.123Z",
+			"level":   "info",
+			"message": "Batch test log",
+			"index":   i,
+		}
+
+		logJSON, _ := json.Marshal(logEntry)
+		writer.Write(logJSON)
+	}
+
+	// Wait for async processing
+	time.Sleep(1 * time.Second)
+
+	// Verify all logs were processed
+	queries := db.New(database)
+	count, err := queries.CountLogs(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to count logs: %v", err)
+	}
+
+	if count != int64(numLogs) {
+		t.Errorf("Expected %d logs, got %d", numLogs, count)
+	}
+}
+
+func TestSQLiteLogWriter_ConcurrentWrites(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+	defer writer.Close()
+
+	// Test concurrent writes
+	const numGoroutines = 10
+	const logsPerGoroutine = 50
+	
+	done := make(chan bool, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(routineID int) {
+			defer func() { done <- true }()
+			
+			for j := 0; j < logsPerGoroutine; j++ {
+				logEntry := map[string]interface{}{
+					"time":      "2024-01-15T10:30:00.123Z",
+					"level":     "info",
+					"message":   "Concurrent test log",
+					"routine":   routineID,
+					"log_num":   j,
+				}
+
+				logJSON, _ := json.Marshal(logEntry)
+				_, err := writer.Write(logJSON)
+				if err != nil {
+					t.Errorf("Goroutine %d failed to write log: %v", routineID, err)
+				}
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines to finish
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+
+	// Wait for processing
+	time.Sleep(1 * time.Second)
+
+	// Verify all logs were processed
+	queries := db.New(database)
+	count, err := queries.CountLogs(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to count logs: %v", err)
+	}
+
+	expectedTotal := int64(numGoroutines * logsPerGoroutine)
+	if count != expectedTotal {
+		t.Errorf("Expected %d logs, got %d", expectedTotal, count)
+	}
+}
+
+func TestSQLiteLogWriter_Close(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+
+	// Write a log entry
+	logEntry := map[string]interface{}{
+		"time":    "2024-01-15T10:30:00.123Z",
+		"level":   "info",
+		"message": "Close test log",
+	}
+	logJSON, _ := json.Marshal(logEntry)
+	writer.Write(logJSON)
+
+	// Close the writer
+	err := writer.Close()
+	if err != nil {
+		t.Fatalf("Failed to close writer: %v", err)
+	}
+
+	// Verify the log was processed before close
+	queries := db.New(database)
+	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("Failed to query logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Errorf("Expected 1 log to be processed during close, got %d", len(logs))
+	}
+
+	// Writing after close should still work (non-blocking)
+	writer.Write(logJSON)
+}
+
+func TestSQLiteLogWriter_MissingFields(t *testing.T) {
+	database := setupLogTestDB(t)
+	defer database.Close()
+
+	writer := NewSQLiteLogWriter(database)
+	defer writer.Close()
+
+	// Log entry with missing required fields
+	logEntry := map[string]interface{}{
+		"some_field": "some_value",
+		// missing time, level, message
+	}
+
+	logJSON, _ := json.Marshal(logEntry)
+	writer.Write(logJSON)
+
+	// Give time for processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Should handle gracefully and not insert incomplete records
+	queries := db.New(database)
+	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("Failed to query logs: %v", err)
+	}
+
+	// Should have no logs since required fields were missing
+	if len(logs) != 0 {
+		t.Errorf("Expected 0 logs for incomplete entry, got %d", len(logs))
+	}
+} 
