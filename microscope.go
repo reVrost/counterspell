@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/your-github-username/microscope/internal/microscope"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -109,8 +108,8 @@ func AddToEcho(e *echo.Echo, opts ...Option) error {
 	}
 
 	configureGlobalLogger(ms.logWriter)
-	e.Use(otelecho.Middleware(cfg.serviceName))
-	e.Use(loggerMiddleware)
+	// e.Use(otelecho.Middleware(cfg.serviceName))
+	// e.Use(loggerMiddleware)
 	registerEchoRoutes(e, db, cfg.authToken)
 	registerEchoShutdownHook(e, ms)
 

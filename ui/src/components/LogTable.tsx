@@ -9,9 +9,10 @@ import {
   Group,
   ScrollArea,
   Table,
+  useMantineTheme,
 } from "@mantine/core";
 import classes from "./LogTable.module.css";
-import { IconArrowRight, IconX } from "@tabler/icons-react";
+import { IconChevronRight, IconX } from "@tabler/icons-react";
 import { type ApiResponse, Log } from "../utils/types";
 import { api } from "../utils/api";
 import useSWR from "swr";
@@ -27,6 +28,7 @@ export function LogTable() {
     const res = await api.get(url, { params: { secret } });
     return res.data;
   };
+  const theme = useMantineTheme();
 
   const { data: response, error } = useSWR<ApiResponse<Log>>(
     secret && "/logs",
@@ -102,7 +104,7 @@ export function LogTable() {
         <Table.Td>
           <Group justify="space-between">
             {item.timestamp}
-            <IconArrowRight />
+            <IconChevronRight size={16} color={theme.colors.gray[5]} />
           </Group>
         </Table.Td>
       </Table.Tr>
@@ -170,7 +172,7 @@ export function LogTable() {
         <Table
           miw={800}
           verticalSpacing="xs"
-          fw={400}
+          fw={500}
           variant="compact"
           fz="xs"
         >

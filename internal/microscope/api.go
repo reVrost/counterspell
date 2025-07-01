@@ -28,8 +28,8 @@ func NewAPIHandler(database *sql.DB) *APIHandler {
 
 // APIResponse represents the standard API response format
 type APIResponse struct {
-	Metadata map[string]interface{} `json:"metadata"`
-	Data     interface{}            `json:"data"`
+	Metadata map[string]any `json:"metadata"`
+	Data     any            `json:"data"`
 }
 
 // TraceListItem represents a trace in the list view
@@ -45,33 +45,33 @@ type TraceListItem struct {
 
 // TraceDetail represents detailed trace information
 type TraceDetail struct {
-	TraceID string      `json:"trace_id"`
-	Spans   []SpanItem  `json:"spans"`
+	TraceID string     `json:"trace_id"`
+	Spans   []SpanItem `json:"spans"`
 }
 
 // SpanItem represents a span in the trace detail view
 type SpanItem struct {
-	SpanID       string                 `json:"span_id"`
-	TraceID      string                 `json:"trace_id"`
-	ParentSpanID *string                `json:"parent_span_id"`
-	Name         string                 `json:"name"`
-	StartTime    string                 `json:"start_time"`
-	EndTime      string                 `json:"end_time"`
-	DurationNs   int64                  `json:"duration_ns"`
-	Attributes   map[string]interface{} `json:"attributes"`
-	ServiceName  string                 `json:"service_name"`
-	HasError     bool                   `json:"has_error"`
+	SpanID       string         `json:"span_id"`
+	TraceID      string         `json:"trace_id"`
+	ParentSpanID *string        `json:"parent_span_id"`
+	Name         string         `json:"name"`
+	StartTime    string         `json:"start_time"`
+	EndTime      string         `json:"end_time"`
+	DurationNs   int64          `json:"duration_ns"`
+	Attributes   map[string]any `json:"attributes"`
+	ServiceName  string         `json:"service_name"`
+	HasError     bool           `json:"has_error"`
 }
 
 // LogItem represents a log entry
 type LogItem struct {
-	ID         int64                  `json:"id"`
-	Timestamp  string                 `json:"timestamp"`
-	Level      string                 `json:"level"`
-	Message    string                 `json:"message"`
-	TraceID    *string                `json:"trace_id"`
-	SpanID     *string                `json:"span_id"`
-	Attributes map[string]interface{} `json:"attributes"`
+	ID         int64          `json:"id"`
+	Timestamp  string         `json:"timestamp"`
+	Level      string         `json:"level"`
+	Message    string         `json:"message"`
+	TraceID    *string        `json:"trace_id"`
+	SpanID     *string        `json:"span_id"`
+	Attributes map[string]any `json:"attributes"`
 }
 
 // QueryLogs handles GET /microscope/api/logs
@@ -108,7 +108,7 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 			params.Level = nil
 			countParams.Level = nil
 		}
-		
+
 		if traceID != "" {
 			params.TraceID = traceID
 			countParams.TraceID = traceID
@@ -116,7 +116,7 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 			params.TraceID = nil
 			countParams.TraceID = nil
 		}
-		
+
 		if startTime != "" {
 			params.StartTime = startTime
 			countParams.StartTime = startTime
@@ -124,7 +124,7 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 			params.StartTime = nil
 			countParams.StartTime = nil
 		}
-		
+
 		if endTime != "" {
 			params.EndTime = endTime
 			countParams.EndTime = endTime
@@ -177,14 +177,14 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 
 		// Parse attributes JSON
 		if log.Attributes.Valid && log.Attributes.String != "" {
-			var attrs map[string]interface{}
+			var attrs map[string]any
 			if json.Unmarshal([]byte(log.Attributes.String), &attrs) == nil {
 				apiLog.Attributes = attrs
 			} else {
-				apiLog.Attributes = make(map[string]interface{})
+				apiLog.Attributes = make(map[string]any)
 			}
 		} else {
-			apiLog.Attributes = make(map[string]interface{})
+			apiLog.Attributes = make(map[string]any)
 		}
 
 		// Apply text search filter if provided
@@ -200,7 +200,7 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 	}
 
 	response := APIResponse{
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"total":  total,
 			"limit":  limit,
 			"offset": offset,
@@ -216,7 +216,7 @@ func (h *APIHandler) QueryTraces(c echo.Context) error {
 	// Parse query parameters
 	limit := parseIntParam(c.QueryParam("limit"), 100)
 	offset := parseIntParam(c.QueryParam("offset"), 0)
-	q := c.QueryParam("q")                      // search root span name
+	q := c.QueryParam("q")                     // search root span name
 	hasErrorParam := c.QueryParam("has_error") // filter by error status
 
 	ctx := c.Request().Context()
@@ -295,7 +295,7 @@ func (h *APIHandler) QueryTraces(c echo.Context) error {
 	}
 
 	response := APIResponse{
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"total":  total,
 			"limit":  limit,
 			"offset": offset,
@@ -345,14 +345,14 @@ func (h *APIHandler) GetTraceDetails(c echo.Context) error {
 
 		// Parse attributes JSON
 		if span.Attributes.Valid && span.Attributes.String != "" {
-			var attrs map[string]interface{}
+			var attrs map[string]any
 			if json.Unmarshal([]byte(span.Attributes.String), &attrs) == nil {
 				apiSpan.Attributes = attrs
 			} else {
-				apiSpan.Attributes = make(map[string]interface{})
+				apiSpan.Attributes = make(map[string]any)
 			}
 		} else {
-			apiSpan.Attributes = make(map[string]interface{})
+			apiSpan.Attributes = make(map[string]any)
 		}
 
 		apiSpans = append(apiSpans, apiSpan)
@@ -378,4 +378,4 @@ func parseIntParam(param string, defaultValue int) int {
 	}
 
 	return value
-} 
+}
