@@ -32,7 +32,7 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# MicroScope specific files
+# Counterspell specific files
 # Database files
 *.db
 *.db-*
