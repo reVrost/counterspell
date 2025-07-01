@@ -14,33 +14,18 @@
 
 .navlink {
   display: flex;
+  transition: all 0.1s ease-in-out;
+  height: 32px;
+  width: 100%;
+  padding: 0 var(--mantine-spacing-xs);
+  justify-content: flex-start;
+  align-items: center;
   color: var(--mantine-color-white);
+  border-radius: var(--mantine-radius-xs);
   text-decoration: none;
   &:hover {
     background-color: var(--mantine-color-black);
   }
-  &[data-active] {
-    &,
-    &:hover {
-      box-shadow: var(--mantine-shadow-sm);
-      background-color: var(--mantine-color-white);
-      color: var(--mantine-color-black);
-    }
-  }
-}
-
-.link {
-  height: 32px;
-  border-radius: var(--mantine-radius-xs);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  color: var(--mantine-color-white);
-
-  &:hover {
-    background-color: var(--mantine-color-black);
-  }
-
   &[data-active] {
     &,
     &:hover {

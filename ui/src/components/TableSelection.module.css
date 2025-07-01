@@ -1,0 +1,12 @@
+.rowSelected {
+  background-color: var(--mantine-color-gray-1);
+}
+
+.row {
+  cursor: pointer;
+
+  /**hover **/
+  &:hover {
+    background-color: var(--mantine-color-gray-1);
+  }
+}

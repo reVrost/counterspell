@@ -55,7 +55,7 @@ func (w *SQLiteLogWriter) Write(p []byte) (n int, err error) {
 	}
 	w.closeMu.RUnlock()
 
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	if err := json.Unmarshal(p, &logEntry); err != nil {
 		return len(p), nil
 	}
@@ -73,12 +73,12 @@ func (w *SQLiteLogWriter) Write(p []byte) (n int, err error) {
 // worker processes logs in batches
 func (w *SQLiteLogWriter) worker() {
 	defer w.wg.Done()
-	
+
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	batch := make([]LogData, 0, w.batchSize)
-	
+
 	for {
 		select {
 		case log := <-w.logChan:
@@ -118,7 +118,7 @@ func (w *SQLiteLogWriter) worker() {
 // processBatch inserts logs into database
 func (w *SQLiteLogWriter) processBatch(batch []LogData) {
 	ctx := context.Background()
-	
+
 	for _, log := range batch {
 		_ = w.queries.InsertLog(ctx, db.InsertLogParams{
 			Timestamp:  log.Timestamp,
@@ -132,7 +132,7 @@ func (w *SQLiteLogWriter) processBatch(batch []LogData) {
 }
 
 // convertLogEntry converts JSON log to LogData
-func (w *SQLiteLogWriter) convertLogEntry(entry map[string]interface{}) LogData {
+func (w *SQLiteLogWriter) convertLogEntry(entry map[string]any) LogData {
 	logData := LogData{}
 
 	// Check both "time" and "timestamp" fields
@@ -164,7 +164,7 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]interface{}) LogData 
 		logData.SpanID = sql.NullString{String: spanID, Valid: true}
 	}
 
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]any)
 	for key, value := range entry {
 		if key != "time" && key != "timestamp" && key != "level" && key != "message" && key != "trace_id" && key != "span_id" {
 			attributes[key] = value
@@ -191,7 +191,7 @@ func (w *SQLiteLogWriter) Close() error {
 	w.closeMu.Unlock()
 
 	close(w.done)
-	
+
 	done := make(chan struct{})
 	go func() {
 		w.wg.Wait()
@@ -204,4 +204,4 @@ func (w *SQLiteLogWriter) Close() error {
 	case <-time.After(5 * time.Second):
 		return nil
 	}
-} 
+}

@@ -20,7 +20,7 @@ go get github.com/your-github-username/microscope
 
 ## Quick Start
 
-The simplest way to add MicroScope to your application:
+The simplest way to add Microscope to your application:
 
 ```go
 package main
@@ -37,7 +37,7 @@ func main() {
 
     // One-liner installation - set MICROSCOPE_AUTH_TOKEN environment variable
     if err := microscope.Install(e); err != nil {
-        log.Fatal().Err(err).Msg("Failed to install MicroScope")
+        log.Fatal().Err(err).Msg("Failed to install Microscope")
     }
 
     // Your application routes
@@ -51,14 +51,14 @@ func main() {
     })
 
     log.Info().Msg("Server starting on :1323")
-    log.Info().Msg("MicroScope API available at /microscope/api")
+    log.Info().Msg("Microscope API available at /microscope/api")
     e.Logger.Fatal(e.Start(":1323"))
 }
 ```
 
 ## Configuration
 
-MicroScope supports configuration through functional options:
+Microscope supports configuration through functional options:
 
 ```go
 err := microscope.Install(e,
@@ -81,7 +81,7 @@ All API endpoints require authentication via the `Authorization: Bearer <token>`
 GET /microscope/health
 ```
 
-Returns the health status of MicroScope (no authentication required).
+Returns the health status of Microscope (no authentication required).
 
 ### Query Logs
 
@@ -90,6 +90,7 @@ GET /microscope/api/logs?limit=100&offset=0&level=info&q=search&trace_id=...
 ```
 
 **Query Parameters:**
+
 - `limit`: Number of logs to return (default: 100)
 - `offset`: Offset for pagination (default: 0)
 - `level`: Filter by log level (debug, info, warn, error)
@@ -99,6 +100,7 @@ GET /microscope/api/logs?limit=100&offset=0&level=info&q=search&trace_id=...
 - `trace_id`: Filter logs by trace ID
 
 **Response:**
+
 ```json
 {
   "metadata": {
@@ -130,12 +132,14 @@ GET /microscope/api/traces?limit=50&offset=0&q=search&has_error=true
 ```
 
 **Query Parameters:**
+
 - `limit`: Number of traces to return (default: 100)
 - `offset`: Offset for pagination (default: 0)
 - `q`: Search in root span names
 - `has_error`: Filter traces that have errors (true/false)
 
 **Response:**
+
 ```json
 {
   "metadata": {
@@ -164,6 +168,7 @@ GET /microscope/api/traces/{trace_id}
 ```
 
 **Response:**
+
 ```json
 {
   "trace_id": "abc123...",
@@ -189,7 +194,7 @@ GET /microscope/api/traces/{trace_id}
 
 ## Database Schema
 
-MicroScope uses SQLite with the following schema:
+Microscope uses SQLite with the following schema:
 
 ### Logs Table
 
@@ -244,7 +249,7 @@ go test ./...
 
 ### Database Migrations
 
-Migrations are handled automatically using Goose when MicroScope starts. The migration files are embedded in the binary.
+Migrations are handled automatically using Goose when Microscope starts. The migration files are embedded in the binary.
 
 ### Code Generation
 
@@ -257,7 +262,7 @@ sqlc generate
 
 ## Architecture
 
-MicroScope consists of several key components:
+Microscope consists of several key components:
 
 1. **Custom OpenTelemetry Exporter**: Writes spans to SQLite asynchronously
 2. **Custom Zerolog Writer**: Writes logs to SQLite with trace correlation
@@ -266,6 +271,7 @@ MicroScope consists of several key components:
 5. **Migrations**: Automatic database schema management with Goose
 
 The system is designed to be:
+
 - **Non-blocking**: All database writes happen asynchronously
 - **Performant**: Batched writes to minimize database overhead
 - **Reliable**: Graceful shutdown ensures data integrity

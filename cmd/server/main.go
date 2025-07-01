@@ -92,7 +92,7 @@ func main() {
 
 	// Start server
 	log.Info().Msg("Server starting on :1323")
-	log.Info().Msg("MicroScope API available at /microscope/api")
+	log.Info().Msg("Microscope API available at /microscope/api")
 	log.Info().Msg("Example routes: /hello, /slow, /error")
 
 	// Graceful shutdown
@@ -342,5 +342,5 @@ func errorHandler(c echo.Context) error {
 	err := fmt.Errorf("this is a simulated error for testing")
 	span.RecordError(err)
 
-	return echo.NewHTTPError(500, "Simulated error for testing MicroScope")
+	return echo.NewHTTPError(500, "Simulated error for testing Microscope")
 }

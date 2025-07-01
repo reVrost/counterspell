@@ -2,16 +2,16 @@
 
 # Default target
 help: ## Show available commands
-	@echo "MicroScope - Available commands:"
+	@echo "Microscope - Available commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 # Development
 dev: generate migrate ## Start development server with hot reloading
-	@echo "🚀 Starting MicroScope in development mode..."
+	@echo "🚀 Starting Microscope in development mode..."
 	MICROSCOPE_AUTH_TOKEN=dev-token air
 
 run: generate migrate ## Run the server
-	@echo "🚀 Starting MicroScope server..."
+	@echo "🚀 Starting Microscope server..."
 	MICROSCOPE_AUTH_TOKEN=dev-token go run ./cmd/server
 
 # Code generation
