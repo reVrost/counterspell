@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -50,8 +51,28 @@ func main() {
 	// Initialize API handlers
 	apiHandler := microscope.NewAPIHandler(db)
 
-	// Register microscope API routes
-	api := e.Group("/microscope/api")
+	// Get auth token from environment
+	authToken := os.Getenv("MICROSCOPE_AUTH_TOKEN")
+	if authToken == "" {
+		authToken = "dev-token" // Default for development
+	}
+
+	// Custom middleware to check for secret query parameter
+	secretAuth := func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			secret := c.QueryParam("secret")
+			if secret == "" {
+				return echo.NewHTTPError(http.StatusBadRequest, "secret query parameter is required")
+			}
+			if secret != authToken {
+				return echo.NewHTTPError(http.StatusUnauthorized, "invalid secret")
+			}
+			return next(c)
+		}
+	}
+
+	// Register microscope API routes with authentication
+	api := e.Group("/microscope/api", secretAuth)
 	api.GET("/logs", apiHandler.QueryLogs)
 	api.GET("/traces", apiHandler.QueryTraces)
 	api.GET("/traces/:trace_id", apiHandler.GetTraceDetails)
@@ -154,8 +175,8 @@ func initObservability(db *sql.DB) (func(), error) {
 
 	// Configure zerolog with multiple outputs
 	multiWriter := zerolog.MultiLevelWriter(
-		os.Stdout,    // Console output for development
-		logWriter,    // SQLite storage
+		os.Stdout, // Console output for development
+		logWriter, // SQLite storage
 	)
 
 	// Configure global logger with trace context hook
@@ -170,18 +191,18 @@ func initObservability(db *sql.DB) (func(), error) {
 	// Return cleanup function
 	return func() {
 		log.Info().Msg("Shutting down observability...")
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		if err := tp.Shutdown(ctx); err != nil {
 			log.Error().Err(err).Msg("Failed to shutdown tracer provider")
 		}
-		
+
 		if err := logWriter.Close(); err != nil {
 			log.Error().Err(err).Msg("Failed to close log writer")
 		}
-		
+
 		log.Info().Msg("Observability shutdown complete")
 	}, nil
 }
@@ -202,13 +223,13 @@ func (h TracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 // tracingMiddleware adds OpenTelemetry tracing to HTTP requests
 func tracingMiddleware() echo.MiddlewareFunc {
 	tracer := otel.Tracer("microscope-http")
-	
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			req := c.Request()
-			
+
 			// Start a new span for the HTTP request
-			ctx, span := tracer.Start(req.Context(), 
+			ctx, span := tracer.Start(req.Context(),
 				fmt.Sprintf("%s %s", req.Method, req.URL.Path),
 				oteltrace.WithAttributes(
 					attribute.String("http.method", req.Method),
@@ -266,7 +287,7 @@ func helloHandler(c echo.Context) error {
 	log.Info().Msg("Hello request completed successfully")
 
 	return c.JSON(200, map[string]string{
-		"message": "Hello, World!",
+		"message":  "Hello, World!",
 		"trace_id": span.SpanContext().TraceID().String(),
 	})
 }
@@ -283,11 +304,11 @@ func slowHandler(c echo.Context) error {
 	// Simulate slow work with sub-spans
 	for i := 0; i < 3; i++ {
 		_, subSpan := tracer.Start(ctx, fmt.Sprintf("slow-step-%d", i+1))
-		
+
 		log.Info().
 			Int("step", i+1).
 			Msg("Processing slow step")
-		
+
 		time.Sleep(200 * time.Millisecond)
 		subSpan.End()
 	}
@@ -295,9 +316,9 @@ func slowHandler(c echo.Context) error {
 	log.Info().Msg("Slow operation completed")
 
 	return c.JSON(200, map[string]interface{}{
-		"message": "Slow operation completed",
+		"message":     "Slow operation completed",
 		"duration_ms": 600,
-		"trace_id": span.SpanContext().TraceID().String(),
+		"trace_id":    span.SpanContext().TraceID().String(),
 	})
 }
 
@@ -322,4 +343,4 @@ func errorHandler(c echo.Context) error {
 	span.RecordError(err)
 
 	return echo.NewHTTPError(500, "Simulated error for testing MicroScope")
-} 
+}

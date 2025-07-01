@@ -57,9 +57,8 @@ func TestInstall_WithOptions(t *testing.T) {
 		t.Fatalf("Install with options failed: %v", err)
 	}
 
-	// Test API endpoint with custom token
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
-	req.Header.Set("Authorization", "Bearer custom-token")
+	// Test API endpoint with custom token using query parameter
+	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=custom-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -142,19 +141,18 @@ func TestInstall_APIEndpointAuthentication(t *testing.T) {
 		t.Fatalf("Install failed: %v", err)
 	}
 
-	// Test API endpoint without auth (should fail)
+	// Test API endpoint without secret parameter (should fail)
 	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusUnauthorized {
-		t.Errorf("Expected unauthorized or bad request status, got %d", rec.Code)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected bad request status, got %d", rec.Code)
 	}
 
-	// Test API endpoint with wrong token (should fail)
-	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
-	req.Header.Set("Authorization", "Bearer wrong-token")
+	// Test API endpoint with wrong secret (should fail)
+	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=wrong-token", nil)
 	rec = httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -163,9 +161,8 @@ func TestInstall_APIEndpointAuthentication(t *testing.T) {
 		t.Errorf("Expected unauthorized status with wrong token, got %d", rec.Code)
 	}
 
-	// Test API endpoint with correct token (should succeed)
-	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
-	req.Header.Set("Authorization", "Bearer secret-token")
+	// Test API endpoint with correct secret (should succeed)
+	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=secret-token", nil)
 	rec = httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -307,8 +304,7 @@ func TestInstall_EnvVarAuthToken(t *testing.T) {
 	}
 
 	// Test that the environment variable token works
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
-	req.Header.Set("Authorization", "Bearer env-token")
+	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=env-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -336,8 +332,7 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 	}
 
 	// Test that the option token works (not env var)
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
-	req.Header.Set("Authorization", "Bearer option-token")
+	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=option-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -347,8 +342,7 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 	}
 
 	// Test that env var token no longer works
-	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
-	req.Header.Set("Authorization", "Bearer env-token")
+	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=env-token", nil)
 	rec = httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -360,14 +354,14 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		func() bool {
-			for i := 1; i <= len(s)-len(substr); i++ {
-				if s[i:i+len(substr)] == substr {
-					return true
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			func() bool {
+				for i := 1; i <= len(s)-len(substr); i++ {
+					if s[i:i+len(substr)] == substr {
+						return true
+					}
 				}
-			}
-			return false
-		}())))
-} 
+				return false
+			}())))
+}

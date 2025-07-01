@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog"
@@ -50,9 +50,9 @@ func WithAuthToken(token string) Option {
 
 // MicroScope holds the internal state for the observability system
 type MicroScope struct {
-	db            *sql.DB
+	db             *sql.DB
 	tracerProvider *trace.TracerProvider
-	logWriter     *microscope.SQLiteLogWriter
+	logWriter      *microscope.SQLiteLogWriter
 }
 
 // Install initializes MicroScope with the provided Echo instance
@@ -101,7 +101,7 @@ func initDatabase(dbPath string) (*sql.DB, error) {
 	}
 
 	goose.SetBaseFS(migrationsFS)
-	
+
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to set goose dialect: %w", err)
@@ -137,9 +137,9 @@ func setupObservability(db *sql.DB) (*MicroScope, error) {
 	otel.SetTracerProvider(tp)
 
 	return &MicroScope{
-		db:            db,
+		db:             db,
 		tracerProvider: tp,
-		logWriter:     logWriter,
+		logWriter:      logWriter,
 	}, nil
 }
 
@@ -170,9 +170,21 @@ func registerRoutes(e *echo.Echo, db *sql.DB, authToken string) {
 
 	microscopeGroup := e.Group("/microscope")
 
-	apiGroup := microscopeGroup.Group("/api", middleware.KeyAuth(func(key string, c echo.Context) (bool, error) {
-		return key == authToken, nil
-	}))
+	// Custom middleware to check for secret query parameter
+	secretAuth := func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			secret := c.QueryParam("secret")
+			if secret == "" {
+				return echo.NewHTTPError(http.StatusBadRequest, "secret query parameter is required")
+			}
+			if secret != authToken {
+				return echo.NewHTTPError(http.StatusUnauthorized, "invalid secret")
+			}
+			return next(c)
+		}
+	}
+
+	apiGroup := microscopeGroup.Group("/api", secretAuth)
 
 	apiGroup.GET("/logs", handler.QueryLogs)
 	apiGroup.GET("/traces", handler.QueryTraces)
@@ -207,4 +219,4 @@ func registerShutdownHook(e *echo.Echo, ms *MicroScope) {
 
 		log.Info().Msg("MicroScope shutdown complete")
 	})
-} 
+}

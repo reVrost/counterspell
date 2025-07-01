@@ -13,7 +13,9 @@ func main() {
 	// --- MICROSCOPE: ONE-LINER INSTALLATION ---
 	// The auth token is set via environment variable:
 	// $ export MICROSCOPE_AUTH_TOKEN="my-secret-token"
-	if err := microscope.Install(e); err != nil {
+	if err := microscope.Install(e,
+		microscope.WithAuthToken("secret"),
+	); err != nil {
 		log.Fatal().Err(err).Msg("Failed to install MicroScope")
 	}
 	// That's it. It's installed, configured, and will shut down gracefully.
