@@ -278,7 +278,7 @@ The system is designed to be:
 
 ## License
 
-Apache License 2.0
+MIT
 
 ## Contributing
 
