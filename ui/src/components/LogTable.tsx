@@ -18,12 +18,13 @@ import classes from "./LogTable.module.css";
 import {
   IconArrowRight,
   IconChevronRight,
+  IconRefresh,
   IconSearch,
   IconX,
 } from "@tabler/icons-react";
 import { type ApiResponse, Log } from "../utils/types";
 import { api } from "../utils/api";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR, { mutate } from "swr";
 import { notifications } from "@mantine/notifications";
 import { useDisclosure, useLocalStorage } from "@mantine/hooks";
 import { useSearchParams } from "react-router-dom";
@@ -36,8 +37,6 @@ export function LogTable() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filter, setFilter] = useState(searchParams.get("q") || "");
   const [level, setLevel] = useState(searchParams.get("level") || "");
-
-  const { mutate } = useSWRConfig();
 
   const fetcher = async (url: string) => {
     const res = await api.get(url, {
@@ -219,18 +218,23 @@ export function LogTable() {
             }
           }}
         />
-        <Select
-          maw="20%"
-          placeholder="Log level"
-          value={level}
-          onChange={(value) => setLevel(value || "")}
-          data={[
-            { value: "debug", label: "Debug" },
-            { value: "info", label: "Info" },
-            { value: "warn", label: "Warn" },
-            { value: "error", label: "Error" },
-          ]}
-        />
+
+        <Group maw="20%">
+          <ActionIcon variant="subtle" onClick={() => mutate("logs")}>
+            <IconRefresh />
+          </ActionIcon>
+          <Select
+            placeholder="Log level"
+            value={level}
+            onChange={(value) => setLevel(value || "")}
+            data={[
+              { value: "debug", label: "Debug" },
+              { value: "info", label: "Info" },
+              { value: "warn", label: "Warn" },
+              { value: "error", label: "Error" },
+            ]}
+          />
+        </Group>
       </Group>
       <ScrollArea>
         <Table
