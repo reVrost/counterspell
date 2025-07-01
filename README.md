@@ -1,4 +1,4 @@
-# MicroScope
+# Microscope
 
 A lightweight, embedded observability tool for Go applications that provides OpenTelemetry tracing and logging capabilities with a local SQLite database backend and REST API for data querying.
 
