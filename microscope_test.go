@@ -2,6 +2,7 @@ package microscope
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInstall_Success(t *testing.T) {
@@ -350,6 +352,55 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("Environment auth token should be overridden, expected 401, got %d", rec.Code)
 	}
+}
+
+func TestAddToEcho_Success(t *testing.T) {
+	// Clean up any existing test databases
+	os.Remove("test_add_echo.db")
+	defer os.Remove("test_add_echo.db")
+
+	e := echo.New()
+	err := AddToEcho(e, WithDBPath("test_add_echo.db"), WithAuthToken("test-token"))
+
+	assert.NoError(t, err)
+	assert.NotNil(t, e)
+}
+
+func TestAddToStdlib_Success(t *testing.T) {
+	// Clean up any existing test databases
+	os.Remove("test_add_stdlib.db")
+	defer os.Remove("test_add_stdlib.db")
+
+	mux := http.NewServeMux()
+	ms, err := AddToStdlib(mux, WithDBPath("test_add_stdlib.db"), WithAuthToken("test-token"))
+
+	assert.NoError(t, err)
+	assert.NotNil(t, ms)
+	assert.NotNil(t, mux)
+}
+
+func TestAddToStdlib_HealthEndpoint(t *testing.T) {
+	// Clean up any existing test databases
+	os.Remove("test_stdlib_health.db")
+	defer os.Remove("test_stdlib_health.db")
+
+	mux := http.NewServeMux()
+	_, err := AddToStdlib(mux, WithDBPath("test_stdlib_health.db"), WithAuthToken("test-token"))
+	assert.NoError(t, err)
+
+	// Test the health endpoint
+	req := httptest.NewRequest("GET", "/microscope/health", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
+
+	var response map[string]string
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "healthy", response["status"])
+	assert.Equal(t, "microscope", response["service"])
 }
 
 // Helper function to check if a string contains a substring

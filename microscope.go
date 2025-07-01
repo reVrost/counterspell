@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"time"
 
@@ -55,8 +57,14 @@ type MicroScope struct {
 	logWriter      *microscope.SQLiteLogWriter
 }
 
-// Install initializes MicroScope with the provided Echo instance
+// Install is deprecated. Use AddToEcho instead.
+// This function is kept for backward compatibility.
 func Install(e *echo.Echo, opts ...Option) error {
+	return AddToEcho(e, opts...)
+}
+
+// AddToEcho initializes MicroScope with the provided Echo instance
+func AddToEcho(e *echo.Echo, opts ...Option) error {
 	cfg := &config{
 		dbPath:    "microscope.db",
 		authToken: os.Getenv("MICROSCOPE_AUTH_TOKEN"),
@@ -82,11 +90,44 @@ func Install(e *echo.Echo, opts ...Option) error {
 	}
 
 	configureGlobalLogger(ms.logWriter)
-	registerRoutes(e, db, cfg.authToken)
-	registerShutdownHook(e, ms)
+	registerEchoRoutes(e, db, cfg.authToken)
+	registerEchoShutdownHook(e, ms)
 
 	log.Info().Str("db_path", cfg.dbPath).Msg("MicroScope installed successfully")
 	return nil
+}
+
+// AddToStdlib initializes MicroScope with the provided standard library ServeMux
+func AddToStdlib(mux *http.ServeMux, opts ...Option) (*MicroScope, error) {
+	cfg := &config{
+		dbPath:    "microscope.db",
+		authToken: os.Getenv("MICROSCOPE_AUTH_TOKEN"),
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	if cfg.authToken == "" {
+		return nil, fmt.Errorf("auth token is required: set MICROSCOPE_AUTH_TOKEN environment variable or use WithAuthToken option")
+	}
+
+	db, err := initDatabase(cfg.dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	ms, err := setupObservability(db)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to setup observability: %w", err)
+	}
+
+	configureGlobalLogger(ms.logWriter)
+	registerStdlibRoutes(mux, db, cfg.authToken)
+
+	log.Info().Str("db_path", cfg.dbPath).Msg("MicroScope installed successfully")
+	return ms, nil
 }
 
 func initDatabase(dbPath string) (*sql.DB, error) {
@@ -165,7 +206,7 @@ func (h tracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	}
 }
 
-func registerRoutes(e *echo.Echo, db *sql.DB, authToken string) {
+func registerEchoRoutes(e *echo.Echo, db *sql.DB, authToken string) {
 	handler := microscope.NewAPIHandler(db)
 
 	microscopeGroup := e.Group("/microscope")
@@ -198,7 +239,146 @@ func registerRoutes(e *echo.Echo, db *sql.DB, authToken string) {
 	})
 }
 
-func registerShutdownHook(e *echo.Echo, ms *MicroScope) {
+func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
+	apiHandler := microscope.NewAPIHandler(db)
+
+	// Create auth middleware wrapper for stdlib
+	withAuth := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			secret := r.URL.Query().Get("secret")
+			if secret == "" {
+				http.Error(w, "secret query parameter is required", http.StatusBadRequest)
+				return
+			}
+			if secret != authToken {
+				http.Error(w, "invalid secret", http.StatusUnauthorized)
+				return
+			}
+			next(w, r)
+		}
+	}
+
+	// Create native stdlib handlers instead of trying to adapt Echo handlers
+	logsHandler := withAuth(func(w http.ResponseWriter, r *http.Request) {
+		// Call the API logic through a temporary Echo context wrapper
+		e := echo.New()
+		c := e.NewContext(r, httptest.NewRecorder())
+		c.SetRequest(r)
+
+		// Set query params on the context
+		for key, values := range r.URL.Query() {
+			for _, value := range values {
+				c.QueryParams()[key] = append(c.QueryParams()[key], value)
+			}
+		}
+
+		// Call the handler
+		if err := apiHandler.QueryLogs(c); err != nil {
+			if httpErr, ok := err.(*echo.HTTPError); ok {
+				http.Error(w, httpErr.Message.(string), httpErr.Code)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Copy response from echo recorder to actual response
+		recorder := c.Response().Writer.(*httptest.ResponseRecorder)
+		for key, values := range recorder.Header() {
+			for _, value := range values {
+				w.Header().Add(key, value)
+			}
+		}
+		w.WriteHeader(recorder.Code)
+		w.Write(recorder.Body.Bytes())
+	})
+
+	tracesHandler := withAuth(func(w http.ResponseWriter, r *http.Request) {
+		e := echo.New()
+		c := e.NewContext(r, httptest.NewRecorder())
+		c.SetRequest(r)
+
+		// Set query params on the context
+		for key, values := range r.URL.Query() {
+			for _, value := range values {
+				c.QueryParams()[key] = append(c.QueryParams()[key], value)
+			}
+		}
+
+		if err := apiHandler.QueryTraces(c); err != nil {
+			if httpErr, ok := err.(*echo.HTTPError); ok {
+				http.Error(w, httpErr.Message.(string), httpErr.Code)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		recorder := c.Response().Writer.(*httptest.ResponseRecorder)
+		for key, values := range recorder.Header() {
+			for _, value := range values {
+				w.Header().Add(key, value)
+			}
+		}
+		w.WriteHeader(recorder.Code)
+		w.Write(recorder.Body.Bytes())
+	})
+
+	traceDetailsHandler := withAuth(func(w http.ResponseWriter, r *http.Request) {
+		// Extract trace_id from URL path
+		path := r.URL.Path
+		traceID := ""
+		if len(path) > len("/microscope/api/traces/") {
+			traceID = path[len("/microscope/api/traces/"):]
+		}
+
+		if traceID == "" {
+			http.Error(w, "trace_id is required", http.StatusBadRequest)
+			return
+		}
+
+		e := echo.New()
+		c := e.NewContext(r, httptest.NewRecorder())
+		c.SetRequest(r)
+		c.SetParamNames("trace_id")
+		c.SetParamValues(traceID)
+
+		if err := apiHandler.GetTraceDetails(c); err != nil {
+			if httpErr, ok := err.(*echo.HTTPError); ok {
+				http.Error(w, httpErr.Message.(string), httpErr.Code)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		recorder := c.Response().Writer.(*httptest.ResponseRecorder)
+		for key, values := range recorder.Header() {
+			for _, value := range values {
+				w.Header().Add(key, value)
+			}
+		}
+		w.WriteHeader(recorder.Code)
+		w.Write(recorder.Body.Bytes())
+	})
+
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "healthy",
+			"service": "microscope",
+		})
+	}
+
+	// Register routes
+	mux.HandleFunc("/microscope/api/logs", logsHandler)
+	mux.HandleFunc("/microscope/api/traces", tracesHandler)
+	mux.HandleFunc("/microscope/api/traces/", traceDetailsHandler) // Note: trailing slash for path pattern matching
+	mux.HandleFunc("/microscope/health", healthHandler)
+}
+
+func registerEchoShutdownHook(e *echo.Echo, ms *MicroScope) {
 	e.Server.RegisterOnShutdown(func() {
 		log.Info().Msg("MicroScope shutting down...")
 
