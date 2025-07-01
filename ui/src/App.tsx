@@ -7,7 +7,9 @@ import SettingsPage from "./pages/Settings";
 
 function App() {
   return (
-    <AppShell navbar={{ width: 180, breakpoint: "sm" }}>
+    <AppShell
+      navbar={{ width: 180, breakpoint: "sm", collapsed: { mobile: true } }}
+    >
       <AppShell.Navbar>
         <NavBar />
       </AppShell.Navbar>

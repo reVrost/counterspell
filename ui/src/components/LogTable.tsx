@@ -1,37 +1,54 @@
 import { useEffect, useState } from "react";
 import cx from "clsx";
 import {
+  ActionIcon,
   Badge,
   Checkbox,
   Code,
   Drawer,
-  Text,
   Group,
   ScrollArea,
+  Select,
   Table,
+  Text,
+  TextInput,
   useMantineTheme,
 } from "@mantine/core";
 import classes from "./LogTable.module.css";
-import { IconChevronRight, IconX } from "@tabler/icons-react";
+import {
+  IconArrowRight,
+  IconChevronRight,
+  IconSearch,
+  IconX,
+} from "@tabler/icons-react";
 import { type ApiResponse, Log } from "../utils/types";
 import { api } from "../utils/api";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { notifications } from "@mantine/notifications";
 import { useDisclosure, useLocalStorage } from "@mantine/hooks";
+import { useSearchParams } from "react-router-dom";
 
 export function LogTable() {
   const [secret] = useLocalStorage<string>({
     key: "secret-token",
     defaultValue: "",
   });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filter, setFilter] = useState(searchParams.get("q") || "");
+  const [level, setLevel] = useState(searchParams.get("level") || "");
+
+  const { mutate } = useSWRConfig();
+
   const fetcher = async (url: string) => {
-    const res = await api.get(url, { params: { secret } });
+    const res = await api.get(url, {
+      params: { secret, q: filter, level },
+    });
     return res.data;
   };
   const theme = useMantineTheme();
 
   const { data: response, error } = useSWR<ApiResponse<Log>>(
-    secret && "/logs",
+    secret ? `/logs?q=${filter}&level=${level}` : null,
     fetcher,
   );
   const data = response?.data || [];
@@ -47,6 +64,10 @@ export function LogTable() {
       });
     }
   }, [error]);
+
+  useEffect(() => {
+    setSearchParams({ q: filter, level });
+  }, [filter, level, setSearchParams]);
 
   const [selection, setSelection] = useState<string[]>([]);
   const [opened, { open, close }] = useDisclosure(false);
@@ -103,7 +124,7 @@ export function LogTable() {
         </Table.Td>
         <Table.Td>
           <Group justify="space-between">
-            {item.timestamp}
+            {new Date(item.timestamp).toLocaleString()}
             <IconChevronRight size={16} color={theme.colors.gray[5]} />
           </Group>
         </Table.Td>
@@ -138,6 +159,10 @@ export function LogTable() {
       }
     : {};
 
+  const handleSearch = () => {
+    mutate(`/logs?q=${filter}&level=${level}`);
+  };
+
   return (
     <>
       <Drawer
@@ -168,6 +193,45 @@ export function LogTable() {
           </Table>
         )}
       </Drawer>
+      <Group justify="space-between" align="center">
+        <TextInput
+          radius="xl"
+          miw="80%"
+          rightSectionWidth={42}
+          leftSection={<IconSearch size={18} stroke={1.5} />}
+          rightSection={
+            <ActionIcon
+              size={32}
+              radius="xl"
+              color={theme.primaryColor}
+              variant="filled"
+              onClick={handleSearch}
+            >
+              <IconArrowRight size={18} stroke={1.5} />
+            </ActionIcon>
+          }
+          placeholder="Search term or filter"
+          value={filter}
+          onChange={(event) => setFilter(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              handleSearch();
+            }
+          }}
+        />
+        <Select
+          maw="20%"
+          placeholder="Log level"
+          value={level}
+          onChange={(value) => setLevel(value || "")}
+          data={[
+            { value: "debug", label: "Debug" },
+            { value: "info", label: "Info" },
+            { value: "warn", label: "Warn" },
+            { value: "error", label: "Error" },
+          ]}
+        />
+      </Group>
       <ScrollArea>
         <Table
           miw={800}
@@ -187,10 +251,10 @@ export function LogTable() {
                   }
                 />
               </Table.Th>
-              <Table.Th w={150}>Level</Table.Th>
+              <Table.Th w={200}>Level</Table.Th>
               <Table.Th>Message</Table.Th>
               <Table.Th>Attributes</Table.Th>
-              <Table.Th w={250}>Created</Table.Th>
+              <Table.Th w={200}>Created</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>{rows}</Table.Tbody>
