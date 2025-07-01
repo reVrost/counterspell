@@ -22,7 +22,7 @@ func main() {
 
 	// Add your application routes
 	mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
-		log.Ctx(r.Context()).Debug().Msg("Hello from stdlib router with Microscope!")
+		log.Ctx(r.Context()).Debug().Str("user", "demo").Msg("Hello from stdlib router with Microscope!")
 		log.Ctx(r.Context()).Error().Msg("Hello from stdlib router with Microscope!")
 		w.Write([]byte("Hello from stdlib router with Microscope!"))
 	})

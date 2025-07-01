@@ -2,6 +2,7 @@ export interface Log {
   id: string;
   level: string;
   message: string;
+  attributes: any;
   timestamp: string;
 }
 

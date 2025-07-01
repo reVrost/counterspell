@@ -23,7 +23,7 @@ func main() {
 
 	// Add your application routes
 	e.GET("/hello", func(c echo.Context) error {
-		log.Ctx(c.Request().Context()).Debug().Msg("Hello from Echo with Microscope!")
+		log.Ctx(c.Request().Context()).Debug().Str("user", "demo").Msg("Hello from Echo with Microscope!")
 		log.Ctx(c.Request().Context()).Error().Msg("Hello from Echo with Microscope!")
 		return c.String(http.StatusOK, "Hello from Echo with Microscope!")
 	})

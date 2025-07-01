@@ -8,7 +8,7 @@ import {
   useMantineTheme,
 } from "@mantine/core";
 import { IconArrowRight, IconRefresh, IconSearch } from "@tabler/icons-react";
-import { TableSelection } from "../components/TableSelection";
+import { LogTable } from "../components/LogTable";
 
 export default function LogsPage() {
   const theme = useMantineTheme();
@@ -39,7 +39,7 @@ export default function LogsPage() {
           }
           placeholder="Search term or filter like 'level > 0'"
         />
-        <TableSelection />
+        <LogTable />
       </Stack>
     </Container>
   );
