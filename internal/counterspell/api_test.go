@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/your-github-username/microscope/internal/db"
+	"github.com/your-github-username/counterspell/internal/db"
 )
 
 func setupAPITestDB(t *testing.T) *sql.DB {
@@ -157,17 +157,17 @@ func createTestEcho(database *sql.DB, authToken string) *echo.Echo {
 		}
 	}
 
-	api := e.Group("/microscope/api", secretAuth)
+	api := e.Group("/counterspell/api", secretAuth)
 
 	api.GET("/logs", handler.QueryLogs)
 	api.GET("/traces", handler.QueryTraces)
 	api.GET("/traces/:trace_id", handler.GetTraceDetails)
 
 	// Add health endpoint (no auth required)
-	e.GET("/microscope/health", func(c echo.Context) error {
+	e.GET("/counterspell/health", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{
 			"status":  "healthy",
-			"service": "microscope",
+			"service": "counterspell",
 		})
 	})
 
@@ -183,7 +183,7 @@ func TestAPIHandler_QueryLogs(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test successful request with secret parameter
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?limit=10&secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?limit=10&secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -219,7 +219,7 @@ func TestAPIHandler_QueryLogsWithFilters(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test level filter
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?level=error&secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?level=error&secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -249,7 +249,7 @@ func TestAPIHandler_QueryLogsUnauthorized(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test request without secret parameter
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -266,7 +266,7 @@ func TestAPIHandler_QueryLogsWrongToken(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test request with wrong secret
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=wrong-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=wrong-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -285,7 +285,7 @@ func TestAPIHandler_QueryTraces(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test successful request
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/traces?limit=10&secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/traces?limit=10&secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -319,7 +319,7 @@ func TestAPIHandler_QueryTracesWithErrorFilter(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test has_error filter
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/traces?has_error=true&secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/traces?has_error=true&secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -352,7 +352,7 @@ func TestAPIHandler_GetTraceDetails(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test successful request
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/traces/trace123?secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/traces/trace123?secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -390,7 +390,7 @@ func TestAPIHandler_GetTraceDetailsNotFound(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test non-existent trace
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/traces/nonexistent?secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/traces/nonexistent?secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -407,7 +407,7 @@ func TestAPIHandler_HealthEndpoint(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test health endpoint (no auth required)
-	req := httptest.NewRequest(http.MethodGet, "/microscope/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/health", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -424,8 +424,8 @@ func TestAPIHandler_HealthEndpoint(t *testing.T) {
 	if response["status"] != "healthy" {
 		t.Errorf("Expected status 'healthy', got '%s'", response["status"])
 	}
-	if response["service"] != "microscope" {
-		t.Errorf("Expected service 'microscope', got '%s'", response["service"])
+	if response["service"] != "counterspell" {
+		t.Errorf("Expected service 'counterspell', got '%s'", response["service"])
 	}
 }
 
@@ -438,7 +438,7 @@ func TestAPIHandler_QueryLogsTextSearch(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test text search
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?q=error&secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?q=error&secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -472,7 +472,7 @@ func TestAPIHandler_QueryLogsPagination(t *testing.T) {
 	e := createTestEcho(database, "test-token")
 
 	// Test pagination
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?limit=2&offset=1&secret=test-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?limit=2&offset=1&secret=test-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)

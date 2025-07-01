@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/your-github-username/microscope/internal/db"
+	"github.com/your-github-username/counterspell/internal/db"
 )
 
 func setupLogTestDB(t *testing.T) *sql.DB {
@@ -302,13 +302,13 @@ func TestSQLiteLogWriter_ConcurrentWrites(t *testing.T) {
 	// Test concurrent writes
 	const numGoroutines = 10
 	const logsPerGoroutine = 20
-	
+
 	done := make(chan bool, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
 		go func(routineID int) {
 			defer func() { done <- true }()
-			
+
 			for j := 0; j < logsPerGoroutine; j++ {
 				logJSON := `{
 					"level": "info",
@@ -394,7 +394,7 @@ func TestSQLiteLogWriter_Close(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Errorf("Expected to find the pre-close log, but it wasn't found")
 	}
@@ -404,4 +404,4 @@ func TestSQLiteLogWriter_Close(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error when writing to closed writer, got nil")
 	}
-} 
+}

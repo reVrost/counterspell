@@ -19,7 +19,7 @@ function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
   return (
     <NavLink
       className={classes.navlink}
-      to={"microscope/" + path}
+      to={"counterspell/" + path}
       style={({ isActive }) => {
         return {
           color: isActive

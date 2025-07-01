@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"database/sql"
@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/your-github-username/microscope/internal/db"
+	"github.com/your-github-username/counterspell/internal/db"
 )
 
-// APIHandler handles HTTP requests for the microscope API
+// APIHandler handles HTTP requests for the counterspell API
 type APIHandler struct {
 	queries *db.Queries
 	db      *sql.DB
@@ -74,7 +74,7 @@ type LogItem struct {
 	Attributes map[string]any `json:"attributes"`
 }
 
-// QueryLogs handles GET /microscope/api/logs
+// QueryLogs handles GET /counterspell/api/logs
 func (h *APIHandler) QueryLogs(c echo.Context) error {
 	// Parse query parameters
 	limit := parseIntParam(c.QueryParam("limit"), 100)
@@ -211,7 +211,7 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// QueryTraces handles GET /microscope/api/traces
+// QueryTraces handles GET /counterspell/api/traces
 func (h *APIHandler) QueryTraces(c echo.Context) error {
 	// Parse query parameters
 	limit := parseIntParam(c.QueryParam("limit"), 100)
@@ -306,7 +306,7 @@ func (h *APIHandler) QueryTraces(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// GetTraceDetails handles GET /microscope/api/traces/:trace_id
+// GetTraceDetails handles GET /counterspell/api/traces/:trace_id
 func (h *APIHandler) GetTraceDetails(c echo.Context) error {
 	traceID := c.Param("trace_id")
 	if traceID == "" {

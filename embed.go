@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import "embed"
 

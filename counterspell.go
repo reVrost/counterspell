@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/your-github-username/microscope/internal/microscope"
+	"github.com/your-github-username/counterspell/internal/counterspell"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -27,7 +27,7 @@ import (
 //go:embed db/migrations/*.sql
 var migrationsFS embed.FS
 
-// config holds the configuration for Microscope
+// config holds the configuration for Counterspell
 type config struct {
 	dbPath        string
 	authToken     string
@@ -35,7 +35,7 @@ type config struct {
 	serviceVesion string
 }
 
-// Option represents a configuration option for Microscope
+// Option represents a configuration option for Counterspell
 type Option func(*config)
 
 // WithDBPath sets the database path
@@ -66,11 +66,11 @@ func WithServiceVersion(version string) Option {
 	}
 }
 
-// Microscope holds the internal state for the observability system
-type Microscope struct {
+// Counterspell holds the internal state for the observability system
+type Counterspell struct {
 	db             *sql.DB
 	tracerProvider *trace.TracerProvider
-	logWriter      *microscope.SQLiteLogWriter
+	logWriter      *counterspell.SQLiteLogWriter
 }
 
 // Install is deprecated. Use AddToEcho instead.
@@ -79,12 +79,12 @@ func Install(e *echo.Echo, opts ...Option) error {
 	return AddToEcho(e, opts...)
 }
 
-// AddToEcho initializes Microscope with the provided Echo instance
+// AddToEcho initializes Counterspell with the provided Echo instance
 func AddToEcho(e *echo.Echo, opts ...Option) error {
 	cfg := &config{
-		dbPath:        "microscope.db",
-		authToken:     os.Getenv("MICROSCOPE_AUTH_TOKEN"),
-		serviceName:   "microscope-app",
+		dbPath:        "counterspell.db",
+		authToken:     os.Getenv("COUNTERSPELL_AUTH_TOKEN"),
+		serviceName:   "counterspell-app",
 		serviceVesion: "1.0.0",
 	}
 
@@ -93,7 +93,7 @@ func AddToEcho(e *echo.Echo, opts ...Option) error {
 	}
 
 	if cfg.authToken == "" {
-		return fmt.Errorf("auth token is required: set MICROSCOPE_AUTH_TOKEN environment variable or use WithAuthToken option")
+		return fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
 	}
 
 	db, err := initDatabase(cfg.dbPath)
@@ -113,16 +113,16 @@ func AddToEcho(e *echo.Echo, opts ...Option) error {
 	registerEchoRoutes(e, db, cfg.authToken)
 	registerEchoShutdownHook(e, ms)
 
-	log.Info().Str("db_path", cfg.dbPath).Msg("Microscope installed successfully")
+	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully")
 	return nil
 }
 
-// AddToStdlib initializes Microscope with the provided standard library ServeMux
-func AddToStdlib(mux *http.ServeMux, opts ...Option) (*Microscope, error) {
+// AddToStdlib initializes Counterspell with the provided standard library ServeMux
+func AddToStdlib(mux *http.ServeMux, opts ...Option) (*Counterspell, error) {
 	cfg := &config{
-		dbPath:        "microscope.db",
-		authToken:     os.Getenv("MICROSCOPE_AUTH_TOKEN"),
-		serviceName:   "microscope-app",
+		dbPath:        "counterspell.db",
+		authToken:     os.Getenv("COUNTERSPELL_AUTH_TOKEN"),
+		serviceName:   "counterspell-app",
 		serviceVesion: "1.0.0",
 	}
 
@@ -131,7 +131,7 @@ func AddToStdlib(mux *http.ServeMux, opts ...Option) (*Microscope, error) {
 	}
 
 	if cfg.authToken == "" {
-		return nil, fmt.Errorf("auth token is required: set MICROSCOPE_AUTH_TOKEN environment variable or use WithAuthToken option")
+		return nil, fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
 	}
 
 	db, err := initDatabase(cfg.dbPath)
@@ -148,7 +148,7 @@ func AddToStdlib(mux *http.ServeMux, opts ...Option) (*Microscope, error) {
 	configureGlobalLogger(ms.logWriter)
 	registerStdlibRoutes(mux, db, cfg.authToken)
 
-	log.Info().Str("db_path", cfg.dbPath).Msg("Microscope installed successfully")
+	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully")
 	return ms, nil
 }
 
@@ -178,9 +178,9 @@ func initDatabase(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Microscope, error) {
-	exporter := microscope.NewSQLiteSpanExporter(db)
-	logWriter := microscope.NewSQLiteLogWriter(db)
+func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Counterspell, error) {
+	exporter := counterspell.NewSQLiteSpanExporter(db)
+	logWriter := counterspell.NewSQLiteLogWriter(db)
 
 	res, err := resource.New(context.Background(),
 		resource.WithAttributes(
@@ -199,14 +199,14 @@ func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Micros
 
 	otel.SetTracerProvider(tp)
 
-	return &Microscope{
+	return &Counterspell{
 		db:             db,
 		tracerProvider: tp,
 		logWriter:      logWriter,
 	}, nil
 }
 
-func configureGlobalLogger(logWriter *microscope.SQLiteLogWriter) {
+func configureGlobalLogger(logWriter *counterspell.SQLiteLogWriter) {
 	multiWriter := zerolog.MultiLevelWriter(
 		zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339},
 		logWriter,
@@ -248,9 +248,9 @@ func loggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func registerEchoRoutes(e *echo.Echo, db *sql.DB, authToken string) {
-	handler := microscope.NewAPIHandler(db)
+	handler := counterspell.NewAPIHandler(db)
 
-	microscopeGroup := e.Group("/microscope")
+	counterspellGroup := e.Group("/counterspell")
 
 	// Custom middleware to check for secret query parameter
 	secretAuth := func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -266,22 +266,22 @@ func registerEchoRoutes(e *echo.Echo, db *sql.DB, authToken string) {
 		}
 	}
 
-	apiGroup := microscopeGroup.Group("/api", secretAuth)
+	apiGroup := counterspellGroup.Group("/api", secretAuth)
 
 	apiGroup.GET("/logs", handler.QueryLogs)
 	apiGroup.GET("/traces", handler.QueryTraces)
 	apiGroup.GET("/traces/:trace_id", handler.GetTraceDetails)
 
-	microscopeGroup.GET("/health", func(c echo.Context) error {
+	counterspellGroup.GET("/health", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{
 			"status":  "healthy",
-			"service": "microscope",
+			"service": "counterspell",
 		})
 	})
 }
 
 func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
-	apiHandler := microscope.NewAPIHandler(db)
+	apiHandler := counterspell.NewAPIHandler(db)
 
 	// Create auth middleware wrapper for stdlib
 	withAuth := func(next http.HandlerFunc) http.HandlerFunc {
@@ -369,8 +369,8 @@ func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
 		// Extract trace_id from URL path
 		path := r.URL.Path
 		traceID := ""
-		if len(path) > len("/microscope/api/traces/") {
-			traceID = path[len("/microscope/api/traces/"):]
+		if len(path) > len("/counterspell/api/traces/") {
+			traceID = path[len("/counterspell/api/traces/"):]
 		}
 
 		if traceID == "" {
@@ -408,20 +408,20 @@ func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "healthy",
-			"service": "microscope",
+			"service": "counterspell",
 		})
 	}
 
 	// Register routes
-	mux.HandleFunc("/microscope/api/logs", logsHandler)
-	mux.HandleFunc("/microscope/api/traces", tracesHandler)
-	mux.HandleFunc("/microscope/api/traces/", traceDetailsHandler) // Note: trailing slash for path pattern matching
-	mux.HandleFunc("/microscope/health", healthHandler)
+	mux.HandleFunc("/counterspell/api/logs", logsHandler)
+	mux.HandleFunc("/counterspell/api/traces", tracesHandler)
+	mux.HandleFunc("/counterspell/api/traces/", traceDetailsHandler) // Note: trailing slash for path pattern matching
+	mux.HandleFunc("/counterspell/health", healthHandler)
 }
 
-func registerEchoShutdownHook(e *echo.Echo, ms *Microscope) {
+func registerEchoShutdownHook(e *echo.Echo, ms *Counterspell) {
 	e.Server.RegisterOnShutdown(func() {
-		log.Info().Msg("Microscope shutting down...")
+		log.Info().Msg("Counterspell shutting down...")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -438,6 +438,6 @@ func registerEchoShutdownHook(e *echo.Echo, ms *Microscope) {
 			log.Error().Err(err).Msg("Failed to close database")
 		}
 
-		log.Info().Msg("Microscope shutdown complete")
+		log.Info().Msg("Counterspell shutdown complete")
 	})
 }

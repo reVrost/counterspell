@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/your-github-username/microscope/internal/db"
+	"github.com/your-github-username/counterspell/internal/db"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
@@ -216,7 +216,7 @@ func TestSQLiteSpanExporter_Shutdown(t *testing.T) {
 		ServiceName:  "test-service",
 		HasError:     false,
 	}
-	
+
 	select {
 	case exporter.spanChan <- spanData:
 	default:
@@ -271,13 +271,13 @@ func TestSQLiteSpanExporter_ConcurrentProcessing(t *testing.T) {
 	// Test concurrent span processing
 	const numGoroutines = 10
 	const spansPerGoroutine = 20
-	
+
 	done := make(chan bool, numGoroutines)
 
 	for i := 0; i < numGoroutines; i++ {
 		go func(routineID int) {
 			defer func() { done <- true }()
-			
+
 			for j := 0; j < spansPerGoroutine; j++ {
 				spanData := SpanData{
 					SpanID:       fmt.Sprintf("span-%d-%d", routineID, j), // Unique span IDs
@@ -291,7 +291,7 @@ func TestSQLiteSpanExporter_ConcurrentProcessing(t *testing.T) {
 					ServiceName:  "test-service",
 					HasError:     false,
 				}
-				
+
 				select {
 				case exporter.spanChan <- spanData:
 				case <-time.After(1 * time.Second):
@@ -321,4 +321,4 @@ func TestSQLiteSpanExporter_ConcurrentProcessing(t *testing.T) {
 	if len(dbSpans) != expectedTotal {
 		t.Errorf("Expected %d spans, got %d", expectedTotal, len(dbSpans))
 	}
-} 
+}

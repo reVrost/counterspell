@@ -16,7 +16,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/your-github-username/microscope/internal/microscope"
+	"github.com/your-github-username/counterspell/internal/counterspell"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -27,7 +27,7 @@ import (
 
 func main() {
 	// Initialize database
-	db, err := initDB("microscope.db")
+	db, err := initDB("counterspell.db")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize database")
 	}
@@ -49,10 +49,10 @@ func main() {
 	e.Use(tracingMiddleware())
 
 	// Initialize API handlers
-	apiHandler := microscope.NewAPIHandler(db)
+	apiHandler := counterspell.NewAPIHandler(db)
 
 	// Get auth token from environment
-	authToken := os.Getenv("MICROSCOPE_AUTH_TOKEN")
+	authToken := os.Getenv("COUNTERSPELL_AUTH_TOKEN")
 	if authToken == "" {
 		authToken = "dev-token" // Default for development
 	}
@@ -71,17 +71,17 @@ func main() {
 		}
 	}
 
-	// Register microscope API routes with authentication
-	api := e.Group("/microscope/api", secretAuth)
+	// Register counterspell API routes with authentication
+	api := e.Group("/counterspell/api", secretAuth)
 	api.GET("/logs", apiHandler.QueryLogs)
 	api.GET("/traces", apiHandler.QueryTraces)
 	api.GET("/traces/:trace_id", apiHandler.GetTraceDetails)
 
 	// Add health endpoint (no auth required)
-	e.GET("/microscope/health", func(c echo.Context) error {
+	e.GET("/counterspell/health", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{
 			"status":  "healthy",
-			"service": "microscope",
+			"service": "counterspell",
 		})
 	})
 
@@ -92,7 +92,7 @@ func main() {
 
 	// Start server
 	log.Info().Msg("Server starting on :1323")
-	log.Info().Msg("Microscope API available at /microscope/api")
+	log.Info().Msg("Counterspell API available at /counterspell/api")
 	log.Info().Msg("Example routes: /hello, /slow, /error")
 
 	// Graceful shutdown
@@ -148,12 +148,12 @@ func initDB(dbPath string) (*sql.DB, error) {
 // initObservability sets up OpenTelemetry tracing and logging
 func initObservability(db *sql.DB) (func(), error) {
 	// Create SQLite exporter
-	exporter := microscope.NewSQLiteSpanExporter(db)
+	exporter := counterspell.NewSQLiteSpanExporter(db)
 
 	// Create resource
 	res, err := resource.New(context.Background(),
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String("microscope-example"),
+			semconv.ServiceNameKey.String("counterspell-example"),
 			semconv.ServiceVersionKey.String("1.0.0"),
 		),
 	)
@@ -171,7 +171,7 @@ func initObservability(db *sql.DB) (func(), error) {
 	otel.SetTracerProvider(tp)
 
 	// Initialize logging
-	logWriter := microscope.NewSQLiteLogWriter(db)
+	logWriter := counterspell.NewSQLiteLogWriter(db)
 
 	// Configure zerolog with multiple outputs
 	multiWriter := zerolog.MultiLevelWriter(
@@ -222,7 +222,7 @@ func (h TracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 
 // tracingMiddleware adds OpenTelemetry tracing to HTTP requests
 func tracingMiddleware() echo.MiddlewareFunc {
-	tracer := otel.Tracer("microscope-http")
+	tracer := otel.Tracer("counterspell-http")
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -264,7 +264,7 @@ func tracingMiddleware() echo.MiddlewareFunc {
 // Example handlers for testing
 
 func helloHandler(c echo.Context) error {
-	tracer := otel.Tracer("microscope-example")
+	tracer := otel.Tracer("counterspell-example")
 	ctx, span := tracer.Start(c.Request().Context(), "hello-processing")
 	defer span.End()
 
@@ -293,7 +293,7 @@ func helloHandler(c echo.Context) error {
 }
 
 func slowHandler(c echo.Context) error {
-	tracer := otel.Tracer("microscope-example")
+	tracer := otel.Tracer("counterspell-example")
 	ctx, span := tracer.Start(c.Request().Context(), "slow-processing")
 	defer span.End()
 
@@ -323,7 +323,7 @@ func slowHandler(c echo.Context) error {
 }
 
 func errorHandler(c echo.Context) error {
-	tracer := otel.Tracer("microscope-example")
+	tracer := otel.Tracer("counterspell-example")
 	ctx, span := tracer.Start(c.Request().Context(), "error-simulation")
 	defer span.End()
 
@@ -342,5 +342,5 @@ func errorHandler(c echo.Context) error {
 	err := fmt.Errorf("this is a simulated error for testing")
 	span.RecordError(err)
 
-	return echo.NewHTTPError(500, "Simulated error for testing Microscope")
+	return echo.NewHTTPError(500, "Simulated error for testing Counterspell")
 }

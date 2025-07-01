@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/your-github-username/microscope/internal/db"
+	"github.com/your-github-username/counterspell/internal/db"
 )
 
 // LogData represents a log entry for database insertion

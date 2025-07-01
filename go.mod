@@ -1,4 +1,4 @@
-module github.com/your-github-username/microscope
+module github.com/your-github-username/counterspell
 
 go 1.23.0
 

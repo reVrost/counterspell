@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/your-github-username/microscope/internal/db"
+	"github.com/your-github-username/counterspell/internal/db"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -55,36 +55,36 @@ func NewSQLiteSpanExporter(database *sql.DB) *SQLiteSpanExporter {
 // worker processes spans from the channel in batches
 func (e *SQLiteSpanExporter) worker() {
 	defer e.wg.Done()
-	
+
 	ticker := time.NewTicker(100 * time.Millisecond) // Flush every 100ms
 	defer ticker.Stop()
-	
+
 	batch := make([]SpanData, 0, e.batchSize)
-	
+
 	for {
 		select {
 		case span := <-e.spanChan:
 			batch = append(batch, span)
-			
+
 			// Process batch when it's full
 			if len(batch) >= e.batchSize {
 				e.processBatch(batch)
 				batch = batch[:0] // Reset slice
 			}
-			
+
 		case <-ticker.C:
 			// Process any remaining spans in batch
 			if len(batch) > 0 {
 				e.processBatch(batch)
 				batch = batch[:0]
 			}
-			
+
 		case <-e.done:
 			// Process any remaining spans before shutting down
 			if len(batch) > 0 {
 				e.processBatch(batch)
 			}
-			
+
 			// Drain any remaining spans in the channel
 			for {
 				select {
@@ -108,7 +108,7 @@ func (e *SQLiteSpanExporter) worker() {
 // processBatch inserts a batch of spans into the database
 func (e *SQLiteSpanExporter) processBatch(batch []SpanData) {
 	ctx := context.Background()
-	
+
 	for _, span := range batch {
 		err := e.queries.InsertSpan(ctx, db.InsertSpanParams{
 			SpanID:       span.SpanID,
@@ -135,7 +135,7 @@ func (e *SQLiteSpanExporter) processBatch(batch []SpanData) {
 func (e *SQLiteSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
 	for _, span := range spans {
 		spanData := e.convertSpan(span)
-		
+
 		// Send span to worker goroutine (non-blocking)
 		select {
 		case e.spanChan <- spanData:
@@ -145,7 +145,7 @@ func (e *SQLiteSpanExporter) ExportSpans(ctx context.Context, spans []trace.Read
 			// In a production system, you might want to implement backpressure
 		}
 	}
-	
+
 	return nil
 }
 
@@ -159,15 +159,15 @@ func (e *SQLiteSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
 			Valid:  true,
 		}
 	}
-	
+
 	// Convert attributes to JSON
 	attributes := make(map[string]interface{})
 	for _, attr := range span.Attributes() {
 		attributes[string(attr.Key)] = attr.Value.AsInterface()
 	}
-	
+
 	attributesJSON, _ := json.Marshal(attributes)
-	
+
 	// Get service name from resource attributes
 	serviceName := "unknown"
 	if resource := span.Resource(); resource != nil {
@@ -178,10 +178,10 @@ func (e *SQLiteSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
 			}
 		}
 	}
-	
+
 	// Check if span has error
 	hasError := span.Status().Code == codes.Error
-	
+
 	return SpanData{
 		SpanID:       span.SpanContext().SpanID().String(),
 		TraceID:      span.SpanContext().TraceID().String(),
@@ -199,14 +199,14 @@ func (e *SQLiteSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
 // Shutdown gracefully shuts down the exporter
 func (e *SQLiteSpanExporter) Shutdown(ctx context.Context) error {
 	close(e.done)
-	
+
 	// Wait for worker to finish with timeout
 	done := make(chan struct{})
 	go func() {
 		e.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return nil
@@ -221,4 +221,4 @@ func (e *SQLiteSpanExporter) ForceFlush(ctx context.Context) error {
 	// we can't easily force flush without adding complexity.
 	// For simplicity, we'll just return nil here.
 	return nil
-} 
+}

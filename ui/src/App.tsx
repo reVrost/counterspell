@@ -15,9 +15,9 @@ function App() {
       </AppShell.Navbar>
       <AppShell.Main>
         <Routes>
-          <Route path="/microscope/logs" element={<LogsPage />} />
-          <Route path="/microscope/metrics" element={<MetricsPage />} />
-          <Route path="/microscope/settings" element={<SettingsPage />} />
+          <Route path="/counterspell/logs" element={<LogsPage />} />
+          <Route path="/counterspell/metrics" element={<MetricsPage />} />
+          <Route path="/counterspell/settings" element={<SettingsPage />} />
         </Routes>
       </AppShell.Main>
     </AppShell>

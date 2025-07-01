@@ -1,4 +1,4 @@
-# Microscope
+# Counterspell
 
 A lightweight, embedded observability tool for Go applications that provides OpenTelemetry tracing and logging capabilities with a local SQLite database backend and REST API for data querying.
 
@@ -15,12 +15,12 @@ A lightweight, embedded observability tool for Go applications that provides Ope
 ## Installation
 
 ```bash
-go get github.com/your-github-username/microscope
+go get github.com/your-github-username/counterspell
 ```
 
 ## Quick Start
 
-The simplest way to add Microscope to your application:
+The simplest way to add Counterspell to your application:
 
 ```go
 package main
@@ -28,16 +28,16 @@ package main
 import (
     "github.com/labstack/echo/v4"
     "github.com/rs/zerolog/log"
-    "github.com/your-github-username/microscope"
+    "github.com/your-github-username/counterspell"
     "go.opentelemetry.io/otel"
 )
 
 func main() {
     e := echo.New()
 
-    // One-liner installation - set MICROSCOPE_AUTH_TOKEN environment variable
-    if err := microscope.Install(e); err != nil {
-        log.Fatal().Err(err).Msg("Failed to install Microscope")
+    // One-liner installation - set COUNTERSPELL_AUTH_TOKEN environment variable
+    if err := counterspell.Install(e); err != nil {
+        log.Fatal().Err(err).Msg("Failed to install Counterspell")
     }
 
     // Your application routes
@@ -51,25 +51,25 @@ func main() {
     })
 
     log.Info().Msg("Server starting on :1323")
-    log.Info().Msg("Microscope API available at /microscope/api")
+    log.Info().Msg("Counterspell API available at /counterspell/api")
     e.Logger.Fatal(e.Start(":1323"))
 }
 ```
 
 ## Configuration
 
-Microscope supports configuration through functional options:
+Counterspell supports configuration through functional options:
 
 ```go
-err := microscope.Install(e,
-    microscope.WithAuthToken("my-secret-token"),
-    microscope.WithDBPath("./data/observability.db"),
+err := counterspell.Install(e,
+    counterspell.WithAuthToken("my-secret-token"),
+    counterspell.WithDBPath("./data/observability.db"),
 )
 ```
 
 ### Environment Variables
 
-- `MICROSCOPE_AUTH_TOKEN`: Authentication token for API access (required)
+- `COUNTERSPELL_AUTH_TOKEN`: Authentication token for API access (required)
 
 ## API Endpoints
 
@@ -78,15 +78,15 @@ All API endpoints require authentication via the `Authorization: Bearer <token>`
 ### Health Check
 
 ```
-GET /microscope/health
+GET /counterspell/health
 ```
 
-Returns the health status of Microscope (no authentication required).
+Returns the health status of Counterspell (no authentication required).
 
 ### Query Logs
 
 ```
-GET /microscope/api/logs?limit=100&offset=0&level=info&q=search&trace_id=...
+GET /counterspell/api/logs?limit=100&offset=0&level=info&q=search&trace_id=...
 ```
 
 **Query Parameters:**
@@ -128,7 +128,7 @@ GET /microscope/api/logs?limit=100&offset=0&level=info&q=search&trace_id=...
 ### Query Traces
 
 ```
-GET /microscope/api/traces?limit=50&offset=0&q=search&has_error=true
+GET /counterspell/api/traces?limit=50&offset=0&q=search&has_error=true
 ```
 
 **Query Parameters:**
@@ -164,7 +164,7 @@ GET /microscope/api/traces?limit=50&offset=0&q=search&has_error=true
 ### Get Trace Details
 
 ```
-GET /microscope/api/traces/{trace_id}
+GET /counterspell/api/traces/{trace_id}
 ```
 
 **Response:**
@@ -194,7 +194,7 @@ GET /microscope/api/traces/{trace_id}
 
 ## Database Schema
 
-Microscope uses SQLite with the following schema:
+Counterspell uses SQLite with the following schema:
 
 ### Logs Table
 
@@ -249,7 +249,7 @@ go test ./...
 
 ### Database Migrations
 
-Migrations are handled automatically using Goose when Microscope starts. The migration files are embedded in the binary.
+Migrations are handled automatically using Goose when Counterspell starts. The migration files are embedded in the binary.
 
 ### Code Generation
 
@@ -262,7 +262,7 @@ sqlc generate
 
 ## Architecture
 
-Microscope consists of several key components:
+Counterspell consists of several key components:
 
 1. **Custom OpenTelemetry Exporter**: Writes spans to SQLite asynchronously
 2. **Custom Zerolog Writer**: Writes logs to SQLite with trace correlation

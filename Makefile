@@ -29,4 +29,4 @@ test: generate ## Run all tests
 
 # Cleanup
 clean: ## Clean build artifacts and database
-	rm -rf bin/ microscope.db coverage.out *.log 
+	rm -rf bin/ counterspell.db coverage.out *.log 

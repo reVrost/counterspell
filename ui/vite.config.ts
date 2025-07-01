@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: "/microscope",
+  base: "/counterspell",
   css: {
     modules: {
       localsConvention: "camelCase", // Converts kebab-case to camelCase for class names
@@ -32,7 +32,7 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, "/microscope/api"),
+        rewrite: (path) => path.replace(/^\/api/, "/counterspell/api"),
       },
     },
   },

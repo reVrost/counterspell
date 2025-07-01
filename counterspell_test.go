@@ -1,4 +1,4 @@
-package microscope
+package counterspell
 
 import (
 	"database/sql"
@@ -15,14 +15,14 @@ import (
 
 func TestInstall_Success(t *testing.T) {
 	// Create a temporary database file
-	tmpDB := "test_microscope.db"
+	tmpDB := "test_counterspell.db"
 	defer os.Remove(tmpDB)
 
 	e := echo.New()
 
 	// Set auth token environment variable
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "test-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	err := Install(e, WithDBPath(tmpDB))
 	if err != nil {
@@ -35,7 +35,7 @@ func TestInstall_Success(t *testing.T) {
 	}
 
 	// Test that routes were registered by making a request
-	req := httptest.NewRequest(http.MethodGet, "/microscope/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/health", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -46,7 +46,7 @@ func TestInstall_Success(t *testing.T) {
 }
 
 func TestInstall_WithOptions(t *testing.T) {
-	tmpDB := "test_microscope_options.db"
+	tmpDB := "test_counterspell_options.db"
 	defer os.Remove(tmpDB)
 
 	e := echo.New()
@@ -60,7 +60,7 @@ func TestInstall_WithOptions(t *testing.T) {
 	}
 
 	// Test API endpoint with custom token using query parameter
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=custom-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=custom-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -72,7 +72,7 @@ func TestInstall_WithOptions(t *testing.T) {
 
 func TestInstall_NoAuthToken(t *testing.T) {
 	// Ensure no auth token is set
-	os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 
@@ -93,7 +93,7 @@ func TestInstall_InvalidDBPath(t *testing.T) {
 	// Try to create database in non-existent directory
 	err := Install(e,
 		WithAuthToken("test-token"),
-		WithDBPath("/non/existent/path/microscope.db"),
+		WithDBPath("/non/existent/path/counterspell.db"),
 	)
 	if err == nil {
 		t.Error("Expected Install to fail with invalid DB path, but it succeeded")
@@ -104,8 +104,8 @@ func TestInstall_HealthEndpoint(t *testing.T) {
 	tmpDB := "test_health.db"
 	defer os.Remove(tmpDB)
 
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "test-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 	err := Install(e, WithDBPath(tmpDB))
@@ -114,7 +114,7 @@ func TestInstall_HealthEndpoint(t *testing.T) {
 	}
 
 	// Test health endpoint (no auth required)
-	req := httptest.NewRequest(http.MethodGet, "/microscope/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/health", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -125,7 +125,7 @@ func TestInstall_HealthEndpoint(t *testing.T) {
 
 	// Verify response content contains the expected fields
 	body := rec.Body.String()
-	if !contains(body, "healthy") || !contains(body, "microscope") {
+	if !contains(body, "healthy") || !contains(body, "counterspell") {
 		t.Errorf("Response body should contain health status: %s", body)
 	}
 }
@@ -144,7 +144,7 @@ func TestInstall_APIEndpointAuthentication(t *testing.T) {
 	}
 
 	// Test API endpoint without secret parameter (should fail)
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -154,7 +154,7 @@ func TestInstall_APIEndpointAuthentication(t *testing.T) {
 	}
 
 	// Test API endpoint with wrong secret (should fail)
-	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=wrong-token", nil)
+	req = httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=wrong-token", nil)
 	rec = httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -164,7 +164,7 @@ func TestInstall_APIEndpointAuthentication(t *testing.T) {
 	}
 
 	// Test API endpoint with correct secret (should succeed)
-	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=secret-token", nil)
+	req = httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=secret-token", nil)
 	rec = httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -178,8 +178,8 @@ func TestInstall_DatabaseMigrations(t *testing.T) {
 	tmpDB := "test_migrations.db"
 	defer os.Remove(tmpDB)
 
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "test-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 	err := Install(e, WithDBPath(tmpDB))
@@ -255,8 +255,8 @@ func TestInstall_ShutdownHandling(t *testing.T) {
 	tmpDB := "test_shutdown.db"
 	defer os.Remove(tmpDB)
 
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "test-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 	err := Install(e, WithDBPath(tmpDB))
@@ -274,10 +274,10 @@ func TestInstall_ShutdownHandling(t *testing.T) {
 
 func TestInstall_DefaultDBPath(t *testing.T) {
 	// Test default database path
-	defer os.Remove("microscope.db") // Default path
+	defer os.Remove("counterspell.db") // Default path
 
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "test-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 	err := Install(e) // No WithDBPath option
@@ -286,7 +286,7 @@ func TestInstall_DefaultDBPath(t *testing.T) {
 	}
 
 	// Verify default database file was created
-	if _, err := os.Stat("microscope.db"); os.IsNotExist(err) {
+	if _, err := os.Stat("counterspell.db"); os.IsNotExist(err) {
 		t.Error("Default database file was not created")
 	}
 }
@@ -296,8 +296,8 @@ func TestInstall_EnvVarAuthToken(t *testing.T) {
 	defer os.Remove(tmpDB)
 
 	// Set environment variable
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "env-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "env-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 	err := Install(e, WithDBPath(tmpDB))
@@ -306,7 +306,7 @@ func TestInstall_EnvVarAuthToken(t *testing.T) {
 	}
 
 	// Test that the environment variable token works
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=env-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=env-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -321,8 +321,8 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 	defer os.Remove(tmpDB)
 
 	// Set environment variable
-	os.Setenv("MICROSCOPE_AUTH_TOKEN", "env-token")
-	defer os.Unsetenv("MICROSCOPE_AUTH_TOKEN")
+	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "env-token")
+	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
 	err := Install(e,
@@ -334,7 +334,7 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 	}
 
 	// Test that the option token works (not env var)
-	req := httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=option-token", nil)
+	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=option-token", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -344,7 +344,7 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 	}
 
 	// Test that env var token no longer works
-	req = httptest.NewRequest(http.MethodGet, "/microscope/api/logs?secret=env-token", nil)
+	req = httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=env-token", nil)
 	rec = httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -389,7 +389,7 @@ func TestAddToStdlib_HealthEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test the health endpoint
-	req := httptest.NewRequest("GET", "/microscope/health", nil)
+	req := httptest.NewRequest("GET", "/counterspell/health", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -400,7 +400,7 @@ func TestAddToStdlib_HealthEndpoint(t *testing.T) {
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "healthy", response["status"])
-	assert.Equal(t, "microscope", response["service"])
+	assert.Equal(t, "counterspell", response["service"])
 }
 
 // Helper function to check if a string contains a substring
