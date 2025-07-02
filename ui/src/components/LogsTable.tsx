@@ -229,7 +229,13 @@ export function LogsTable() {
           </Grid.Col>
         </Grid>
         <ScrollArea>
-          <Table miw={800} verticalSpacing="xs" variant="compact" fz="xs">
+          <Table
+            withTableBorder
+            miw={800}
+            verticalSpacing="xs"
+            variant="compact"
+            fz="xs"
+          >
             <Table.Thead>
               <Table.Tr>
                 <Table.Th w={10}>
