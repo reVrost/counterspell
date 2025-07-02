@@ -1,17 +1,18 @@
 import { Container, Group, Stack, Title } from "@mantine/core";
-import { LogTable } from "../components/LogTable";
+import { LogsTable } from "../components/LogsTable";
 
 export default function LogsPage() {
   return (
-    <Container p="xl" size="responsive">
-      <Group justify="space-between" align="center">
-        <Title fw={500} mb="xl">
-          Logs
-        </Title>
-      </Group>
-      <Stack gap="xl">
-        <LogTable />
-      </Stack>
+    <Container size="responsive" px="0">
+      {/* <Group */}
+      {/*   display="flex" */}
+      {/*   h="50px" */}
+      {/*   p="xs" */}
+      {/*   style={{ */}
+      {/*     borderBottom: "1px solid var(--mantine-color-gray-2)", */}
+      {/*   }} */}
+      {/* ></Group> */}
+      <LogsTable />
     </Container>
   );
 }

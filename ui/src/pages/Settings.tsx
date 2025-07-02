@@ -1,17 +1,14 @@
 import { Button, Container, Group, Input, Stack, Title } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconDeviceFloppy } from "@tabler/icons-react";
+import { useSecret } from "../context/SecretContext";
 
 export default function SettingsPage() {
-  const [secret, setSecret] = useLocalStorage<string>({
-    key: "secret-token",
-    defaultValue: "",
-  });
+  const { secret, setSecret } = useSecret();
 
   return (
     <Container p="xl" size="responsive">
-      <Title fw={500} mb="xl">
+      <Title fw="bold" mb="xl">
         Settings
       </Title>
       <Stack gap="xl">

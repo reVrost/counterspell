@@ -5,7 +5,7 @@ import {
   IconNotes,
   IconSettings,
 } from "@tabler/icons-react";
-import { Stack, Text, Title, Group } from "@mantine/core";
+import { Stack, Text, Title, Group, Divider } from "@mantine/core";
 import classes from "./Navbar.module.css";
 import { NavLink } from "react-router-dom";
 
@@ -19,7 +19,7 @@ function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
   return (
     <NavLink
       className={classes.navlink}
-      to={"counterspell/" + path}
+      to={"/" + path}
       style={({ isActive }) => {
         return {
           color: isActive
@@ -51,20 +51,20 @@ export function NavBar() {
 
   return (
     <nav className={classes.navbar}>
-      <div>
-        <Group mb="30" gap={0}>
-          <Title order={1}>M</Title>
-          <IconChartLine size={40} stroke={1.5} />
-        </Group>
+      <Stack>
+        <Title fz={40} fw={600} ff="">
+          Cs
+          <IconChartLine size={25} stroke={1.5} />
+        </Title>
         <Stack
           justify="flex-start"
           align="flex-start"
-          gap="lg"
+          gap="xs"
           className={classes.navbarMain}
         >
           {links}
         </Stack>
-      </div>
+      </Stack>
     </nav>
   );
 }

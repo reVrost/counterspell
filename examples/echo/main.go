@@ -6,12 +6,16 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/your-github-username/counterspell"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
 func main() {
 	// Example 1: Using Echo router
 	log.Info().Msg("Starting Echo server with Counterspell...")
 	e := echo.New()
+
+	// Use echo
+	e.Use(otelecho.Middleware("counterspell-example"))
 
 	// Add Counterspell to Echo router
 	if err := counterspell.AddToEcho(e,

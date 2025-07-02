@@ -1,10 +1,4 @@
-import {
-  ActionIcon,
-  Container,
-  Group,
-  Stack,
-  Title,
-} from "@mantine/core";
+import { ActionIcon, Container, Group, Stack, Title } from "@mantine/core";
 import { IconRefresh } from "@tabler/icons-react";
 import { useState } from "react";
 import { TracesTable } from "../components/TracesTable";
@@ -16,7 +10,7 @@ export default function MetricsPage() {
   return (
     <Container p="xl" size="responsive">
       <Group justify="space-between" align="center">
-        <Title fw={500} mb="xl">
+        <Title fw="bold" mb="xl">
           Metrics
         </Title>
         <ActionIcon variant="subtle">

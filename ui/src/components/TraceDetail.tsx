@@ -1,4 +1,3 @@
-import { useLocalStorage } from "@mantine/hooks";
 import useSWR from "swr";
 import { TraceDetail } from "../types/types";
 import {
@@ -22,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../utils/api";
+import { useSecret } from "../context/SecretContext";
 
 export interface TraceDetailViewProps {
   traceId: string;
@@ -29,10 +29,7 @@ export interface TraceDetailViewProps {
 }
 
 export function TraceDetailView({ traceId, onClose }: TraceDetailViewProps) {
-  const [secret] = useLocalStorage<string>({
-    key: "secret-token",
-    defaultValue: "",
-  });
+  const { secret } = useSecret();
   const fetcher = async (url: string) => {
     const res = await api.get(url, { params: { secret } });
     return res.data;
