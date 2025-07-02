@@ -356,9 +356,9 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
     fuchsia: fuchsiaColors,
     pink: pinkColors,
 
-    primary: zincColors,
-    secondary: zincColors,
-    dark: zincColors,
+    primary: slateColors,
+    secondary: slateColors,
+    dark: slateColors,
 
     error: redColors as MantineColorsTuple,
     success: greenColors,
@@ -369,9 +369,9 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
   scale: 1,
   primaryColor: "primary",
   primaryShade: { light: 8, dark: 0 },
-  autoContrast: true,
+  // autoContrast: true,
   luminanceThreshold: 0.3,
-  // system-ui is a great fallback. Poppins is fine, but can feel a bit too "bubbly".
+  // system-ui is a great fallback. Geist is fine, but can feel a bit too "bubbly".
   fontFamily:
     "Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
 
@@ -402,9 +402,9 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
 
   // The core change: smaller base sizes for higher information density.
   fontSizes: {
-    xs: rem("12px"), // For tiny labels, metadata, breadcrumbs
-    sm: rem("13px"), // **Your new body/paragraph text size**
-    md: rem("14px"), // For primary data display (e.g., in tables), emphasis
+    xs: rem("13px"), // For tiny labels, metadata, breadcrumbs
+    sm: rem("14px"), // **Your new body/paragraph text size**
+    md: rem("15px"), // For primary data display (e.g., in tables), emphasis
     lg: rem("16px"), // For sub-headings or important stand-out text
     xl: rem("18px"),
     "2xl": rem("20px"),
