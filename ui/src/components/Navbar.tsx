@@ -5,7 +5,7 @@ import {
   IconNotes,
   IconSettings,
 } from "@tabler/icons-react";
-import { Stack, Text, Title, Group, Divider } from "@mantine/core";
+import { Stack, Text, Title, } from "@mantine/core";
 import classes from "./Navbar.module.css";
 import { NavLink } from "react-router-dom";
 

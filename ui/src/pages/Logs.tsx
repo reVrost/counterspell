@@ -1,4 +1,4 @@
-import { Container, Group, Stack, Title } from "@mantine/core";
+import { Container } from "@mantine/core";
 import { LogsTable } from "../components/LogsTable";
 
 export default function LogsPage() {
