@@ -6,15 +6,18 @@ import {
   Checkbox,
   Code,
   Drawer,
+  Grid,
   Group,
   ScrollArea,
   Select,
+  Stack,
   Table,
   Text,
   TextInput,
+  Title,
   useMantineTheme,
 } from "@mantine/core";
-import classes from "./LogTable.module.css";
+import classes from "./LogsTable.module.css";
 import {
   IconArrowRight,
   IconChevronRight,
@@ -26,14 +29,12 @@ import { type ApiResponse, Log } from "../utils/types";
 import { api } from "../utils/api";
 import useSWR, { mutate } from "swr";
 import { notifications } from "@mantine/notifications";
-import { useDisclosure, useLocalStorage } from "@mantine/hooks";
+import { useDisclosure } from "@mantine/hooks";
 import { useSearchParams } from "react-router-dom";
+import { useSecret } from "../context/SecretContext";
 
-export function LogTable() {
-  const [secret] = useLocalStorage<string>({
-    key: "secret-token",
-    defaultValue: "",
-  });
+export function LogsTable() {
+  const { secret } = useSecret();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filter, setFilter] = useState(searchParams.get("q") || "");
   const [level, setLevel] = useState(searchParams.get("level") || "");
@@ -164,6 +165,92 @@ export function LogTable() {
 
   return (
     <>
+      <Group
+        justify="space-between"
+        align="center"
+        style={{
+          backgroundColor: "var(--mantine-color-gray-0)",
+          borderBottom: "1px solid var(--mantine-color-gray-2)",
+          boxShadow: "0.5px 0.5px  var(--mantine-color-gray-2)",
+        }}
+        p="12"
+      >
+        <Title order={2} fw={600}>
+          Logs
+        </Title>
+      </Group>
+      <Stack p="lg">
+        <Grid>
+          <Grid.Col span={8}>
+            <TextInput
+              radius="xl"
+              miw="80%"
+              rightSectionWidth={42}
+              leftSection={<IconSearch size={18} stroke={1.5} />}
+              rightSection={
+                <ActionIcon
+                  size={32}
+                  radius="xl"
+                  color={theme.primaryColor}
+                  variant="filled"
+                  onClick={handleSearch}
+                >
+                  <IconArrowRight size={18} stroke={1.5} />
+                </ActionIcon>
+              }
+              placeholder="Search term or filter"
+              value={filter}
+              onChange={(event) => setFilter(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  handleSearch();
+                }
+              }}
+            />
+          </Grid.Col>
+
+          <Grid.Col span={3}>
+            <Select
+              placeholder="Log level"
+              value={level}
+              onChange={(value) => setLevel(value || "")}
+              data={[
+                { value: "debug", label: "Debug" },
+                { value: "info", label: "Info" },
+                { value: "warn", label: "Warn" },
+                { value: "error", label: "Error" },
+              ]}
+            />
+          </Grid.Col>
+          <Grid.Col span={1}>
+            <ActionIcon variant="subtle" onClick={() => mutate("logs")}>
+              <IconRefresh />
+            </ActionIcon>
+          </Grid.Col>
+        </Grid>
+        <ScrollArea>
+          <Table miw={800} verticalSpacing="xs" variant="compact" fz="xs">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w={10}>
+                  <Checkbox
+                    onChange={toggleAll}
+                    checked={selection.length === data?.length}
+                    indeterminate={
+                      selection.length > 0 && selection.length !== data?.length
+                    }
+                  />
+                </Table.Th>
+                <Table.Th w={200}>Level</Table.Th>
+                <Table.Th>Message</Table.Th>
+                <Table.Th>Attributes</Table.Th>
+                <Table.Th w={200}>Created</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>{rows}</Table.Tbody>
+          </Table>
+        </ScrollArea>
+      </Stack>
       <Drawer
         opened={opened}
         onClose={close}
@@ -192,78 +279,6 @@ export function LogTable() {
           </Table>
         )}
       </Drawer>
-      <Group justify="space-between" align="center">
-        <TextInput
-          radius="xl"
-          miw="80%"
-          rightSectionWidth={42}
-          leftSection={<IconSearch size={18} stroke={1.5} />}
-          rightSection={
-            <ActionIcon
-              size={32}
-              radius="xl"
-              color={theme.primaryColor}
-              variant="filled"
-              onClick={handleSearch}
-            >
-              <IconArrowRight size={18} stroke={1.5} />
-            </ActionIcon>
-          }
-          placeholder="Search term or filter"
-          value={filter}
-          onChange={(event) => setFilter(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              handleSearch();
-            }
-          }}
-        />
-
-        <Group maw="20%">
-          <ActionIcon variant="subtle" onClick={() => mutate("logs")}>
-            <IconRefresh />
-          </ActionIcon>
-          <Select
-            placeholder="Log level"
-            value={level}
-            onChange={(value) => setLevel(value || "")}
-            data={[
-              { value: "debug", label: "Debug" },
-              { value: "info", label: "Info" },
-              { value: "warn", label: "Warn" },
-              { value: "error", label: "Error" },
-            ]}
-          />
-        </Group>
-      </Group>
-      <ScrollArea>
-        <Table
-          miw={800}
-          verticalSpacing="xs"
-          fw={500}
-          variant="compact"
-          fz="xs"
-        >
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th w={10}>
-                <Checkbox
-                  onChange={toggleAll}
-                  checked={selection.length === data?.length}
-                  indeterminate={
-                    selection.length > 0 && selection.length !== data?.length
-                  }
-                />
-              </Table.Th>
-              <Table.Th w={200}>Level</Table.Th>
-              <Table.Th>Message</Table.Th>
-              <Table.Th>Attributes</Table.Th>
-              <Table.Th w={200}>Created</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>{rows}</Table.Tbody>
-        </Table>
-      </ScrollArea>
     </>
   );
 }

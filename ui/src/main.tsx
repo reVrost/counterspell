@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { ModalsProvider } from "@mantine/modals";
-import { BrowserRouter } from "react-router-dom";
+import { HashRouter } from "react-router-dom";
 import App from "./App";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
@@ -16,7 +16,7 @@ let myTheme = shadcnTheme;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <HashRouter>
       <MantineProvider
         theme={myTheme}
         cssVariablesResolver={shadcnCssVariableResolver}
@@ -26,6 +26,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <App />
         </ModalsProvider>
       </MantineProvider>
-    </BrowserRouter>
+    </HashRouter>
   </React.StrictMode>,
 );

@@ -6,22 +6,23 @@ import {
   TextInput,
   useMantineTheme,
 } from "@mantine/core";
-import { IconArrowRight, IconChevronRight, IconSearch } from "@tabler/icons-react";
+import {
+  IconArrowRight,
+  IconChevronRight,
+  IconSearch,
+} from "@tabler/icons-react";
 import useSWR, { useSWRConfig } from "swr";
 import { api } from "../utils/api";
 import { TraceListItem } from "../types/types";
-import { useLocalStorage } from "@mantine/hooks";
 import { useState } from "react";
+import { useSecret } from "../context/SecretContext";
 
 interface TracesTableProps {
   onTraceClick: (trace: TraceListItem) => void;
 }
 
 export function TracesTable({ onTraceClick }: TracesTableProps) {
-  const [secret] = useLocalStorage<string>({
-    key: "secret-token",
-    defaultValue: "",
-  });
+  const { secret } = useSecret();
   const [filter, setFilter] = useState("");
   const { mutate } = useSWRConfig();
 
@@ -118,4 +119,3 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
     </>
   );
 }
-

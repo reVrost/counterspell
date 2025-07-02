@@ -108,8 +108,7 @@ func AddToEcho(e *echo.Echo, opts ...Option) error {
 	}
 
 	configureGlobalLogger(ms.logWriter)
-	// e.Use(otelecho.Middleware(cfg.serviceName))
-	// e.Use(loggerMiddleware)
+	e.Use(loggerMiddleware)
 	registerEchoRoutes(e, db, cfg.authToken)
 	registerEchoShutdownHook(e, ms)
 
@@ -266,8 +265,10 @@ func registerEchoRoutes(e *echo.Echo, db *sql.DB, authToken string) {
 		}
 	}
 
-	apiGroup := counterspellGroup.Group("/api", secretAuth)
+	// Serve UI
+	counterspellGroup.Static("/", "ui/dist")
 
+	apiGroup := counterspellGroup.Group("/api", secretAuth)
 	apiGroup.GET("/logs", handler.QueryLogs)
 	apiGroup.GET("/traces", handler.QueryTraces)
 	apiGroup.GET("/traces/:trace_id", handler.GetTraceDetails)

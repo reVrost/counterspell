@@ -371,67 +371,79 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
   primaryShade: { light: 8, dark: 0 },
   autoContrast: true,
   luminanceThreshold: 0.3,
-  fontFamily: "Poppins",
+  // system-ui is a great fallback. Poppins is fine, but can feel a bit too "bubbly".
+  fontFamily:
+    "Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
+
+  // Reduced radius for a crisper, more technical feel.
   radius: {
-    xs: rem("6px"),
-    sm: rem("8px"),
-    md: rem("12px"),
-    lg: rem("16px"),
-    xl: rem("24px"),
+    xs: rem("4px"), // For small interactive elements like tags or checkboxes
+    sm: rem("6px"), // Default for buttons, inputs
+    md: rem("8px"), // For cards, containers
+    lg: rem("12px"), // For larger layouts, modals
+    xl: rem("16px"), // Use sparingly
   },
-  defaultRadius: "sm",
+  defaultRadius: "sm", // A subtle 6px is a great default
+
+  // A consistent 4px grid is key for precise alignment.
   spacing: {
     "4xs": rem("2px"),
-    "3xs": rem("4px"),
-    "2xs": rem("8px"),
-    xs: rem("10px"),
-    sm: rem("12px"),
-    md: rem("16px"),
-    lg: rem("20px"),
-    xl: rem("24px"),
-    "2xl": rem("28px"),
-    "3xl": rem("32px"),
-    "4xl": rem("40px"),
-  },
-  fontSizes: {
-    xs: rem("12px"),
-    sm: rem("14px"),
-    md: rem("16px"),
-    lg: rem("18px"),
-    xl: rem("20px"),
-    "2xl": rem("24px"),
-    "3xl": rem("30px"),
-    "4xl": rem("36px"),
-    "5xl": rem("48px"),
-  },
-  lineHeights: {
-    xs: rem("18px"),
-    sm: rem("20px"),
-    md: rem("24px"),
-    lg: rem("28px"),
+    "3xs": rem("4px"), // Smallest gap
+    "2xs": rem("8px"), // Icon padding, etc.
+    xs: rem("12px"), // Small gaps between elements
+    sm: rem("16px"), // Standard container padding
+    md: rem("20px"),
+    lg: rem("24px"), // Gaps between larger sections
+    xl: rem("32px"),
+    "2xl": rem("40px"),
+    "3xl": rem("48px"),
+    "4xl": rem("64px"),
   },
 
+  // The core change: smaller base sizes for higher information density.
+  fontSizes: {
+    xs: rem("12px"), // For tiny labels, metadata, breadcrumbs
+    sm: rem("13px"), // **Your new body/paragraph text size**
+    md: rem("14px"), // For primary data display (e.g., in tables), emphasis
+    lg: rem("16px"), // For sub-headings or important stand-out text
+    xl: rem("18px"),
+    "2xl": rem("20px"),
+    "3xl": rem("24px"), // Largest sizes for dashboard titles etc.
+    "4xl": rem("30px"),
+    "5xl": rem("36px"), // Use very sparingly, if at all
+  },
+
+  // Adjusted for legibility at smaller font sizes (approx 1.5x font size).
+  lineHeights: {
+    xs: rem("16px"), // For 12px font
+    sm: rem("20px"), // For 13px/14px font
+    md: rem("24px"), // For 16px font
+    lg: rem("28px"), // For 18px font
+  },
+
+  // Headings are scaled down significantly to act as headers, not giant proclamations.
   headings: {
-    fontFamily: "Poppins",
+    fontFamily: "Geist, -apple-system, sans-serif", // Keep consistent
     sizes: {
       h1: {
-        fontSize: rem("36px"),
-        lineHeight: rem("44px"),
-        fontWeight: "600",
+        fontSize: rem("24px"),
+        lineHeight: rem("32px"),
+        fontWeight: "600", // Semibold
       },
       h2: {
-        fontSize: rem("30px"),
-        lineHeight: rem("38px"),
+        fontSize: rem("20px"),
+        lineHeight: rem("28px"),
         fontWeight: "600",
       },
       h3: {
-        fontSize: rem("24px"),
-        lineHeight: rem("32px"),
+        fontSize: rem("16px"),
+        lineHeight: rem("24px"),
         fontWeight: "600",
       },
       h4: {
-        fontSize: rem("20px"),
-        lineHeight: rem("30px"),
+        // Often used for card titles or form section labels
+        fontSize: rem("14px"),
+        lineHeight: rem("20px"),
         fontWeight: "600",
       },
     },
