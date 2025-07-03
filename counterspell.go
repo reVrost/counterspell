@@ -16,7 +16,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/your-github-username/counterspell/internal/counterspell"
+	"github.com/revrost/counterspell/internal/counterspell"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"

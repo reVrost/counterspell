@@ -7,7 +7,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/your-github-username/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/db"
 )
 
 func setupLogTestDB(t *testing.T) *sql.DB {

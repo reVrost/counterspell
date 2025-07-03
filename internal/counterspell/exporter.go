@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/your-github-username/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/db"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
