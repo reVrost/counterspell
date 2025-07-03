@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog/log"
-	"github.com/your-github-username/counterspell"
+	"github.com/revrost/counterspell"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/your-github-username/counterspell
+module github.com/revrost/counterspell
 
 go 1.23.0
 
