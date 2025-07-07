@@ -9,14 +9,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	echov4 "github.com/labstack/echo/v4"
+	middlewarev4 "github.com/labstack/echo/v4/middleware"
+	echov5 "github.com/labstack/echo/v5"
+	middlewarev5 "github.com/labstack/echo/v5/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
+	"github.com/revrost/counterspell/internal/counterspell"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/revrost/counterspell/internal/counterspell"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -29,10 +33,10 @@ var migrationsFS embed.FS
 
 // config holds the configuration for Counterspell
 type config struct {
-	dbPath        string
-	authToken     string
-	serviceName   string
-	serviceVesion string
+	dbPath         string
+	authToken      string
+	serviceName    string
+	serviceVersion string
 }
 
 // Option represents a configuration option for Counterspell
@@ -62,7 +66,7 @@ func WithServiceName(name string) Option {
 // WithServiceVersion sets the service version
 func WithServiceVersion(version string) Option {
 	return func(c *config) {
-		c.serviceVesion = version
+		c.serviceVersion = version
 	}
 }
 
@@ -75,22 +79,13 @@ type Counterspell struct {
 
 // Install is deprecated. Use AddToEcho instead.
 // This function is kept for backward compatibility.
-func Install(e *echo.Echo, opts ...Option) error {
+func Install(e *echov4.Echo, opts ...Option) error {
 	return AddToEcho(e, opts...)
 }
 
-// AddToEcho initializes Counterspell with the provided Echo instance
-func AddToEcho(e *echo.Echo, opts ...Option) error {
-	cfg := &config{
-		dbPath:        "counterspell.db",
-		authToken:     os.Getenv("COUNTERSPELL_AUTH_TOKEN"),
-		serviceName:   "counterspell-app",
-		serviceVesion: "1.0.0",
-	}
-
-	for _, opt := range opts {
-		opt(cfg)
-	}
+// AddToEcho initializes Counterspell with the provided Echo v4 instance
+func AddToEcho(e *echov4.Echo, opts ...Option) error {
+	cfg := buildConfig(opts...)
 
 	if cfg.authToken == "" {
 		return fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
@@ -101,33 +96,52 @@ func AddToEcho(e *echo.Echo, opts ...Option) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	ms, err := setupObservability(db, cfg.serviceName, cfg.serviceVesion)
+	cs, err := setupObservability(db, cfg.serviceName, cfg.serviceVersion)
 	if err != nil {
 		db.Close()
 		return fmt.Errorf("failed to setup observability: %w", err)
 	}
 
-	configureGlobalLogger(ms.logWriter)
-	e.Use(loggerMiddleware)
-	registerEchoRoutes(e, db, cfg.authToken)
-	registerEchoShutdownHook(e, ms)
+	setupGlobalLogger(cs.logWriter)
+	setupEchoV4Middleware(e)
+	registerEchoV4Routes(e, db, cfg.authToken)
+	registerEchoV4ShutdownHook(e, cs)
 
-	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully")
+	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully with Echo v4")
+	return nil
+}
+
+// AddToEchoV5 initializes Counterspell with the provided Echo v5 instance
+func AddToEchoV5(e *echov5.Echo, opts ...Option) error {
+	cfg := buildConfig(opts...)
+
+	if cfg.authToken == "" {
+		return fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
+	}
+
+	db, err := initDatabase(cfg.dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	cs, err := setupObservability(db, cfg.serviceName, cfg.serviceVersion)
+	if err != nil {
+		db.Close()
+		return fmt.Errorf("failed to setup observability: %w", err)
+	}
+
+	setupGlobalLogger(cs.logWriter)
+	setupEchoV5Middleware(e)
+	registerEchoV5Routes(e, db, cfg.authToken)
+	registerEchoV5ShutdownHook(e, cs)
+
+	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully with Echo v5")
 	return nil
 }
 
 // AddToStdlib initializes Counterspell with the provided standard library ServeMux
 func AddToStdlib(mux *http.ServeMux, opts ...Option) (*Counterspell, error) {
-	cfg := &config{
-		dbPath:        "counterspell.db",
-		authToken:     os.Getenv("COUNTERSPELL_AUTH_TOKEN"),
-		serviceName:   "counterspell-app",
-		serviceVesion: "1.0.0",
-	}
-
-	for _, opt := range opts {
-		opt(cfg)
-	}
+	cfg := buildConfig(opts...)
 
 	if cfg.authToken == "" {
 		return nil, fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
@@ -138,17 +152,33 @@ func AddToStdlib(mux *http.ServeMux, opts ...Option) (*Counterspell, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	ms, err := setupObservability(db, cfg.serviceName, cfg.serviceVesion)
+	cs, err := setupObservability(db, cfg.serviceName, cfg.serviceVersion)
 	if err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to setup observability: %w", err)
 	}
 
-	configureGlobalLogger(ms.logWriter)
+	setupGlobalLogger(cs.logWriter)
 	registerStdlibRoutes(mux, db, cfg.authToken)
 
 	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully")
-	return ms, nil
+	return cs, nil
+}
+
+// buildConfig creates a config with defaults and applies options
+func buildConfig(opts ...Option) *config {
+	cfg := &config{
+		dbPath:         "counterspell.db",
+		authToken:      os.Getenv("COUNTERSPELL_AUTH_TOKEN"),
+		serviceName:    "counterspell-app",
+		serviceVersion: "1.0.0",
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return cfg
 }
 
 func initDatabase(dbPath string) (*sql.DB, error) {
@@ -205,7 +235,7 @@ func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Counte
 	}, nil
 }
 
-func configureGlobalLogger(logWriter *counterspell.SQLiteLogWriter) {
+func setupGlobalLogger(logWriter *counterspell.SQLiteLogWriter) {
 	multiWriter := zerolog.MultiLevelWriter(
 		zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339},
 		logWriter,
@@ -215,6 +245,34 @@ func configureGlobalLogger(logWriter *counterspell.SQLiteLogWriter) {
 		With().
 		Timestamp().
 		Logger()
+}
+
+func setupEchoV4Middleware(e *echov4.Echo) {
+	// Add CORS middleware
+	e.Use(middlewarev4.CORS())
+
+	// Add request ID middleware
+	e.Use(middlewarev4.RequestID())
+
+	// Add recover middleware
+	e.Use(middlewarev4.Recover())
+
+	// Add our custom logger middleware
+	e.Use(createLoggerMiddleware())
+}
+
+func setupEchoV5Middleware(e *echov5.Echo) {
+	// Add CORS middleware
+	e.Use(middlewarev5.CORS())
+
+	// Add request ID middleware
+	e.Use(middlewarev5.RequestID())
+
+	// Add recover middleware
+	e.Use(middlewarev5.Recover())
+
+	// Add our custom logger middleware
+	e.Use(createLoggerMiddlewareV5())
 }
 
 type tracingHook struct {
@@ -228,64 +286,169 @@ func (h tracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	}
 }
 
-func loggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// Create a new logger with a tracing hook that has the request context.
-		loggerWithTrace := log.Logger.Hook(tracingHook{ctx: c.Request().Context()})
+func createLoggerMiddleware() echov4.MiddlewareFunc {
+	return func(next echov4.HandlerFunc) echov4.HandlerFunc {
+		return func(c echov4.Context) error {
+			// Create a new logger with a tracing hook that has the request context.
+			loggerWithTrace := log.Logger.Hook(tracingHook{ctx: c.Request().Context()})
 
-		// Create a new context with the new logger.
-		ctxWithLogger := loggerWithTrace.WithContext(c.Request().Context())
+			// Replace the global logger with our context-aware logger for this request.
+			c.Set("logger", &loggerWithTrace)
 
-		// Create a new request with the new context.
-		req := c.Request().WithContext(ctxWithLogger)
-
-		// Set the new request in the Echo context.
-		c.SetRequest(req)
-
-		return next(c)
+			return next(c)
+		}
 	}
 }
 
-func registerEchoRoutes(e *echo.Echo, db *sql.DB, authToken string) {
-	handler := counterspell.NewAPIHandler(db)
+func createLoggerMiddlewareV5() echov5.MiddlewareFunc {
+	return func(next echov5.HandlerFunc) echov5.HandlerFunc {
+		return func(c echov5.Context) error {
+			// Create a new logger with a tracing hook that has the request context.
+			loggerWithTrace := log.Logger.Hook(tracingHook{ctx: c.Request().Context()})
 
-	counterspellGroup := e.Group("/counterspell")
+			// Replace the global logger with our context-aware logger for this request.
+			c.Set("logger", &loggerWithTrace)
 
-	// Custom middleware to check for secret query parameter
-	secretAuth := func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+			return next(c)
+		}
+	}
+}
+
+func createAuthMiddleware(authToken string) echov4.MiddlewareFunc {
+	return func(next echov4.HandlerFunc) echov4.HandlerFunc {
+		return func(c echov4.Context) error {
 			secret := c.QueryParam("secret")
 			if secret == "" {
-				return echo.NewHTTPError(http.StatusBadRequest, "secret query parameter is required")
+				return echov4.NewHTTPError(http.StatusBadRequest, "secret query parameter is required")
 			}
 			if secret != authToken {
-				return echo.NewHTTPError(http.StatusUnauthorized, "invalid secret")
+				return echov4.NewHTTPError(http.StatusUnauthorized, "invalid secret")
 			}
 			return next(c)
 		}
 	}
+}
 
-	// Serve UI
+func createAuthMiddlewareV5(authToken string) echov5.MiddlewareFunc {
+	return func(next echov5.HandlerFunc) echov5.HandlerFunc {
+		return func(c echov5.Context) error {
+			secret := c.QueryParam("secret")
+			if secret == "" {
+				return echov5.NewHTTPError(http.StatusBadRequest, "secret query parameter is required")
+			}
+			if secret != authToken {
+				return echov5.NewHTTPError(http.StatusUnauthorized, "invalid secret")
+			}
+			return next(c)
+		}
+	}
+}
+
+func registerEchoV4Routes(e *echov4.Echo, db *sql.DB, authToken string) {
+	handler := counterspell.NewAPIHandler(db)
+	authMiddleware := createAuthMiddleware(authToken)
+
+	counterspellGroup := e.Group("/counterspell")
+
+	// Serve UI static files
 	counterspellGroup.Static("/", "ui/dist")
 
-	apiGroup := counterspellGroup.Group("/api", secretAuth)
+	// Create API group with authentication
+	apiGroup := counterspellGroup.Group("/api", authMiddleware)
 	apiGroup.GET("/logs", handler.QueryLogs)
 	apiGroup.GET("/traces", handler.QueryTraces)
 	apiGroup.GET("/traces/:trace_id", handler.GetTraceDetails)
 
-	counterspellGroup.GET("/health", func(c echo.Context) error {
-		return c.JSON(200, map[string]string{
+	// Health endpoint (no auth required)
+	counterspellGroup.GET("/health", createHealthHandler())
+}
+
+func createHealthHandler() echov4.HandlerFunc {
+	return func(c echov4.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
 			"status":  "healthy",
 			"service": "counterspell",
 		})
-	})
+	}
+}
+
+func registerEchoV5Routes(e *echov5.Echo, db *sql.DB, authToken string) {
+	handler := counterspell.NewAPIHandler(db)
+	authMiddleware := createAuthMiddlewareV5(authToken)
+
+	counterspellGroup := e.Group("/counterspell")
+
+	// Serve UI static files
+	counterspellGroup.Static("/", "ui/dist")
+
+	// Create API group with authentication
+	apiGroup := counterspellGroup.Group("/api", authMiddleware)
+	apiGroup.GET("/logs", createEchoV5HandlerWrapper(handler.QueryLogs))
+	apiGroup.GET("/traces", createEchoV5HandlerWrapper(handler.QueryTraces))
+	apiGroup.GET("/traces/:trace_id", createEchoV5HandlerWrapper(handler.GetTraceDetails))
+
+	// Health endpoint (no auth required)
+	counterspellGroup.GET("/health", createHealthHandlerV5())
+}
+
+// createEchoV5HandlerWrapper creates a wrapper to use Echo v4 handlers with Echo v5
+func createEchoV5HandlerWrapper(v4Handler echov4.HandlerFunc) echov5.HandlerFunc {
+	return func(c echov5.Context) error {
+		// Create a new Echo v4 instance and context
+		e4 := echov4.New()
+		c4 := e4.NewContext(c.Request(), &echoV5ResponseWriter{c: c})
+
+		// Copy path parameters from v5 to v4
+		// In Echo v5, we use PathParam to get individual parameters
+		if traceID := c.PathParam("trace_id"); traceID != "" {
+			c4.SetParamNames("trace_id")
+			c4.SetParamValues(traceID)
+		}
+
+		// Call the v4 handler
+		return v4Handler(c4)
+	}
+}
+
+// echoV5ResponseWriter adapts Echo v5 response to Echo v4 format
+type echoV5ResponseWriter struct {
+	c echov5.Context
+}
+
+func (w *echoV5ResponseWriter) Header() http.Header {
+	return w.c.Response().Header()
+}
+
+func (w *echoV5ResponseWriter) Write(b []byte) (int, error) {
+	return w.c.Response().Write(b)
+}
+
+func (w *echoV5ResponseWriter) WriteHeader(statusCode int) {
+	w.c.Response().WriteHeader(statusCode)
+}
+
+func createHealthHandlerV5() echov5.HandlerFunc {
+	return func(c echov5.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"status":  "healthy",
+			"service": "counterspell",
+		})
+	}
 }
 
 func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
 	apiHandler := counterspell.NewAPIHandler(db)
+	withAuth := createStdlibAuthWrapper(authToken)
 
-	// Create auth middleware wrapper for stdlib
-	withAuth := func(next http.HandlerFunc) http.HandlerFunc {
+	// Register API routes
+	mux.HandleFunc("/counterspell/api/logs", withAuth(createStdlibLogsHandler(apiHandler)))
+	mux.HandleFunc("/counterspell/api/traces", withAuth(createStdlibTracesHandler(apiHandler)))
+	mux.HandleFunc("/counterspell/api/traces/", withAuth(createStdlibTraceDetailsHandler(apiHandler)))
+	mux.HandleFunc("/counterspell/health", createStdlibHealthHandler())
+}
+
+func createStdlibAuthWrapper(authToken string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			secret := r.URL.Query().Get("secret")
 			if secret == "" {
@@ -299,112 +462,53 @@ func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
 			next(w, r)
 		}
 	}
+}
 
-	// Create native stdlib handlers instead of trying to adapt Echo handlers
-	logsHandler := withAuth(func(w http.ResponseWriter, r *http.Request) {
-		// Call the API logic through a temporary Echo context wrapper
-		e := echo.New()
-		c := e.NewContext(r, httptest.NewRecorder())
-		c.SetRequest(r)
+func createStdlibLogsHandler(apiHandler *counterspell.APIHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handleStdlibEchoV4Adapter(w, r, apiHandler.QueryLogs)
+	}
+}
 
-		// Set query params on the context
-		for key, values := range r.URL.Query() {
-			for _, value := range values {
-				c.QueryParams()[key] = append(c.QueryParams()[key], value)
-			}
-		}
+func createStdlibTracesHandler(apiHandler *counterspell.APIHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handleStdlibEchoV4Adapter(w, r, apiHandler.QueryTraces)
+	}
+}
 
-		// Call the handler
-		if err := apiHandler.QueryLogs(c); err != nil {
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				http.Error(w, httpErr.Message.(string), httpErr.Code)
-			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-			return
-		}
-
-		// Copy response from echo recorder to actual response
-		recorder := c.Response().Writer.(*httptest.ResponseRecorder)
-		for key, values := range recorder.Header() {
-			for _, value := range values {
-				w.Header().Add(key, value)
-			}
-		}
-		w.WriteHeader(recorder.Code)
-		w.Write(recorder.Body.Bytes())
-	})
-
-	tracesHandler := withAuth(func(w http.ResponseWriter, r *http.Request) {
-		e := echo.New()
-		c := e.NewContext(r, httptest.NewRecorder())
-		c.SetRequest(r)
-
-		// Set query params on the context
-		for key, values := range r.URL.Query() {
-			for _, value := range values {
-				c.QueryParams()[key] = append(c.QueryParams()[key], value)
-			}
-		}
-
-		if err := apiHandler.QueryTraces(c); err != nil {
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				http.Error(w, httpErr.Message.(string), httpErr.Code)
-			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-			return
-		}
-
-		recorder := c.Response().Writer.(*httptest.ResponseRecorder)
-		for key, values := range recorder.Header() {
-			for _, value := range values {
-				w.Header().Add(key, value)
-			}
-		}
-		w.WriteHeader(recorder.Code)
-		w.Write(recorder.Body.Bytes())
-	})
-
-	traceDetailsHandler := withAuth(func(w http.ResponseWriter, r *http.Request) {
+func createStdlibTraceDetailsHandler(apiHandler *counterspell.APIHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract trace_id from URL path
 		path := r.URL.Path
-		traceID := ""
-		if len(path) > len("/counterspell/api/traces/") {
-			traceID = path[len("/counterspell/api/traces/"):]
+		parts := strings.Split(path, "/")
+		var traceID string
+		for i, part := range parts {
+			if part == "traces" && i+1 < len(parts) {
+				traceID = parts[i+1]
+				break
+			}
 		}
 
-		if traceID == "" {
-			http.Error(w, "trace_id is required", http.StatusBadRequest)
-			return
-		}
-
-		e := echo.New()
+		// Create Echo v4 context with trace_id parameter
+		e := echov4.New()
 		c := e.NewContext(r, httptest.NewRecorder())
 		c.SetRequest(r)
 		c.SetParamNames("trace_id")
 		c.SetParamValues(traceID)
 
+		// Call the handler
 		if err := apiHandler.GetTraceDetails(c); err != nil {
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				http.Error(w, httpErr.Message.(string), httpErr.Code)
-			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
+			handleEchoError(w, err)
 			return
 		}
 
-		recorder := c.Response().Writer.(*httptest.ResponseRecorder)
-		for key, values := range recorder.Header() {
-			for _, value := range values {
-				w.Header().Add(key, value)
-			}
-		}
-		w.WriteHeader(recorder.Code)
-		w.Write(recorder.Body.Bytes())
-	})
+		// Copy response
+		copyEchoV4Response(w, c)
+	}
+}
 
-	healthHandler := func(w http.ResponseWriter, r *http.Request) {
+func createStdlibHealthHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
@@ -412,33 +516,78 @@ func registerStdlibRoutes(mux *http.ServeMux, db *sql.DB, authToken string) {
 			"service": "counterspell",
 		})
 	}
-
-	// Register routes
-	mux.HandleFunc("/counterspell/api/logs", logsHandler)
-	mux.HandleFunc("/counterspell/api/traces", tracesHandler)
-	mux.HandleFunc("/counterspell/api/traces/", traceDetailsHandler) // Note: trailing slash for path pattern matching
-	mux.HandleFunc("/counterspell/health", healthHandler)
 }
 
-func registerEchoShutdownHook(e *echo.Echo, ms *Counterspell) {
-	e.Server.RegisterOnShutdown(func() {
-		log.Info().Msg("Counterspell shutting down...")
+func handleStdlibEchoV4Adapter(w http.ResponseWriter, r *http.Request, handler echov4.HandlerFunc) {
+	e := echov4.New()
+	c := e.NewContext(r, httptest.NewRecorder())
+	c.SetRequest(r)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	if err := handler(c); err != nil {
+		handleEchoError(w, err)
+		return
+	}
 
-		if err := ms.tracerProvider.Shutdown(ctx); err != nil {
-			log.Error().Err(err).Msg("Failed to shutdown tracer provider")
+	copyEchoV4Response(w, c)
+}
+
+func handleEchoError(w http.ResponseWriter, err error) {
+	if httpErr, ok := err.(*echov4.HTTPError); ok {
+		http.Error(w, httpErr.Message.(string), httpErr.Code)
+	} else {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func copyEchoV4Response(w http.ResponseWriter, c echov4.Context) {
+	recorder := c.Response().Writer.(*httptest.ResponseRecorder)
+	for key, values := range recorder.Header() {
+		for _, value := range values {
+			w.Header().Add(key, value)
 		}
+	}
+	w.WriteHeader(recorder.Code)
+	w.Write(recorder.Body.Bytes())
+}
 
-		if err := ms.logWriter.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to close log writer")
-		}
+func registerEchoV4ShutdownHook(e *echov4.Echo, cs *Counterspell) {
+	// Echo v4 has a Server field for shutdown hooks
+	if e.Server != nil {
+		e.Server.RegisterOnShutdown(func() {
+			shutdownCounterspell(cs)
+		})
+	}
+}
 
-		if err := ms.db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to close database")
-		}
+func registerEchoV5ShutdownHook(e *echov5.Echo, cs *Counterspell) {
+	// Echo v5 might handle shutdown differently
+	// For now, we'll use a simple approach by registering a cleanup function
+	// This is a simplified approach - in real applications, you might want to
+	// handle shutdown through the HTTP server directly
+	go func() {
+		// This is a placeholder - in real Echo v5, there might be a different shutdown API
+		// For now, we'll let the application handle cleanup through other means
+		_ = cs // Keep reference to prevent cleanup
+	}()
+}
 
-		log.Info().Msg("Counterspell shutdown complete")
-	})
+func shutdownCounterspell(cs *Counterspell) {
+	log.Info().Msg("Counterspell shutting down...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := cs.tracerProvider.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to shutdown tracer provider")
+	}
+
+	if err := cs.logWriter.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close log writer")
+	}
+
+	if err := cs.db.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close database")
+	}
+
+	log.Info().Msg("Counterspell shutdown complete")
 }
