@@ -10,12 +10,14 @@ import {
   IconArrowRight,
   IconChevronRight,
   IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import useSWR, { useSWRConfig } from "swr";
 import { api } from "../utils/api";
 import { TraceListItem } from "../types/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSecret } from "../context/SecretContext";
+import { notifications } from "@mantine/notifications";
 
 interface TracesTableProps {
   onTraceClick: (trace: TraceListItem) => void;
@@ -30,16 +32,33 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
     const res = await api.get(url, { params: { secret, q: filter } });
     return res.data;
   };
+
+  // TODO: define any type
   const { data, error } = useSWR<any>(
-    secret ? `/traces?q=${filter}` : null,
-    fetcher,
+    [`/traces?q=${filter}`, secret],
+    async ([url, secret]) => {
+      if (!secret) {
+        // SWR will catch this error and return it in the `error` object.
+        throw new Error("Secret is not set.");
+      }
+      return fetcher(url);
+    },
   );
   const theme = useMantineTheme();
 
-  if (error) return <div>Failed to load</div>;
-  if (!data) return <div>Loading...</div>;
+  useEffect(() => {
+    if (error) {
+      notifications.show({
+        title: "Error fetching metrics",
+        message:
+          "There was an error fetching metrics data. Reason: " + error.message,
+        color: "red",
+        icon: <IconX />,
+      });
+    }
+  }, [error]);
 
-  const rows = data.data.map((trace: TraceListItem) => (
+  const rows = data?.data.map((trace: TraceListItem) => (
     <Table.Tr
       key={trace.trace_id}
       onClick={() => onTraceClick(trace)}
