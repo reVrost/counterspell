@@ -48,17 +48,29 @@ export function LogsTable() {
   const theme = useMantineTheme();
 
   const { data: response, error } = useSWR<ApiResponse<Log>>(
-    secret ? `/logs?q=${filter}&level=${level}` : null,
-    fetcher,
+    [`/logs?q=${filter}&level=${level}`, secret],
+    async ([url, secret]) => {
+      if (!secret) {
+        // SWR will catch this error and return it in the `error` object.
+        throw new Error("Secret is not set.");
+      }
+      return fetcher(url);
+    },
   );
   const data = response?.data || [];
+
+  // const { data: response, error } = useSWR<ApiResponse<Log>>(
+  //   secret ? `/logs?q=${filter}&level=${level}` : null,
+  //   fetcher,
+  // );
+  // const data = response?.data || [];
 
   useEffect(() => {
     if (error) {
       notifications.show({
         title: "Error fetching logs",
         message:
-          "There was an error fetching the logs. Please try again later.",
+          "There was an error fetching the logs. Reason: " + error.message,
         color: "red",
         icon: <IconX />,
       });

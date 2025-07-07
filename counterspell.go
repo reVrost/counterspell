@@ -19,6 +19,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	"github.com/revrost/counterspell/internal/counterspell"
+	"github.com/revrost/counterspell/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
@@ -379,7 +380,7 @@ func registerEchoV5Routes(e *echov5.Echo, db *sql.DB, authToken string) {
 	counterspellGroup := e.Group("/counterspell")
 
 	// Serve UI static files
-	counterspellGroup.Static("/", "ui/dist")
+	counterspellGroup.StaticFS("/", ui.DistDirFS)
 
 	// Create API group with authentication
 	apiGroup := counterspellGroup.Group("/api", authMiddleware)
