@@ -7,14 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/revrost/counterspell/internal/db"
 )
 
 func setupAPITestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("sqlite3", ":memory:")
+	database, err := sql.Open("duckdb", "")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
@@ -22,28 +23,28 @@ func setupAPITestDB(t *testing.T) *sql.DB {
 	// Create tables
 	_, err = database.Exec(`
 		CREATE TABLE logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			timestamp TEXT NOT NULL,
-			level TEXT NOT NULL,
-			message TEXT NOT NULL,
-			trace_id TEXT,
-			span_id TEXT,
-			attributes TEXT
+			id BIGINT PRIMARY KEY,
+			timestamp BIGINT NOT NULL,
+			level VARCHAR NOT NULL,
+			message VARCHAR NOT NULL,
+			trace_id VARCHAR,
+			span_id VARCHAR,
+			attributes BLOB
 		);
 		CREATE INDEX idx_logs_timestamp ON logs(timestamp);
 		CREATE INDEX idx_logs_level ON logs(level);
 		CREATE INDEX idx_logs_trace_id ON logs(trace_id);
 
 		CREATE TABLE spans (
-			span_id TEXT PRIMARY KEY,
-			trace_id TEXT NOT NULL,
-			parent_span_id TEXT,
-			name TEXT NOT NULL,
-			start_time TEXT NOT NULL,
-			end_time TEXT NOT NULL,
-			duration_ns INTEGER NOT NULL,
-			attributes TEXT,
-			service_name TEXT NOT NULL,
+			span_id VARCHAR PRIMARY KEY,
+			trace_id VARCHAR NOT NULL,
+			parent_span_id VARCHAR,
+			name VARCHAR NOT NULL,
+			start_time BIGINT NOT NULL,
+			end_time BIGINT NOT NULL,
+			duration_ns BIGINT NOT NULL,
+			attributes BLOB,
+			service_name VARCHAR NOT NULL,
 			has_error BOOLEAN NOT NULL DEFAULT FALSE
 		);
 		CREATE INDEX idx_spans_trace_id ON spans(trace_id);
@@ -60,33 +61,37 @@ func insertTestLogs(t *testing.T, database *sql.DB) {
 	queries := db.New(database)
 
 	// Insert test logs
-	logs := []db.InsertLogParams{
+	logs := []db.Log{
 		{
-			Timestamp:  "2024-01-15T10:30:00.123Z",
-			Level:      "info",
-			Message:    "Test info log",
-			TraceID:    sql.NullString{String: "trace123", Valid: true},
-			SpanID:     sql.NullString{String: "span123", Valid: true},
-			Attributes: sql.NullString{String: `{"user":"test"}`, Valid: true},
+			ID:        1,
+			Timestamp: time.Date(2024, time.January, 15, 10, 30, 0, 123000000, time.UTC).UnixNano(),
+			Level:     "info",
+			Message:   "Test info log",
+			TraceID:   "trace123",
+			SpanID:    "span123",
+			Attributes: []byte(`{"user":"test"}`),
 		},
 		{
-			Timestamp:  "2024-01-15T10:31:00.123Z",
-			Level:      "error",
-			Message:    "Test error log",
-			TraceID:    sql.NullString{String: "trace456", Valid: true},
-			SpanID:     sql.NullString{String: "span456", Valid: true},
-			Attributes: sql.NullString{String: `{"error":"test error"}`, Valid: true},
+			ID:        2,
+			Timestamp: time.Date(2024, time.January, 15, 10, 31, 0, 123000000, time.UTC).UnixNano(),
+			Level:     "error",
+			Message:   "Test error log",
+			TraceID:   "trace456",
+			SpanID:    "span456",
+			Attributes: []byte(`{"error":"test error"}`),
 		},
 		{
-			Timestamp:  "2024-01-15T10:32:00.123Z",
-			Level:      "debug",
-			Message:    "Test debug log",
-			Attributes: sql.NullString{String: `{"debug":"test"}`, Valid: true},
+			ID:        3,
+			Timestamp: time.Date(2024, time.January, 15, 10, 32, 0, 123000000, time.UTC).UnixNano(),
+			Level:     "debug",
+			Message:   "Test debug log",
+			Attributes: []byte(`{"debug":"test"}`),
 		},
 	}
 
 	for _, log := range logs {
-		if err := queries.InsertLog(context.Background(), log); err != nil {
+		_, err := queries.InsertLog(context.Background(), log.ID, log.Timestamp, log.Level, log.Message, log.TraceID, log.SpanID, log.Attributes)
+		if err != nil {
 			t.Fatalf("Failed to insert test log: %v", err)
 		}
 	}
@@ -96,44 +101,48 @@ func insertTestSpans(t *testing.T, database *sql.DB) {
 	queries := db.New(database)
 
 	// Insert test spans
-	spans := []db.InsertSpanParams{
+	spans := []db.Span{
 		{
 			SpanID:      "span123",
 			TraceID:     "trace123",
+			ParentSpanID: "",
 			Name:        "GET /hello",
-			StartTime:   "2024-01-15T10:30:00.000Z",
-			EndTime:     "2024-01-15T10:30:00.100Z",
+			StartTime:   time.Date(2024, time.January, 15, 10, 30, 0, 0, time.UTC).UnixNano(),
+			EndTime:     time.Date(2024, time.January, 15, 10, 30, 0, 100000000, time.UTC).UnixNano(),
 			DurationNs:  100000000,
-			Attributes:  sql.NullString{String: `{"http.method":"GET"}`, Valid: true},
+			Attributes:  []byte(`{"http.method":"GET"}`),
 			ServiceName: "test-service",
 			HasError:    false,
 		},
 		{
 			SpanID:      "span456",
 			TraceID:     "trace456",
+			ParentSpanID: "",
 			Name:        "POST /error",
-			StartTime:   "2024-01-15T10:31:00.000Z",
-			EndTime:     "2024-01-15T10:31:00.200Z",
+			StartTime:   time.Date(2024, time.January, 15, 10, 31, 0, 0, time.UTC).UnixNano(),
+			EndTime:     time.Date(2024, time.January, 15, 10, 31, 0, 200000000, time.UTC).UnixNano(),
 			DurationNs:  200000000,
-			Attributes:  sql.NullString{String: `{"http.method":"POST"}`, Valid: true},
+			Attributes:  []byte(`{"http.method":"POST"}`),
 			ServiceName: "test-service",
 			HasError:    true,
 		},
 		{
 			SpanID:      "span789",
 			TraceID:     "trace789",
+			ParentSpanID: "",
 			Name:        "Background Task",
-			StartTime:   "2024-01-15T10:32:00.000Z",
-			EndTime:     "2024-01-15T10:32:00.500Z",
+			StartTime:   time.Date(2024, time.January, 15, 10, 32, 0, 0, time.UTC).UnixNano(),
+			EndTime:     time.Date(2024, time.January, 15, 10, 32, 0, 500000000, time.UTC).UnixNano(),
 			DurationNs:  500000000,
-			Attributes:  sql.NullString{String: `{"task":"background"}`, Valid: true},
+			Attributes:  []byte(`{"task":"background"}`),
 			ServiceName: "worker-service",
 			HasError:    false,
 		},
 	}
 
 	for _, span := range spans {
-		if err := queries.InsertSpan(context.Background(), span); err != nil {
+		_, err := queries.InsertSpan(context.Background(), span.SpanID, span.TraceID, span.ParentSpanID, span.Name, span.StartTime, span.EndTime, span.DurationNs, span.Attributes, span.ServiceName, span.HasError)
+		if err != nil {
 			t.Fatalf("Failed to insert test span: %v", err)
 		}
 	}

@@ -1,12 +1,12 @@
 # Counterspell
 
-A lightweight, embedded observability tool for Go applications that provides OpenTelemetry tracing and logging capabilities with a local SQLite database backend and REST API for data querying.
+A lightweight, embedded observability tool for Go applications that provides OpenTelemetry tracing and logging capabilities with a local DuckDB database backend and REST API for data querying.
 
 ## What it is
 
 - Fast and easy to get started
 - Gives you observability UI with the greatest of ease
-- Embedded observability with otel, zerolog (uses sqlite)
+- Embedded observability with otel, zerolog (uses duckdb)
 - Means no external dependencies, no xtra docker containers
 - Writes logs on a separate goroutine, so your app is not affected
 - Will add features for LLM ops soon!

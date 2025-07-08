@@ -3,7 +3,7 @@ package counterspell
 import (
 	"context"
 	"database/sql"
-	"embed"
+	
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,8 +16,8 @@ import (
 	middlewarev4 "github.com/labstack/echo/v4/middleware"
 	echov5 "github.com/labstack/echo/v5"
 	middlewarev5 "github.com/labstack/echo/v5/middleware"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
+	_ "github.com/marcboeker/go-duckdb/v2"
+	
 	"github.com/revrost/counterspell/internal/counterspell"
 	"github.com/revrost/counterspell/ui"
 	"github.com/rs/zerolog"
@@ -29,8 +29,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
-//go:embed db/migrations/*.sql
-var migrationsFS embed.FS
+
 
 // config holds the configuration for Counterspell
 type config struct {
@@ -75,12 +74,12 @@ func WithServiceVersion(version string) Option {
 type Counterspell struct {
 	db             *sql.DB
 	tracerProvider *trace.TracerProvider
-	logWriter      *counterspell.SQLiteLogWriter
+	logWriter      *counterspell.DuckDBLogWriter
 }
 
 // Install is deprecated. Use AddToEcho instead.
 // This function is kept for backward compatibility.
-func Install(e *echov4.Echo, opts ...Option) error {
+func Install(e *echov4.Echo, opts ...Option) (*Counterspell, error) {
 	return AddToEcho(e, opts...)
 }
 
@@ -183,7 +182,7 @@ func buildConfig(opts ...Option) *config {
 }
 
 func initDatabase(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
+	db, err := sql.Open("duckdb", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -193,24 +192,14 @@ func initDatabase(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	goose.SetBaseFS(migrationsFS)
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to set goose dialect: %w", err)
-	}
-
-	if err := goose.Up(db, "db/migrations"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
-	}
+	
 
 	return db, nil
 }
 
 func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Counterspell, error) {
-	exporter := counterspell.NewSQLiteSpanExporter(db)
-	logWriter := counterspell.NewSQLiteLogWriter(db)
+	exporter := counterspell.NewDuckDBSpanExporter(db)
+	logWriter := counterspell.NewDuckDBLogWriter(db)
 
 	res, err := resource.New(context.Background(),
 		resource.WithAttributes(
@@ -236,7 +225,7 @@ func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Counte
 	}, nil
 }
 
-func setupGlobalLogger(logWriter *counterspell.SQLiteLogWriter) {
+func setupGlobalLogger(logWriter *counterspell.DuckDBLogWriter) {
 	multiWriter := zerolog.MultiLevelWriter(
 		zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339},
 		logWriter,

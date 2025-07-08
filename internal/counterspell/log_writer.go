@@ -12,16 +12,16 @@ import (
 
 // LogData represents a log entry for database insertion
 type LogData struct {
-	Timestamp  string
+	Timestamp  int64
 	Level      string
 	Message    string
-	TraceID    sql.NullString
-	SpanID     sql.NullString
-	Attributes string
+	TraceID    string
+	SpanID     string
+	Attributes []byte
 }
 
-// SQLiteLogWriter writes logs to SQLite asynchronously
-type SQLiteLogWriter struct {
+// DuckDBLogWriter writes logs to DuckDB asynchronously
+type DuckDBLogWriter struct {
 	queries   *db.Queries
 	logChan   chan LogData
 	batchSize int
@@ -31,9 +31,9 @@ type SQLiteLogWriter struct {
 	closeMu   sync.RWMutex
 }
 
-// NewSQLiteLogWriter creates a new log writer
-func NewSQLiteLogWriter(database *sql.DB) *SQLiteLogWriter {
-	writer := &SQLiteLogWriter{
+// NewDuckDBLogWriter creates a new log writer
+func NewDuckDBLogWriter(database *sql.DB) *DuckDBLogWriter {
+	writer := &DuckDBLogWriter{
 		queries:   db.New(database),
 		logChan:   make(chan LogData, 1000),
 		batchSize: 100,
@@ -47,7 +47,7 @@ func NewSQLiteLogWriter(database *sql.DB) *SQLiteLogWriter {
 }
 
 // Write implements io.Writer
-func (w *SQLiteLogWriter) Write(p []byte) (n int, err error) {
+func (w *DuckDBLogWriter) Write(p []byte) (n int, err error) {
 	w.closeMu.RLock()
 	if w.closed {
 		w.closeMu.RUnlock()
@@ -71,7 +71,7 @@ func (w *SQLiteLogWriter) Write(p []byte) (n int, err error) {
 }
 
 // worker processes logs in batches
-func (w *SQLiteLogWriter) worker() {
+func (w *DuckDBLogWriter) worker() {
 	defer w.wg.Done()
 
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -116,32 +116,40 @@ func (w *SQLiteLogWriter) worker() {
 }
 
 // processBatch inserts logs into database
-func (w *SQLiteLogWriter) processBatch(batch []LogData) {
+func (w *DuckDBLogWriter) processBatch(batch []LogData) {
 	ctx := context.Background()
 
 	for _, log := range batch {
-		_ = w.queries.InsertLog(ctx, db.InsertLogParams{
-			Timestamp:  log.Timestamp,
-			Level:      log.Level,
-			Message:    log.Message,
-			TraceID:    log.TraceID,
-			SpanID:     log.SpanID,
-			Attributes: sql.NullString{String: log.Attributes, Valid: log.Attributes != ""},
-		})
+		_, _ = w.queries.InsertLog(ctx, 0,
+			log.Timestamp,
+			log.Level,
+			log.Message,
+			log.TraceID,
+			log.SpanID,
+			log.Attributes,
+		)
 	}
 }
 
 // convertLogEntry converts JSON log to LogData
-func (w *SQLiteLogWriter) convertLogEntry(entry map[string]any) LogData {
+func (w *DuckDBLogWriter) convertLogEntry(entry map[string]any) LogData {
 	logData := LogData{}
 
 	// Check both "time" and "timestamp" fields
-	if timestamp, ok := entry["time"].(string); ok {
-		logData.Timestamp = timestamp
-	} else if timestamp, ok := entry["timestamp"].(string); ok {
-		logData.Timestamp = timestamp
+	timestampStr := ""
+	if ts, ok := entry["time"].(string); ok {
+		timestampStr = ts
+	} else if ts, ok := entry["timestamp"].(string); ok {
+		timestampStr = ts
+	}
+
+	// Parse timestamp string to int64 (nanoseconds)
+	if timestampStr != "" {
+		if t, err := time.Parse(time.RFC3339Nano, timestampStr); err == nil {
+			logData.Timestamp = t.UnixNano()
+		}
 	} else {
-		logData.Timestamp = time.Now().Format(time.RFC3339Nano)
+		logData.Timestamp = time.Now().UnixNano()
 	}
 
 	if level, ok := entry["level"].(string); ok {
@@ -156,12 +164,12 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]any) LogData {
 		logData.Message = "unknown"
 	}
 
-	if traceID, ok := entry["trace_id"].(string); ok && traceID != "" {
-		logData.TraceID = sql.NullString{String: traceID, Valid: true}
+	if traceID, ok := entry["trace_id"].(string); ok {
+		logData.TraceID = traceID
 	}
 
-	if spanID, ok := entry["span_id"].(string); ok && spanID != "" {
-		logData.SpanID = sql.NullString{String: spanID, Valid: true}
+	if spanID, ok := entry["span_id"].(string); ok {
+		logData.SpanID = spanID
 	}
 
 	attributes := make(map[string]any)
@@ -173,7 +181,7 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]any) LogData {
 
 	if len(attributes) > 0 {
 		if attributesJSON, err := json.Marshal(attributes); err == nil {
-			logData.Attributes = string(attributesJSON)
+			logData.Attributes = attributesJSON
 		}
 	}
 
@@ -181,7 +189,7 @@ func (w *SQLiteLogWriter) convertLogEntry(entry map[string]any) LogData {
 }
 
 // Close shuts down the writer
-func (w *SQLiteLogWriter) Close() error {
+func (w *DuckDBLogWriter) Close() error {
 	w.closeMu.Lock()
 	if w.closed {
 		w.closeMu.Unlock()

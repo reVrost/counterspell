@@ -36,7 +36,7 @@ type APIResponse struct {
 type TraceListItem struct {
 	TraceID        string  `json:"trace_id"`
 	RootSpanName   string  `json:"root_span_name"`
-	TraceStartTime string  `json:"trace_start_time"`
+	TraceStartTime int64   `json:"trace_start_time"`
 	DurationMs     float64 `json:"duration_ms"`
 	SpanCount      int64   `json:"span_count"`
 	ErrorCount     int64   `json:"error_count"`
@@ -53,10 +53,10 @@ type TraceDetail struct {
 type SpanItem struct {
 	SpanID       string         `json:"span_id"`
 	TraceID      string         `json:"trace_id"`
-	ParentSpanID *string        `json:"parent_span_id"`
+	ParentSpanID string         `json:"parent_span_id"`
 	Name         string         `json:"name"`
-	StartTime    string         `json:"start_time"`
-	EndTime      string         `json:"end_time"`
+	StartTime    int64          `json:"start_time"`
+	EndTime      int64          `json:"end_time"`
 	DurationNs   int64          `json:"duration_ns"`
 	Attributes   map[string]any `json:"attributes"`
 	ServiceName  string         `json:"service_name"`
@@ -66,11 +66,11 @@ type SpanItem struct {
 // LogItem represents a log entry
 type LogItem struct {
 	ID         int64          `json:"id"`
-	Timestamp  string         `json:"timestamp"`
+	Timestamp  int64          `json:"timestamp"`
 	Level      string         `json:"level"`
 	Message    string         `json:"message"`
-	TraceID    *string        `json:"trace_id"`
-	SpanID     *string        `json:"span_id"`
+	TraceID    string         `json:"trace_id"`
+	SpanID     string         `json:"span_id"`
 	Attributes map[string]any `json:"attributes"`
 }
 
@@ -79,11 +79,11 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 	// Parse query parameters
 	limit := parseIntParam(c.QueryParam("limit"), 100)
 	offset := parseIntParam(c.QueryParam("offset"), 0)
-	level := c.QueryParam("level")
+	levelStr := c.QueryParam("level")
 	q := c.QueryParam("q") // Full-text search
-	startTime := c.QueryParam("start_time")
-	endTime := c.QueryParam("end_time")
-	traceID := c.QueryParam("trace_id")
+	startTimeStr := c.QueryParam("start_time")
+	endTimeStr := c.QueryParam("end_time")
+	traceIDStr := c.QueryParam("trace_id")
 
 	ctx := c.Request().Context()
 
@@ -92,62 +92,43 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 	var total int64
 	var err error
 
-	if level != "" || startTime != "" || endTime != "" || traceID != "" {
-		// Use filtered query
-		params := db.GetLogsWithFiltersParams{
-			Limit:  int64(limit),
-			Offset: int64(offset),
+	if levelStr != "" || startTimeStr != "" || endTimeStr != "" || traceIDStr != "" {
+		// Set nullable parameters
+		var level sql.NullString
+		if levelStr != "" {
+			level = sql.NullString{String: levelStr, Valid: true}
 		}
-		countParams := db.CountLogsWithFiltersParams{}
-
-		// Set nullable parameters - use nil for empty, value for present
-		if level != "" {
-			params.Level = level
-			countParams.Level = level
-		} else {
-			params.Level = nil
-			countParams.Level = nil
+		var traceID sql.NullString
+		if traceIDStr != "" {
+			traceID = sql.NullString{String: traceIDStr, Valid: true}
 		}
-
-		if traceID != "" {
-			params.TraceID = traceID
-			countParams.TraceID = traceID
-		} else {
-			params.TraceID = nil
-			countParams.TraceID = nil
+		var startTime sql.NullInt64
+		if startTimeStr != "" {
+			parsedStartTime, err := strconv.ParseInt(startTimeStr, 10, 64)
+			if err == nil {
+				startTime = sql.NullInt64{Int64: parsedStartTime, Valid: true}
+			}
 		}
-
-		if startTime != "" {
-			params.StartTime = startTime
-			countParams.StartTime = startTime
-		} else {
-			params.StartTime = nil
-			countParams.StartTime = nil
+		var endTime sql.NullInt64
+		if endTimeStr != "" {
+			parsedEndTime, err := strconv.ParseInt(endTimeStr, 10, 64)
+			if err == nil {
+				endTime = sql.NullInt64{Int64: parsedEndTime, Valid: true}
+			}
 		}
 
-		if endTime != "" {
-			params.EndTime = endTime
-			countParams.EndTime = endTime
-		} else {
-			params.EndTime = nil
-			countParams.EndTime = nil
-		}
-
-		logs, err = h.queries.GetLogsWithFilters(ctx, params)
+		logs, err = h.queries.GetLogsWithFilters(ctx, level, traceID, startTime, endTime, int32(limit), int32(offset))
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to query logs")
 		}
 
-		total, err = h.queries.CountLogsWithFilters(ctx, countParams)
+		total, err = h.queries.CountLogsWithFilters(ctx, level, traceID, startTime, endTime)
 		if err != nil {
 			total = 0
 		}
 	} else {
 		// Use simple query
-		logs, err = h.queries.GetLogs(ctx, db.GetLogsParams{
-			Limit:  int64(limit),
-			Offset: int64(offset),
-		})
+		logs, err = h.queries.GetLogs(ctx, int32(limit), int32(offset))
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to query logs")
 		}
@@ -166,19 +147,14 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 			Timestamp: log.Timestamp,
 			Level:     log.Level,
 			Message:   log.Message,
-		}
-
-		if log.TraceID.Valid {
-			apiLog.TraceID = &log.TraceID.String
-		}
-		if log.SpanID.Valid {
-			apiLog.SpanID = &log.SpanID.String
+			TraceID:   log.TraceID,
+			SpanID:    log.SpanID,
 		}
 
 		// Parse attributes JSON
-		if log.Attributes.Valid && log.Attributes.String != "" {
+		if len(log.Attributes) > 0 {
 			var attrs map[string]any
-			if json.Unmarshal([]byte(log.Attributes.String), &attrs) == nil {
+			if json.Unmarshal(log.Attributes, &attrs) == nil {
 				apiLog.Attributes = attrs
 			} else {
 				apiLog.Attributes = make(map[string]any)
@@ -191,7 +167,7 @@ func (h *APIHandler) QueryLogs(c echo.Context) error {
 		if q != "" {
 			searchTerm := strings.ToLower(q)
 			if !strings.Contains(strings.ToLower(apiLog.Message), searchTerm) &&
-				!strings.Contains(strings.ToLower(log.Attributes.String), searchTerm) {
+				!strings.Contains(strings.ToLower(string(log.Attributes)), searchTerm) {
 				continue
 			}
 		}
@@ -222,10 +198,7 @@ func (h *APIHandler) QueryTraces(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	// Get root spans
-	rootSpans, err := h.queries.GetRootSpans(ctx, db.GetRootSpansParams{
-		Limit:  int64(limit),
-		Offset: int64(offset),
-	})
+	rootSpans, err := h.queries.GetRootSpans(ctx, int32(limit), int32(offset))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to query traces")
 	}
@@ -256,14 +229,11 @@ func (h *APIHandler) QueryTraces(c echo.Context) error {
 			stats = db.GetTraceStatsRow{
 				TraceID:    rootSpan.TraceID,
 				SpanCount:  1,
-				ErrorCount: sql.NullFloat64{Float64: 0, Valid: true},
+				ErrorCount: 0,
 			}
 		}
 
-		errorCount := int64(0)
-		if stats.ErrorCount.Valid {
-			errorCount = int64(stats.ErrorCount.Float64)
-		}
+		errorCount := stats.ErrorCount
 
 		// Apply error filter if provided
 		if hasErrorParam == "true" && errorCount == 0 {
@@ -271,8 +241,9 @@ func (h *APIHandler) QueryTraces(c echo.Context) error {
 		}
 
 		// Calculate duration in milliseconds
-		startTime, _ := time.Parse(time.RFC3339Nano, rootSpan.StartTime)
-		endTime, _ := time.Parse(time.RFC3339Nano, rootSpan.EndTime)
+		// Convert nanoseconds to time.Time for duration calculation
+		startTime := time.Unix(0, rootSpan.StartTime)
+		endTime := time.Unix(0, rootSpan.EndTime)
 		durationMs := float64(endTime.Sub(startTime).Nanoseconds()) / 1000000
 
 		trace := TraceListItem{
@@ -329,24 +300,21 @@ func (h *APIHandler) GetTraceDetails(c echo.Context) error {
 	apiSpans := make([]SpanItem, 0, len(spans))
 	for _, span := range spans {
 		apiSpan := SpanItem{
-			SpanID:      span.SpanID,
-			TraceID:     span.TraceID,
-			Name:        span.Name,
-			StartTime:   span.StartTime,
-			EndTime:     span.EndTime,
-			DurationNs:  span.DurationNs,
-			ServiceName: span.ServiceName,
-			HasError:    span.HasError,
-		}
-
-		if span.ParentSpanID.Valid {
-			apiSpan.ParentSpanID = &span.ParentSpanID.String
+			SpanID:       span.SpanID,
+			TraceID:      span.TraceID,
+			ParentSpanID: span.ParentSpanID,
+			Name:         span.Name,
+			StartTime:    span.StartTime,
+			EndTime:      span.EndTime,
+			DurationNs:   span.DurationNs,
+			ServiceName:  span.ServiceName,
+			HasError:     span.HasError,
 		}
 
 		// Parse attributes JSON
-		if span.Attributes.Valid && span.Attributes.String != "" {
+		if len(span.Attributes) > 0 {
 			var attrs map[string]any
-			if json.Unmarshal([]byte(span.Attributes.String), &attrs) == nil {
+			if json.Unmarshal(span.Attributes, &attrs) == nil {
 				apiSpan.Attributes = attrs
 			} else {
 				apiSpan.Attributes = make(map[string]any)

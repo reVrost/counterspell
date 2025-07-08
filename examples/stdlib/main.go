@@ -3,8 +3,8 @@ package main
 import (
 	"net/http"
 
-	"github.com/rs/zerolog/log"
 	"github.com/revrost/counterspell"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {

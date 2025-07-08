@@ -16,19 +16,19 @@ import (
 type SpanData struct {
 	SpanID       string
 	TraceID      string
-	ParentSpanID sql.NullString
+	ParentSpanID string
 	Name         string
-	StartTime    string
-	EndTime      string
+	StartTime    int64
+	EndTime      int64
 	DurationNs   int64
-	Attributes   string
+	Attributes   []byte
 	ServiceName  string
 	HasError     bool
 }
 
-// SQLiteSpanExporter implements the OpenTelemetry SpanExporter interface
-// and writes spans to SQLite database asynchronously
-type SQLiteSpanExporter struct {
+// DuckDBSpanExporter implements the OpenTelemetry SpanExporter interface
+// and writes spans to DuckDB database asynchronously
+type DuckDBSpanExporter struct {
 	queries   *db.Queries
 	spanChan  chan SpanData
 	batchSize int
@@ -36,9 +36,9 @@ type SQLiteSpanExporter struct {
 	wg        sync.WaitGroup
 }
 
-// NewSQLiteSpanExporter creates a new SQLite span exporter
-func NewSQLiteSpanExporter(database *sql.DB) *SQLiteSpanExporter {
-	exporter := &SQLiteSpanExporter{
+// NewDuckDBSpanExporter creates a new DuckDB span exporter
+func NewDuckDBSpanExporter(database *sql.DB) *DuckDBSpanExporter {
+	exporter := &DuckDBSpanExporter{
 		queries:   db.New(database),
 		spanChan:  make(chan SpanData, 1000), // Buffer for async processing
 		batchSize: 100,                       // Process spans in batches
@@ -53,7 +53,7 @@ func NewSQLiteSpanExporter(database *sql.DB) *SQLiteSpanExporter {
 }
 
 // worker processes spans from the channel in batches
-func (e *SQLiteSpanExporter) worker() {
+func (e *DuckDBSpanExporter) worker() {
 	defer e.wg.Done()
 
 	ticker := time.NewTicker(100 * time.Millisecond) // Flush every 100ms
@@ -106,22 +106,22 @@ func (e *SQLiteSpanExporter) worker() {
 }
 
 // processBatch inserts a batch of spans into the database
-func (e *SQLiteSpanExporter) processBatch(batch []SpanData) {
+func (e *DuckDBSpanExporter) processBatch(batch []SpanData) {
 	ctx := context.Background()
 
 	for _, span := range batch {
-		err := e.queries.InsertSpan(ctx, db.InsertSpanParams{
-			SpanID:       span.SpanID,
-			TraceID:      span.TraceID,
-			ParentSpanID: span.ParentSpanID,
-			Name:         span.Name,
-			StartTime:    span.StartTime,
-			EndTime:      span.EndTime,
-			DurationNs:   span.DurationNs,
-			Attributes:   sql.NullString{String: span.Attributes, Valid: span.Attributes != ""},
-			ServiceName:  span.ServiceName,
-			HasError:     span.HasError,
-		})
+		_, err := e.queries.InsertSpan(ctx,
+			span.SpanID,
+			span.TraceID,
+			span.ParentSpanID,
+			span.Name,
+			span.StartTime,
+			span.EndTime,
+			span.DurationNs,
+			span.Attributes,
+			span.ServiceName,
+			span.HasError,
+		)
 		if err != nil {
 			// In a production system, you might want to log this error
 			// For now, we'll silently continue to avoid disrupting the application
@@ -130,9 +130,9 @@ func (e *SQLiteSpanExporter) processBatch(batch []SpanData) {
 	}
 }
 
-// ExportSpans exports spans to the SQLite database
+// ExportSpans exports spans to the DuckDB database
 // This method is called by the OpenTelemetry SDK
-func (e *SQLiteSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
+func (e *DuckDBSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
 	for _, span := range spans {
 		spanData := e.convertSpan(span)
 
@@ -150,14 +150,11 @@ func (e *SQLiteSpanExporter) ExportSpans(ctx context.Context, spans []trace.Read
 }
 
 // convertSpan converts an OpenTelemetry ReadOnlySpan to our SpanData struct
-func (e *SQLiteSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
+func (e *DuckDBSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
 	// Get parent span ID
-	var parentSpanID sql.NullString
+	var parentSpanID string
 	if span.Parent().IsValid() {
-		parentSpanID = sql.NullString{
-			String: span.Parent().SpanID().String(),
-			Valid:  true,
-		}
+		parentSpanID = span.Parent().SpanID().String()
 	}
 
 	// Convert attributes to JSON
@@ -187,17 +184,17 @@ func (e *SQLiteSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
 		TraceID:      span.SpanContext().TraceID().String(),
 		ParentSpanID: parentSpanID,
 		Name:         span.Name(),
-		StartTime:    span.StartTime().Format(time.RFC3339Nano),
-		EndTime:      span.EndTime().Format(time.RFC3339Nano),
+		StartTime:    span.StartTime().UnixNano(),
+		EndTime:      span.EndTime().UnixNano(),
 		DurationNs:   span.EndTime().Sub(span.StartTime()).Nanoseconds(),
-		Attributes:   string(attributesJSON),
+		Attributes:   attributesJSON,
 		ServiceName:  serviceName,
 		HasError:     hasError,
 	}
 }
 
 // Shutdown gracefully shuts down the exporter
-func (e *SQLiteSpanExporter) Shutdown(ctx context.Context) error {
+func (e *DuckDBSpanExporter) Shutdown(ctx context.Context) error {
 	close(e.done)
 
 	// Wait for worker to finish with timeout
@@ -216,7 +213,7 @@ func (e *SQLiteSpanExporter) Shutdown(ctx context.Context) error {
 }
 
 // ForceFlush forces the exporter to flush any buffered spans
-func (e *SQLiteSpanExporter) ForceFlush(ctx context.Context) error {
+func (e *DuckDBSpanExporter) ForceFlush(ctx context.Context) error {
 	// Since we're using a buffered channel and batch processing,
 	// we can't easily force flush without adding complexity.
 	// For simplicity, we'll just return nil here.

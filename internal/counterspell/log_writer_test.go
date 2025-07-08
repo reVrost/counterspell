@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/revrost/counterspell/internal/db"
 )
 
 func setupLogTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("sqlite3", ":memory:")
+	database, err := sql.Open("duckdb", "")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
@@ -19,8 +19,8 @@ func setupLogTestDB(t *testing.T) *sql.DB {
 	// Create the logs table
 	_, err = database.Exec(`
 		CREATE TABLE logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			timestamp TEXT NOT NULL,
+			id BIGINT PRIMARY KEY,
+			timestamp BIGINT NOT NULL,
 			level TEXT NOT NULL,
 			message TEXT NOT NULL,
 			trace_id TEXT,
@@ -38,11 +38,11 @@ func setupLogTestDB(t *testing.T) *sql.DB {
 	return database
 }
 
-func TestSQLiteLogWriter_WriteValidJSON(t *testing.T) {
+func TestDuckDBLogWriter_WriteValidJSON(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 	defer writer.Close()
 
 	// Test writing a valid JSON log with trace context
@@ -70,10 +70,7 @@ func TestSQLiteLogWriter_WriteValidJSON(t *testing.T) {
 
 	// Verify log was written to database
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  10,
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), 10, 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}
@@ -89,25 +86,25 @@ func TestSQLiteLogWriter_WriteValidJSON(t *testing.T) {
 	if log.Message != "Test log message" {
 		t.Errorf("Expected message 'Test log message', got '%s'", log.Message)
 	}
-	if !log.TraceID.Valid || log.TraceID.String != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("Expected trace_id '1234567890abcdef1234567890abcdef', got '%s'", log.TraceID.String)
+	if log.TraceID != "1234567890abcdef1234567890abcdef" {
+		t.Errorf("Expected trace_id '1234567890abcdef1234567890abcdef', got '%s'", log.TraceID)
 	}
-	if !log.SpanID.Valid || log.SpanID.String != "1234567890abcdef" {
-		t.Errorf("Expected span_id '1234567890abcdef', got '%s'", log.SpanID.String)
+	if log.SpanID != "1234567890abcdef" {
+		t.Errorf("Expected span_id '1234567890abcdef', got '%s'", log.SpanID)
 	}
 
-	// Check attributes were stored (excluding processed fields)
+	// Check attributes were stored correctly
 	expectedAttrs := `{"service":"test-service","user_id":"user123"}`
-	if log.Attributes.String != expectedAttrs {
-		t.Errorf("Expected attributes '%s', got '%s'", expectedAttrs, log.Attributes.String)
+	if string(log.Attributes) != expectedAttrs {
+		t.Errorf("Expected attributes '%s', got '%s'", expectedAttrs, string(log.Attributes))
 	}
 }
 
-func TestSQLiteLogWriter_WriteWithoutTraceContext(t *testing.T) {
+func TestDuckDBLogWriter_WriteWithoutTraceContext(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 	defer writer.Close()
 
 	// Test writing a log without trace context
@@ -129,10 +126,7 @@ func TestSQLiteLogWriter_WriteWithoutTraceContext(t *testing.T) {
 
 	// Verify log was written to database
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  10,
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), 10, 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}
@@ -148,25 +142,25 @@ func TestSQLiteLogWriter_WriteWithoutTraceContext(t *testing.T) {
 	if log.Message != "Error occurred" {
 		t.Errorf("Expected message 'Error occurred', got '%s'", log.Message)
 	}
-	if log.TraceID.Valid {
-		t.Errorf("Expected trace_id to be NULL, got '%s'", log.TraceID.String)
+	if log.TraceID != "" {
+		t.Errorf("Expected trace_id to be empty, got '%s'", log.TraceID)
 	}
-	if log.SpanID.Valid {
-		t.Errorf("Expected span_id to be NULL, got '%s'", log.SpanID.String)
+	if log.SpanID != "" {
+		t.Errorf("Expected span_id to be empty, got '%s'", log.SpanID)
 	}
 
 	// Check attributes were stored
 	expectedAttrs := `{"error_code":"E001","service":"test-service"}`
-	if log.Attributes.String != expectedAttrs {
-		t.Errorf("Expected attributes '%s', got '%s'", expectedAttrs, log.Attributes.String)
+	if string(log.Attributes) != expectedAttrs {
+		t.Errorf("Expected attributes '%s', got '%s'", expectedAttrs, string(log.Attributes))
 	}
 }
 
-func TestSQLiteLogWriter_WriteInvalidJSON(t *testing.T) {
+func TestDuckDBLogWriter_WriteInvalidJSON(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 	defer writer.Close()
 
 	// Test writing invalid JSON (should be handled gracefully)
@@ -187,10 +181,7 @@ func TestSQLiteLogWriter_WriteInvalidJSON(t *testing.T) {
 
 	// Verify no logs were written to database (invalid JSON is discarded)
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  10,
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), 10, 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}
@@ -200,11 +191,11 @@ func TestSQLiteLogWriter_WriteInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestSQLiteLogWriter_WriteMissingFields(t *testing.T) {
+func TestDuckDBLogWriter_WriteMissingFields(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 	defer writer.Close()
 
 	// Test writing JSON with missing required fields
@@ -223,10 +214,7 @@ func TestSQLiteLogWriter_WriteMissingFields(t *testing.T) {
 
 	// Verify log was written with default values
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  10,
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), 10, 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}
@@ -246,16 +234,16 @@ func TestSQLiteLogWriter_WriteMissingFields(t *testing.T) {
 
 	// Custom field should be in attributes
 	expectedAttrs := `{"custom_field":"custom_value"}`
-	if log.Attributes.String != expectedAttrs {
-		t.Errorf("Expected attributes '%s', got '%s'", expectedAttrs, log.Attributes.String)
+	if string(log.Attributes) != expectedAttrs {
+		t.Errorf("Expected attributes '%s', got '%s'", expectedAttrs, string(log.Attributes))
 	}
 }
 
-func TestSQLiteLogWriter_BatchProcessing(t *testing.T) {
+func TestDuckDBLogWriter_BatchProcessing(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 	defer writer.Close()
 
 	// Write many logs to test batching
@@ -279,10 +267,7 @@ func TestSQLiteLogWriter_BatchProcessing(t *testing.T) {
 
 	// Verify all logs were processed
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  int64(numLogs + 10), // Get more than we wrote
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), int32(numLogs+10), 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}
@@ -292,11 +277,11 @@ func TestSQLiteLogWriter_BatchProcessing(t *testing.T) {
 	}
 }
 
-func TestSQLiteLogWriter_ConcurrentWrites(t *testing.T) {
+func TestDuckDBLogWriter_ConcurrentWrites(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 	defer writer.Close()
 
 	// Test concurrent writes
@@ -337,10 +322,7 @@ func TestSQLiteLogWriter_ConcurrentWrites(t *testing.T) {
 
 	// Verify all logs were processed
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  int64(numGoroutines*logsPerGoroutine + 10),
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), int32(numGoroutines*logsPerGoroutine+10), 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}
@@ -351,11 +333,11 @@ func TestSQLiteLogWriter_ConcurrentWrites(t *testing.T) {
 	}
 }
 
-func TestSQLiteLogWriter_Close(t *testing.T) {
+func TestDuckDBLogWriter_Close(t *testing.T) {
 	database := setupLogTestDB(t)
 	defer database.Close()
 
-	writer := NewSQLiteLogWriter(database)
+	writer := NewDuckDBLogWriter(database)
 
 	// Write a log before closing with unique identifier
 	logJSON := `{
@@ -378,10 +360,7 @@ func TestSQLiteLogWriter_Close(t *testing.T) {
 
 	// Verify the log was processed before close
 	queries := db.New(database)
-	logs, err := queries.GetLogs(context.Background(), db.GetLogsParams{
-		Limit:  10,
-		Offset: 0,
-	})
+	logs, err := queries.GetLogs(context.Background(), 10, 0)
 	if err != nil {
 		t.Fatalf("Failed to query logs: %v", err)
 	}

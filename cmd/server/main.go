@@ -12,11 +12,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
+	_ "github.com/marcboeker/go-duckdb/v2"
+	
+	"github.com/revrost/counterspell/internal/counterspell"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/revrost/counterspell/internal/counterspell"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -120,9 +120,9 @@ func main() {
 	log.Info().Msg("Server exited")
 }
 
-// initDB initializes the SQLite database and runs migrations
+// initDB initializes the DuckDB database and runs migrations
 func initDB(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
+	db, err := sql.Open("duckdb", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -133,13 +133,7 @@ func initDB(dbPath string) (*sql.DB, error) {
 	}
 
 	// Run migrations
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return nil, fmt.Errorf("failed to set goose dialect: %w", err)
-	}
-
-	if err := goose.Up(db, "db/migrations"); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
-	}
+	
 
 	log.Info().Msg("Database initialized successfully")
 	return db, nil
@@ -147,8 +141,8 @@ func initDB(dbPath string) (*sql.DB, error) {
 
 // initObservability sets up OpenTelemetry tracing and logging
 func initObservability(db *sql.DB) (func(), error) {
-	// Create SQLite exporter
-	exporter := counterspell.NewSQLiteSpanExporter(db)
+	// Create DuckDB exporter
+	exporter := counterspell.NewDuckDBSpanExporter(db)
 
 	// Create resource
 	res, err := resource.New(context.Background(),
@@ -171,12 +165,12 @@ func initObservability(db *sql.DB) (func(), error) {
 	otel.SetTracerProvider(tp)
 
 	// Initialize logging
-	logWriter := counterspell.NewSQLiteLogWriter(db)
+	logWriter := counterspell.NewDuckDBLogWriter(db)
 
 	// Configure zerolog with multiple outputs
 	multiWriter := zerolog.MultiLevelWriter(
 		os.Stdout, // Console output for development
-		logWriter, // SQLite storage
+		logWriter, // DuckDB storage
 	)
 
 	// Configure global logger with trace context hook

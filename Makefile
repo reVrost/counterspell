@@ -21,7 +21,7 @@ generate: ## Generate sqlc code
 # Database
 migrate: ## Run database migrations
 	@mkdir -p bin
-	cd db && goose sqlite3 ../counterspell.db up
+	cd db && goose duckdb ../counterspell.db up
 
 # Testing
 test: generate ## Run all tests

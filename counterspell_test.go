@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -188,7 +188,7 @@ func TestInstall_DatabaseMigrations(t *testing.T) {
 	}
 
 	// Verify tables were created by connecting to database
-	db, err := sql.Open("sqlite3", tmpDB)
+	db, err := sql.Open("duckdb", tmpDB)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
@@ -196,13 +196,13 @@ func TestInstall_DatabaseMigrations(t *testing.T) {
 
 	// Check if logs table exists
 	var tableName string
-	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='logs'").Scan(&tableName)
+	err = db.QueryRow("SELECT table_name FROM information_schema.tables WHERE table_name = 'logs'").Scan(&tableName)
 	if err != nil {
 		t.Errorf("Logs table was not created: %v", err)
 	}
 
 	// Check if spans table exists
-	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='spans'").Scan(&tableName)
+	err = db.QueryRow("SELECT table_name FROM information_schema.tables WHERE table_name = 'spans'").Scan(&tableName)
 	if err != nil {
 		t.Errorf("Spans table was not created: %v", err)
 	}

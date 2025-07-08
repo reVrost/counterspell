@@ -25,12 +25,12 @@ LIMIT ? OFFSET ?;
 -- name: GetLogsWithFilters :many
 SELECT * FROM logs
 WHERE 
-  (sqlc.narg('level') IS NULL OR level = sqlc.narg('level'))
-  AND (sqlc.narg('trace_id') IS NULL OR trace_id = sqlc.narg('trace_id'))
-  AND (sqlc.narg('start_time') IS NULL OR timestamp >= sqlc.narg('start_time'))
-  AND (sqlc.narg('end_time') IS NULL OR timestamp <= sqlc.narg('end_time'))
+  (? IS NULL OR level = ?)
+  AND (? IS NULL OR trace_id = ?)
+  AND (? IS NULL OR timestamp >= ?)
+  AND (? IS NULL OR timestamp <= ?)
 ORDER BY timestamp DESC
-LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+LIMIT ? OFFSET ?;
 
 -- name: CountLogs :one
 SELECT COUNT(*) FROM logs;
@@ -38,10 +38,10 @@ SELECT COUNT(*) FROM logs;
 -- name: CountLogsWithFilters :one
 SELECT COUNT(*) FROM logs
 WHERE 
-  (sqlc.narg('level') IS NULL OR level = sqlc.narg('level'))
-  AND (sqlc.narg('trace_id') IS NULL OR trace_id = sqlc.narg('trace_id'))
-  AND (sqlc.narg('start_time') IS NULL OR timestamp >= sqlc.narg('start_time'))
-  AND (sqlc.narg('end_time') IS NULL OR timestamp <= sqlc.narg('end_time'));
+  (? IS NULL OR level = ?)
+  AND (? IS NULL OR trace_id = ?)
+  AND (? IS NULL OR timestamp >= ?)
+  AND (? IS NULL OR timestamp <= ?);
 
 -- name: GetRootSpans :many
 SELECT trace_id, name, start_time, end_time

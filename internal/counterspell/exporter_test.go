@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/revrost/counterspell/internal/db"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("sqlite3", ":memory:")
+	database, err := sql.Open("duckdb", "")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
@@ -25,8 +25,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			trace_id TEXT NOT NULL,
 			parent_span_id TEXT,
 			name TEXT NOT NULL,
-			start_time TEXT NOT NULL,
-			end_time TEXT NOT NULL,
+			start_time BIGINT NOT NULL,
+			end_time BIGINT NOT NULL,
 			duration_ns INTEGER NOT NULL,
 			attributes TEXT,
 			service_name TEXT NOT NULL,
@@ -42,23 +42,23 @@ func setupTestDB(t *testing.T) *sql.DB {
 	return database
 }
 
-func TestSQLiteSpanExporter_ProcessSpanData(t *testing.T) {
+func TestDuckDBSpanExporter_ProcessSpanData(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	exporter := NewSQLiteSpanExporter(database)
+	exporter := NewDuckDBSpanExporter(database)
 	defer exporter.Shutdown(context.Background())
 
 	// Test direct span data processing
 	spanData := SpanData{
 		SpanID:       "1234567890abcdef",
 		TraceID:      "1234567890abcdef1234567890abcdef",
-		ParentSpanID: sql.NullString{Valid: false},
+		ParentSpanID: "",
 		Name:         "test-span",
-		StartTime:    time.Now().Format(time.RFC3339Nano),
-		EndTime:      time.Now().Add(100 * time.Millisecond).Format(time.RFC3339Nano),
+		StartTime:    time.Now().UnixNano(),
+		EndTime:      time.Now().Add(100 * time.Millisecond).UnixNano(),
 		DurationNs:   100000000,
-		Attributes:   `{"http.method":"GET","http.url":"/test"}`,
+		Attributes:   []byte(`{"http.method":"GET","http.url":"/test"}`),
 		ServiceName:  "test-service",
 		HasError:     false,
 	}
@@ -97,7 +97,7 @@ func TestSQLiteSpanExporter_ProcessSpanData(t *testing.T) {
 
 	// Check attributes were stored correctly
 	var attrs map[string]interface{}
-	if err := json.Unmarshal([]byte(span.Attributes.String), &attrs); err != nil {
+	if err := json.Unmarshal(span.Attributes, &attrs); err != nil {
 		t.Errorf("Failed to parse attributes JSON: %v", err)
 	}
 	if attrs["http.method"] != "GET" {
@@ -105,11 +105,11 @@ func TestSQLiteSpanExporter_ProcessSpanData(t *testing.T) {
 	}
 }
 
-func TestSQLiteSpanExporter_BatchProcessing(t *testing.T) {
+func TestDuckDBSpanExporter_BatchProcessing(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	exporter := NewSQLiteSpanExporter(database)
+	exporter := NewDuckDBSpanExporter(database)
 	defer exporter.Shutdown(context.Background())
 
 	// Send many spans to test batching
@@ -118,12 +118,12 @@ func TestSQLiteSpanExporter_BatchProcessing(t *testing.T) {
 		spanData := SpanData{
 			SpanID:       "span" + fmt.Sprintf("%04d", i), // Unique span IDs
 			TraceID:      "1234567890abcdef1234567890abcdef",
-			ParentSpanID: sql.NullString{Valid: false},
+			ParentSpanID: "",
 			Name:         "batch-test-span",
-			StartTime:    time.Now().Format(time.RFC3339Nano),
-			EndTime:      time.Now().Add(100 * time.Millisecond).Format(time.RFC3339Nano),
+			StartTime:    time.Now().UnixNano(),
+			EndTime:      time.Now().Add(100 * time.Millisecond).UnixNano(),
 			DurationNs:   100000000,
-			Attributes:   `{"test":"batch"}`,
+			Attributes:   []byte(`{"test":"batch"}`),
 			ServiceName:  "test-service",
 			HasError:     false,
 		}
@@ -150,23 +150,23 @@ func TestSQLiteSpanExporter_BatchProcessing(t *testing.T) {
 	}
 }
 
-func TestSQLiteSpanExporter_ErrorSpan(t *testing.T) {
+func TestDuckDBSpanExporter_ErrorSpan(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	exporter := NewSQLiteSpanExporter(database)
+	exporter := NewDuckDBSpanExporter(database)
 	defer exporter.Shutdown(context.Background())
 
 	// Test span with error
 	spanData := SpanData{
 		SpanID:       "error-span",
 		TraceID:      "error-trace",
-		ParentSpanID: sql.NullString{Valid: false},
+		ParentSpanID: "",
 		Name:         "error-span",
-		StartTime:    time.Now().Format(time.RFC3339Nano),
-		EndTime:      time.Now().Add(100 * time.Millisecond).Format(time.RFC3339Nano),
+		StartTime:    time.Now().UnixNano(),
+		EndTime:      time.Now().Add(100 * time.Millisecond).UnixNano(),
 		DurationNs:   100000000,
-		Attributes:   `{"error":"test error"}`,
+		Attributes:   []byte(`{"error":"test error"}`),
 		ServiceName:  "test-service",
 		HasError:     true,
 	}
@@ -197,22 +197,22 @@ func TestSQLiteSpanExporter_ErrorSpan(t *testing.T) {
 	}
 }
 
-func TestSQLiteSpanExporter_Shutdown(t *testing.T) {
+func TestDuckDBSpanExporter_Shutdown(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	exporter := NewSQLiteSpanExporter(database)
+	exporter := NewDuckDBSpanExporter(database)
 
 	// Add some spans to the queue
 	spanData := SpanData{
 		SpanID:       "shutdown-span",
 		TraceID:      "shutdown-trace",
-		ParentSpanID: sql.NullString{Valid: false},
+		ParentSpanID: "",
 		Name:         "shutdown-test",
-		StartTime:    time.Now().Format(time.RFC3339Nano),
-		EndTime:      time.Now().Add(100 * time.Millisecond).Format(time.RFC3339Nano),
+		StartTime:    time.Now().UnixNano(),
+		EndTime:      time.Now().Add(100 * time.Millisecond).UnixNano(),
 		DurationNs:   100000000,
-		Attributes:   `{"test":"shutdown"}`,
+		Attributes:   []byte(`{"test":"shutdown"}`),
 		ServiceName:  "test-service",
 		HasError:     false,
 	}
@@ -244,11 +244,11 @@ func TestSQLiteSpanExporter_Shutdown(t *testing.T) {
 	}
 }
 
-func TestSQLiteSpanExporter_ShutdownTimeout(t *testing.T) {
+func TestDuckDBSpanExporter_ShutdownTimeout(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	exporter := NewSQLiteSpanExporter(database)
+	exporter := NewDuckDBSpanExporter(database)
 
 	// Create a context that times out immediately
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -261,11 +261,11 @@ func TestSQLiteSpanExporter_ShutdownTimeout(t *testing.T) {
 	}
 }
 
-func TestSQLiteSpanExporter_ConcurrentProcessing(t *testing.T) {
+func TestDuckDBSpanExporter_ConcurrentProcessing(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	exporter := NewSQLiteSpanExporter(database)
+	exporter := NewDuckDBSpanExporter(database)
 	defer exporter.Shutdown(context.Background())
 
 	// Test concurrent span processing
@@ -282,12 +282,12 @@ func TestSQLiteSpanExporter_ConcurrentProcessing(t *testing.T) {
 				spanData := SpanData{
 					SpanID:       fmt.Sprintf("span-%d-%d", routineID, j), // Unique span IDs
 					TraceID:      "concurrent-trace",
-					ParentSpanID: sql.NullString{Valid: false},
+					ParentSpanID: "",
 					Name:         "concurrent-test",
-					StartTime:    time.Now().Format(time.RFC3339Nano),
-					EndTime:      time.Now().Add(100 * time.Millisecond).Format(time.RFC3339Nano),
+					StartTime:    time.Now().UnixNano(),
+					EndTime:      time.Now().Add(100 * time.Millisecond).UnixNano(),
 					DurationNs:   100000000,
-					Attributes:   `{"routine":"` + fmt.Sprintf("%d", routineID) + `"}`,
+					Attributes:   []byte(`{"routine":"` + fmt.Sprintf("%d", routineID) + `"}`),
 					ServiceName:  "test-service",
 					HasError:     false,
 				}
