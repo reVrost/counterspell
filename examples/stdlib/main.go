@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	// Example 2: Using standard library router (Go 1.22+)
+	// Example 2: Using standard library router (Go 1.22+) with DuckDB
 	log.Info().Msg("Starting stdlib server with Counterspell...")
 	mux := http.NewServeMux()
 
@@ -17,7 +17,7 @@ func main() {
 		counterspell.WithAuthToken("my-other-secret-token"),
 		counterspell.WithDBPath("counterspell_stdlib.db"),
 	); err != nil {
-		log.Fatal().Err(err).Msg("Failed to add Counterspell to stdlibbj")
+		log.Fatal().Err(err).Msg("Failed to add Counterspell to stdlib")
 	}
 
 	// Add your application routes

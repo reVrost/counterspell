@@ -3,7 +3,7 @@ package counterspell
 import (
 	"context"
 	"database/sql"
-	
+
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,8 +17,9 @@ import (
 	echov5 "github.com/labstack/echo/v5"
 	middlewarev5 "github.com/labstack/echo/v5/middleware"
 	_ "github.com/marcboeker/go-duckdb/v2"
-	
+
 	"github.com/revrost/counterspell/internal/counterspell"
+	"github.com/revrost/counterspell/internal/db"
 	"github.com/revrost/counterspell/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -28,8 +29,6 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
-
-
 
 // config holds the configuration for Counterspell
 type config struct {
@@ -84,22 +83,22 @@ func Install(e *echov4.Echo, opts ...Option) (*Counterspell, error) {
 }
 
 // AddToEcho initializes Counterspell with the provided Echo v4 instance
-func AddToEcho(e *echov4.Echo, opts ...Option) error {
+func AddToEcho(e *echov4.Echo, opts ...Option) (*Counterspell, error) {
 	cfg := buildConfig(opts...)
 
 	if cfg.authToken == "" {
-		return fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
+		return nil, fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
 	}
 
 	db, err := initDatabase(cfg.dbPath)
 	if err != nil {
-		return fmt.Errorf("failed to initialize database: %w", err)
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	cs, err := setupObservability(db, cfg.serviceName, cfg.serviceVersion)
 	if err != nil {
 		db.Close()
-		return fmt.Errorf("failed to setup observability: %w", err)
+		return nil, fmt.Errorf("failed to setup observability: %w", err)
 	}
 
 	setupGlobalLogger(cs.logWriter)
@@ -108,26 +107,26 @@ func AddToEcho(e *echov4.Echo, opts ...Option) error {
 	registerEchoV4ShutdownHook(e, cs)
 
 	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully with Echo v4")
-	return nil
+	return cs, nil
 }
 
 // AddToEchoV5 initializes Counterspell with the provided Echo v5 instance
-func AddToEchoV5(e *echov5.Echo, opts ...Option) error {
+func AddToEchoV5(e *echov5.Echo, opts ...Option) (*Counterspell, error) {
 	cfg := buildConfig(opts...)
 
 	if cfg.authToken == "" {
-		return fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
+		return nil, fmt.Errorf("auth token is required: set COUNTERSPELL_AUTH_TOKEN environment variable or use WithAuthToken option")
 	}
 
 	db, err := initDatabase(cfg.dbPath)
 	if err != nil {
-		return fmt.Errorf("failed to initialize database: %w", err)
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	cs, err := setupObservability(db, cfg.serviceName, cfg.serviceVersion)
 	if err != nil {
 		db.Close()
-		return fmt.Errorf("failed to setup observability: %w", err)
+		return nil, fmt.Errorf("failed to setup observability: %w", err)
 	}
 
 	setupGlobalLogger(cs.logWriter)
@@ -136,7 +135,7 @@ func AddToEchoV5(e *echov5.Echo, opts ...Option) error {
 	registerEchoV5ShutdownHook(e, cs)
 
 	log.Info().Str("db_path", cfg.dbPath).Msg("Counterspell installed successfully with Echo v5")
-	return nil
+	return cs, nil
 }
 
 // AddToStdlib initializes Counterspell with the provided standard library ServeMux
@@ -182,19 +181,8 @@ func buildConfig(opts ...Option) *config {
 }
 
 func initDatabase(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("duckdb", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	
-
-	return db, nil
+	// Use the db package's Open function which includes schema creation
+	return db.Open(dbPath)
 }
 
 func setupObservability(db *sql.DB, serviceName, serviceVersion string) (*Counterspell, error) {

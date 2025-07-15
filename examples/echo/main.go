@@ -10,18 +10,19 @@ import (
 )
 
 func main() {
-	// Example 1: Using Echo router
+	// Example 1: Using Echo v4 router with DuckDB backend
 	log.Info().Msg("Starting Echo server with Counterspell...")
 	e := echo.New()
 
 	// Use echo
 	e.Use(otelecho.Middleware("counterspell-example"))
 
-	// Add Counterspell to Echo router
-	if err := counterspell.AddToEcho(e,
+	// Add Counterspell to Echo router - uses DuckDB for storage
+	_, err := counterspell.AddToEcho(e,
 		counterspell.WithAuthToken("my-secret-token"),
 		counterspell.WithDBPath("counterspell_echo.db"),
-	); err != nil {
+	)
+	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to add Counterspell to Echo")
 	}
 

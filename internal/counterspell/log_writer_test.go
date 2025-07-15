@@ -11,28 +11,10 @@ import (
 )
 
 func setupLogTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("duckdb", "")
+	// Use the same schema setup as the main application
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Create the logs table
-	_, err = database.Exec(`
-		CREATE TABLE logs (
-			id BIGINT PRIMARY KEY,
-			timestamp BIGINT NOT NULL,
-			level TEXT NOT NULL,
-			message TEXT NOT NULL,
-			trace_id TEXT,
-			span_id TEXT,
-			attributes TEXT
-		);
-		CREATE INDEX idx_logs_timestamp ON logs(timestamp);
-		CREATE INDEX idx_logs_level ON logs(level);
-		CREATE INDEX idx_logs_trace_id ON logs(trace_id);
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create test table: %v", err)
 	}
 
 	return database

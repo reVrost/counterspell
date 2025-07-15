@@ -15,43 +15,10 @@ import (
 )
 
 func setupAPITestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("duckdb", "")
+	// Use the same schema setup as the main application
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Create tables
-	_, err = database.Exec(`
-		CREATE TABLE logs (
-			id BIGINT PRIMARY KEY,
-			timestamp BIGINT NOT NULL,
-			level VARCHAR NOT NULL,
-			message VARCHAR NOT NULL,
-			trace_id VARCHAR,
-			span_id VARCHAR,
-			attributes BLOB
-		);
-		CREATE INDEX idx_logs_timestamp ON logs(timestamp);
-		CREATE INDEX idx_logs_level ON logs(level);
-		CREATE INDEX idx_logs_trace_id ON logs(trace_id);
-
-		CREATE TABLE spans (
-			span_id VARCHAR PRIMARY KEY,
-			trace_id VARCHAR NOT NULL,
-			parent_span_id VARCHAR,
-			name VARCHAR NOT NULL,
-			start_time BIGINT NOT NULL,
-			end_time BIGINT NOT NULL,
-			duration_ns BIGINT NOT NULL,
-			attributes BLOB,
-			service_name VARCHAR NOT NULL,
-			has_error BOOLEAN NOT NULL DEFAULT FALSE
-		);
-		CREATE INDEX idx_spans_trace_id ON spans(trace_id);
-		CREATE INDEX idx_spans_start_time ON spans(start_time);
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create test tables: %v", err)
 	}
 
 	return database
@@ -63,34 +30,34 @@ func insertTestLogs(t *testing.T, database *sql.DB) {
 	// Insert test logs
 	logs := []db.Log{
 		{
-			ID:        1,
-			Timestamp: time.Date(2024, time.January, 15, 10, 30, 0, 123000000, time.UTC).UnixNano(),
-			Level:     "info",
-			Message:   "Test info log",
-			TraceID:   "trace123",
-			SpanID:    "span123",
+			ID:         1,
+			Timestamp:  time.Date(2024, time.January, 15, 10, 30, 0, 123000000, time.UTC).UnixNano(),
+			Level:      "info",
+			Message:    "Test info log",
+			TraceID:    "trace123",
+			SpanID:     "span123",
 			Attributes: []byte(`{"user":"test"}`),
 		},
 		{
-			ID:        2,
-			Timestamp: time.Date(2024, time.January, 15, 10, 31, 0, 123000000, time.UTC).UnixNano(),
-			Level:     "error",
-			Message:   "Test error log",
-			TraceID:   "trace456",
-			SpanID:    "span456",
+			ID:         2,
+			Timestamp:  time.Date(2024, time.January, 15, 10, 31, 0, 123000000, time.UTC).UnixNano(),
+			Level:      "error",
+			Message:    "Test error log",
+			TraceID:    "trace456",
+			SpanID:     "span456",
 			Attributes: []byte(`{"error":"test error"}`),
 		},
 		{
-			ID:        3,
-			Timestamp: time.Date(2024, time.January, 15, 10, 32, 0, 123000000, time.UTC).UnixNano(),
-			Level:     "debug",
-			Message:   "Test debug log",
+			ID:         3,
+			Timestamp:  time.Date(2024, time.January, 15, 10, 32, 0, 123000000, time.UTC).UnixNano(),
+			Level:      "debug",
+			Message:    "Test debug log",
 			Attributes: []byte(`{"debug":"test"}`),
 		},
 	}
 
 	for _, log := range logs {
-		_, err := queries.InsertLog(context.Background(), log.ID, log.Timestamp, log.Level, log.Message, log.TraceID, log.SpanID, log.Attributes)
+		_, err := queries.InsertLog(context.Background(), log.Timestamp, log.Level, log.Message, log.TraceID, log.SpanID, log.Attributes)
 		if err != nil {
 			t.Fatalf("Failed to insert test log: %v", err)
 		}
@@ -103,40 +70,40 @@ func insertTestSpans(t *testing.T, database *sql.DB) {
 	// Insert test spans
 	spans := []db.Span{
 		{
-			SpanID:      "span123",
-			TraceID:     "trace123",
+			SpanID:       "span123",
+			TraceID:      "trace123",
 			ParentSpanID: "",
-			Name:        "GET /hello",
-			StartTime:   time.Date(2024, time.January, 15, 10, 30, 0, 0, time.UTC).UnixNano(),
-			EndTime:     time.Date(2024, time.January, 15, 10, 30, 0, 100000000, time.UTC).UnixNano(),
-			DurationNs:  100000000,
-			Attributes:  []byte(`{"http.method":"GET"}`),
-			ServiceName: "test-service",
-			HasError:    false,
+			Name:         "GET /hello",
+			StartTime:    time.Date(2024, time.January, 15, 10, 30, 0, 0, time.UTC).UnixNano(),
+			EndTime:      time.Date(2024, time.January, 15, 10, 30, 0, 100000000, time.UTC).UnixNano(),
+			DurationNs:   100000000,
+			Attributes:   []byte(`{"http.method":"GET"}`),
+			ServiceName:  "test-service",
+			HasError:     false,
 		},
 		{
-			SpanID:      "span456",
-			TraceID:     "trace456",
+			SpanID:       "span456",
+			TraceID:      "trace456",
 			ParentSpanID: "",
-			Name:        "POST /error",
-			StartTime:   time.Date(2024, time.January, 15, 10, 31, 0, 0, time.UTC).UnixNano(),
-			EndTime:     time.Date(2024, time.January, 15, 10, 31, 0, 200000000, time.UTC).UnixNano(),
-			DurationNs:  200000000,
-			Attributes:  []byte(`{"http.method":"POST"}`),
-			ServiceName: "test-service",
-			HasError:    true,
+			Name:         "POST /error",
+			StartTime:    time.Date(2024, time.January, 15, 10, 31, 0, 0, time.UTC).UnixNano(),
+			EndTime:      time.Date(2024, time.January, 15, 10, 31, 0, 200000000, time.UTC).UnixNano(),
+			DurationNs:   200000000,
+			Attributes:   []byte(`{"http.method":"POST"}`),
+			ServiceName:  "test-service",
+			HasError:     true,
 		},
 		{
-			SpanID:      "span789",
-			TraceID:     "trace789",
+			SpanID:       "span789",
+			TraceID:      "trace789",
 			ParentSpanID: "",
-			Name:        "Background Task",
-			StartTime:   time.Date(2024, time.January, 15, 10, 32, 0, 0, time.UTC).UnixNano(),
-			EndTime:     time.Date(2024, time.January, 15, 10, 32, 0, 500000000, time.UTC).UnixNano(),
-			DurationNs:  500000000,
-			Attributes:  []byte(`{"task":"background"}`),
-			ServiceName: "worker-service",
-			HasError:    false,
+			Name:         "Background Task",
+			StartTime:    time.Date(2024, time.January, 15, 10, 32, 0, 0, time.UTC).UnixNano(),
+			EndTime:      time.Date(2024, time.January, 15, 10, 32, 0, 500000000, time.UTC).UnixNano(),
+			DurationNs:   500000000,
+			Attributes:   []byte(`{"task":"background"}`),
+			ServiceName:  "worker-service",
+			HasError:     false,
 		},
 	}
 

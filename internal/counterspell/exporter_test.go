@@ -13,30 +13,10 @@ import (
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("duckdb", "")
+	// Use the same schema setup as the main application
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Create the spans table
-	_, err = database.Exec(`
-		CREATE TABLE spans (
-			span_id TEXT PRIMARY KEY,
-			trace_id TEXT NOT NULL,
-			parent_span_id TEXT,
-			name TEXT NOT NULL,
-			start_time BIGINT NOT NULL,
-			end_time BIGINT NOT NULL,
-			duration_ns INTEGER NOT NULL,
-			attributes TEXT,
-			service_name TEXT NOT NULL,
-			has_error BOOLEAN NOT NULL DEFAULT FALSE
-		);
-		CREATE INDEX idx_spans_trace_id ON spans(trace_id);
-		CREATE INDEX idx_spans_start_time ON spans(start_time);
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create test table: %v", err)
 	}
 
 	return database

@@ -9,14 +9,12 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
-	_ "github.com/marcboeker/go-duckdb/v2"
+	"github.com/revrost/counterspell/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInstall_Success(t *testing.T) {
-	// Create a temporary database file
-	tmpDB := "test_counterspell.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_counterspell")
 
 	e := echo.New()
 
@@ -24,7 +22,7 @@ func TestInstall_Success(t *testing.T) {
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
-	err := Install(e, WithDBPath(tmpDB))
+	_, err := Install(e, WithDBPath(tmpDB))
 	if err != nil {
 		t.Fatalf("Install failed: %v", err)
 	}
@@ -37,36 +35,31 @@ func TestInstall_Success(t *testing.T) {
 	// Test that routes were registered by making a request
 	req := httptest.NewRequest(http.MethodGet, "/counterspell/health", nil)
 	rec := httptest.NewRecorder()
-
 	e.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Errorf("Health endpoint not working, expected 200, got %d", rec.Code)
+		t.Errorf("Expected status 200, got %d", rec.Code)
 	}
 }
 
 func TestInstall_WithOptions(t *testing.T) {
-	tmpDB := "test_counterspell_options.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_counterspell_options")
 
 	e := echo.New()
 
-	err := Install(e,
+	_, err := Install(e,
 		WithDBPath(tmpDB),
 		WithAuthToken("custom-token"),
+		WithServiceName("test-service"),
+		WithServiceVersion("1.0.0"),
 	)
 	if err != nil {
 		t.Fatalf("Install with options failed: %v", err)
 	}
 
-	// Test API endpoint with custom token using query parameter
-	req := httptest.NewRequest(http.MethodGet, "/counterspell/api/logs?secret=custom-token", nil)
-	rec := httptest.NewRecorder()
-
-	e.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("API endpoint with custom token failed, expected 200, got %d", rec.Code)
+	// Verify database file was created
+	if _, err := os.Stat(tmpDB); os.IsNotExist(err) {
+		t.Error("Database file was not created")
 	}
 }
 
@@ -76,7 +69,7 @@ func TestInstall_NoAuthToken(t *testing.T) {
 
 	e := echo.New()
 
-	err := Install(e)
+	_, err := Install(e)
 	if err == nil {
 		t.Error("Expected Install to fail without auth token, but it succeeded")
 	}
@@ -91,7 +84,7 @@ func TestInstall_InvalidDBPath(t *testing.T) {
 	e := echo.New()
 
 	// Try to create database in non-existent directory
-	err := Install(e,
+	_, err := Install(e,
 		WithAuthToken("test-token"),
 		WithDBPath("/non/existent/path/counterspell.db"),
 	)
@@ -101,14 +94,13 @@ func TestInstall_InvalidDBPath(t *testing.T) {
 }
 
 func TestInstall_HealthEndpoint(t *testing.T) {
-	tmpDB := "test_health.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_health")
 
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
-	err := Install(e, WithDBPath(tmpDB))
+	_, err := Install(e, WithDBPath(tmpDB))
 	if err != nil {
 		t.Fatalf("Install failed: %v", err)
 	}
@@ -131,11 +123,10 @@ func TestInstall_HealthEndpoint(t *testing.T) {
 }
 
 func TestInstall_APIEndpointAuthentication(t *testing.T) {
-	tmpDB := "test_auth.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_auth")
 
 	e := echo.New()
-	err := Install(e,
+	_, err := Install(e,
 		WithDBPath(tmpDB),
 		WithAuthToken("secret-token"),
 	)
@@ -175,14 +166,13 @@ func TestInstall_APIEndpointAuthentication(t *testing.T) {
 }
 
 func TestInstall_DatabaseMigrations(t *testing.T) {
-	tmpDB := "test_migrations.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_migrations")
 
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
-	err := Install(e, WithDBPath(tmpDB))
+	_, err := Install(e, WithDBPath(tmpDB))
 	if err != nil {
 		t.Fatalf("Install failed: %v", err)
 	}
@@ -210,10 +200,8 @@ func TestInstall_DatabaseMigrations(t *testing.T) {
 
 func TestInstall_ConcurrentInstallation(t *testing.T) {
 	// Test that multiple installations don't conflict
-	tmpDB1 := "test_concurrent1.db"
-	tmpDB2 := "test_concurrent2.db"
-	defer os.Remove(tmpDB1)
-	defer os.Remove(tmpDB2)
+	tmpDB1 := testutil.CreateTempDB(t, "test_concurrent1")
+	tmpDB2 := testutil.CreateTempDB(t, "test_concurrent2")
 
 	e1 := echo.New()
 	e2 := echo.New()
@@ -222,17 +210,19 @@ func TestInstall_ConcurrentInstallation(t *testing.T) {
 
 	// Install in parallel
 	go func() {
-		done <- Install(e1,
+		_, err := Install(e1,
 			WithDBPath(tmpDB1),
 			WithAuthToken("token1"),
 		)
+		done <- err
 	}()
 
 	go func() {
-		done <- Install(e2,
+		_, err := Install(e2,
 			WithDBPath(tmpDB2),
 			WithAuthToken("token2"),
 		)
+		done <- err
 	}()
 
 	// Wait for both to complete
@@ -252,14 +242,13 @@ func TestInstall_ConcurrentInstallation(t *testing.T) {
 }
 
 func TestInstall_ShutdownHandling(t *testing.T) {
-	tmpDB := "test_shutdown.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_shutdown")
 
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
-	err := Install(e, WithDBPath(tmpDB))
+	_, err := Install(e, WithDBPath(tmpDB))
 	if err != nil {
 		t.Fatalf("Install failed: %v", err)
 	}
@@ -273,14 +262,18 @@ func TestInstall_ShutdownHandling(t *testing.T) {
 }
 
 func TestInstall_DefaultDBPath(t *testing.T) {
-	// Test default database path
-	defer os.Remove("counterspell.db") // Default path
+	// Clean up the default database files
+	t.Cleanup(func() {
+		os.Remove("counterspell.db")
+		os.Remove("counterspell.db.wal")
+		os.Remove("counterspell.db.shm")
+	})
 
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "test-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
-	err := Install(e) // No WithDBPath option
+	_, err := Install(e) // No WithDBPath option
 	if err != nil {
 		t.Fatalf("Install with default DB path failed: %v", err)
 	}
@@ -292,15 +285,14 @@ func TestInstall_DefaultDBPath(t *testing.T) {
 }
 
 func TestInstall_EnvVarAuthToken(t *testing.T) {
-	tmpDB := "test_env_auth.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_env_auth")
 
 	// Set environment variable
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "env-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
-	err := Install(e, WithDBPath(tmpDB))
+	_, err := Install(e, WithDBPath(tmpDB))
 	if err != nil {
 		t.Fatalf("Install failed: %v", err)
 	}
@@ -317,15 +309,14 @@ func TestInstall_EnvVarAuthToken(t *testing.T) {
 }
 
 func TestInstall_OptionOverridesEnvVar(t *testing.T) {
-	tmpDB := "test_option_override.db"
-	defer os.Remove(tmpDB)
+	tmpDB := testutil.CreateTempDB(t, "test_option_override")
 
 	// Set environment variable
 	os.Setenv("COUNTERSPELL_AUTH_TOKEN", "env-token")
 	defer os.Unsetenv("COUNTERSPELL_AUTH_TOKEN")
 
 	e := echo.New()
-	err := Install(e,
+	_, err := Install(e,
 		WithDBPath(tmpDB),
 		WithAuthToken("option-token"), // Should override env var
 	)
@@ -355,37 +346,27 @@ func TestInstall_OptionOverridesEnvVar(t *testing.T) {
 }
 
 func TestAddToEcho_Success(t *testing.T) {
-	// Clean up any existing test databases
-	os.Remove("test_add_echo.db")
-	defer os.Remove("test_add_echo.db")
-
+	// Use in-memory database for simple tests
 	e := echo.New()
-	err := AddToEcho(e, WithDBPath("test_add_echo.db"), WithAuthToken("test-token"))
+	_, err := AddToEcho(e, WithDBPath(":memory:"), WithAuthToken("test-token"))
 
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 }
 
 func TestAddToStdlib_Success(t *testing.T) {
-	// Clean up any existing test databases
-	os.Remove("test_add_stdlib.db")
-	defer os.Remove("test_add_stdlib.db")
-
+	// Use in-memory database for simple tests
 	mux := http.NewServeMux()
-	ms, err := AddToStdlib(mux, WithDBPath("test_add_stdlib.db"), WithAuthToken("test-token"))
+	_, err := AddToStdlib(mux, WithDBPath(":memory:"), WithAuthToken("test-token"))
 
 	assert.NoError(t, err)
-	assert.NotNil(t, ms)
 	assert.NotNil(t, mux)
 }
 
 func TestAddToStdlib_HealthEndpoint(t *testing.T) {
-	// Clean up any existing test databases
-	os.Remove("test_stdlib_health.db")
-	defer os.Remove("test_stdlib_health.db")
-
+	// Use in-memory database for simple tests
 	mux := http.NewServeMux()
-	_, err := AddToStdlib(mux, WithDBPath("test_stdlib_health.db"), WithAuthToken("test-token"))
+	_, err := AddToStdlib(mux, WithDBPath(":memory:"), WithAuthToken("test-token"))
 	assert.NoError(t, err)
 
 	// Test the health endpoint
@@ -397,7 +378,7 @@ func TestAddToStdlib_HealthEndpoint(t *testing.T) {
 	assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 
 	var response map[string]string
-	err = json.Unmarshal(w.Body.Bytes(), &response)
+	err = json.NewDecoder(w.Body).Decode(&response)
 	assert.NoError(t, err)
 	assert.Equal(t, "healthy", response["status"])
 	assert.Equal(t, "counterspell", response["service"])

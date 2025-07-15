@@ -37,6 +37,8 @@ go.work.sum
 # Database files
 *.db
 *.db-*
+*.db.wal
+*.db.shm
 
 # Build artifacts
 bin/

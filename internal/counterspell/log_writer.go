@@ -120,7 +120,7 @@ func (w *DuckDBLogWriter) processBatch(batch []LogData) {
 	ctx := context.Background()
 
 	for _, log := range batch {
-		_, _ = w.queries.InsertLog(ctx, 0,
+		_, _ = w.queries.InsertLog(ctx,
 			log.Timestamp,
 			log.Level,
 			log.Message,

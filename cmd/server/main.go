@@ -13,8 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/marcboeker/go-duckdb/v2"
-	
+
 	"github.com/revrost/counterspell/internal/counterspell"
+	"github.com/revrost/counterspell/internal/db"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
@@ -122,21 +123,8 @@ func main() {
 
 // initDB initializes the DuckDB database and runs migrations
 func initDB(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("duckdb", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-
-	// Test connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	// Run migrations
-	
-
-	log.Info().Msg("Database initialized successfully")
-	return db, nil
+	// Use the db package's Open function which includes schema creation
+	return db.Open(dbPath)
 }
 
 // initObservability sets up OpenTelemetry tracing and logging

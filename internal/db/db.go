@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
@@ -34,6 +35,8 @@ func Open(dsn string) (*sql.DB, error) {
 
 	// Manually apply initial schema
 	schemaSQL := `
+	CREATE SEQUENCE IF NOT EXISTS logs_id_seq;
+
 	CREATE TABLE IF NOT EXISTS spans (
 		span_id VARCHAR NOT NULL,
 		trace_id VARCHAR NOT NULL,
@@ -49,7 +52,7 @@ func Open(dsn string) (*sql.DB, error) {
 	);
 
 	CREATE TABLE IF NOT EXISTS logs (
-		id SERIAL PRIMARY KEY,
+		id INTEGER PRIMARY KEY DEFAULT nextval('logs_id_seq'),
 		timestamp BIGINT NOT NULL,
 		level VARCHAR NOT NULL,
 		message VARCHAR NOT NULL,
@@ -97,19 +100,17 @@ func (q *Queries) InsertSpan(ctx context.Context,
 
 const insertLog = `
 INSERT INTO logs (
-  id, timestamp, level, message, trace_id, span_id, attributes
+  timestamp, level, message, trace_id, span_id, attributes
 ) VALUES (
-  ?, ?, ?, ?, ?, ?, ?
+  ?, ?, ?, ?, ?, ?
 );
 `
 
 func (q *Queries) InsertLog(ctx context.Context,
-	id int64,
 	timestamp int64,
 	level, message, traceID, spanID string,
 	attributes []byte) (sql.Result, error) {
 	return q.db.ExecContext(ctx, insertLog,
-		id,
 		timestamp,
 		level,
 		message,
