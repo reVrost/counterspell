@@ -3,6 +3,7 @@
 *.db
 
 node_modules
+echo-v5-test
 # Binaries for programs and plugins
 *.exe
 *.exe~
