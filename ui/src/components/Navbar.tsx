@@ -1,13 +1,14 @@
 import {
-  IconChartLine,
   IconGauge,
+  IconHome,
   IconHome2,
   IconNotes,
   IconSettings,
 } from "@tabler/icons-react";
-import { Stack, Text, Title, } from "@mantine/core";
+import { Anchor, Button, Group, Stack, Text } from "@mantine/core";
 import classes from "./Navbar.module.css";
-import { NavLink } from "react-router-dom";
+import { UserButton } from "./UserButton/UserButton";
+import { TeamButton } from "./TeamButton/TeamButton";
 
 interface NavbarLinkProps {
   icon: typeof IconHome2;
@@ -17,30 +18,26 @@ interface NavbarLinkProps {
 
 function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
   return (
-    <NavLink
-      className={classes.navlink}
-      to={"/" + path}
-      style={({ isActive }) => {
-        return {
-          color: isActive
-            ? "var(--mantine-color-black)"
-            : "var(--mantine-color-white)",
-          backgroundColor: isActive
-            ? "var(--mantine-color-white)"
-            : "var(--mantine-color-black)",
-          boxShadow: isActive ? "var(--mantine-shadow-sm)" : "",
-        };
-      }}
-    >
-      <Icon size={20} stroke={1.5} />
-      <Text fw="500" size="sm" ml={8}>
-        {label}
-      </Text>
-    </NavLink>
+    <Anchor href={"#/" + path} underline="never" w="100%">
+      <Group flex={1} justify="flex-start">
+        <Button
+          fullWidth
+          variant="subtle"
+          justify="flex-start"
+          leftSection={<Icon size={20} stroke={1.5} />}
+          size="xs"
+        >
+          <Text fw="500" size="sm" ta="start">
+            {label}
+          </Text>
+        </Button>
+      </Group>
+    </Anchor>
   );
 }
 
 const menu = [
+  { icon: IconHome, label: "Home", path: "logs" },
   { icon: IconNotes, label: "Logs", path: "logs" },
   { icon: IconGauge, label: "Metrics", path: "metrics" },
   { icon: IconSettings, label: "Settings", path: "settings" },
@@ -51,19 +48,12 @@ export function NavBar() {
 
   return (
     <nav className={classes.navbar}>
-      <Stack>
-        <Title fz={40} fw={600} ff="">
-          Cs
-          <IconChartLine size={25} stroke={1.5} />
-        </Title>
-        <Stack
-          justify="flex-start"
-          align="flex-start"
-          gap="xs"
-          className={classes.navbarMain}
-        >
-          {links}
-        </Stack>
+      <TeamButton />
+      <Stack mt="lg" gap="2xs" justify="flex-start" align="flex-start">
+        {links}
+      </Stack>
+      <Stack mt="auto">
+        <UserButton />
       </Stack>
     </nav>
   );

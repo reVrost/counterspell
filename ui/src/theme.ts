@@ -29,6 +29,7 @@ import {
   Timeline,
   Tooltip,
 } from "@mantine/core";
+import buttonClassess from "./button.module.css";
 
 const CONTAINER_SIZES: Record<string, string> = {
   xxs: rem("200px"),
@@ -373,7 +374,7 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
   luminanceThreshold: 0.3,
   // system-ui is a great fallback. Geist is fine, but can feel a bit too "bubbly".
   fontFamily:
-    "Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
+    "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
 
   // Reduced radius for a crisper, more technical feel.
   radius: {
@@ -423,7 +424,7 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
 
   // Headings are scaled down significantly to act as headers, not giant proclamations.
   headings: {
-    fontFamily: "Geist, -apple-system, sans-serif", // Keep consistent
+    fontFamily: "Inter, -apple-system, sans-serif", // Keep consistent
     sizes: {
       h1: {
         fontSize: rem("24px"),
@@ -603,6 +604,8 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
       },
     }),
     Button: Button.extend({
+      // Hover change
+      classNames: buttonClassess,
       vars: (theme, props) => {
         const colorKey =
           props.color && Object.keys(theme.colors).includes(props.color)

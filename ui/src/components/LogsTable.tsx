@@ -177,20 +177,6 @@ export function LogsTable() {
 
   return (
     <>
-      <Group
-        justify="space-between"
-        align="center"
-        style={{
-          backgroundColor: "var(--mantine-color-gray-0)",
-          borderBottom: "1px solid var(--mantine-color-gray-2)",
-          boxShadow: "0.5px 0.5px  var(--mantine-color-gray-2)",
-        }}
-        p="12"
-      >
-        <Title order={2} fw={600}>
-          Logs
-        </Title>
-      </Group>
       <Stack p="lg">
         <Grid>
           <Grid.Col span={8}>

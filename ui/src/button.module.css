@@ -1,0 +1,10 @@
+.root {
+  &[data-variant="subtle"] {
+    @mixin hover {
+      background-color: light-dark(
+        var(--mantine-color-gray-2),
+        var(--mantine-color-dark-5)
+      );
+    }
+  }
+}

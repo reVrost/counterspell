@@ -8,20 +8,6 @@ export default function SettingsPage() {
 
   return (
     <>
-      <Group
-        justify="space-between"
-        align="center"
-        style={{
-          backgroundColor: "var(--mantine-color-gray-0)",
-          borderBottom: "1px solid var(--mantine-color-gray-2)",
-          boxShadow: "0.5px 0.5px  var(--mantine-color-gray-2)",
-        }}
-        p="12"
-      >
-        <Title order={2} fw={600}>
-          Settings
-        </Title>
-      </Group>
       <Container p="xl" size="responsive">
         <Stack gap="xl">
           <Input.Wrapper label="Secret Token">

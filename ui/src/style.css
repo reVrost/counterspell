@@ -1,3 +1,7 @@
+html {
+  background-color: var(--mantine-color-gray-1);
+}
+
 /* Checkbox */
 .mantine-Checkbox-root {
   --checkbox-color: var(--mantine-primary-color-filled);
