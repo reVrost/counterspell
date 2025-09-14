@@ -1,0 +1,31 @@
+.user {
+  color: light-dark(var(--mantine-color-black), var(--mantine-color-dark-0));
+  padding: rem(8px) rem(12px);
+  border-radius: var(--mantine-radius-sm);
+  transition: all 300ms ease;
+
+  @mixin hover {
+    background-color: light-dark(
+      var(--mantine-color-gray-1),
+      var(--mantine-color-dark-5)
+    );
+  }
+
+  .burger {
+    color: light-dark(var(--mantine-color-black), var(--mantine-color-dark-0));
+    padding: rem(8px) rem(12px);
+    border-radius: var(--mantine-radius-sm);
+    transition: all 100ms ease;
+
+    @mixin hover {
+      background-color: light-dark(
+        var(--mantine-color-white),
+        var(--mantine-color-dark-8)
+      );
+    }
+  }
+
+  .userActive {
+    color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-8));
+  }
+}

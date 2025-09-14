@@ -14,9 +14,9 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
+	"github.com/revrost/counterspell/internal/counterspell"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/revrost/counterspell/internal/counterspell"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -91,13 +91,13 @@ func main() {
 	e.GET("/error", errorHandler)
 
 	// Start server
-	log.Info().Msg("Server starting on :1323")
+	log.Info().Msg("Server starting on :8989")
 	log.Info().Msg("Counterspell API available at /counterspell/api")
 	log.Info().Msg("Example routes: /hello, /slow, /error")
 
 	// Graceful shutdown
 	go func() {
-		if err := e.Start(":1323"); err != nil {
+		if err := e.Start(":8989"); err != nil {
 			log.Info().Err(err).Msg("Server stopped")
 		}
 	}()
