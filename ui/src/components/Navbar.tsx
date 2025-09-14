@@ -5,10 +5,11 @@ import {
   IconNotes,
   IconSettings,
 } from "@tabler/icons-react";
-import { Anchor, Button, Group, Stack, Text } from "@mantine/core";
+import { Button, Group, Stack, Text } from "@mantine/core";
 import classes from "./Navbar.module.css";
 import { UserButton } from "./UserButton/UserButton";
 import { TeamButton } from "./TeamButton/TeamButton";
+import { NavLink } from "react-router-dom";
 
 interface NavbarLinkProps {
   icon: typeof IconHome2;
@@ -18,26 +19,29 @@ interface NavbarLinkProps {
 
 function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
   return (
-    <Anchor href={"#/" + path} underline="never" w="100%">
+    <NavLink
+      to={"/" + path}
+      style={{ textDecoration: "none", width: "100%" }}
+      className={({ isActive }) => (isActive ? classes.active : "")}
+    >
       <Group flex={1} justify="flex-start">
         <Button
           fullWidth
           variant="subtle"
           justify="flex-start"
           leftSection={<Icon size={20} stroke={1.5} />}
-          size="xs"
         >
-          <Text fw="500" size="sm" ta="start">
+          <Text size="sm" ta="start">
             {label}
           </Text>
         </Button>
       </Group>
-    </Anchor>
+    </NavLink>
   );
 }
 
 const menu = [
-  { icon: IconHome, label: "Home", path: "logs" },
+  { icon: IconHome, label: "Home", path: "home" },
   { icon: IconNotes, label: "Logs", path: "logs" },
   { icon: IconGauge, label: "Metrics", path: "metrics" },
   { icon: IconSettings, label: "Settings", path: "settings" },

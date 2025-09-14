@@ -403,7 +403,7 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
 
   // The core change: smaller base sizes for higher information density.
   fontSizes: {
-    xs: rem("13px"), // For tiny labels, metadata, breadcrumbs
+    xs: rem("12px"), // For tiny labels, metadata, breadcrumbs
     sm: rem("14px"), // **Your new body/paragraph text size**
     md: rem("15px"), // For primary data display (e.g., in tables), emphasis
     lg: rem("16px"), // For sub-headings or important stand-out text
