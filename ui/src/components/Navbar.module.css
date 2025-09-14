@@ -9,13 +9,16 @@
 }
 
 .navlink {
-  display: flex;
-  transition: all 0.1s ease-in-out;
-  height: 32px;
-  width: 100%;
-  padding: 0 var(--mantine-spacing-xs);
-  justify-content: flex-start;
-  align-items: center;
-  border-radius: var(--mantine-radius-xs);
-  text-decoration: none;
+  font-weight: 400;
+}
+
+/* .navlink:hover { */
+/*   background-color: var(--mantine-color-gray-2); */
+/* } */
+
+.active {
+  background-color: var(--mantine-color-gray-2);
+  border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-dark-7);
+  font-weight: bold;
 }
