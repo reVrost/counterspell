@@ -1,8 +1,8 @@
 module github.com/revrost/counterspell
 
-go 1.23.0
+go 1.25
 
-toolchain go1.24.3
+
 
 require (
 	github.com/labstack/echo/v4 v4.13.4
