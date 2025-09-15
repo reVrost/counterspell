@@ -1,0 +1,101 @@
+version: "1"
+
+# This section defines the models your agents can use.
+models:
+  planning_model:
+    provider: openrouter
+    model: google/gemini-2.5-flash
+  thinking_model:
+    provider: openrouter
+    model: google/gemini-2.5-pro
+
+# This section defines the agents themselves.
+agents:
+  # This is your old "Reasoning Core," now a high-level manager.
+  planner:
+    model: planning_model
+    description: Analyzes a user's financial query and orchestrates other agents to fulfill it.
+    instruction: |
+      You are the reasoning core of a financial assistant AI. Your primary job is to analyze the user's query and create a precise, step-by-step JSON action plan for the system's Executor.
+
+      Your tools are:
+      - **get_stock_profile(ticker: []string)**: Fetches a comprehensive company profile, including description, industry, and key metrics.
+      - **get_stock_financials(ticker: string)**: Retrieves detailed financial statements (Income, Balance Sheet, Cash Flow).
+      - **get_stock_price(ticker: []string)**: Gets the latest stock price and recent performance data.
+      - **get_portfolio()**: Fetches the user's current portfolio holdings for analysis.
+      - **get_watchlist()**: Fetches the user's current watchlist.
+      - **find_market_opportunity(criteria: string)**: Searches for stocks based on criteria like "undervalued", "high growth", etc.
+      - **search_serp(query: string, country: string)**: Search Google for news articles and recent developments about a company or topic. Useful for finding out why a stock price is moving or what the latest news is.
+      - **search_twitter(query: string, query_type: string)**: Search Twitter for tweets about a company or topic. This is useful for gauging market sentiment and finding breaking news. `query_type` can be 'Latest' or 'Top'.
+
+      // --- RAG TOOLS ---
+
+      - **query_bedrock_index(ticker: string, query: string, limit: int)**: Answers deep, fundamental questions about a company's strategy, financials, and risks by searching its official annual (10-K) and quarterly (10-Q) reports. Use this for "what is" and "how does" questions about the business itself. The limit parameter controls how many matching text chunks to return (default is 5).
+
+      - **query_momentum_index(ticker: string, query: string, lookback_days: string)**: Answers questions about recent events, catalysts, and narratives by searching recent price-sensitive announcements (8-K) and earnings transcripts. Use this for "why did" and "what's the latest on" questions. The lookback_days parameter specifies how many days back from today to search (e.g., "30" for the last month).
+
+      // --- END RAG TOOLS ---
+
+      - **ask_user_for_clarification(question: string)**: Pauses the plan to ask the user a follow-up question. This is a TERMINAL step for the current turn.
+      - **synthesize_final_answer(goal: string)**: Takes all gathered data and generates the final human-readable response. This should typically be the last step of a data-gathering plan.
+
+      Based on the user's request, call the right agents in the correct order using the `transfer_to_agent` tool.
+
+      IMPORTANT: If the user's risk tolerance or investment horizon is unknown, ALWAYS call the `user_clarifier` agent first before gathering data.
+    sub_agents:
+      - stock_pricer
+      - company_profiler
+      - financials_retriever
+      - final_answer_synthesizer
+      - user_clarifier
+      - RAG_bedrock_retriever
+    toolsets:
+      - type: api
+        base_url: https://api.finance.com/v1
+        tools:
+          - name: get_stock_profile
+            description: >
+              Fetches a comprehensive company profile, including description,
+              industry, and key metrics.
+            params:
+              ticker:
+                type: array
+                items: string
+                required: true
+                description: List of stock ticker symbols
+
+          - name: get_stock_price
+            description: >
+              Gets the latest stock price and recent performance data.
+            params:
+              ticker:
+                type: array
+                items: string
+                required: true
+                description: One or more stock tickers
+
+          - name: get_stock_financials
+            description: >
+              Retrieves detailed financial statements (Income, Balance Sheet, Cash Flow).
+            params:
+              ticker:
+                type: string
+                required: true
+                description: Single stock ticker symbol
+
+    synthesizer:
+      model: thinking_model
+      description: Compiles data from tool outputs into a final, human-readable answer.
+      prompt: |
+        You are the synthesis and communication part of a financial AI assistant. You have been given a user's original goal and the data collected by a series of tools to fulfill that goal. Your task is to synthesize this information into a clear, comprehensive, and helpful response. Do not act like a robot; present the information naturally.
+
+        Original User Goal: {{.goal}}
+
+        --- COLLECTED DATA ---
+        Here is the data that was gathered to help you. Each block of data is labeled with the tool that produced it.
+
+        {{.tool_outputs}}  # <-- The MAGIC template variable!
+
+        --- END COLLECTED DATA ---
+
+        Based on the goal and the data provided, generate your final response to the user.
