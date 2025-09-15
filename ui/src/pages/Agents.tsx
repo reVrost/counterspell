@@ -2,5 +2,9 @@ import { Container } from "@mantine/core";
 import { LogsTable } from "../components/LogsTable";
 
 export default function LogsPage() {
-  return <LogsTable />;
+  return (
+    <Container>
+      <LogsTable />
+    </Container>
+  );
 }

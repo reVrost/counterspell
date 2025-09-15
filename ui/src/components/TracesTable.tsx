@@ -116,13 +116,7 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
           }
         }}
       />
-      <Table
-        withTableBorder
-        verticalSpacing="sm"
-        highlightOnHover
-        fz="xs"
-        fw={500}
-      >
+      <Table verticalSpacing="sm" highlightOnHover fz="xs" fw={500}>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Trace</Table.Th>
