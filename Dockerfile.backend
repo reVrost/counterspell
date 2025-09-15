@@ -1,0 +1,41 @@
+# Use the official Golang image to create a build artifact.
+# This is a multi-stage Dockerfile.
+FROM golang:1.25-alpine AS builder
+
+# Set the Current Working Directory inside the container
+WORKDIR /app
+
+# We want to populate the module cache based on the go.mod file.
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code into the container
+COPY . .
+
+# Build the Go app
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./bin/server ./cmd/server
+
+# Now, create the final image that will be used to run the server.
+FROM alpine:latest
+
+# Install delve for debugging.
+RUN apk --no-cache add curl && \
+    curl -L -o /usr/local/bin/dlv https://github.com/go-delve/delve/releases/download/v1.25.2/dlv-linux-amd64 && \
+    chmod +x /usr/local/bin/dlv
+
+# Install air for live reloading.
+RUN curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b /usr/local/bin
+
+# Copy the built server from the builder stage.
+COPY --from=builder /app/bin/server /usr/local/bin/server
+
+# Copy the air config
+COPY --from=builder /app/.air.toml /.air.toml
+
+# Expose port 8080 to the outside world
+EXPOSE 8080
+# Expose port 2345 for delve debugger
+EXPOSE 2345
+
+# Command to run the server with air for live reload and delve for debugging
+CMD ["air", "-c", ".air.toml"]

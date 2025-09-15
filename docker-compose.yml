@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8080:8080"
+      - "2345:2345"
+    volumes:
+      - .:/app
+    command: air -c .air.toml
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./ui:/app/ui
+      - /app/ui/node_modules
+    command: npm run dev -- --host 0.0.0.0
