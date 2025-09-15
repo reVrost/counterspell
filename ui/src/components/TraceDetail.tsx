@@ -62,6 +62,9 @@ export function TraceDetailView({ traceId, onClose }: TraceDetailViewProps) {
     <Drawer
       opened
       onClose={onClose}
+      transitionProps={{ duration: 0 }}
+      withOverlay={false}
+      radius="md"
       title={<Text fw="500">Trace: {traceId}</Text>}
       padding="xl"
       size="xl"

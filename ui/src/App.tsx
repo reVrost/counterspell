@@ -35,6 +35,7 @@ function App() {
               <MainHeader />
               <Routes>
                 <Route path="/home" element={<LogsPage />} />
+                <Route path="/agents" element={<AgentsPage />} />
                 <Route path="/logs" element={<LogsPage />} />
                 <Route path="/metrics" element={<MetricsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

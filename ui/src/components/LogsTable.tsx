@@ -177,7 +177,7 @@ export function LogsTable() {
 
   return (
     <>
-      <Stack p="lg">
+      <Stack>
         <Grid>
           <Grid.Col span={8}>
             <TextInput
@@ -227,13 +227,7 @@ export function LogsTable() {
           </Grid.Col>
         </Grid>
         <ScrollArea>
-          <Table
-            withTableBorder
-            miw={800}
-            verticalSpacing="xs"
-            variant="compact"
-            fz="xs"
-          >
+          <Table miw={800} verticalSpacing="xs" variant="compact" fz="xs">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th w={10}>
