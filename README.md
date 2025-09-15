@@ -19,6 +19,14 @@ A lightweight, embedded observability tool for Go applications that provides Ope
 go get github.com/revrost/counterspell
 ```
 
+## Todo
+
+- [ ] Agent configuration framework
+- [ ] Openrouter integration
+- [ ] Lightweight execution runtime via goroutine (inspired by cadence/go-workflow)
+- [ ] Orchestrator-Executor MVP via cli
+- [ ] Openapi streaming spec
+
 ## Quick Start
 
 The simplest way to add Counterspell to your application:
