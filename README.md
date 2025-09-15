@@ -68,9 +68,6 @@ func main() {
 
 All API endpoints require authentication via the `Authorization: Bearer <token>` header or `auth` query parameter.
 
-## License
-
-MIT
 
 ## Contributing
 
