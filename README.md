@@ -21,11 +21,15 @@ go get github.com/revrost/counterspell
 
 ## Todo
 
-- [ ] Agent configuration framework
+- [ ] Protobuf schemas
+- [ ] Agent configuration/blueprint framework
 - [ ] Openrouter integration
-- [ ] Lightweight execution runtime via goroutine (inspired by cadence/go-workflow)
-- [ ] Orchestrator-Executor MVP via cli
+- [ ] Lightweight execution runtime utilize goroutine (cadence/go-workflow)
+- [ ] Create agent, run agent, watch UI
+- [ ] Orchestrator-Executor MVP via ui
+- [ ] Otel integration
 - [ ] Openapi streaming spec
+- [ ] Move sqlite to postgres (later)
 
 ## Quick Start
 
@@ -67,7 +71,6 @@ func main() {
 ## API Endpoints
 
 All API endpoints require authentication via the `Authorization: Bearer <token>` header or `auth` query parameter.
-
 
 ## Contributing
 
