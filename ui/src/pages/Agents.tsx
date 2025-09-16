@@ -1,5 +1,5 @@
-import { LogsTable } from "../components/LogsTable";
+import { Stack } from "@mantine/core";
 
 export default function AgentsPage() {
-  return <LogsTable />;
+  return <Stack></Stack>;
 }

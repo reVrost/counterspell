@@ -27,12 +27,15 @@ function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
     >
       <Group flex={1} justify="flex-start">
         <Button
+          fz="sm"
+          fw="400"
           fullWidth
           variant="subtle"
+          size="compact-lg"
           justify="flex-start"
           leftSection={<Icon size={20} stroke={1.5} />}
         >
-          <Text size="sm" ta="start">
+          <Text size="sm" ta="start" inherit>
             {label}
           </Text>
         </Button>
@@ -43,7 +46,7 @@ function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
 
 const menu = [
   { icon: IconHome, label: "Home", path: "home" },
-  { icon: IconCube, label: "Inferences", path: "inferences" },
+  { icon: IconCube, label: "Agents", path: "agents" },
   { icon: IconNotes, label: "Logs", path: "logs" },
   { icon: IconGauge, label: "Metrics", path: "metrics" },
   { icon: IconSettings, label: "Settings", path: "settings" },
@@ -55,7 +58,7 @@ export function NavBar() {
   return (
     <nav className={classes.navbar}>
       <TeamButton />
-      <Stack mt="lg" gap="2xs" justify="flex-start" align="flex-start">
+      <Stack mt="lg" gap="4xs" justify="flex-start" align="flex-start">
         {links}
       </Stack>
       <Stack mt="auto">

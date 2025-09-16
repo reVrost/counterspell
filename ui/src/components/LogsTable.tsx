@@ -173,7 +173,6 @@ export function LogsTable() {
               fontFamily: "JetBrains Mono, monospace",
               fontSize: "13px",
               color: "var(--mantine-color-indigo-6)",
-              borderTop: "1px solid var(--mantine-color-gray-3)",
             }}
           >
             {JSON.stringify(selectedLog, null, 2)
