@@ -1,4 +1,4 @@
-import { ActionIcon, Container, Group, Stack, Title } from "@mantine/core";
+import { Stack } from "@mantine/core";
 import { useState } from "react";
 import { TracesTable } from "../components/TracesTable";
 import { TraceDetailView } from "../components/TraceDetail";

@@ -2,7 +2,6 @@ import useSWR from "swr";
 import { TraceDetail } from "../types/types";
 import {
   Badge,
-  Drawer,
   ScrollArea,
   Stack,
   Text,
@@ -22,6 +21,7 @@ import {
 } from "recharts";
 import { api } from "../utils/api";
 import { useSecret } from "../context/SecretContext";
+import { Drawer } from "./Drawer/Drawer";
 
 export interface TraceDetailViewProps {
   traceId: string;
@@ -62,15 +62,9 @@ export function TraceDetailView({ traceId, onClose }: TraceDetailViewProps) {
     <Drawer
       opened
       onClose={onClose}
-      transitionProps={{ duration: 0 }}
-      withOverlay={false}
-      radius="md"
       title={<Text fw="500">Trace: {traceId}</Text>}
-      padding="xl"
-      size="xl"
-      position="right"
     >
-      <Stack gap="xl">
+      <Stack gap="xl" p="md">
         <Title order={4} fw={500}>
           Spans Timeline
         </Title>

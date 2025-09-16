@@ -1,4 +1,4 @@
-import { AppShell, Card, Flex, Paper, Stack } from "@mantine/core";
+import { AppShell, Card, Stack } from "@mantine/core";
 import { NavBar } from "./components/Navbar";
 import { Route, Routes } from "react-router-dom";
 import LogsPage from "./pages/Logs";
@@ -36,7 +36,7 @@ function App() {
               <MainHeader />
               <Routes>
                 <Route path="/home" element={<LogsPage />} />
-                <Route path="/agents" element={<AgentsPage />} />
+                <Route path="/inferences" element={<AgentsPage />} />
                 <Route path="/logs" element={<LogsPage />} />
                 <Route path="/metrics" element={<MetricsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
