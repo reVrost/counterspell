@@ -30,3 +30,6 @@ test: generate ## Run all tests
 # Cleanup
 clean: ## Clean build artifacts and database
 	rm -rf bin/ counterspell.db coverage.out *.log 
+
+buf:
+	npx buf generate
