@@ -1,17 +1,6 @@
-import {
-  ActionIcon,
-  Badge,
-  Table,
-  Text,
-  TextInput,
-  useMantineTheme,
-} from "@mantine/core";
-import {
-  IconArrowRight,
-  IconChevronRight,
-  IconSearch,
-  IconX,
-} from "@tabler/icons-react";
+import { Badge, Stack, Table, Text, TextInput } from "@mantine/core";
+import { OpsTable } from "./OpsTable/OpsTable";
+import { IconSearch, IconX } from "@tabler/icons-react";
 import useSWR, { useSWRConfig } from "swr";
 import { api } from "../utils/api";
 import { TraceListItem } from "../types/types";
@@ -44,7 +33,6 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
       return fetcher(url);
     },
   );
-  const theme = useMantineTheme();
 
   useEffect(() => {
     if (error) {
@@ -64,6 +52,7 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
       onClick={() => onTraceClick(trace)}
       style={{ cursor: "pointer" }}
     >
+      <Table.Td>{new Date(trace.trace_start_time).toLocaleString()}</Table.Td>
       <Table.Td>
         <Text inherit fw={500}>
           {trace.root_span_name}
@@ -73,16 +62,19 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
         </Text>
       </Table.Td>
       <Table.Td>
-        <Badge variant="dot" color={trace.has_error ? "red" : "green"}>
+        <Badge
+          variant="dot"
+          color={
+            trace.has_error
+              ? "var(--mantine-color-red-5)"
+              : "var(--mantine-color-green-5)"
+          }
+        >
           {trace.has_error ? "Error" : "OK"}
         </Badge>
       </Table.Td>
-      <Table.Td>{new Date(trace.trace_start_time).toLocaleString()}</Table.Td>
       <Table.Td>{trace.duration_ms.toFixed(2)}ms</Table.Td>
       <Table.Td>{trace.span_count}</Table.Td>
-      <Table.Td>
-        <IconChevronRight size={16} color={theme.colors.gray[5]} />
-      </Table.Td>
     </Table.Tr>
   ));
 
@@ -91,22 +83,11 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
   };
 
   return (
-    <>
+    <Stack gap={0}>
       <TextInput
-        radius="xl"
-        rightSectionWidth={42}
-        leftSection={<IconSearch size={18} stroke={1.5} />}
-        rightSection={
-          <ActionIcon
-            size={32}
-            radius="xl"
-            color={theme.primaryColor}
-            variant="filled"
-            onClick={handleSearch}
-          >
-            <IconArrowRight size={18} stroke={1.5} />
-          </ActionIcon>
-        }
+        radius="md"
+        variant="subtle"
+        rightSection={<IconSearch size={18} stroke={1.5} />}
         placeholder="Search for a trace by root span name"
         value={filter}
         onChange={(event) => setFilter(event.currentTarget.value)}
@@ -116,19 +97,10 @@ export function TracesTable({ onTraceClick }: TracesTableProps) {
           }
         }}
       />
-      <Table verticalSpacing="sm" highlightOnHover fz="xs" fw={500}>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Trace</Table.Th>
-            <Table.Th>Status</Table.Th>
-            <Table.Th>Start Time</Table.Th>
-            <Table.Th>Duration</Table.Th>
-            <Table.Th>Spans</Table.Th>
-            <Table.Th />
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>{rows}</Table.Tbody>
-      </Table>
-    </>
+      <OpsTable
+        columns={["Start Time", "Trace", "Status", "Duration", "Spans"]}
+        rows={rows}
+      />
+    </Stack>
   );
 }

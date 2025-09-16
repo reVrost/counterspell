@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActionIcon,
-  Code,
   Group,
   ScrollArea,
   Select,
@@ -110,7 +109,7 @@ export function LogsTable() {
   };
 
   return (
-    <ScrollArea>
+    <>
       <Stack>
         <Group p="xs">
           <TextInput
@@ -201,6 +200,6 @@ export function LogsTable() {
           </div>
         )}
       </Drawer>
-    </ScrollArea>
+    </>
   );
 }

@@ -43,7 +43,7 @@ function NavbarLink({ icon: Icon, label, path }: NavbarLinkProps) {
 
 const menu = [
   { icon: IconHome, label: "Home", path: "home" },
-  { icon: IconCube, label: "Agents", path: "agents" },
+  { icon: IconCube, label: "Inferences", path: "agents" },
   { icon: IconNotes, label: "Logs", path: "logs" },
   { icon: IconGauge, label: "Metrics", path: "metrics" },
   { icon: IconSettings, label: "Settings", path: "settings" },
