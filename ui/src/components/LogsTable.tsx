@@ -105,33 +105,6 @@ export function LogsTable() {
     );
   });
 
-  const flattenAttributes = (
-    attributes: Record<string, any>,
-    prefix = "attribute.",
-  ) => {
-    let flat: Record<string, any> = {};
-    for (const key in attributes) {
-      if (typeof attributes[key] === "object" && attributes[key] !== null) {
-        Object.assign(
-          flat,
-          flattenAttributes(attributes[key], `${prefix}${key}.`),
-        );
-      } else {
-        flat[`${prefix}${key}`] = attributes[key];
-      }
-    }
-    return flat;
-  };
-
-  const drawerData = selectedLog
-    ? {
-        id: selectedLog.id,
-        message: selectedLog.message,
-        timestamp: selectedLog.timestamp,
-        ...flattenAttributes(selectedLog.attributes),
-      }
-    : {};
-
   const handleSearch = () => {
     mutate(`/logs?q=${filter}&level=${level}`);
   };
@@ -172,26 +145,60 @@ export function LogsTable() {
           rows={rows}
         />
       </Stack>
-      <Drawer opened={opened} onClose={close} title="Log Details">
+      <Drawer
+        opened={opened}
+        onClose={close}
+        title={
+          <Group gap="3xs">
+            <Text component="span" c="var(--mantine-color-indigo-4)" inherit>
+              Log Details
+            </Text>
+            <span>
+              at{" "}
+              {new Date(selectedLog?.timestamp || "").toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                timeZoneName: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
+          </Group>
+        }
+      >
         {selectedLog && (
-          <Table withTableBorder fz="sm">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Property</Table.Th>
-                <Table.Th>Value</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {Object.entries(drawerData).map(([key, value]) => (
-                <Table.Tr key={key}>
-                  <Table.Td>{key}</Table.Td>
-                  <Table.Td>
-                    <Text inherit>{value as string}</Text>
-                  </Table.Td>
-                </Table.Tr>
+          <div
+            style={{
+              fontFamily: "JetBrains Mono, monospace",
+              fontSize: "13px",
+              color: "var(--mantine-color-indigo-6)",
+              borderTop: "1px solid var(--mantine-color-gray-3)",
+            }}
+          >
+            {JSON.stringify(selectedLog, null, 2)
+              .split("\n")
+              .map((line, index) => (
+                <div style={{ display: "flex" }} key={index}>
+                  <span
+                    style={{
+                      minWidth: "3em",
+                      paddingRight: "1em",
+                      borderRight: "1px solid var(--mantine-color-gray-3)",
+                      textAlign: "right",
+                      userSelect: "none",
+                      color: "var(--mantine-color-gray-4)",
+                    }}
+                  >
+                    {index + 1}
+                  </span>
+                  <span style={{ marginLeft: "1em", whiteSpace: "pre" }}>
+                    {line}
+                  </span>
+                </div>
               ))}
-            </Table.Tbody>
-          </Table>
+          </div>
         )}
       </Drawer>
     </ScrollArea>
