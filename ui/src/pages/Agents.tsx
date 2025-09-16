@@ -7,8 +7,9 @@ export default function AgentsPage() {
       <Group justify="space-between">
         <Stack gap="4xs">
           <Title>Blueprints</Title>
-          <Text fz="sm" c="dimmed">
-            Create your agentic blueprints here.
+          <Text size="sm" c="dimmed">
+            Blueprints are a collection of agents that can be used to create
+            counterspells.
           </Text>
         </Stack>
         <Button
