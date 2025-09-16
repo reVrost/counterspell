@@ -8,8 +8,7 @@ export default function AgentsPage() {
         <Stack gap="4xs">
           <Title>Blueprints</Title>
           <Text size="sm" c="dimmed">
-            Blueprints are a collection of agents that can be used to create
-            counterspells.
+            Blueprints are agents configurations.
           </Text>
         </Stack>
         <Button
