@@ -37,6 +37,7 @@ export function UserButton() {
         <Button
           variant="subtle"
           fullWidth
+          size="md"
           justify="space-between"
           px="2xs"
           leftSection={
