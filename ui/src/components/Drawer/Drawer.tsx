@@ -15,6 +15,7 @@ export const Drawer = ({ children, ...props }: MantineDrawerProps) => {
       styles={{
         header: {
           padding: "16px",
+          borderBottom: "1px solid var(--mantine-color-gray-3)",
         },
         title: {
           fontWeight: "500",

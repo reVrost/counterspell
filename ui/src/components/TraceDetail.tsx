@@ -62,7 +62,20 @@ export function TraceDetailView({ traceId, onClose }: TraceDetailViewProps) {
     <Drawer
       opened
       onClose={onClose}
-      title={<Text fw="500">Trace: {traceId}</Text>}
+      title={
+        <Text fw="500" c="indigo.4">
+          Trace{" "}
+          <Text
+            component="span"
+            ff="JetBrains Mono"
+            fz="sm"
+            fw="600"
+            c="gray.6"
+          >
+            {traceId}
+          </Text>
+        </Text>
+      }
     >
       <Stack gap="xl" p="md">
         <Title order={4} fw={500}>

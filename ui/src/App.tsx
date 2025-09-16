@@ -14,7 +14,7 @@ function App() {
       <AppShell
         navbar={{ width: 256, breakpoint: "sm", collapsed: { mobile: true } }}
         style={{
-          backgroundColor: "var(--mantine-color-gray-1)",
+          backgroundColor: "var(--mantine-color-gray-0)",
         }}
       >
         <AppShell.Navbar withBorder={false}>
@@ -24,11 +24,12 @@ function App() {
           <Stack>
             <Card
               h="calc(100vh - var(--mantine-spacing-lg))"
-              my="xs"
-              mx="xs"
+              my="2xs"
+              mr="xs"
+              ml="4xs"
               p={0}
               style={{ backgroundColor: "var(--mantine-color-white)" }}
-              shadow="none"
+              shadow="3xs"
               variant="outline"
               radius="md"
               withBorder
@@ -36,7 +37,7 @@ function App() {
               <MainHeader />
               <Routes>
                 <Route path="/home" element={<LogsPage />} />
-                <Route path="/inferences" element={<AgentsPage />} />
+                <Route path="/agents" element={<AgentsPage />} />
                 <Route path="/logs" element={<LogsPage />} />
                 <Route path="/metrics" element={<MetricsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
