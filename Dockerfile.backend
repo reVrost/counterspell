@@ -11,6 +11,7 @@ RUN go mod download
 
 # Copy the source code into the container
 COPY . .
+COPY .air.toml .
 
 # Build the Go app
 RUN CGO_ENABLED=0 GOOS=linux go build -o ./bin/server ./cmd/server

@@ -7,9 +7,9 @@ tmp_dir = "tmp"
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ./cmd/server"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "bin", "examples"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "bin", "examples", "node_modules", "ui/node_modules"]
   exclude_file = []
-  exclude_regex = ["_test.go"]
+  exclude_regex = ["_test.go", "node_modules/*", "\\.git/*"]
   exclude_unchanged = false
   follow_symlink = false
   full_bin = ""
@@ -41,4 +41,4 @@ tmp_dir = "tmp"
 
 [screen]
   clear_on_rebuild = false
-  keep_scroll = true 
+  keep_scroll = true

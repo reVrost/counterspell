@@ -2,6 +2,11 @@
   background-color: var(--mantine-color-gray-1);
 }
 
+.table {
+  color: var(--mantine-color-gray-5);
+  background-color: var(--mantine-color-gray-0);
+}
+
 .row {
   cursor: pointer;
 
