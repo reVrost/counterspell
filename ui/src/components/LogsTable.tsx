@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
-import cx from "clsx";
 import {
   ActionIcon,
-  Badge,
-  Checkbox,
   Code,
-  Drawer,
-  Grid,
   Group,
   ScrollArea,
   Select,
@@ -14,17 +9,8 @@ import {
   Table,
   Text,
   TextInput,
-  Title,
-  useMantineTheme,
 } from "@mantine/core";
-import classes from "./LogsTable.module.css";
-import {
-  IconArrowRight,
-  IconChevronRight,
-  IconRefresh,
-  IconSearch,
-  IconX,
-} from "@tabler/icons-react";
+import { IconRefresh, IconSearch, IconX } from "@tabler/icons-react";
 import { type ApiResponse, Log } from "../utils/types";
 import { api } from "../utils/api";
 import useSWR, { mutate } from "swr";
@@ -32,6 +18,8 @@ import { notifications } from "@mantine/notifications";
 import { useDisclosure } from "@mantine/hooks";
 import { useSearchParams } from "react-router-dom";
 import { useSecret } from "../context/SecretContext";
+import { OpsTable } from "./OpsTable/OpsTable";
+import { Drawer } from "./Drawer/Drawer";
 
 export function LogsTable() {
   const { secret } = useSecret();
@@ -45,7 +33,6 @@ export function LogsTable() {
     });
     return res.data;
   };
-  const theme = useMantineTheme();
 
   const { data: response, error } = useSWR<ApiResponse<Log>>(
     [`/logs?q=${filter}&level=${level}`, secret],
@@ -81,7 +68,6 @@ export function LogsTable() {
     setSearchParams({ q: filter, level });
   }, [filter, level, setSearchParams]);
 
-  const [selection, setSelection] = useState<string[]>([]);
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
 
@@ -90,56 +76,31 @@ export function LogsTable() {
     open();
   };
 
-  const toggleRow = (id: string) =>
-    setSelection((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
-  const toggleAll = () =>
-    setSelection((current) =>
-      current.length === data?.length ? [] : data?.map((item) => item.id) || [],
-    );
-
-  const levelToIcon: Record<string, string> = {
-    debug: "var(--mantine-color-teal-4)",
-    info: "var(--mantine-color-blue-4)",
-    warn: "var(--mantine-color-orange-4)",
-    error: "var(--mantine-color-red-4)",
+  const levelToColor: Record<string, string> = {
+    debug: "var(--mantine-color-teal-5)",
+    info: "var(--mantine-color-blue-5)",
+    warn: "var(--mantine-color-orange-5)",
+    error: "var(--mantine-color-red-5)",
   };
 
   const rows = data?.map((item) => {
-    const selected = selection.includes(item.id);
     return (
       <Table.Tr
         key={item.id}
-        className={cx(classes.row, { [classes.rowSelected]: selected })}
+        style={{
+          cursor: "pointer",
+          "&:hover": {
+            backgroundColor: "var(--mantine-color-gray-2)",
+          },
+        }}
         onClick={() => handleRowClick(item)}
       >
-        <Table.Td>
-          <Checkbox
-            checked={selection.includes(item.id)}
-            onChange={() => toggleRow(item.id)}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </Table.Td>
-        <Table.Td>
-          <Group gap="sm">
-            <Badge variant="dot" color={levelToIcon[item.level]}>
-              {item.level}
-            </Badge>
-          </Group>
+        <Table.Td>{new Date(item.timestamp).toLocaleString()}</Table.Td>
+        <Table.Td tt="uppercase" c={levelToColor[item.level]}>
+          {item.level}
         </Table.Td>
         <Table.Td>{item.message}</Table.Td>
-        <Table.Td>
-          <Code color="teal.1">{JSON.stringify(item.attributes)}</Code>
-        </Table.Td>
-        <Table.Td>
-          <Group justify="space-between">
-            {new Date(item.timestamp).toLocaleString()}
-            <IconChevronRight size={16} color={theme.colors.gray[5]} />
-          </Group>
-        </Table.Td>
+        <Table.Td>{JSON.stringify(item.attributes)}</Table.Td>
       </Table.Tr>
     );
   });
@@ -176,86 +137,42 @@ export function LogsTable() {
   };
 
   return (
-    <>
+    <ScrollArea>
       <Stack>
-        <Grid>
-          <Grid.Col span={8}>
-            <TextInput
-              radius="xl"
-              miw="80%"
-              rightSectionWidth={42}
-              leftSection={<IconSearch size={18} stroke={1.5} />}
-              rightSection={
-                <ActionIcon
-                  size={32}
-                  radius="xl"
-                  color={theme.primaryColor}
-                  variant="filled"
-                  onClick={handleSearch}
-                >
-                  <IconArrowRight size={18} stroke={1.5} />
-                </ActionIcon>
+        <Group p="xs">
+          <TextInput
+            rightSection={<IconSearch size={18} stroke={1.5} />}
+            placeholder="Search term or filter"
+            value={filter}
+            onChange={(event) => setFilter(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                handleSearch();
               }
-              placeholder="Search term or filter"
-              value={filter}
-              onChange={(event) => setFilter(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleSearch();
-                }
-              }}
-            />
-          </Grid.Col>
+            }}
+          />
 
-          <Grid.Col span={3}>
-            <Select
-              placeholder="Log level"
-              value={level}
-              onChange={(value) => setLevel(value || "")}
-              data={[
-                { value: "debug", label: "Debug" },
-                { value: "info", label: "Info" },
-                { value: "warn", label: "Warn" },
-                { value: "error", label: "Error" },
-              ]}
-            />
-          </Grid.Col>
-          <Grid.Col span={1}>
-            <ActionIcon variant="subtle" onClick={() => mutate("logs")}>
-              <IconRefresh />
-            </ActionIcon>
-          </Grid.Col>
-        </Grid>
-        <ScrollArea>
-          <Table miw={800} verticalSpacing="xs" variant="compact" fz="xs">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th w={10}>
-                  <Checkbox
-                    onChange={toggleAll}
-                    checked={selection.length === data?.length}
-                    indeterminate={
-                      selection.length > 0 && selection.length !== data?.length
-                    }
-                  />
-                </Table.Th>
-                <Table.Th w={200}>Level</Table.Th>
-                <Table.Th>Message</Table.Th>
-                <Table.Th>Attributes</Table.Th>
-                <Table.Th w={200}>Created</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>{rows}</Table.Tbody>
-          </Table>
-        </ScrollArea>
+          <Select
+            placeholder="Log level"
+            value={level}
+            onChange={(value) => setLevel(value || "")}
+            data={[
+              { value: "debug", label: "Debug" },
+              { value: "info", label: "Info" },
+              { value: "warn", label: "Warn" },
+              { value: "error", label: "Error" },
+            ]}
+          />
+          <ActionIcon variant="light" onClick={() => mutate("logs")}>
+            <IconRefresh />
+          </ActionIcon>
+        </Group>
+        <OpsTable
+          columns={["Time", "Level", "Message", "Attributes"]}
+          rows={rows}
+        />
       </Stack>
-      <Drawer
-        opened={opened}
-        onClose={close}
-        title="Log Details"
-        position="right"
-        size="lg"
-      >
+      <Drawer opened={opened} onClose={close} title="Log Details">
         {selectedLog && (
           <Table withTableBorder fz="sm">
             <Table.Thead>
@@ -277,6 +194,6 @@ export function LogsTable() {
           </Table>
         )}
       </Drawer>
-    </>
+    </ScrollArea>
   );
 }
