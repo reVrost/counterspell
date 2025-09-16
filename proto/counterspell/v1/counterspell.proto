@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package counterspell.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/revrost/counterspell/gen/counterspell/v1;counterspellv1";

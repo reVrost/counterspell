@@ -6,7 +6,7 @@ import MetricsPage from "./pages/Metrics";
 import SettingsPage from "./pages/Settings";
 import { SecretProvider } from "./context/SecretContext";
 import { MainHeader } from "./components/MainHeader/MainHeader";
-import AgentsPage from "./pages/Agents";
+import AgentsPage from "./pages/AgentsPage";
 
 function App() {
   return (

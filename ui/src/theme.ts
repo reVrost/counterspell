@@ -604,6 +604,9 @@ export const shadcnTheme: MantineThemeOverride = createTheme({
       },
     }),
     Button: Button.extend({
+      defaultProps: {
+        size: "xs",
+      },
       // Hover change
       classNames: buttonClassess,
       vars: (theme, props) => {
