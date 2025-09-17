@@ -76,6 +76,30 @@ func main() {
 	api.GET("/logs", apiHandler.QueryLogs)
 	api.GET("/traces", apiHandler.QueryTraces)
 	api.GET("/traces/:trace_id", apiHandler.GetTraceDetails)
+	api.POST("/chat", func(c echo.Context) error {
+		// This is a placeholder implementation.
+		// In a real application, you would call your LLM here.
+		var body struct {
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := c.Bind(&body); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		}
+
+		// Echo back the last user message for now
+		var lastUserMessage string
+		for i := len(body.Messages) - 1; i >= 0; i-- {
+			if body.Messages[i].Role == "user" {
+				lastUserMessage = body.Messages[i].Content
+				break
+			}
+		}
+
+		return c.String(http.StatusOK, "Echo: "+lastUserMessage)
+	})
 
 	// Add health endpoint (no auth required)
 	e.GET("/counterspell/health", func(c echo.Context) error {
