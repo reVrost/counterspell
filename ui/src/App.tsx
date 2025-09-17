@@ -7,6 +7,7 @@ import SettingsPage from "./pages/Settings";
 import { SecretProvider } from "./context/SecretContext";
 import { MainHeader } from "./components/MainHeader/MainHeader";
 import AgentsPage from "./pages/AgentsPage";
+import CreateBlueprintPage from "./pages/CreateBlueprintPage";
 
 function App() {
   return (
@@ -38,6 +39,10 @@ function App() {
               <Routes>
                 <Route path="/home" element={<LogsPage />} />
                 <Route path="/agents" element={<AgentsPage />} />
+                <Route
+                  path="/agents/create"
+                  element={<CreateBlueprintPage />}
+                />
                 <Route path="/logs" element={<LogsPage />} />
                 <Route path="/metrics" element={<MetricsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
