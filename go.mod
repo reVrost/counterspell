@@ -2,8 +2,6 @@ module github.com/revrost/counterspell
 
 go 1.25
 
-
-
 require (
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/labstack/echo/v5 v5.0.0-20230722203903-ec5b858dab61
@@ -18,6 +16,7 @@ require (
 )
 
 require (
+	connectrpc.com/connect v1.18.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -38,6 +37,7 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
