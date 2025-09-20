@@ -926,7 +926,7 @@ func (x *ListLogsResponse) GetLogs() []*Log {
 	return nil
 }
 
-type GetTracesRequest struct {
+type ListTracesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pagination    *Pagination            `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
 	RootSpanName  string                 `protobuf:"bytes,2,opt,name=root_span_name,json=rootSpanName,proto3" json:"root_span_name,omitempty"`
@@ -935,20 +935,20 @@ type GetTracesRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetTracesRequest) Reset() {
-	*x = GetTracesRequest{}
+func (x *ListTracesRequest) Reset() {
+	*x = ListTracesRequest{}
 	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetTracesRequest) String() string {
+func (x *ListTracesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetTracesRequest) ProtoMessage() {}
+func (*ListTracesRequest) ProtoMessage() {}
 
-func (x *GetTracesRequest) ProtoReflect() protoreflect.Message {
+func (x *ListTracesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -960,53 +960,53 @@ func (x *GetTracesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetTracesRequest.ProtoReflect.Descriptor instead.
-func (*GetTracesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListTracesRequest.ProtoReflect.Descriptor instead.
+func (*ListTracesRequest) Descriptor() ([]byte, []int) {
 	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *GetTracesRequest) GetPagination() *Pagination {
+func (x *ListTracesRequest) GetPagination() *Pagination {
 	if x != nil {
 		return x.Pagination
 	}
 	return nil
 }
 
-func (x *GetTracesRequest) GetRootSpanName() string {
+func (x *ListTracesRequest) GetRootSpanName() string {
 	if x != nil {
 		return x.RootSpanName
 	}
 	return ""
 }
 
-func (x *GetTracesRequest) GetHasError() bool {
+func (x *ListTracesRequest) GetHasError() bool {
 	if x != nil {
 		return x.HasError
 	}
 	return false
 }
 
-type GetTracesResponse struct {
+type ListTracesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Traces        []*Trace               `protobuf:"bytes,1,rep,name=traces,proto3" json:"traces,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetTracesResponse) Reset() {
-	*x = GetTracesResponse{}
+func (x *ListTracesResponse) Reset() {
+	*x = ListTracesResponse{}
 	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetTracesResponse) String() string {
+func (x *ListTracesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetTracesResponse) ProtoMessage() {}
+func (*ListTracesResponse) ProtoMessage() {}
 
-func (x *GetTracesResponse) ProtoReflect() protoreflect.Message {
+func (x *ListTracesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1018,12 +1018,12 @@ func (x *GetTracesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetTracesResponse.ProtoReflect.Descriptor instead.
-func (*GetTracesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListTracesResponse.ProtoReflect.Descriptor instead.
+func (*ListTracesResponse) Descriptor() ([]byte, []int) {
 	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *GetTracesResponse) GetTraces() []*Trace {
+func (x *ListTracesResponse) GetTraces() []*Trace {
 	if x != nil {
 		return x.Traces
 	}
@@ -1496,14 +1496,14 @@ const file_proto_counterspell_v1_counterspell_proto_rawDesc = "" +
 	"start_time\x18\x04 \x01(\tR\tstartTime\x12\x19\n" +
 	"\bend_time\x18\x05 \x01(\tR\aendTime\"<\n" +
 	"\x10ListLogsResponse\x12(\n" +
-	"\x04logs\x18\x01 \x03(\v2\x14.counterspell.v1.LogR\x04logs\"\x92\x01\n" +
-	"\x10GetTracesRequest\x12;\n" +
+	"\x04logs\x18\x01 \x03(\v2\x14.counterspell.v1.LogR\x04logs\"\x93\x01\n" +
+	"\x11ListTracesRequest\x12;\n" +
 	"\n" +
 	"pagination\x18\x01 \x01(\v2\x1b.counterspell.v1.PaginationR\n" +
 	"pagination\x12$\n" +
 	"\x0eroot_span_name\x18\x02 \x01(\tR\frootSpanName\x12\x1b\n" +
-	"\thas_error\x18\x03 \x01(\bR\bhasError\"C\n" +
-	"\x11GetTracesResponse\x12.\n" +
+	"\thas_error\x18\x03 \x01(\bR\bhasError\"D\n" +
+	"\x12ListTracesResponse\x12.\n" +
 	"\x06traces\x18\x01 \x03(\v2\x16.counterspell.v1.TraceR\x06traces\"\x9c\x02\n" +
 	"\x03Log\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
@@ -1550,14 +1550,15 @@ const file_proto_counterspell_v1_counterspell_proto_rawDesc = "" +
 	"\x0fGetTraceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"@\n" +
 	"\x10GetTraceResponse\x12,\n" +
-	"\x05trace\x18\x01 \x01(\v2\x16.counterspell.v1.TraceR\x05trace2\x9c\x06\n" +
+	"\x05trace\x18\x01 \x01(\v2\x16.counterspell.v1.TraceR\x05trace2\x9f\x06\n" +
 	"\aService\x12\x96\x01\n" +
 	"\x0fCreateBlueprint\x12'.counterspell.v1.CreateBlueprintRequest\x1a(.counterspell.v1.CreateBlueprintResponse\"0\x82\xd3\xe4\x93\x02*\"(/v1/blueprints?limit={limit}&page={page}\x12x\n" +
 	"\fGetBlueprint\x12$.counterspell.v1.GetBlueprintRequest\x1a%.counterspell.v1.GetBlueprintResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/blueprints/{id}\x12\x93\x01\n" +
 	"\x0eListBlueprints\x12&.counterspell.v1.ListBlueprintsRequest\x1a'.counterspell.v1.ListBlueprintsResponse\"0\x82\xd3\xe4\x93\x02*\x12(/v1/blueprints?limit={limit}&page={page}\x12{\n" +
-	"\bListLogs\x12 .counterspell.v1.ListLogsRequest\x1a!.counterspell.v1.ListLogsResponse\"*\x82\xd3\xe4\x93\x02$\x12\"/v1/logs?limit={limit}&page={page}\x12\x80\x01\n" +
-	"\tGetTraces\x12!.counterspell.v1.GetTracesRequest\x1a\".counterspell.v1.GetTracesResponse\",\x82\xd3\xe4\x93\x02&\x12$/v1/traces?limit={limit}&page={page}\x12h\n" +
-	"\bGetTrace\x12 .counterspell.v1.GetTraceRequest\x1a!.counterspell.v1.GetTraceResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/traces/{id}BDZBgithub.com/revrost/counterspell/gen/counterspell/v1;counterspellv1b\x06proto3"
+	"\bListLogs\x12 .counterspell.v1.ListLogsRequest\x1a!.counterspell.v1.ListLogsResponse\"*\x82\xd3\xe4\x93\x02$\x12\"/v1/logs?limit={limit}&page={page}\x12\x83\x01\n" +
+	"\n" +
+	"ListTraces\x12\".counterspell.v1.ListTracesRequest\x1a#.counterspell.v1.ListTracesResponse\",\x82\xd3\xe4\x93\x02&\x12$/v1/traces?limit={limit}&page={page}\x12h\n" +
+	"\bGetTrace\x12 .counterspell.v1.GetTraceRequest\x1a!.counterspell.v1.GetTraceResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/traces/{id}BNZLgithub.com/revrost/counterspell/pkg/gen/proto/counterspell/v1;counterspellv1b\x06proto3"
 
 var (
 	file_proto_counterspell_v1_counterspell_proto_rawDescOnce sync.Once
@@ -1589,8 +1590,8 @@ var file_proto_counterspell_v1_counterspell_proto_goTypes = []any{
 	(*GetBlueprintResponse)(nil),    // 13: counterspell.v1.GetBlueprintResponse
 	(*ListLogsRequest)(nil),         // 14: counterspell.v1.ListLogsRequest
 	(*ListLogsResponse)(nil),        // 15: counterspell.v1.ListLogsResponse
-	(*GetTracesRequest)(nil),        // 16: counterspell.v1.GetTracesRequest
-	(*GetTracesResponse)(nil),       // 17: counterspell.v1.GetTracesResponse
+	(*ListTracesRequest)(nil),       // 16: counterspell.v1.ListTracesRequest
+	(*ListTracesResponse)(nil),      // 17: counterspell.v1.ListTracesResponse
 	(*Log)(nil),                     // 18: counterspell.v1.Log
 	(*Trace)(nil),                   // 19: counterspell.v1.Trace
 	(*Span)(nil),                    // 20: counterspell.v1.Span
@@ -1615,8 +1616,8 @@ var file_proto_counterspell_v1_counterspell_proto_depIdxs = []int32{
 	7,  // 9: counterspell.v1.GetBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
 	0,  // 10: counterspell.v1.ListLogsRequest.pagination:type_name -> counterspell.v1.Pagination
 	18, // 11: counterspell.v1.ListLogsResponse.logs:type_name -> counterspell.v1.Log
-	0,  // 12: counterspell.v1.GetTracesRequest.pagination:type_name -> counterspell.v1.Pagination
-	19, // 13: counterspell.v1.GetTracesResponse.traces:type_name -> counterspell.v1.Trace
+	0,  // 12: counterspell.v1.ListTracesRequest.pagination:type_name -> counterspell.v1.Pagination
+	19, // 13: counterspell.v1.ListTracesResponse.traces:type_name -> counterspell.v1.Trace
 	26, // 14: counterspell.v1.Log.attributes:type_name -> counterspell.v1.Log.AttributesEntry
 	20, // 15: counterspell.v1.Trace.spans:type_name -> counterspell.v1.Span
 	27, // 16: counterspell.v1.Span.attributes:type_name -> counterspell.v1.Span.AttributesEntry
@@ -1628,13 +1629,13 @@ var file_proto_counterspell_v1_counterspell_proto_depIdxs = []int32{
 	12, // 22: counterspell.v1.Service.GetBlueprint:input_type -> counterspell.v1.GetBlueprintRequest
 	10, // 23: counterspell.v1.Service.ListBlueprints:input_type -> counterspell.v1.ListBlueprintsRequest
 	14, // 24: counterspell.v1.Service.ListLogs:input_type -> counterspell.v1.ListLogsRequest
-	16, // 25: counterspell.v1.Service.GetTraces:input_type -> counterspell.v1.GetTracesRequest
+	16, // 25: counterspell.v1.Service.ListTraces:input_type -> counterspell.v1.ListTracesRequest
 	21, // 26: counterspell.v1.Service.GetTrace:input_type -> counterspell.v1.GetTraceRequest
 	9,  // 27: counterspell.v1.Service.CreateBlueprint:output_type -> counterspell.v1.CreateBlueprintResponse
 	13, // 28: counterspell.v1.Service.GetBlueprint:output_type -> counterspell.v1.GetBlueprintResponse
 	11, // 29: counterspell.v1.Service.ListBlueprints:output_type -> counterspell.v1.ListBlueprintsResponse
 	15, // 30: counterspell.v1.Service.ListLogs:output_type -> counterspell.v1.ListLogsResponse
-	17, // 31: counterspell.v1.Service.GetTraces:output_type -> counterspell.v1.GetTracesResponse
+	17, // 31: counterspell.v1.Service.ListTraces:output_type -> counterspell.v1.ListTracesResponse
 	22, // 32: counterspell.v1.Service.GetTrace:output_type -> counterspell.v1.GetTraceResponse
 	27, // [27:33] is the sub-list for method output_type
 	21, // [21:27] is the sub-list for method input_type

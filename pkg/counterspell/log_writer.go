@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/pkg/db"
 )
 
 // LogData represents a log entry for database insertion

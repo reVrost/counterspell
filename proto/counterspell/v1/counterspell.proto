@@ -7,7 +7,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/revrost/counterspell/gen/counterspell/v1;counterspellv1";
+option go_package = "github.com/revrost/counterspell/pkg/gen/proto/counterspell/v1;counterspellv1";
 
 message Pagination {
   int32 limit = 1; // Max items per page (e.g., 10, 50, max 100)
@@ -102,13 +102,13 @@ message ListLogsResponse {
   repeated Log logs = 1;
 }
 
-message GetTracesRequest {
+message ListTracesRequest {
   Pagination pagination = 1;
   string root_span_name = 2;
   bool has_error = 3;
 }
 
-message GetTracesResponse {
+message ListTracesResponse {
   repeated Trace traces = 1;
 }
 
@@ -166,7 +166,7 @@ service Service {
   rpc ListLogs(ListLogsRequest) returns (ListLogsResponse) {
     option (google.api.http) = {get: "/v1/logs?limit={limit}&page={page}"};
   }
-  rpc GetTraces(GetTracesRequest) returns (GetTracesResponse) {
+  rpc ListTraces(ListTracesRequest) returns (ListTracesResponse) {
     option (google.api.http) = {get: "/v1/traces?limit={limit}&page={page}"};
   }
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {

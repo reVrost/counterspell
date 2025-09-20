@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/revrost/counterspell/gen/counterspell/v1"
+	v1 "github.com/revrost/counterspell/pkg/gen/proto/counterspell/v1"
 	http "net/http"
 	strings "strings"
 )
@@ -41,8 +41,8 @@ const (
 	ServiceListBlueprintsProcedure = "/counterspell.v1.Service/ListBlueprints"
 	// ServiceListLogsProcedure is the fully-qualified name of the Service's ListLogs RPC.
 	ServiceListLogsProcedure = "/counterspell.v1.Service/ListLogs"
-	// ServiceGetTracesProcedure is the fully-qualified name of the Service's GetTraces RPC.
-	ServiceGetTracesProcedure = "/counterspell.v1.Service/GetTraces"
+	// ServiceListTracesProcedure is the fully-qualified name of the Service's ListTraces RPC.
+	ServiceListTracesProcedure = "/counterspell.v1.Service/ListTraces"
 	// ServiceGetTraceProcedure is the fully-qualified name of the Service's GetTrace RPC.
 	ServiceGetTraceProcedure = "/counterspell.v1.Service/GetTrace"
 )
@@ -53,7 +53,7 @@ type ServiceClient interface {
 	GetBlueprint(context.Context, *connect.Request[v1.GetBlueprintRequest]) (*connect.Response[v1.GetBlueprintResponse], error)
 	ListBlueprints(context.Context, *connect.Request[v1.ListBlueprintsRequest]) (*connect.Response[v1.ListBlueprintsResponse], error)
 	ListLogs(context.Context, *connect.Request[v1.ListLogsRequest]) (*connect.Response[v1.ListLogsResponse], error)
-	GetTraces(context.Context, *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error)
+	ListTraces(context.Context, *connect.Request[v1.ListTracesRequest]) (*connect.Response[v1.ListTracesResponse], error)
 	GetTrace(context.Context, *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error)
 }
 
@@ -92,10 +92,10 @@ func NewServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...con
 			connect.WithSchema(serviceMethods.ByName("ListLogs")),
 			connect.WithClientOptions(opts...),
 		),
-		getTraces: connect.NewClient[v1.GetTracesRequest, v1.GetTracesResponse](
+		listTraces: connect.NewClient[v1.ListTracesRequest, v1.ListTracesResponse](
 			httpClient,
-			baseURL+ServiceGetTracesProcedure,
-			connect.WithSchema(serviceMethods.ByName("GetTraces")),
+			baseURL+ServiceListTracesProcedure,
+			connect.WithSchema(serviceMethods.ByName("ListTraces")),
 			connect.WithClientOptions(opts...),
 		),
 		getTrace: connect.NewClient[v1.GetTraceRequest, v1.GetTraceResponse](
@@ -113,7 +113,7 @@ type serviceClient struct {
 	getBlueprint    *connect.Client[v1.GetBlueprintRequest, v1.GetBlueprintResponse]
 	listBlueprints  *connect.Client[v1.ListBlueprintsRequest, v1.ListBlueprintsResponse]
 	listLogs        *connect.Client[v1.ListLogsRequest, v1.ListLogsResponse]
-	getTraces       *connect.Client[v1.GetTracesRequest, v1.GetTracesResponse]
+	listTraces      *connect.Client[v1.ListTracesRequest, v1.ListTracesResponse]
 	getTrace        *connect.Client[v1.GetTraceRequest, v1.GetTraceResponse]
 }
 
@@ -137,9 +137,9 @@ func (c *serviceClient) ListLogs(ctx context.Context, req *connect.Request[v1.Li
 	return c.listLogs.CallUnary(ctx, req)
 }
 
-// GetTraces calls counterspell.v1.Service.GetTraces.
-func (c *serviceClient) GetTraces(ctx context.Context, req *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error) {
-	return c.getTraces.CallUnary(ctx, req)
+// ListTraces calls counterspell.v1.Service.ListTraces.
+func (c *serviceClient) ListTraces(ctx context.Context, req *connect.Request[v1.ListTracesRequest]) (*connect.Response[v1.ListTracesResponse], error) {
+	return c.listTraces.CallUnary(ctx, req)
 }
 
 // GetTrace calls counterspell.v1.Service.GetTrace.
@@ -153,7 +153,7 @@ type ServiceHandler interface {
 	GetBlueprint(context.Context, *connect.Request[v1.GetBlueprintRequest]) (*connect.Response[v1.GetBlueprintResponse], error)
 	ListBlueprints(context.Context, *connect.Request[v1.ListBlueprintsRequest]) (*connect.Response[v1.ListBlueprintsResponse], error)
 	ListLogs(context.Context, *connect.Request[v1.ListLogsRequest]) (*connect.Response[v1.ListLogsResponse], error)
-	GetTraces(context.Context, *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error)
+	ListTraces(context.Context, *connect.Request[v1.ListTracesRequest]) (*connect.Response[v1.ListTracesResponse], error)
 	GetTrace(context.Context, *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error)
 }
 
@@ -188,10 +188,10 @@ func NewServiceHandler(svc ServiceHandler, opts ...connect.HandlerOption) (strin
 		connect.WithSchema(serviceMethods.ByName("ListLogs")),
 		connect.WithHandlerOptions(opts...),
 	)
-	serviceGetTracesHandler := connect.NewUnaryHandler(
-		ServiceGetTracesProcedure,
-		svc.GetTraces,
-		connect.WithSchema(serviceMethods.ByName("GetTraces")),
+	serviceListTracesHandler := connect.NewUnaryHandler(
+		ServiceListTracesProcedure,
+		svc.ListTraces,
+		connect.WithSchema(serviceMethods.ByName("ListTraces")),
 		connect.WithHandlerOptions(opts...),
 	)
 	serviceGetTraceHandler := connect.NewUnaryHandler(
@@ -210,8 +210,8 @@ func NewServiceHandler(svc ServiceHandler, opts ...connect.HandlerOption) (strin
 			serviceListBlueprintsHandler.ServeHTTP(w, r)
 		case ServiceListLogsProcedure:
 			serviceListLogsHandler.ServeHTTP(w, r)
-		case ServiceGetTracesProcedure:
-			serviceGetTracesHandler.ServeHTTP(w, r)
+		case ServiceListTracesProcedure:
+			serviceListTracesHandler.ServeHTTP(w, r)
 		case ServiceGetTraceProcedure:
 			serviceGetTraceHandler.ServeHTTP(w, r)
 		default:
@@ -239,8 +239,8 @@ func (UnimplementedServiceHandler) ListLogs(context.Context, *connect.Request[v1
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.ListLogs is not implemented"))
 }
 
-func (UnimplementedServiceHandler) GetTraces(context.Context, *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.GetTraces is not implemented"))
+func (UnimplementedServiceHandler) ListTraces(context.Context, *connect.Request[v1.ListTracesRequest]) (*connect.Response[v1.ListTracesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.ListTraces is not implemented"))
 }
 
 func (UnimplementedServiceHandler) GetTrace(context.Context, *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error) {

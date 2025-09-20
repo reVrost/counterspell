@@ -9,7 +9,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/pkg/db"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
