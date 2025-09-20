@@ -2,11 +2,17 @@ syntax = "proto3";
 
 package counterspell.v1;
 
+import "google/api/annotations.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/revrost/counterspell/gen/counterspell/v1;counterspellv1";
+
+message Pagination {
+  int32 limit = 1; // Max items per page (e.g., 10, 50, max 100)
+  int32 page = 2; // Page number to fetch (1-based, e.g., 1, 2, 3)
+}
 
 // ---------- MODELS ----------
 message Model {
@@ -59,8 +65,111 @@ message Blueprint {
   map<string, Agent> agents = 3; // planner, stock_pricer, etc.
 }
 
+message CreateBlueprintRequest {
+  string name = 1;
+  string config = 2;
+}
+
+message CreateBlueprintResponse {
+  Blueprint blueprint = 1;
+}
+
+message ListBlueprintsRequest {
+  Pagination pagination = 1;
+}
+
+message ListBlueprintsResponse {
+  repeated Blueprint blueprints = 1;
+}
+
+message GetBlueprintRequest {
+  string id = 1;
+}
+
+message GetBlueprintResponse {
+  Blueprint blueprint = 1;
+}
+
+message ListLogsRequest {
+  Pagination pagination = 1;
+  string level = 2;
+  string trace_id = 3;
+  string start_time = 4;
+  string end_time = 5;
+}
+
+message ListLogsResponse {
+  repeated Log logs = 1;
+}
+
+message GetTracesRequest {
+  Pagination pagination = 1;
+  string root_span_name = 2;
+  bool has_error = 3;
+}
+
+message GetTracesResponse {
+  repeated Trace traces = 1;
+}
+
+message Log {
+  string id = 1;
+  string timestamp = 2;
+  string level = 3;
+  string message = 4;
+  string trace_id = 5;
+  string span_id = 6;
+  map<string, string> attributes = 7;
+}
+
+message Trace {
+  string id = 1;
+  string trace_id = 2;
+  string root_span_name = 3;
+  string start_time = 4;
+  string end_time = 5;
+  int64 duration_ms = 6;
+  repeated Span spans = 7;
+}
+
+message Span {
+  string id = 1;
+  string trace_id = 2;
+  string parent_span_id = 3;
+  string name = 4;
+  string start_time = 5;
+  string end_time = 6;
+  int64 duration_ns = 7;
+  string service_name = 8;
+  bool has_error = 9;
+  map<string, string> attributes = 10;
+}
+
+message GetTraceRequest {
+  string id = 1;
+}
+
+message GetTraceResponse {
+  Trace trace = 1;
+}
+
 service Service {
-  // rpc CreateBlueprint(Blueprint) returns (Blueprint);
-  // rpc GetBlueprint(Blueprint) returns (Blueprint);
-  // rpc ListBlueprints(Blueprint) returns (Blueprint);
+  rpc CreateBlueprint(CreateBlueprintRequest) returns (CreateBlueprintResponse) {
+    option (google.api.http) = {post: "/v1/blueprints?limit={limit}&page={page}"};
+  }
+  rpc GetBlueprint(GetBlueprintRequest) returns (GetBlueprintResponse) {
+    option (google.api.http) = {get: "/v1/blueprints/{id}"};
+  }
+  rpc ListBlueprints(ListBlueprintsRequest) returns (ListBlueprintsResponse) {
+    option (google.api.http) = {get: "/v1/blueprints?limit={limit}&page={page}"};
+  }
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse) {
+    option (google.api.http) = {get: "/v1/logs?limit={limit}&page={page}"};
+  }
+  rpc GetTraces(GetTracesRequest) returns (GetTracesResponse) {
+    option (google.api.http) = {get: "/v1/traces?limit={limit}&page={page}"};
+  }
+  rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) {
+    option (google.api.http) = {get: "/v1/traces/{id}"};
+  }
 }

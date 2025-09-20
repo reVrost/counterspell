@@ -4,6 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_google_api_annotations } from "../../../google/api/annotations_pb";
 import { file_google_protobuf_any, file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -11,7 +12,33 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file proto/counterspell/v1/counterspell.proto.
  */
 export const file_proto_counterspell_v1_counterspell: GenFile = /*@__PURE__*/
-  fileDesc("Cihwcm90by9jb3VudGVyc3BlbGwvdjEvY291bnRlcnNwZWxsLnByb3RvEg9jb3VudGVyc3BlbGwudjEiKAoFTW9kZWwSEAoIcHJvdmlkZXIYASABKAkSDQoFbW9kZWwYAiABKAkiXQoJVG9vbFBhcmFtEgwKBG5hbWUYASABKAkSDAoEdHlwZRgCIAEoCRIQCghyZXF1aXJlZBgDIAEoCBITCgtkZXNjcmlwdGlvbhgEIAEoCRINCgVpdGVtcxgFIAMoCSKnAQoEVG9vbBIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEjEKBnBhcmFtcxgDIAMoCzIhLmNvdW50ZXJzcGVsbC52MS5Ub29sLlBhcmFtc0VudHJ5GkkKC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRIpCgV2YWx1ZRgCIAEoCzIaLmNvdW50ZXJzcGVsbC52MS5Ub29sUGFyYW06AjgBIk8KB1Rvb2xzZXQSDAoEdHlwZRgBIAEoCRIQCghiYXNlX3VybBgCIAEoCRIkCgV0b29scxgDIAMoCzIVLmNvdW50ZXJzcGVsbC52MS5Ub29sIkEKC1N5bnRoZXNpemVyEg0KBW1vZGVsGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEg4KBnByb21wdBgDIAEoCSKzAQoFQWdlbnQSDQoFbW9kZWwYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSEwoLaW5zdHJ1Y3Rpb24YAyABKAkSEgoKc3ViX2FnZW50cxgEIAMoCRIqCgh0b29sc2V0cxgFIAMoCzIYLmNvdW50ZXJzcGVsbC52MS5Ub29sc2V0EjEKC3N5bnRoZXNpemVyGAYgASgLMhwuY291bnRlcnNwZWxsLnYxLlN5bnRoZXNpemVyIpoCCglCbHVlcHJpbnQSDwoHdmVyc2lvbhgBIAEoCRI2CgZtb2RlbHMYAiADKAsyJi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50Lk1vZGVsc0VudHJ5EjYKBmFnZW50cxgDIAMoCzImLmNvdW50ZXJzcGVsbC52MS5CbHVlcHJpbnQuQWdlbnRzRW50cnkaRQoLTW9kZWxzRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuY291bnRlcnNwZWxsLnYxLk1vZGVsOgI4ARpFCgtBZ2VudHNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5jb3VudGVyc3BlbGwudjEuQWdlbnQ6AjgBMgkKB1NlcnZpY2VCRFpCZ2l0aHViLmNvbS9yZXZyb3N0L2NvdW50ZXJzcGVsbC9nZW4vY291bnRlcnNwZWxsL3YxO2NvdW50ZXJzcGVsbHYxYgZwcm90bzM", [file_google_protobuf_any, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("Cihwcm90by9jb3VudGVyc3BlbGwvdjEvY291bnRlcnNwZWxsLnByb3RvEg9jb3VudGVyc3BlbGwudjEiKQoKUGFnaW5hdGlvbhINCgVsaW1pdBgBIAEoBRIMCgRwYWdlGAIgASgFIigKBU1vZGVsEhAKCHByb3ZpZGVyGAEgASgJEg0KBW1vZGVsGAIgASgJIl0KCVRvb2xQYXJhbRIMCgRuYW1lGAEgASgJEgwKBHR5cGUYAiABKAkSEAoIcmVxdWlyZWQYAyABKAgSEwoLZGVzY3JpcHRpb24YBCABKAkSDQoFaXRlbXMYBSADKAkipwEKBFRvb2wSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIxCgZwYXJhbXMYAyADKAsyIS5jb3VudGVyc3BlbGwudjEuVG9vbC5QYXJhbXNFbnRyeRpJCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSKQoFdmFsdWUYAiABKAsyGi5jb3VudGVyc3BlbGwudjEuVG9vbFBhcmFtOgI4ASJPCgdUb29sc2V0EgwKBHR5cGUYASABKAkSEAoIYmFzZV91cmwYAiABKAkSJAoFdG9vbHMYAyADKAsyFS5jb3VudGVyc3BlbGwudjEuVG9vbCJBCgtTeW50aGVzaXplchINCgVtb2RlbBgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIOCgZwcm9tcHQYAyABKAkiswEKBUFnZW50Eg0KBW1vZGVsGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEhMKC2luc3RydWN0aW9uGAMgASgJEhIKCnN1Yl9hZ2VudHMYBCADKAkSKgoIdG9vbHNldHMYBSADKAsyGC5jb3VudGVyc3BlbGwudjEuVG9vbHNldBIxCgtzeW50aGVzaXplchgGIAEoCzIcLmNvdW50ZXJzcGVsbC52MS5TeW50aGVzaXplciKaAgoJQmx1ZXByaW50Eg8KB3ZlcnNpb24YASABKAkSNgoGbW9kZWxzGAIgAygLMiYuY291bnRlcnNwZWxsLnYxLkJsdWVwcmludC5Nb2RlbHNFbnRyeRI2CgZhZ2VudHMYAyADKAsyJi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50LkFnZW50c0VudHJ5GkUKC01vZGVsc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmNvdW50ZXJzcGVsbC52MS5Nb2RlbDoCOAEaRQoLQWdlbnRzRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuY291bnRlcnNwZWxsLnYxLkFnZW50OgI4ASI2ChZDcmVhdGVCbHVlcHJpbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGY29uZmlnGAIgASgJIkgKF0NyZWF0ZUJsdWVwcmludFJlc3BvbnNlEi0KCWJsdWVwcmludBgBIAEoCzIaLmNvdW50ZXJzcGVsbC52MS5CbHVlcHJpbnQiSAoVTGlzdEJsdWVwcmludHNSZXF1ZXN0Ei8KCnBhZ2luYXRpb24YASABKAsyGy5jb3VudGVyc3BlbGwudjEuUGFnaW5hdGlvbiJIChZMaXN0Qmx1ZXByaW50c1Jlc3BvbnNlEi4KCmJsdWVwcmludHMYASADKAsyGi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50IiEKE0dldEJsdWVwcmludFJlcXVlc3QSCgoCaWQYASABKAkiRQoUR2V0Qmx1ZXByaW50UmVzcG9uc2USLQoJYmx1ZXByaW50GAEgASgLMhouY291bnRlcnNwZWxsLnYxLkJsdWVwcmludCKJAQoPTGlzdExvZ3NSZXF1ZXN0Ei8KCnBhZ2luYXRpb24YASABKAsyGy5jb3VudGVyc3BlbGwudjEuUGFnaW5hdGlvbhINCgVsZXZlbBgCIAEoCRIQCgh0cmFjZV9pZBgDIAEoCRISCgpzdGFydF90aW1lGAQgASgJEhAKCGVuZF90aW1lGAUgASgJIjYKEExpc3RMb2dzUmVzcG9uc2USIgoEbG9ncxgBIAMoCzIULmNvdW50ZXJzcGVsbC52MS5Mb2cibgoQR2V0VHJhY2VzUmVxdWVzdBIvCgpwYWdpbmF0aW9uGAEgASgLMhsuY291bnRlcnNwZWxsLnYxLlBhZ2luYXRpb24SFgoOcm9vdF9zcGFuX25hbWUYAiABKAkSEQoJaGFzX2Vycm9yGAMgASgIIjsKEUdldFRyYWNlc1Jlc3BvbnNlEiYKBnRyYWNlcxgBIAMoCzIWLmNvdW50ZXJzcGVsbC52MS5UcmFjZSLUAQoDTG9nEgoKAmlkGAEgASgJEhEKCXRpbWVzdGFtcBgCIAEoCRINCgVsZXZlbBgDIAEoCRIPCgdtZXNzYWdlGAQgASgJEhAKCHRyYWNlX2lkGAUgASgJEg8KB3NwYW5faWQYBiABKAkSOAoKYXR0cmlidXRlcxgHIAMoCzIkLmNvdW50ZXJzcGVsbC52MS5Mb2cuQXR0cmlidXRlc0VudHJ5GjEKD0F0dHJpYnV0ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIp4BCgVUcmFjZRIKCgJpZBgBIAEoCRIQCgh0cmFjZV9pZBgCIAEoCRIWCg5yb290X3NwYW5fbmFtZRgDIAEoCRISCgpzdGFydF90aW1lGAQgASgJEhAKCGVuZF90aW1lGAUgASgJEhMKC2R1cmF0aW9uX21zGAYgASgDEiQKBXNwYW5zGAcgAygLMhUuY291bnRlcnNwZWxsLnYxLlNwYW4inAIKBFNwYW4SCgoCaWQYASABKAkSEAoIdHJhY2VfaWQYAiABKAkSFgoOcGFyZW50X3NwYW5faWQYAyABKAkSDAoEbmFtZRgEIAEoCRISCgpzdGFydF90aW1lGAUgASgJEhAKCGVuZF90aW1lGAYgASgJEhMKC2R1cmF0aW9uX25zGAcgASgDEhQKDHNlcnZpY2VfbmFtZRgIIAEoCRIRCgloYXNfZXJyb3IYCSABKAgSOQoKYXR0cmlidXRlcxgKIAMoCzIlLmNvdW50ZXJzcGVsbC52MS5TcGFuLkF0dHJpYnV0ZXNFbnRyeRoxCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIdCg9HZXRUcmFjZVJlcXVlc3QSCgoCaWQYASABKAkiOQoQR2V0VHJhY2VSZXNwb25zZRIlCgV0cmFjZRgBIAEoCzIWLmNvdW50ZXJzcGVsbC52MS5UcmFjZTKcBgoHU2VydmljZRKWAQoPQ3JlYXRlQmx1ZXByaW50EicuY291bnRlcnNwZWxsLnYxLkNyZWF0ZUJsdWVwcmludFJlcXVlc3QaKC5jb3VudGVyc3BlbGwudjEuQ3JlYXRlQmx1ZXByaW50UmVzcG9uc2UiMILT5JMCKiIoL3YxL2JsdWVwcmludHM/bGltaXQ9e2xpbWl0fSZwYWdlPXtwYWdlfRJ4CgxHZXRCbHVlcHJpbnQSJC5jb3VudGVyc3BlbGwudjEuR2V0Qmx1ZXByaW50UmVxdWVzdBolLmNvdW50ZXJzcGVsbC52MS5HZXRCbHVlcHJpbnRSZXNwb25zZSIbgtPkkwIVEhMvdjEvYmx1ZXByaW50cy97aWR9EpMBCg5MaXN0Qmx1ZXByaW50cxImLmNvdW50ZXJzcGVsbC52MS5MaXN0Qmx1ZXByaW50c1JlcXVlc3QaJy5jb3VudGVyc3BlbGwudjEuTGlzdEJsdWVwcmludHNSZXNwb25zZSIwgtPkkwIqEigvdjEvYmx1ZXByaW50cz9saW1pdD17bGltaXR9JnBhZ2U9e3BhZ2V9EnsKCExpc3RMb2dzEiAuY291bnRlcnNwZWxsLnYxLkxpc3RMb2dzUmVxdWVzdBohLmNvdW50ZXJzcGVsbC52MS5MaXN0TG9nc1Jlc3BvbnNlIiqC0+STAiQSIi92MS9sb2dzP2xpbWl0PXtsaW1pdH0mcGFnZT17cGFnZX0SgAEKCUdldFRyYWNlcxIhLmNvdW50ZXJzcGVsbC52MS5HZXRUcmFjZXNSZXF1ZXN0GiIuY291bnRlcnNwZWxsLnYxLkdldFRyYWNlc1Jlc3BvbnNlIiyC0+STAiYSJC92MS90cmFjZXM/bGltaXQ9e2xpbWl0fSZwYWdlPXtwYWdlfRJoCghHZXRUcmFjZRIgLmNvdW50ZXJzcGVsbC52MS5HZXRUcmFjZVJlcXVlc3QaIS5jb3VudGVyc3BlbGwudjEuR2V0VHJhY2VSZXNwb25zZSIXgtPkkwIREg8vdjEvdHJhY2VzL3tpZH1CRFpCZ2l0aHViLmNvbS9yZXZyb3N0L2NvdW50ZXJzcGVsbC9nZW4vY291bnRlcnNwZWxsL3YxO2NvdW50ZXJzcGVsbHYxYgZwcm90bzM", [file_google_api_annotations, file_google_protobuf_any, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+
+/**
+ * @generated from message counterspell.v1.Pagination
+ */
+export type Pagination = Message<"counterspell.v1.Pagination"> & {
+  /**
+   * Max items per page (e.g., 10, 50, max 100)
+   *
+   * @generated from field: int32 limit = 1;
+   */
+  limit: number;
+
+  /**
+   * Page number to fetch (1-based, e.g., 1, 2, 3)
+   *
+   * @generated from field: int32 page = 2;
+   */
+  page: number;
+};
+
+/**
+ * Describes the message counterspell.v1.Pagination.
+ * Use `create(PaginationSchema)` to create a new message.
+ */
+export const PaginationSchema: GenMessage<Pagination> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 0);
 
 /**
  * ---------- MODELS ----------
@@ -35,7 +62,7 @@ export type Model = Message<"counterspell.v1.Model"> & {
  * Use `create(ModelSchema)` to create a new message.
  */
 export const ModelSchema: GenMessage<Model> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 0);
+  messageDesc(file_proto_counterspell_v1_counterspell, 1);
 
 /**
  * ---------- TOOL PARAMS ----------
@@ -76,7 +103,7 @@ export type ToolParam = Message<"counterspell.v1.ToolParam"> & {
  * Use `create(ToolParamSchema)` to create a new message.
  */
 export const ToolParamSchema: GenMessage<ToolParam> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 1);
+  messageDesc(file_proto_counterspell_v1_counterspell, 2);
 
 /**
  * @generated from message counterspell.v1.Tool
@@ -103,7 +130,7 @@ export type Tool = Message<"counterspell.v1.Tool"> & {
  * Use `create(ToolSchema)` to create a new message.
  */
 export const ToolSchema: GenMessage<Tool> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 2);
+  messageDesc(file_proto_counterspell_v1_counterspell, 3);
 
 /**
  * @generated from message counterspell.v1.Toolset
@@ -130,7 +157,7 @@ export type Toolset = Message<"counterspell.v1.Toolset"> & {
  * Use `create(ToolsetSchema)` to create a new message.
  */
 export const ToolsetSchema: GenMessage<Toolset> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 3);
+  messageDesc(file_proto_counterspell_v1_counterspell, 4);
 
 /**
  * ---------- SYNTHESIZER ----------
@@ -159,7 +186,7 @@ export type Synthesizer = Message<"counterspell.v1.Synthesizer"> & {
  * Use `create(SynthesizerSchema)` to create a new message.
  */
 export const SynthesizerSchema: GenMessage<Synthesizer> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 4);
+  messageDesc(file_proto_counterspell_v1_counterspell, 5);
 
 /**
  * ---------- AGENT ----------
@@ -207,7 +234,7 @@ export type Agent = Message<"counterspell.v1.Agent"> & {
  * Use `create(AgentSchema)` to create a new message.
  */
 export const AgentSchema: GenMessage<Agent> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 5);
+  messageDesc(file_proto_counterspell_v1_counterspell, 6);
 
 /**
  * ---------- ROOT CONFIG ----------
@@ -240,16 +267,455 @@ export type Blueprint = Message<"counterspell.v1.Blueprint"> & {
  * Use `create(BlueprintSchema)` to create a new message.
  */
 export const BlueprintSchema: GenMessage<Blueprint> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 6);
+  messageDesc(file_proto_counterspell_v1_counterspell, 7);
 
 /**
- * rpc CreateBlueprint(Blueprint) returns (Blueprint);
- * rpc GetBlueprint(Blueprint) returns (Blueprint);
- * rpc ListBlueprints(Blueprint) returns (Blueprint);
- *
+ * @generated from message counterspell.v1.CreateBlueprintRequest
+ */
+export type CreateBlueprintRequest = Message<"counterspell.v1.CreateBlueprintRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string config = 2;
+   */
+  config: string;
+};
+
+/**
+ * Describes the message counterspell.v1.CreateBlueprintRequest.
+ * Use `create(CreateBlueprintRequestSchema)` to create a new message.
+ */
+export const CreateBlueprintRequestSchema: GenMessage<CreateBlueprintRequest> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 8);
+
+/**
+ * @generated from message counterspell.v1.CreateBlueprintResponse
+ */
+export type CreateBlueprintResponse = Message<"counterspell.v1.CreateBlueprintResponse"> & {
+  /**
+   * @generated from field: counterspell.v1.Blueprint blueprint = 1;
+   */
+  blueprint?: Blueprint;
+};
+
+/**
+ * Describes the message counterspell.v1.CreateBlueprintResponse.
+ * Use `create(CreateBlueprintResponseSchema)` to create a new message.
+ */
+export const CreateBlueprintResponseSchema: GenMessage<CreateBlueprintResponse> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 9);
+
+/**
+ * @generated from message counterspell.v1.ListBlueprintsRequest
+ */
+export type ListBlueprintsRequest = Message<"counterspell.v1.ListBlueprintsRequest"> & {
+  /**
+   * @generated from field: counterspell.v1.Pagination pagination = 1;
+   */
+  pagination?: Pagination;
+};
+
+/**
+ * Describes the message counterspell.v1.ListBlueprintsRequest.
+ * Use `create(ListBlueprintsRequestSchema)` to create a new message.
+ */
+export const ListBlueprintsRequestSchema: GenMessage<ListBlueprintsRequest> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 10);
+
+/**
+ * @generated from message counterspell.v1.ListBlueprintsResponse
+ */
+export type ListBlueprintsResponse = Message<"counterspell.v1.ListBlueprintsResponse"> & {
+  /**
+   * @generated from field: repeated counterspell.v1.Blueprint blueprints = 1;
+   */
+  blueprints: Blueprint[];
+};
+
+/**
+ * Describes the message counterspell.v1.ListBlueprintsResponse.
+ * Use `create(ListBlueprintsResponseSchema)` to create a new message.
+ */
+export const ListBlueprintsResponseSchema: GenMessage<ListBlueprintsResponse> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 11);
+
+/**
+ * @generated from message counterspell.v1.GetBlueprintRequest
+ */
+export type GetBlueprintRequest = Message<"counterspell.v1.GetBlueprintRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message counterspell.v1.GetBlueprintRequest.
+ * Use `create(GetBlueprintRequestSchema)` to create a new message.
+ */
+export const GetBlueprintRequestSchema: GenMessage<GetBlueprintRequest> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 12);
+
+/**
+ * @generated from message counterspell.v1.GetBlueprintResponse
+ */
+export type GetBlueprintResponse = Message<"counterspell.v1.GetBlueprintResponse"> & {
+  /**
+   * @generated from field: counterspell.v1.Blueprint blueprint = 1;
+   */
+  blueprint?: Blueprint;
+};
+
+/**
+ * Describes the message counterspell.v1.GetBlueprintResponse.
+ * Use `create(GetBlueprintResponseSchema)` to create a new message.
+ */
+export const GetBlueprintResponseSchema: GenMessage<GetBlueprintResponse> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 13);
+
+/**
+ * @generated from message counterspell.v1.ListLogsRequest
+ */
+export type ListLogsRequest = Message<"counterspell.v1.ListLogsRequest"> & {
+  /**
+   * @generated from field: counterspell.v1.Pagination pagination = 1;
+   */
+  pagination?: Pagination;
+
+  /**
+   * @generated from field: string level = 2;
+   */
+  level: string;
+
+  /**
+   * @generated from field: string trace_id = 3;
+   */
+  traceId: string;
+
+  /**
+   * @generated from field: string start_time = 4;
+   */
+  startTime: string;
+
+  /**
+   * @generated from field: string end_time = 5;
+   */
+  endTime: string;
+};
+
+/**
+ * Describes the message counterspell.v1.ListLogsRequest.
+ * Use `create(ListLogsRequestSchema)` to create a new message.
+ */
+export const ListLogsRequestSchema: GenMessage<ListLogsRequest> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 14);
+
+/**
+ * @generated from message counterspell.v1.ListLogsResponse
+ */
+export type ListLogsResponse = Message<"counterspell.v1.ListLogsResponse"> & {
+  /**
+   * @generated from field: repeated counterspell.v1.Log logs = 1;
+   */
+  logs: Log[];
+};
+
+/**
+ * Describes the message counterspell.v1.ListLogsResponse.
+ * Use `create(ListLogsResponseSchema)` to create a new message.
+ */
+export const ListLogsResponseSchema: GenMessage<ListLogsResponse> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 15);
+
+/**
+ * @generated from message counterspell.v1.GetTracesRequest
+ */
+export type GetTracesRequest = Message<"counterspell.v1.GetTracesRequest"> & {
+  /**
+   * @generated from field: counterspell.v1.Pagination pagination = 1;
+   */
+  pagination?: Pagination;
+
+  /**
+   * @generated from field: string root_span_name = 2;
+   */
+  rootSpanName: string;
+
+  /**
+   * @generated from field: bool has_error = 3;
+   */
+  hasError: boolean;
+};
+
+/**
+ * Describes the message counterspell.v1.GetTracesRequest.
+ * Use `create(GetTracesRequestSchema)` to create a new message.
+ */
+export const GetTracesRequestSchema: GenMessage<GetTracesRequest> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 16);
+
+/**
+ * @generated from message counterspell.v1.GetTracesResponse
+ */
+export type GetTracesResponse = Message<"counterspell.v1.GetTracesResponse"> & {
+  /**
+   * @generated from field: repeated counterspell.v1.Trace traces = 1;
+   */
+  traces: Trace[];
+};
+
+/**
+ * Describes the message counterspell.v1.GetTracesResponse.
+ * Use `create(GetTracesResponseSchema)` to create a new message.
+ */
+export const GetTracesResponseSchema: GenMessage<GetTracesResponse> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 17);
+
+/**
+ * @generated from message counterspell.v1.Log
+ */
+export type Log = Message<"counterspell.v1.Log"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string timestamp = 2;
+   */
+  timestamp: string;
+
+  /**
+   * @generated from field: string level = 3;
+   */
+  level: string;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string trace_id = 5;
+   */
+  traceId: string;
+
+  /**
+   * @generated from field: string span_id = 6;
+   */
+  spanId: string;
+
+  /**
+   * @generated from field: map<string, string> attributes = 7;
+   */
+  attributes: { [key: string]: string };
+};
+
+/**
+ * Describes the message counterspell.v1.Log.
+ * Use `create(LogSchema)` to create a new message.
+ */
+export const LogSchema: GenMessage<Log> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 18);
+
+/**
+ * @generated from message counterspell.v1.Trace
+ */
+export type Trace = Message<"counterspell.v1.Trace"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string trace_id = 2;
+   */
+  traceId: string;
+
+  /**
+   * @generated from field: string root_span_name = 3;
+   */
+  rootSpanName: string;
+
+  /**
+   * @generated from field: string start_time = 4;
+   */
+  startTime: string;
+
+  /**
+   * @generated from field: string end_time = 5;
+   */
+  endTime: string;
+
+  /**
+   * @generated from field: int64 duration_ms = 6;
+   */
+  durationMs: bigint;
+
+  /**
+   * @generated from field: repeated counterspell.v1.Span spans = 7;
+   */
+  spans: Span[];
+};
+
+/**
+ * Describes the message counterspell.v1.Trace.
+ * Use `create(TraceSchema)` to create a new message.
+ */
+export const TraceSchema: GenMessage<Trace> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 19);
+
+/**
+ * @generated from message counterspell.v1.Span
+ */
+export type Span = Message<"counterspell.v1.Span"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string trace_id = 2;
+   */
+  traceId: string;
+
+  /**
+   * @generated from field: string parent_span_id = 3;
+   */
+  parentSpanId: string;
+
+  /**
+   * @generated from field: string name = 4;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string start_time = 5;
+   */
+  startTime: string;
+
+  /**
+   * @generated from field: string end_time = 6;
+   */
+  endTime: string;
+
+  /**
+   * @generated from field: int64 duration_ns = 7;
+   */
+  durationNs: bigint;
+
+  /**
+   * @generated from field: string service_name = 8;
+   */
+  serviceName: string;
+
+  /**
+   * @generated from field: bool has_error = 9;
+   */
+  hasError: boolean;
+
+  /**
+   * @generated from field: map<string, string> attributes = 10;
+   */
+  attributes: { [key: string]: string };
+};
+
+/**
+ * Describes the message counterspell.v1.Span.
+ * Use `create(SpanSchema)` to create a new message.
+ */
+export const SpanSchema: GenMessage<Span> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 20);
+
+/**
+ * @generated from message counterspell.v1.GetTraceRequest
+ */
+export type GetTraceRequest = Message<"counterspell.v1.GetTraceRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message counterspell.v1.GetTraceRequest.
+ * Use `create(GetTraceRequestSchema)` to create a new message.
+ */
+export const GetTraceRequestSchema: GenMessage<GetTraceRequest> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 21);
+
+/**
+ * @generated from message counterspell.v1.GetTraceResponse
+ */
+export type GetTraceResponse = Message<"counterspell.v1.GetTraceResponse"> & {
+  /**
+   * @generated from field: counterspell.v1.Trace trace = 1;
+   */
+  trace?: Trace;
+};
+
+/**
+ * Describes the message counterspell.v1.GetTraceResponse.
+ * Use `create(GetTraceResponseSchema)` to create a new message.
+ */
+export const GetTraceResponseSchema: GenMessage<GetTraceResponse> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 22);
+
+/**
  * @generated from service counterspell.v1.Service
  */
 export const Service: GenService<{
+  /**
+   * @generated from rpc counterspell.v1.Service.CreateBlueprint
+   */
+  createBlueprint: {
+    methodKind: "unary";
+    input: typeof CreateBlueprintRequestSchema;
+    output: typeof CreateBlueprintResponseSchema;
+  },
+  /**
+   * @generated from rpc counterspell.v1.Service.GetBlueprint
+   */
+  getBlueprint: {
+    methodKind: "unary";
+    input: typeof GetBlueprintRequestSchema;
+    output: typeof GetBlueprintResponseSchema;
+  },
+  /**
+   * @generated from rpc counterspell.v1.Service.ListBlueprints
+   */
+  listBlueprints: {
+    methodKind: "unary";
+    input: typeof ListBlueprintsRequestSchema;
+    output: typeof ListBlueprintsResponseSchema;
+  },
+  /**
+   * @generated from rpc counterspell.v1.Service.ListLogs
+   */
+  listLogs: {
+    methodKind: "unary";
+    input: typeof ListLogsRequestSchema;
+    output: typeof ListLogsResponseSchema;
+  },
+  /**
+   * @generated from rpc counterspell.v1.Service.GetTraces
+   */
+  getTraces: {
+    methodKind: "unary";
+    input: typeof GetTracesRequestSchema;
+    output: typeof GetTracesResponseSchema;
+  },
+  /**
+   * @generated from rpc counterspell.v1.Service.GetTrace
+   */
+  getTrace: {
+    methodKind: "unary";
+    input: typeof GetTraceRequestSchema;
+    output: typeof GetTraceResponseSchema;
+  },
 }> = /*@__PURE__*/
   serviceDesc(file_proto_counterspell_v1_counterspell, 0);
 
