@@ -24,7 +24,7 @@ LIMIT ? OFFSET ?;
 
 -- name: GetLogsWithFilters :many
 SELECT * FROM logs
-WHERE 
+WHERE
   (sqlc.narg('level') IS NULL OR level = sqlc.narg('level'))
   AND (sqlc.narg('trace_id') IS NULL OR trace_id = sqlc.narg('trace_id'))
   AND (sqlc.narg('start_time') IS NULL OR timestamp >= sqlc.narg('start_time'))
@@ -37,7 +37,7 @@ SELECT COUNT(*) FROM logs;
 
 -- name: CountLogsWithFilters :one
 SELECT COUNT(*) FROM logs
-WHERE 
+WHERE
   (sqlc.narg('level') IS NULL OR level = sqlc.narg('level'))
   AND (sqlc.narg('trace_id') IS NULL OR trace_id = sqlc.narg('trace_id'))
   AND (sqlc.narg('start_time') IS NULL OR timestamp >= sqlc.narg('start_time'))
@@ -51,7 +51,7 @@ ORDER BY start_time DESC
 LIMIT ? OFFSET ?;
 
 -- name: GetTraceStats :many
-SELECT 
+SELECT
   trace_id,
   COUNT(*) as span_count,
   SUM(CASE WHEN has_error THEN 1 ELSE 0 END) as error_count
@@ -60,4 +60,18 @@ GROUP BY trace_id;
 
 -- name: CountTraces :one
 SELECT COUNT(DISTINCT trace_id) FROM spans
-WHERE parent_span_id IS NULL OR parent_span_id = ''; 
+WHERE parent_span_id IS NULL OR parent_span_id = '';
+
+-- name: ListBlueprints :many
+SELECT * FROM blueprints
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
+
+-- name: GetBlueprint :one
+SELECT * FROM blueprints
+WHERE id = ?;
+
+-- name: CreateBlueprint :exec
+INSERT INTO blueprints (
+  blueprint_name, config, version, created_at, updated_at, metadata
+) VALUES ( ?, ?, ?, ?, ?, ? );

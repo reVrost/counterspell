@@ -23,7 +23,7 @@ func (q *Queries) CountLogs(ctx context.Context) (int64, error) {
 
 const countLogsWithFilters = `-- name: CountLogsWithFilters :one
 SELECT COUNT(*) FROM logs
-WHERE 
+WHERE
   (?1 IS NULL OR level = ?1)
   AND (?2 IS NULL OR trace_id = ?2)
   AND (?3 IS NULL OR timestamp >= ?3)
@@ -59,6 +59,95 @@ func (q *Queries) CountTraces(ctx context.Context) (int64, error) {
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createBlueprint = `-- name: CreateBlueprint :exec
+INSERT INTO blueprints (
+  blueprint_name, config, version, created_at, updated_at, metadata
+) VALUES ( ?, ?, ?, ?, ?, ? )
+`
+
+type CreateBlueprintParams struct {
+	BlueprintName string
+	Config        string
+	Version       sql.NullInt64
+	CreatedAt     interface{}
+	UpdatedAt     interface{}
+	Metadata      interface{}
+}
+
+func (q *Queries) CreateBlueprint(ctx context.Context, arg CreateBlueprintParams) error {
+	_, err := q.db.ExecContext(ctx, createBlueprint,
+		arg.BlueprintName,
+		arg.Config,
+		arg.Version,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.Metadata,
+	)
+	return err
+}
+
+const getBlueprint = `-- name: GetBlueprint :one
+SELECT id, blueprint_name, config, version, created_at, updated_at, metadata FROM blueprints
+WHERE id = ?
+`
+
+func (q *Queries) GetBlueprint(ctx context.Context, id interface{}) (Blueprint, error) {
+	row := q.db.QueryRowContext(ctx, getBlueprint, id)
+	var i Blueprint
+	err := row.Scan(
+		&i.ID,
+		&i.BlueprintName,
+		&i.Config,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Metadata,
+	)
+	return i, err
+}
+
+const getBlueprints = `-- name: GetBlueprints :many
+SELECT id, blueprint_name, config, version, created_at, updated_at, metadata FROM blueprints
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?
+`
+
+type GetBlueprintsParams struct {
+	Limit  int64
+	Offset int64
+}
+
+func (q *Queries) GetBlueprints(ctx context.Context, arg GetBlueprintsParams) ([]Blueprint, error) {
+	rows, err := q.db.QueryContext(ctx, getBlueprints, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Blueprint
+	for rows.Next() {
+		var i Blueprint
+		if err := rows.Scan(
+			&i.ID,
+			&i.BlueprintName,
+			&i.Config,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Metadata,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getLogs = `-- name: GetLogs :many
@@ -105,7 +194,7 @@ func (q *Queries) GetLogs(ctx context.Context, arg GetLogsParams) ([]Log, error)
 
 const getLogsWithFilters = `-- name: GetLogsWithFilters :many
 SELECT id, timestamp, level, message, trace_id, span_id, attributes FROM logs
-WHERE 
+WHERE
   (?1 IS NULL OR level = ?1)
   AND (?2 IS NULL OR trace_id = ?2)
   AND (?3 IS NULL OR timestamp >= ?3)
@@ -250,7 +339,7 @@ func (q *Queries) GetTraceDetails(ctx context.Context, traceID string) ([]Span, 
 }
 
 const getTraceStats = `-- name: GetTraceStats :many
-SELECT 
+SELECT
   trace_id,
   COUNT(*) as span_count,
   SUM(CASE WHEN has_error THEN 1 ELSE 0 END) as error_count

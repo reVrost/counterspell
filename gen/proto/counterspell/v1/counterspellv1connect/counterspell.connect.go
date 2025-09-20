@@ -6,8 +6,11 @@ package counterspellv1connect
 
 import (
 	connect "connectrpc.com/connect"
-	_ "github.com/revrost/counterspell/gen/counterspell/v1"
+	context "context"
+	errors "errors"
+	v1 "github.com/revrost/counterspell/gen/counterspell/v1"
 	http "net/http"
+	strings "strings"
 )
 
 // This is a compile-time assertion to ensure that this generated file and the connect package are
@@ -22,8 +25,36 @@ const (
 	ServiceName = "counterspell.v1.Service"
 )
 
+// These constants are the fully-qualified names of the RPCs defined in this package. They're
+// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+//
+// Note that these are different from the fully-qualified method names used by
+// google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
+// reflection-formatted method names, remove the leading slash and convert the remaining slash to a
+// period.
+const (
+	// ServiceCreateBlueprintProcedure is the fully-qualified name of the Service's CreateBlueprint RPC.
+	ServiceCreateBlueprintProcedure = "/counterspell.v1.Service/CreateBlueprint"
+	// ServiceGetBlueprintProcedure is the fully-qualified name of the Service's GetBlueprint RPC.
+	ServiceGetBlueprintProcedure = "/counterspell.v1.Service/GetBlueprint"
+	// ServiceListBlueprintsProcedure is the fully-qualified name of the Service's ListBlueprints RPC.
+	ServiceListBlueprintsProcedure = "/counterspell.v1.Service/ListBlueprints"
+	// ServiceListLogsProcedure is the fully-qualified name of the Service's ListLogs RPC.
+	ServiceListLogsProcedure = "/counterspell.v1.Service/ListLogs"
+	// ServiceGetTracesProcedure is the fully-qualified name of the Service's GetTraces RPC.
+	ServiceGetTracesProcedure = "/counterspell.v1.Service/GetTraces"
+	// ServiceGetTraceProcedure is the fully-qualified name of the Service's GetTrace RPC.
+	ServiceGetTraceProcedure = "/counterspell.v1.Service/GetTrace"
+)
+
 // ServiceClient is a client for the counterspell.v1.Service service.
 type ServiceClient interface {
+	CreateBlueprint(context.Context, *connect.Request[v1.CreateBlueprintRequest]) (*connect.Response[v1.CreateBlueprintResponse], error)
+	GetBlueprint(context.Context, *connect.Request[v1.GetBlueprintRequest]) (*connect.Response[v1.GetBlueprintResponse], error)
+	ListBlueprints(context.Context, *connect.Request[v1.ListBlueprintsRequest]) (*connect.Response[v1.ListBlueprintsResponse], error)
+	ListLogs(context.Context, *connect.Request[v1.ListLogsRequest]) (*connect.Response[v1.ListLogsResponse], error)
+	GetTraces(context.Context, *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error)
+	GetTrace(context.Context, *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error)
 }
 
 // NewServiceClient constructs a client for the counterspell.v1.Service service. By default, it uses
@@ -34,15 +65,96 @@ type ServiceClient interface {
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
 func NewServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ServiceClient {
-	return &serviceClient{}
+	baseURL = strings.TrimRight(baseURL, "/")
+	serviceMethods := v1.File_proto_counterspell_v1_counterspell_proto.Services().ByName("Service").Methods()
+	return &serviceClient{
+		createBlueprint: connect.NewClient[v1.CreateBlueprintRequest, v1.CreateBlueprintResponse](
+			httpClient,
+			baseURL+ServiceCreateBlueprintProcedure,
+			connect.WithSchema(serviceMethods.ByName("CreateBlueprint")),
+			connect.WithClientOptions(opts...),
+		),
+		getBlueprint: connect.NewClient[v1.GetBlueprintRequest, v1.GetBlueprintResponse](
+			httpClient,
+			baseURL+ServiceGetBlueprintProcedure,
+			connect.WithSchema(serviceMethods.ByName("GetBlueprint")),
+			connect.WithClientOptions(opts...),
+		),
+		listBlueprints: connect.NewClient[v1.ListBlueprintsRequest, v1.ListBlueprintsResponse](
+			httpClient,
+			baseURL+ServiceListBlueprintsProcedure,
+			connect.WithSchema(serviceMethods.ByName("ListBlueprints")),
+			connect.WithClientOptions(opts...),
+		),
+		listLogs: connect.NewClient[v1.ListLogsRequest, v1.ListLogsResponse](
+			httpClient,
+			baseURL+ServiceListLogsProcedure,
+			connect.WithSchema(serviceMethods.ByName("ListLogs")),
+			connect.WithClientOptions(opts...),
+		),
+		getTraces: connect.NewClient[v1.GetTracesRequest, v1.GetTracesResponse](
+			httpClient,
+			baseURL+ServiceGetTracesProcedure,
+			connect.WithSchema(serviceMethods.ByName("GetTraces")),
+			connect.WithClientOptions(opts...),
+		),
+		getTrace: connect.NewClient[v1.GetTraceRequest, v1.GetTraceResponse](
+			httpClient,
+			baseURL+ServiceGetTraceProcedure,
+			connect.WithSchema(serviceMethods.ByName("GetTrace")),
+			connect.WithClientOptions(opts...),
+		),
+	}
 }
 
 // serviceClient implements ServiceClient.
 type serviceClient struct {
+	createBlueprint *connect.Client[v1.CreateBlueprintRequest, v1.CreateBlueprintResponse]
+	getBlueprint    *connect.Client[v1.GetBlueprintRequest, v1.GetBlueprintResponse]
+	listBlueprints  *connect.Client[v1.ListBlueprintsRequest, v1.ListBlueprintsResponse]
+	listLogs        *connect.Client[v1.ListLogsRequest, v1.ListLogsResponse]
+	getTraces       *connect.Client[v1.GetTracesRequest, v1.GetTracesResponse]
+	getTrace        *connect.Client[v1.GetTraceRequest, v1.GetTraceResponse]
+}
+
+// CreateBlueprint calls counterspell.v1.Service.CreateBlueprint.
+func (c *serviceClient) CreateBlueprint(ctx context.Context, req *connect.Request[v1.CreateBlueprintRequest]) (*connect.Response[v1.CreateBlueprintResponse], error) {
+	return c.createBlueprint.CallUnary(ctx, req)
+}
+
+// GetBlueprint calls counterspell.v1.Service.GetBlueprint.
+func (c *serviceClient) GetBlueprint(ctx context.Context, req *connect.Request[v1.GetBlueprintRequest]) (*connect.Response[v1.GetBlueprintResponse], error) {
+	return c.getBlueprint.CallUnary(ctx, req)
+}
+
+// ListBlueprints calls counterspell.v1.Service.ListBlueprints.
+func (c *serviceClient) ListBlueprints(ctx context.Context, req *connect.Request[v1.ListBlueprintsRequest]) (*connect.Response[v1.ListBlueprintsResponse], error) {
+	return c.listBlueprints.CallUnary(ctx, req)
+}
+
+// ListLogs calls counterspell.v1.Service.ListLogs.
+func (c *serviceClient) ListLogs(ctx context.Context, req *connect.Request[v1.ListLogsRequest]) (*connect.Response[v1.ListLogsResponse], error) {
+	return c.listLogs.CallUnary(ctx, req)
+}
+
+// GetTraces calls counterspell.v1.Service.GetTraces.
+func (c *serviceClient) GetTraces(ctx context.Context, req *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error) {
+	return c.getTraces.CallUnary(ctx, req)
+}
+
+// GetTrace calls counterspell.v1.Service.GetTrace.
+func (c *serviceClient) GetTrace(ctx context.Context, req *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error) {
+	return c.getTrace.CallUnary(ctx, req)
 }
 
 // ServiceHandler is an implementation of the counterspell.v1.Service service.
 type ServiceHandler interface {
+	CreateBlueprint(context.Context, *connect.Request[v1.CreateBlueprintRequest]) (*connect.Response[v1.CreateBlueprintResponse], error)
+	GetBlueprint(context.Context, *connect.Request[v1.GetBlueprintRequest]) (*connect.Response[v1.GetBlueprintResponse], error)
+	ListBlueprints(context.Context, *connect.Request[v1.ListBlueprintsRequest]) (*connect.Response[v1.ListBlueprintsResponse], error)
+	ListLogs(context.Context, *connect.Request[v1.ListLogsRequest]) (*connect.Response[v1.ListLogsResponse], error)
+	GetTraces(context.Context, *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error)
+	GetTrace(context.Context, *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error)
 }
 
 // NewServiceHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -51,8 +163,57 @@ type ServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewServiceHandler(svc ServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	serviceMethods := v1.File_proto_counterspell_v1_counterspell_proto.Services().ByName("Service").Methods()
+	serviceCreateBlueprintHandler := connect.NewUnaryHandler(
+		ServiceCreateBlueprintProcedure,
+		svc.CreateBlueprint,
+		connect.WithSchema(serviceMethods.ByName("CreateBlueprint")),
+		connect.WithHandlerOptions(opts...),
+	)
+	serviceGetBlueprintHandler := connect.NewUnaryHandler(
+		ServiceGetBlueprintProcedure,
+		svc.GetBlueprint,
+		connect.WithSchema(serviceMethods.ByName("GetBlueprint")),
+		connect.WithHandlerOptions(opts...),
+	)
+	serviceListBlueprintsHandler := connect.NewUnaryHandler(
+		ServiceListBlueprintsProcedure,
+		svc.ListBlueprints,
+		connect.WithSchema(serviceMethods.ByName("ListBlueprints")),
+		connect.WithHandlerOptions(opts...),
+	)
+	serviceListLogsHandler := connect.NewUnaryHandler(
+		ServiceListLogsProcedure,
+		svc.ListLogs,
+		connect.WithSchema(serviceMethods.ByName("ListLogs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	serviceGetTracesHandler := connect.NewUnaryHandler(
+		ServiceGetTracesProcedure,
+		svc.GetTraces,
+		connect.WithSchema(serviceMethods.ByName("GetTraces")),
+		connect.WithHandlerOptions(opts...),
+	)
+	serviceGetTraceHandler := connect.NewUnaryHandler(
+		ServiceGetTraceProcedure,
+		svc.GetTrace,
+		connect.WithSchema(serviceMethods.ByName("GetTrace")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/counterspell.v1.Service/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case ServiceCreateBlueprintProcedure:
+			serviceCreateBlueprintHandler.ServeHTTP(w, r)
+		case ServiceGetBlueprintProcedure:
+			serviceGetBlueprintHandler.ServeHTTP(w, r)
+		case ServiceListBlueprintsProcedure:
+			serviceListBlueprintsHandler.ServeHTTP(w, r)
+		case ServiceListLogsProcedure:
+			serviceListLogsHandler.ServeHTTP(w, r)
+		case ServiceGetTracesProcedure:
+			serviceGetTracesHandler.ServeHTTP(w, r)
+		case ServiceGetTraceProcedure:
+			serviceGetTraceHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -61,3 +222,27 @@ func NewServiceHandler(svc ServiceHandler, opts ...connect.HandlerOption) (strin
 
 // UnimplementedServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedServiceHandler struct{}
+
+func (UnimplementedServiceHandler) CreateBlueprint(context.Context, *connect.Request[v1.CreateBlueprintRequest]) (*connect.Response[v1.CreateBlueprintResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.CreateBlueprint is not implemented"))
+}
+
+func (UnimplementedServiceHandler) GetBlueprint(context.Context, *connect.Request[v1.GetBlueprintRequest]) (*connect.Response[v1.GetBlueprintResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.GetBlueprint is not implemented"))
+}
+
+func (UnimplementedServiceHandler) ListBlueprints(context.Context, *connect.Request[v1.ListBlueprintsRequest]) (*connect.Response[v1.ListBlueprintsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.ListBlueprints is not implemented"))
+}
+
+func (UnimplementedServiceHandler) ListLogs(context.Context, *connect.Request[v1.ListLogsRequest]) (*connect.Response[v1.ListLogsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.ListLogs is not implemented"))
+}
+
+func (UnimplementedServiceHandler) GetTraces(context.Context, *connect.Request[v1.GetTracesRequest]) (*connect.Response[v1.GetTracesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.GetTraces is not implemented"))
+}
+
+func (UnimplementedServiceHandler) GetTrace(context.Context, *connect.Request[v1.GetTraceRequest]) (*connect.Response[v1.GetTraceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("counterspell.v1.Service.GetTrace is not implemented"))
+}

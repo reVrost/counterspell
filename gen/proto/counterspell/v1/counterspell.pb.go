@@ -7,6 +7,7 @@
 package counterspellv1
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/known/anypb"
@@ -24,6 +25,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Pagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"` // Max items per page (e.g., 10, 50, max 100)
+	Page          int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`   // Page number to fetch (1-based, e.g., 1, 2, 3)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Pagination) Reset() {
+	*x = Pagination{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Pagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Pagination) ProtoMessage() {}
+
+func (x *Pagination) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Pagination.ProtoReflect.Descriptor instead.
+func (*Pagination) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Pagination) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *Pagination) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
 // ---------- MODELS ----------
 type Model struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -35,7 +88,7 @@ type Model struct {
 
 func (x *Model) Reset() {
 	*x = Model{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[0]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +100,7 @@ func (x *Model) String() string {
 func (*Model) ProtoMessage() {}
 
 func (x *Model) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[0]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +113,7 @@ func (x *Model) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Model.ProtoReflect.Descriptor instead.
 func (*Model) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{0}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Model) GetProvider() string {
@@ -91,7 +144,7 @@ type ToolParam struct {
 
 func (x *ToolParam) Reset() {
 	*x = ToolParam{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[1]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +156,7 @@ func (x *ToolParam) String() string {
 func (*ToolParam) ProtoMessage() {}
 
 func (x *ToolParam) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[1]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +169,7 @@ func (x *ToolParam) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolParam.ProtoReflect.Descriptor instead.
 func (*ToolParam) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{1}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ToolParam) GetName() string {
@@ -165,7 +218,7 @@ type Tool struct {
 
 func (x *Tool) Reset() {
 	*x = Tool{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[2]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -177,7 +230,7 @@ func (x *Tool) String() string {
 func (*Tool) ProtoMessage() {}
 
 func (x *Tool) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[2]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -190,7 +243,7 @@ func (x *Tool) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tool.ProtoReflect.Descriptor instead.
 func (*Tool) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{2}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Tool) GetName() string {
@@ -225,7 +278,7 @@ type Toolset struct {
 
 func (x *Toolset) Reset() {
 	*x = Toolset{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -237,7 +290,7 @@ func (x *Toolset) String() string {
 func (*Toolset) ProtoMessage() {}
 
 func (x *Toolset) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -250,7 +303,7 @@ func (x *Toolset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Toolset.ProtoReflect.Descriptor instead.
 func (*Toolset) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{3}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Toolset) GetType() string {
@@ -286,7 +339,7 @@ type Synthesizer struct {
 
 func (x *Synthesizer) Reset() {
 	*x = Synthesizer{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -298,7 +351,7 @@ func (x *Synthesizer) String() string {
 func (*Synthesizer) ProtoMessage() {}
 
 func (x *Synthesizer) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -311,7 +364,7 @@ func (x *Synthesizer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Synthesizer.ProtoReflect.Descriptor instead.
 func (*Synthesizer) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{4}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Synthesizer) GetModel() string {
@@ -350,7 +403,7 @@ type Agent struct {
 
 func (x *Agent) Reset() {
 	*x = Agent{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[5]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -362,7 +415,7 @@ func (x *Agent) String() string {
 func (*Agent) ProtoMessage() {}
 
 func (x *Agent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[5]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -375,7 +428,7 @@ func (x *Agent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Agent.ProtoReflect.Descriptor instead.
 func (*Agent) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{5}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Agent) GetModel() string {
@@ -432,7 +485,7 @@ type Blueprint struct {
 
 func (x *Blueprint) Reset() {
 	*x = Blueprint{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[6]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +497,7 @@ func (x *Blueprint) String() string {
 func (*Blueprint) ProtoMessage() {}
 
 func (x *Blueprint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[6]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,7 +510,7 @@ func (x *Blueprint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Blueprint.ProtoReflect.Descriptor instead.
 func (*Blueprint) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{6}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Blueprint) GetVersion() string {
@@ -481,11 +534,899 @@ func (x *Blueprint) GetAgents() map[string]*Agent {
 	return nil
 }
 
+type CreateBlueprintRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Config        string                 `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBlueprintRequest) Reset() {
+	*x = CreateBlueprintRequest{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBlueprintRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBlueprintRequest) ProtoMessage() {}
+
+func (x *CreateBlueprintRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBlueprintRequest.ProtoReflect.Descriptor instead.
+func (*CreateBlueprintRequest) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CreateBlueprintRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateBlueprintRequest) GetConfig() string {
+	if x != nil {
+		return x.Config
+	}
+	return ""
+}
+
+type CreateBlueprintResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blueprint     *Blueprint             `protobuf:"bytes,1,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBlueprintResponse) Reset() {
+	*x = CreateBlueprintResponse{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBlueprintResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBlueprintResponse) ProtoMessage() {}
+
+func (x *CreateBlueprintResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBlueprintResponse.ProtoReflect.Descriptor instead.
+func (*CreateBlueprintResponse) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CreateBlueprintResponse) GetBlueprint() *Blueprint {
+	if x != nil {
+		return x.Blueprint
+	}
+	return nil
+}
+
+type ListBlueprintsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pagination    *Pagination            `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlueprintsRequest) Reset() {
+	*x = ListBlueprintsRequest{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlueprintsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlueprintsRequest) ProtoMessage() {}
+
+func (x *ListBlueprintsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlueprintsRequest.ProtoReflect.Descriptor instead.
+func (*ListBlueprintsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListBlueprintsRequest) GetPagination() *Pagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+type ListBlueprintsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blueprints    []*Blueprint           `protobuf:"bytes,1,rep,name=blueprints,proto3" json:"blueprints,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlueprintsResponse) Reset() {
+	*x = ListBlueprintsResponse{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlueprintsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlueprintsResponse) ProtoMessage() {}
+
+func (x *ListBlueprintsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlueprintsResponse.ProtoReflect.Descriptor instead.
+func (*ListBlueprintsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListBlueprintsResponse) GetBlueprints() []*Blueprint {
+	if x != nil {
+		return x.Blueprints
+	}
+	return nil
+}
+
+type GetBlueprintRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlueprintRequest) Reset() {
+	*x = GetBlueprintRequest{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlueprintRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlueprintRequest) ProtoMessage() {}
+
+func (x *GetBlueprintRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlueprintRequest.ProtoReflect.Descriptor instead.
+func (*GetBlueprintRequest) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetBlueprintRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetBlueprintResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blueprint     *Blueprint             `protobuf:"bytes,1,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlueprintResponse) Reset() {
+	*x = GetBlueprintResponse{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlueprintResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlueprintResponse) ProtoMessage() {}
+
+func (x *GetBlueprintResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlueprintResponse.ProtoReflect.Descriptor instead.
+func (*GetBlueprintResponse) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetBlueprintResponse) GetBlueprint() *Blueprint {
+	if x != nil {
+		return x.Blueprint
+	}
+	return nil
+}
+
+type ListLogsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pagination    *Pagination            `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Level         string                 `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	TraceId       string                 `protobuf:"bytes,3,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	StartTime     string                 `protobuf:"bytes,4,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime       string                 `protobuf:"bytes,5,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLogsRequest) Reset() {
+	*x = ListLogsRequest{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLogsRequest) ProtoMessage() {}
+
+func (x *ListLogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLogsRequest.ProtoReflect.Descriptor instead.
+func (*ListLogsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ListLogsRequest) GetPagination() *Pagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *ListLogsRequest) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *ListLogsRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *ListLogsRequest) GetStartTime() string {
+	if x != nil {
+		return x.StartTime
+	}
+	return ""
+}
+
+func (x *ListLogsRequest) GetEndTime() string {
+	if x != nil {
+		return x.EndTime
+	}
+	return ""
+}
+
+type ListLogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Logs          []*Log                 `protobuf:"bytes,1,rep,name=logs,proto3" json:"logs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLogsResponse) Reset() {
+	*x = ListLogsResponse{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLogsResponse) ProtoMessage() {}
+
+func (x *ListLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLogsResponse.ProtoReflect.Descriptor instead.
+func (*ListLogsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListLogsResponse) GetLogs() []*Log {
+	if x != nil {
+		return x.Logs
+	}
+	return nil
+}
+
+type GetTracesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pagination    *Pagination            `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	RootSpanName  string                 `protobuf:"bytes,2,opt,name=root_span_name,json=rootSpanName,proto3" json:"root_span_name,omitempty"`
+	HasError      bool                   `protobuf:"varint,3,opt,name=has_error,json=hasError,proto3" json:"has_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTracesRequest) Reset() {
+	*x = GetTracesRequest{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTracesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTracesRequest) ProtoMessage() {}
+
+func (x *GetTracesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTracesRequest.ProtoReflect.Descriptor instead.
+func (*GetTracesRequest) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetTracesRequest) GetPagination() *Pagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *GetTracesRequest) GetRootSpanName() string {
+	if x != nil {
+		return x.RootSpanName
+	}
+	return ""
+}
+
+func (x *GetTracesRequest) GetHasError() bool {
+	if x != nil {
+		return x.HasError
+	}
+	return false
+}
+
+type GetTracesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Traces        []*Trace               `protobuf:"bytes,1,rep,name=traces,proto3" json:"traces,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTracesResponse) Reset() {
+	*x = GetTracesResponse{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTracesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTracesResponse) ProtoMessage() {}
+
+func (x *GetTracesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTracesResponse.ProtoReflect.Descriptor instead.
+func (*GetTracesResponse) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetTracesResponse) GetTraces() []*Trace {
+	if x != nil {
+		return x.Traces
+	}
+	return nil
+}
+
+type Log struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Timestamp     string                 `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Level         string                 `protobuf:"bytes,3,opt,name=level,proto3" json:"level,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	TraceId       string                 `protobuf:"bytes,5,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	SpanId        string                 `protobuf:"bytes,6,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
+	Attributes    map[string]string      `protobuf:"bytes,7,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Log) Reset() {
+	*x = Log{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Log) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Log) ProtoMessage() {}
+
+func (x *Log) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Log.ProtoReflect.Descriptor instead.
+func (*Log) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *Log) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Log) GetTimestamp() string {
+	if x != nil {
+		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *Log) GetLevel() string {
+	if x != nil {
+		return x.Level
+	}
+	return ""
+}
+
+func (x *Log) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *Log) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *Log) GetSpanId() string {
+	if x != nil {
+		return x.SpanId
+	}
+	return ""
+}
+
+func (x *Log) GetAttributes() map[string]string {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+type Trace struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TraceId       string                 `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RootSpanName  string                 `protobuf:"bytes,3,opt,name=root_span_name,json=rootSpanName,proto3" json:"root_span_name,omitempty"`
+	StartTime     string                 `protobuf:"bytes,4,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime       string                 `protobuf:"bytes,5,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	DurationMs    int64                  `protobuf:"varint,6,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Spans         []*Span                `protobuf:"bytes,7,rep,name=spans,proto3" json:"spans,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Trace) Reset() {
+	*x = Trace{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Trace) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Trace) ProtoMessage() {}
+
+func (x *Trace) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Trace.ProtoReflect.Descriptor instead.
+func (*Trace) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *Trace) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Trace) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *Trace) GetRootSpanName() string {
+	if x != nil {
+		return x.RootSpanName
+	}
+	return ""
+}
+
+func (x *Trace) GetStartTime() string {
+	if x != nil {
+		return x.StartTime
+	}
+	return ""
+}
+
+func (x *Trace) GetEndTime() string {
+	if x != nil {
+		return x.EndTime
+	}
+	return ""
+}
+
+func (x *Trace) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *Trace) GetSpans() []*Span {
+	if x != nil {
+		return x.Spans
+	}
+	return nil
+}
+
+type Span struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TraceId       string                 `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	ParentSpanId  string                 `protobuf:"bytes,3,opt,name=parent_span_id,json=parentSpanId,proto3" json:"parent_span_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	StartTime     string                 `protobuf:"bytes,5,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime       string                 `protobuf:"bytes,6,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	DurationNs    int64                  `protobuf:"varint,7,opt,name=duration_ns,json=durationNs,proto3" json:"duration_ns,omitempty"`
+	ServiceName   string                 `protobuf:"bytes,8,opt,name=service_name,json=serviceName,proto3" json:"service_name,omitempty"`
+	HasError      bool                   `protobuf:"varint,9,opt,name=has_error,json=hasError,proto3" json:"has_error,omitempty"`
+	Attributes    map[string]string      `protobuf:"bytes,10,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Span) Reset() {
+	*x = Span{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Span) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Span) ProtoMessage() {}
+
+func (x *Span) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Span.ProtoReflect.Descriptor instead.
+func (*Span) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Span) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Span) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *Span) GetParentSpanId() string {
+	if x != nil {
+		return x.ParentSpanId
+	}
+	return ""
+}
+
+func (x *Span) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Span) GetStartTime() string {
+	if x != nil {
+		return x.StartTime
+	}
+	return ""
+}
+
+func (x *Span) GetEndTime() string {
+	if x != nil {
+		return x.EndTime
+	}
+	return ""
+}
+
+func (x *Span) GetDurationNs() int64 {
+	if x != nil {
+		return x.DurationNs
+	}
+	return 0
+}
+
+func (x *Span) GetServiceName() string {
+	if x != nil {
+		return x.ServiceName
+	}
+	return ""
+}
+
+func (x *Span) GetHasError() bool {
+	if x != nil {
+		return x.HasError
+	}
+	return false
+}
+
+func (x *Span) GetAttributes() map[string]string {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+type GetTraceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTraceRequest) Reset() {
+	*x = GetTraceRequest{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTraceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTraceRequest) ProtoMessage() {}
+
+func (x *GetTraceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTraceRequest.ProtoReflect.Descriptor instead.
+func (*GetTraceRequest) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetTraceRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetTraceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Trace         *Trace                 `protobuf:"bytes,1,opt,name=trace,proto3" json:"trace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTraceResponse) Reset() {
+	*x = GetTraceResponse{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTraceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTraceResponse) ProtoMessage() {}
+
+func (x *GetTraceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTraceResponse.ProtoReflect.Descriptor instead.
+func (*GetTraceResponse) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetTraceResponse) GetTrace() *Trace {
+	if x != nil {
+		return x.Trace
+	}
+	return nil
+}
+
 var File_proto_counterspell_v1_counterspell_proto protoreflect.FileDescriptor
 
 const file_proto_counterspell_v1_counterspell_proto_rawDesc = "" +
 	"\n" +
-	"(proto/counterspell/v1/counterspell.proto\x12\x0fcounterspell.v1\x1a\x19google/protobuf/any.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"9\n" +
+	"(proto/counterspell/v1/counterspell.proto\x12\x0fcounterspell.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x19google/protobuf/any.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"6\n" +
+	"\n" +
+	"Pagination\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\x05R\x04page\"9\n" +
 	"\x05Model\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\"\x87\x01\n" +
@@ -527,8 +1468,96 @@ const file_proto_counterspell_v1_counterspell_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x16.counterspell.v1.ModelR\x05value:\x028\x01\x1aQ\n" +
 	"\vAgentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
-	"\x05value\x18\x02 \x01(\v2\x16.counterspell.v1.AgentR\x05value:\x028\x012\t\n" +
-	"\aServiceBDZBgithub.com/revrost/counterspell/gen/counterspell/v1;counterspellv1b\x06proto3"
+	"\x05value\x18\x02 \x01(\v2\x16.counterspell.v1.AgentR\x05value:\x028\x01\"D\n" +
+	"\x16CreateBlueprintRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
+	"\x06config\x18\x02 \x01(\tR\x06config\"S\n" +
+	"\x17CreateBlueprintResponse\x128\n" +
+	"\tblueprint\x18\x01 \x01(\v2\x1a.counterspell.v1.BlueprintR\tblueprint\"T\n" +
+	"\x15ListBlueprintsRequest\x12;\n" +
+	"\n" +
+	"pagination\x18\x01 \x01(\v2\x1b.counterspell.v1.PaginationR\n" +
+	"pagination\"T\n" +
+	"\x16ListBlueprintsResponse\x12:\n" +
+	"\n" +
+	"blueprints\x18\x01 \x03(\v2\x1a.counterspell.v1.BlueprintR\n" +
+	"blueprints\"%\n" +
+	"\x13GetBlueprintRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"P\n" +
+	"\x14GetBlueprintResponse\x128\n" +
+	"\tblueprint\x18\x01 \x01(\v2\x1a.counterspell.v1.BlueprintR\tblueprint\"\xb9\x01\n" +
+	"\x0fListLogsRequest\x12;\n" +
+	"\n" +
+	"pagination\x18\x01 \x01(\v2\x1b.counterspell.v1.PaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05level\x18\x02 \x01(\tR\x05level\x12\x19\n" +
+	"\btrace_id\x18\x03 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"start_time\x18\x04 \x01(\tR\tstartTime\x12\x19\n" +
+	"\bend_time\x18\x05 \x01(\tR\aendTime\"<\n" +
+	"\x10ListLogsResponse\x12(\n" +
+	"\x04logs\x18\x01 \x03(\v2\x14.counterspell.v1.LogR\x04logs\"\x92\x01\n" +
+	"\x10GetTracesRequest\x12;\n" +
+	"\n" +
+	"pagination\x18\x01 \x01(\v2\x1b.counterspell.v1.PaginationR\n" +
+	"pagination\x12$\n" +
+	"\x0eroot_span_name\x18\x02 \x01(\tR\frootSpanName\x12\x1b\n" +
+	"\thas_error\x18\x03 \x01(\bR\bhasError\"C\n" +
+	"\x11GetTracesResponse\x12.\n" +
+	"\x06traces\x18\x01 \x03(\v2\x16.counterspell.v1.TraceR\x06traces\"\x9c\x02\n" +
+	"\x03Log\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\tR\ttimestamp\x12\x14\n" +
+	"\x05level\x18\x03 \x01(\tR\x05level\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x19\n" +
+	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x17\n" +
+	"\aspan_id\x18\x06 \x01(\tR\x06spanId\x12D\n" +
+	"\n" +
+	"attributes\x18\a \x03(\v2$.counterspell.v1.Log.AttributesEntryR\n" +
+	"attributes\x1a=\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe0\x01\n" +
+	"\x05Trace\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\btrace_id\x18\x02 \x01(\tR\atraceId\x12$\n" +
+	"\x0eroot_span_name\x18\x03 \x01(\tR\frootSpanName\x12\x1d\n" +
+	"\n" +
+	"start_time\x18\x04 \x01(\tR\tstartTime\x12\x19\n" +
+	"\bend_time\x18\x05 \x01(\tR\aendTime\x12\x1f\n" +
+	"\vduration_ms\x18\x06 \x01(\x03R\n" +
+	"durationMs\x12+\n" +
+	"\x05spans\x18\a \x03(\v2\x15.counterspell.v1.SpanR\x05spans\"\x8c\x03\n" +
+	"\x04Span\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\btrace_id\x18\x02 \x01(\tR\atraceId\x12$\n" +
+	"\x0eparent_span_id\x18\x03 \x01(\tR\fparentSpanId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"start_time\x18\x05 \x01(\tR\tstartTime\x12\x19\n" +
+	"\bend_time\x18\x06 \x01(\tR\aendTime\x12\x1f\n" +
+	"\vduration_ns\x18\a \x01(\x03R\n" +
+	"durationNs\x12!\n" +
+	"\fservice_name\x18\b \x01(\tR\vserviceName\x12\x1b\n" +
+	"\thas_error\x18\t \x01(\bR\bhasError\x12E\n" +
+	"\n" +
+	"attributes\x18\n" +
+	" \x03(\v2%.counterspell.v1.Span.AttributesEntryR\n" +
+	"attributes\x1a=\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"!\n" +
+	"\x0fGetTraceRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"@\n" +
+	"\x10GetTraceResponse\x12,\n" +
+	"\x05trace\x18\x01 \x01(\v2\x16.counterspell.v1.TraceR\x05trace2\x9c\x06\n" +
+	"\aService\x12\x96\x01\n" +
+	"\x0fCreateBlueprint\x12'.counterspell.v1.CreateBlueprintRequest\x1a(.counterspell.v1.CreateBlueprintResponse\"0\x82\xd3\xe4\x93\x02*\"(/v1/blueprints?limit={limit}&page={page}\x12x\n" +
+	"\fGetBlueprint\x12$.counterspell.v1.GetBlueprintRequest\x1a%.counterspell.v1.GetBlueprintResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/blueprints/{id}\x12\x93\x01\n" +
+	"\x0eListBlueprints\x12&.counterspell.v1.ListBlueprintsRequest\x1a'.counterspell.v1.ListBlueprintsResponse\"0\x82\xd3\xe4\x93\x02*\x12(/v1/blueprints?limit={limit}&page={page}\x12{\n" +
+	"\bListLogs\x12 .counterspell.v1.ListLogsRequest\x1a!.counterspell.v1.ListLogsResponse\"*\x82\xd3\xe4\x93\x02$\x12\"/v1/logs?limit={limit}&page={page}\x12\x80\x01\n" +
+	"\tGetTraces\x12!.counterspell.v1.GetTracesRequest\x1a\".counterspell.v1.GetTracesResponse\",\x82\xd3\xe4\x93\x02&\x12$/v1/traces?limit={limit}&page={page}\x12h\n" +
+	"\bGetTrace\x12 .counterspell.v1.GetTraceRequest\x1a!.counterspell.v1.GetTraceResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/traces/{id}BDZBgithub.com/revrost/counterspell/gen/counterspell/v1;counterspellv1b\x06proto3"
 
 var (
 	file_proto_counterspell_v1_counterspell_proto_rawDescOnce sync.Once
@@ -542,34 +1571,76 @@ func file_proto_counterspell_v1_counterspell_proto_rawDescGZIP() []byte {
 	return file_proto_counterspell_v1_counterspell_proto_rawDescData
 }
 
-var file_proto_counterspell_v1_counterspell_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_counterspell_v1_counterspell_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_proto_counterspell_v1_counterspell_proto_goTypes = []any{
-	(*Model)(nil),       // 0: counterspell.v1.Model
-	(*ToolParam)(nil),   // 1: counterspell.v1.ToolParam
-	(*Tool)(nil),        // 2: counterspell.v1.Tool
-	(*Toolset)(nil),     // 3: counterspell.v1.Toolset
-	(*Synthesizer)(nil), // 4: counterspell.v1.Synthesizer
-	(*Agent)(nil),       // 5: counterspell.v1.Agent
-	(*Blueprint)(nil),   // 6: counterspell.v1.Blueprint
-	nil,                 // 7: counterspell.v1.Tool.ParamsEntry
-	nil,                 // 8: counterspell.v1.Blueprint.ModelsEntry
-	nil,                 // 9: counterspell.v1.Blueprint.AgentsEntry
+	(*Pagination)(nil),              // 0: counterspell.v1.Pagination
+	(*Model)(nil),                   // 1: counterspell.v1.Model
+	(*ToolParam)(nil),               // 2: counterspell.v1.ToolParam
+	(*Tool)(nil),                    // 3: counterspell.v1.Tool
+	(*Toolset)(nil),                 // 4: counterspell.v1.Toolset
+	(*Synthesizer)(nil),             // 5: counterspell.v1.Synthesizer
+	(*Agent)(nil),                   // 6: counterspell.v1.Agent
+	(*Blueprint)(nil),               // 7: counterspell.v1.Blueprint
+	(*CreateBlueprintRequest)(nil),  // 8: counterspell.v1.CreateBlueprintRequest
+	(*CreateBlueprintResponse)(nil), // 9: counterspell.v1.CreateBlueprintResponse
+	(*ListBlueprintsRequest)(nil),   // 10: counterspell.v1.ListBlueprintsRequest
+	(*ListBlueprintsResponse)(nil),  // 11: counterspell.v1.ListBlueprintsResponse
+	(*GetBlueprintRequest)(nil),     // 12: counterspell.v1.GetBlueprintRequest
+	(*GetBlueprintResponse)(nil),    // 13: counterspell.v1.GetBlueprintResponse
+	(*ListLogsRequest)(nil),         // 14: counterspell.v1.ListLogsRequest
+	(*ListLogsResponse)(nil),        // 15: counterspell.v1.ListLogsResponse
+	(*GetTracesRequest)(nil),        // 16: counterspell.v1.GetTracesRequest
+	(*GetTracesResponse)(nil),       // 17: counterspell.v1.GetTracesResponse
+	(*Log)(nil),                     // 18: counterspell.v1.Log
+	(*Trace)(nil),                   // 19: counterspell.v1.Trace
+	(*Span)(nil),                    // 20: counterspell.v1.Span
+	(*GetTraceRequest)(nil),         // 21: counterspell.v1.GetTraceRequest
+	(*GetTraceResponse)(nil),        // 22: counterspell.v1.GetTraceResponse
+	nil,                             // 23: counterspell.v1.Tool.ParamsEntry
+	nil,                             // 24: counterspell.v1.Blueprint.ModelsEntry
+	nil,                             // 25: counterspell.v1.Blueprint.AgentsEntry
+	nil,                             // 26: counterspell.v1.Log.AttributesEntry
+	nil,                             // 27: counterspell.v1.Span.AttributesEntry
 }
 var file_proto_counterspell_v1_counterspell_proto_depIdxs = []int32{
-	7, // 0: counterspell.v1.Tool.params:type_name -> counterspell.v1.Tool.ParamsEntry
-	2, // 1: counterspell.v1.Toolset.tools:type_name -> counterspell.v1.Tool
-	3, // 2: counterspell.v1.Agent.toolsets:type_name -> counterspell.v1.Toolset
-	4, // 3: counterspell.v1.Agent.synthesizer:type_name -> counterspell.v1.Synthesizer
-	8, // 4: counterspell.v1.Blueprint.models:type_name -> counterspell.v1.Blueprint.ModelsEntry
-	9, // 5: counterspell.v1.Blueprint.agents:type_name -> counterspell.v1.Blueprint.AgentsEntry
-	1, // 6: counterspell.v1.Tool.ParamsEntry.value:type_name -> counterspell.v1.ToolParam
-	0, // 7: counterspell.v1.Blueprint.ModelsEntry.value:type_name -> counterspell.v1.Model
-	5, // 8: counterspell.v1.Blueprint.AgentsEntry.value:type_name -> counterspell.v1.Agent
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	23, // 0: counterspell.v1.Tool.params:type_name -> counterspell.v1.Tool.ParamsEntry
+	3,  // 1: counterspell.v1.Toolset.tools:type_name -> counterspell.v1.Tool
+	4,  // 2: counterspell.v1.Agent.toolsets:type_name -> counterspell.v1.Toolset
+	5,  // 3: counterspell.v1.Agent.synthesizer:type_name -> counterspell.v1.Synthesizer
+	24, // 4: counterspell.v1.Blueprint.models:type_name -> counterspell.v1.Blueprint.ModelsEntry
+	25, // 5: counterspell.v1.Blueprint.agents:type_name -> counterspell.v1.Blueprint.AgentsEntry
+	7,  // 6: counterspell.v1.CreateBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
+	0,  // 7: counterspell.v1.ListBlueprintsRequest.pagination:type_name -> counterspell.v1.Pagination
+	7,  // 8: counterspell.v1.ListBlueprintsResponse.blueprints:type_name -> counterspell.v1.Blueprint
+	7,  // 9: counterspell.v1.GetBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
+	0,  // 10: counterspell.v1.ListLogsRequest.pagination:type_name -> counterspell.v1.Pagination
+	18, // 11: counterspell.v1.ListLogsResponse.logs:type_name -> counterspell.v1.Log
+	0,  // 12: counterspell.v1.GetTracesRequest.pagination:type_name -> counterspell.v1.Pagination
+	19, // 13: counterspell.v1.GetTracesResponse.traces:type_name -> counterspell.v1.Trace
+	26, // 14: counterspell.v1.Log.attributes:type_name -> counterspell.v1.Log.AttributesEntry
+	20, // 15: counterspell.v1.Trace.spans:type_name -> counterspell.v1.Span
+	27, // 16: counterspell.v1.Span.attributes:type_name -> counterspell.v1.Span.AttributesEntry
+	19, // 17: counterspell.v1.GetTraceResponse.trace:type_name -> counterspell.v1.Trace
+	2,  // 18: counterspell.v1.Tool.ParamsEntry.value:type_name -> counterspell.v1.ToolParam
+	1,  // 19: counterspell.v1.Blueprint.ModelsEntry.value:type_name -> counterspell.v1.Model
+	6,  // 20: counterspell.v1.Blueprint.AgentsEntry.value:type_name -> counterspell.v1.Agent
+	8,  // 21: counterspell.v1.Service.CreateBlueprint:input_type -> counterspell.v1.CreateBlueprintRequest
+	12, // 22: counterspell.v1.Service.GetBlueprint:input_type -> counterspell.v1.GetBlueprintRequest
+	10, // 23: counterspell.v1.Service.ListBlueprints:input_type -> counterspell.v1.ListBlueprintsRequest
+	14, // 24: counterspell.v1.Service.ListLogs:input_type -> counterspell.v1.ListLogsRequest
+	16, // 25: counterspell.v1.Service.GetTraces:input_type -> counterspell.v1.GetTracesRequest
+	21, // 26: counterspell.v1.Service.GetTrace:input_type -> counterspell.v1.GetTraceRequest
+	9,  // 27: counterspell.v1.Service.CreateBlueprint:output_type -> counterspell.v1.CreateBlueprintResponse
+	13, // 28: counterspell.v1.Service.GetBlueprint:output_type -> counterspell.v1.GetBlueprintResponse
+	11, // 29: counterspell.v1.Service.ListBlueprints:output_type -> counterspell.v1.ListBlueprintsResponse
+	15, // 30: counterspell.v1.Service.ListLogs:output_type -> counterspell.v1.ListLogsResponse
+	17, // 31: counterspell.v1.Service.GetTraces:output_type -> counterspell.v1.GetTracesResponse
+	22, // 32: counterspell.v1.Service.GetTrace:output_type -> counterspell.v1.GetTraceResponse
+	27, // [27:33] is the sub-list for method output_type
+	21, // [21:27] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_proto_counterspell_v1_counterspell_proto_init() }
@@ -583,7 +1654,7 @@ func file_proto_counterspell_v1_counterspell_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_counterspell_v1_counterspell_proto_rawDesc), len(file_proto_counterspell_v1_counterspell_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

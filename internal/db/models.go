@@ -8,6 +8,16 @@ import (
 	"database/sql"
 )
 
+type Blueprint struct {
+	ID            interface{}
+	BlueprintName string
+	Config        string
+	Version       sql.NullInt64
+	CreatedAt     interface{}
+	UpdatedAt     interface{}
+	Metadata      interface{}
+}
+
 type Log struct {
 	ID         int64
 	Timestamp  string
