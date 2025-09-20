@@ -161,7 +161,7 @@ func (e *SQLiteSpanExporter) convertSpan(span trace.ReadOnlySpan) SpanData {
 	}
 
 	// Convert attributes to JSON
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]any)
 	for _, attr := range span.Attributes() {
 		attributes[string(attr.Key)] = attr.Value.AsInterface()
 	}

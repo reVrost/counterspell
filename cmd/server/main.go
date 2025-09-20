@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
+	"github.com/revrost/counterspell/gen/proto/counterspell/v1/counterspellv1connect"
 	"github.com/revrost/counterspell/internal/counterspell"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -24,6 +25,11 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+func ConnectHandler(path string, handler http.Handler) (string, echo.HandlerFunc) {
+	path = path + "*"
+	return path, echo.WrapHandler(handler)
+}
 
 func main() {
 	// Initialize database
@@ -113,6 +119,18 @@ func main() {
 	e.GET("/hello", helloHandler)
 	e.GET("/slow", slowHandler)
 	e.GET("/error", errorHandler)
+
+	service := counterspell.NewService(db)
+	// Connect RPC Handlers
+	path, handlers := ConnectHandler(
+		counterspellv1connect.NewServiceHandler(
+			service,
+			// connect.WithInterceptors(market.AuthInterceptor(server.app)),
+		))
+	e.Any(
+		path, handlers,
+		// UserActivityLogger(server.app),
+	)
 
 	// Start server
 	log.Info().Msg("Server starting on :8989")
