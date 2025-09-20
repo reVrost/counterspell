@@ -3,8 +3,6 @@
 # Get the project root directory
 PROJECT_ROOT=$(pwd)
 
-# Kill any existing marketpal server processes
-pkill -f "local/marketpal serve" || true
 # Kill any existing npm dev server processes
 pkill -f "npm run dev" || true
 

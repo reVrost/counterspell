@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/pkg/db"
 )
 
 // APIHandler handles HTTP requests for the counterspell API

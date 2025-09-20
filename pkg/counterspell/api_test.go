@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/pkg/db"
 )
 
 func setupAPITestDB(t *testing.T) *sql.DB {

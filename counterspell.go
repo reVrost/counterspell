@@ -18,7 +18,7 @@ import (
 	middlewarev5 "github.com/labstack/echo/v5/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
-	"github.com/revrost/counterspell/internal/counterspell"
+	"github.com/revrost/counterspell/pkg/counterspell"
 	"github.com/revrost/counterspell/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
