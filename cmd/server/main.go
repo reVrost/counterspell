@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,8 +17,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/revrost/counterspell/pkg/counterspell"
 	"github.com/revrost/counterspell/pkg/gen/proto/counterspell/v1/counterspellv1connect"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	slogmulti "github.com/samber/slog-multi"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -32,17 +32,21 @@ func ConnectHandler(path string, handler http.Handler) (string, echo.HandlerFunc
 }
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 	// Initialize database
 	db, err := initDB("counterspell.db")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize database")
+		slog.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Initialize observability
 	cleanup, err := initObservability(db)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize observability")
+		slog.Error("Failed to initialize observability", "error", err)
+		os.Exit(1)
 	}
 	defer cleanup()
 
@@ -133,14 +137,14 @@ func main() {
 	)
 
 	// Start server
-	log.Info().Msg("Server starting on :8989")
-	log.Info().Msg("Counterspell API available at /counterspell/api")
-	log.Info().Msg("Example routes: /hello, /slow, /error")
+	slog.Info("Server starting on :8989")
+	slog.Info("Counterspell API available at /counterspell/api")
+	slog.Info("Example routes: /hello, /slow, /error")
 
 	// Graceful shutdown
 	go func() {
 		if err := e.Start(":8989"); err != nil {
-			log.Info().Err(err).Msg("Server stopped")
+			slog.Error("Server stopped", "error", err)
 		}
 	}()
 
@@ -149,17 +153,17 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	log.Info().Msg("Server shutting down...")
+	slog.Info("Server shutting down...")
 
 	// Shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Server forced to shutdown")
+		slog.Error("Server forced to shutdown", "error", err)
 	}
 
-	log.Info().Msg("Server exited")
+	slog.Info("Server exited")
 }
 
 // initDB initializes the SQLite database and runs migrations
@@ -183,7 +187,7 @@ func initDB(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Info().Msg("Database initialized successfully")
+	slog.Info("Database initialized successfully")
 	return db, nil
 }
 
@@ -215,51 +219,38 @@ func initObservability(db *sql.DB) (func(), error) {
 	// Initialize logging
 	logWriter := counterspell.NewSQLiteLogWriter(db)
 
-	// Configure zerolog with multiple outputs
-	multiWriter := zerolog.MultiLevelWriter(
-		os.Stdout, // Console output for development
-		logWriter, // SQLite storage
+	// Configure slog with multiple outputs
+	multiHandler := slogmulti.Fanout(
+		slog.NewTextHandler(os.Stdout, nil), // Console output for development
+		slog.NewJSONHandler(logWriter, nil), // SQLite storage
 	)
 
-	// Configure global logger with trace context hook
-	log.Logger = zerolog.New(multiWriter).
-		With().
-		Timestamp().
-		Logger().
-		Hook(TracingHook{})
+	// Configure global logger with trace context handler
+	logger := slog.New(multiHandler).
+		With(slog.String("timestamp", time.Now().Format(time.RFC3339)))
 
-	log.Info().Msg("Observability initialized successfully")
+	// Set as default logger
+	slog.SetDefault(logger)
+
+	slog.Info("Observability initialized successfully")
 
 	// Return cleanup function
 	return func() {
-		log.Info().Msg("Shutting down observability...")
+		slog.Info("Shutting down observability...")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		if err := tp.Shutdown(ctx); err != nil {
-			log.Error().Err(err).Msg("Failed to shutdown tracer provider")
+			slog.Error("Failed to shutdown tracer provider", "error", err)
 		}
 
 		if err := logWriter.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to close log writer")
+			slog.Error("Failed to close log writer", "error", err)
 		}
 
-		log.Info().Msg("Observability shutdown complete")
+		slog.Info("Observability shutdown complete")
 	}, nil
-}
-
-// TracingHook automatically adds trace and span IDs to log entries
-type TracingHook struct{}
-
-func (h TracingHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
-	// This would typically extract trace context from the current goroutine
-	// For simplicity in this example, we'll check if there's an active span
-	span := oteltrace.SpanFromContext(context.Background())
-	if span != nil && span.SpanContext().IsValid() {
-		e.Str("trace_id", span.SpanContext().TraceID().String())
-		e.Str("span_id", span.SpanContext().SpanID().String())
-	}
 }
 
 // tracingMiddleware adds OpenTelemetry tracing to HTTP requests
@@ -313,10 +304,7 @@ func helloHandler(c echo.Context) error {
 	// Update the request context for logging
 	c.SetRequest(c.Request().WithContext(ctx))
 
-	log.Info().
-		Str("user", "demo-user").
-		Str("endpoint", "/hello").
-		Msg("Processing hello request")
+	slog.Info("Processing hello request", "user", "demo-user", "endpoint", "/hello")
 
 	span.SetAttributes(
 		attribute.String("user", "demo-user"),
@@ -326,7 +314,7 @@ func helloHandler(c echo.Context) error {
 	// Simulate some work
 	time.Sleep(50 * time.Millisecond)
 
-	log.Info().Msg("Hello request completed successfully")
+	slog.Info("Hello request completed successfully")
 
 	return c.JSON(200, map[string]string{
 		"message":  "Hello, World!",
@@ -341,23 +329,21 @@ func slowHandler(c echo.Context) error {
 
 	c.SetRequest(c.Request().WithContext(ctx))
 
-	log.Info().Msg("Starting slow operation")
+	slog.Info("Starting slow operation")
 
 	// Simulate slow work with sub-spans
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, subSpan := tracer.Start(ctx, fmt.Sprintf("slow-step-%d", i+1))
 
-		log.Info().
-			Int("step", i+1).
-			Msg("Processing slow step")
+		slog.Info("Processing slow step", "step", i+1)
 
 		time.Sleep(200 * time.Millisecond)
 		subSpan.End()
 	}
 
-	log.Info().Msg("Slow operation completed")
+	slog.Info("Slow operation completed")
 
-	return c.JSON(200, map[string]interface{}{
+	return c.JSON(200, map[string]any{
 		"message":     "Slow operation completed",
 		"duration_ms": 600,
 		"trace_id":    span.SpanContext().TraceID().String(),
@@ -371,9 +357,7 @@ func errorHandler(c echo.Context) error {
 
 	c.SetRequest(c.Request().WithContext(ctx))
 
-	log.Error().
-		Str("error_type", "simulated_error").
-		Msg("Simulating an error condition")
+	slog.Error("Simulating an error condition", "error_type", "simulated_error")
 
 	span.SetAttributes(
 		attribute.String("error.type", "simulated_error"),
