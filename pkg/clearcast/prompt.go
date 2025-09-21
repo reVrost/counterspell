@@ -3,11 +3,12 @@ package clearcast
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -16,22 +17,50 @@ import (
 // DebugContextKey for context-based debug flag
 type DebugContextKey struct{}
 
-// Prompt struct with zerolog and OTEL
-type Prompt struct {
-	llm    LLMProvider
-	Prompt string
-	logger zerolog.Logger
-	tracer trace.Tracer
+// PromptOption defines a functional option for configuring Prompt
+type PromptOption func(*Prompt)
+
+// WithSlogLogger sets the slog.Logger for Prompt
+func WithSlogLogger(logger *slog.Logger) PromptOption {
+	return func(p *Prompt) {
+		p.logger = logger
+	}
 }
 
-// NewPrompt creates a new Prompt with zerolog and OTEL
-func NewPrompt(template string, llm LLMProvider, logger zerolog.Logger) *Prompt {
-	return &Prompt{
-		Prompt: template,
-		llm:    llm,
-		logger: logger,
-		tracer: otel.Tracer("clearcast/prompt"),
+// WithOTEL enables or disables OTEL tracing
+func WithOTEL(enabled bool) PromptOption {
+	return func(p *Prompt) {
+		p.enableOTEL = enabled
+		if enabled {
+			p.tracer = otel.Tracer("clearcast/prompt")
+		} else {
+			p.tracer = nil
+		}
 	}
+}
+
+// Prompt struct with slog and OTEL toggle
+type Prompt struct {
+	llm        LLMProvider
+	Prompt     string
+	logger     *slog.Logger
+	tracer     trace.Tracer
+	enableOTEL bool
+}
+
+// NewPrompt creates a new Prompt with slog (JSON handler) and OTEL enabled by default
+func NewPrompt(template string, llm LLMProvider, opts ...PromptOption) *Prompt {
+	p := &Prompt{
+		Prompt:     template,
+		llm:        llm,
+		logger:     slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+		tracer:     otel.Tracer("clearcast/prompt"),
+		enableOTEL: true,
+	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
 
 // recordUsageAttributes adds usage-related attributes to an OTEL span
@@ -47,50 +76,48 @@ func (t *Prompt) recordUsageAttributes(span trace.Span, usage Usage) {
 	)
 }
 
-// debugLog creates a zerolog event with common fields
-func (t *Prompt) debugLog(ctx context.Context, model string) *zerolog.Event {
-	if isDebugEnabled, _ := ctx.Value(DebugContextKey{}).(bool); isDebugEnabled {
-		return t.logger.Debug().Str("model", model)
+// debugLog checks if debug is enabled and returns keyvals for logging
+func (t *Prompt) debugLog(ctx context.Context, model string) []any {
+	if debugEnabled, _ := ctx.Value(DebugContextKey{}).(bool); debugEnabled {
+		return []any{"model", model}
 	}
 	return nil
 }
 
 func (t *Prompt) render(ctx context.Context, values map[string]any) (string, error) {
-	ctx, span := t.tracer.Start(ctx, "Prompt.Render")
-	defer span.End()
+	var span trace.Span
+	if t.enableOTEL {
+		ctx, span = t.tracer.Start(ctx, "Prompt.Render")
+		defer span.End()
+		span.SetAttributes(
+			attribute.String("template.content", t.Prompt),
+			attribute.Int("values.count", len(values)),
+		)
+	}
 
 	parsedTmpl, err := template.New("template").
 		Option("missingkey=error").
 		Parse(t.Prompt)
 	if err != nil {
-		span.RecordError(err)
-		t.logger.Error().
-			Err(err).
-			Str("template", t.Prompt).
-			Msg("Failed to parse template")
+		if t.enableOTEL {
+			span.RecordError(err)
+		}
+		t.logger.Error("Failed to parse template", "template", t.Prompt, "error", err)
 		return "", err
 	}
 
-	span.SetAttributes(
-		attribute.String("template.content", t.Prompt),
-		attribute.Int("values.count", len(values)),
-	)
-
 	sb := new(strings.Builder)
 	if err := parsedTmpl.Execute(sb, values); err != nil {
-		span.RecordError(err)
-		t.logger.Error().
-			Err(err).
-			Interface("values", values).
-			Msg("Failed to execute template")
+		if t.enableOTEL {
+			span.RecordError(err)
+		}
+		t.logger.Error("Failed to execute template", "values", values, "error", err)
 		return "", err
 	}
 
 	rendered := sb.String()
-	if log := t.debugLog(ctx, ""); log != nil {
-		log.Str("rendered", rendered).
-			Interface("values", values).
-			Msg("Template rendered successfully")
+	if keyvals := t.debugLog(ctx, ""); keyvals != nil {
+		t.logger.Debug("Template rendered successfully", append(keyvals, "rendered", rendered, "values", values)...)
 	}
 
 	return rendered, nil
@@ -98,18 +125,19 @@ func (t *Prompt) render(ctx context.Context, values map[string]any) (string, err
 
 // Non-streaming completion
 func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[string]any) (ChatCompletionResponse, error) {
-	ctx, span := t.tracer.Start(ctx, "Prompt.ChatCompletion")
-	defer span.End()
-
-	span.SetAttributes(attribute.String("model", model))
+	var span trace.Span
+	if t.enableOTEL {
+		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletion")
+		defer span.End()
+		span.SetAttributes(attribute.String("model", model))
+	}
 
 	rendered, err := t.render(ctx, args)
 	if err != nil {
-		span.RecordError(err)
-		t.logger.Error().
-			Err(err).
-			Str("model", model).
-			Msg("Error rendering template for chat completion")
+		if t.enableOTEL {
+			span.RecordError(err)
+		}
+		t.logger.Error("Error rendering template for chat completion", "model", model, "error", err)
 		return ChatCompletionResponse{}, fmt.Errorf("error rendering template: %w", err)
 	}
 
@@ -121,23 +149,21 @@ func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[stri
 	startTime := time.Now()
 	resp, err := t.llm.ChatCompletion(ctx, req)
 	if err != nil {
-		span.RecordError(err)
-		t.logger.Error().
-			Err(err).
-			Str("model", model).
-			Msg("Chat completion failed")
+		if t.enableOTEL {
+			span.RecordError(err)
+		}
+		t.logger.Error("Chat completion failed", "model", model, "error", err)
 		return ChatCompletionResponse{}, err
 	}
 
 	ttft := float64(time.Since(startTime).Nanoseconds()) / 1e6
-	t.recordUsageAttributes(span, resp.Usage)
-	span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
+	if t.enableOTEL {
+		t.recordUsageAttributes(span, resp.Usage)
+		span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
+	}
 
-	if log := t.debugLog(ctx, model); log != nil {
-		log.Interface("response", resp).
-			Float64("ttft_ms", ttft).
-			Interface("usage", resp.Usage).
-			Msg("Chat completion successful")
+	if keyvals := t.debugLog(ctx, model); keyvals != nil {
+		t.logger.Debug("Chat completion successful", append(keyvals, "response", resp, "ttft_ms", ttft, "usage", resp.Usage)...)
 	}
 
 	return resp, nil
@@ -145,18 +171,19 @@ func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[stri
 
 // Streaming completion
 func (t *Prompt) ChatCompletionStream(ctx context.Context, model string, args map[string]any) (<-chan ChatCompletionChunk, error) {
-	ctx, span := t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
-	defer span.End()
-
-	span.SetAttributes(attribute.String("model", model))
+	var span trace.Span
+	if t.enableOTEL {
+		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
+		defer span.End()
+		span.SetAttributes(attribute.String("model", model))
+	}
 
 	rendered, err := t.render(ctx, args)
 	if err != nil {
-		span.RecordError(err)
-		t.logger.Error().
-			Err(err).
-			Str("model", model).
-			Msg("Error rendering template for streaming chat completion")
+		if t.enableOTEL {
+			span.RecordError(err)
+		}
+		t.logger.Error("Error rendering template for streaming chat completion", "model", model, "error", err)
 		return nil, fmt.Errorf("error rendering template: %w", err)
 	}
 
@@ -168,16 +195,15 @@ func (t *Prompt) ChatCompletionStream(ctx context.Context, model string, args ma
 	startTime := time.Now()
 	stream, err := t.llm.ChatCompletionStream(ctx, req)
 	if err != nil {
-		span.RecordError(err)
-		t.logger.Error().
-			Err(err).
-			Str("model", model).
-			Msg("Streaming chat completion failed")
+		if t.enableOTEL {
+			span.RecordError(err)
+		}
+		t.logger.Error("Streaming chat completion failed", "model", model, "error", err)
 		return nil, err
 	}
 
-	if log := t.debugLog(ctx, model); log != nil {
-		log.Msg("Streaming chat completion started")
+	if keyvals := t.debugLog(ctx, model); keyvals != nil {
+		t.logger.Debug("Streaming chat completion started", keyvals...)
 	}
 
 	usageChan := make(chan ChatCompletionChunk)
@@ -188,10 +214,11 @@ func (t *Prompt) ChatCompletionStream(ctx context.Context, model string, args ma
 		for chunk := range stream {
 			if !firstChunkReceived {
 				ttft := float64(time.Since(startTime).Nanoseconds()) / 1e6
-				span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
-				if log := t.debugLog(ctx, model); log != nil {
-					log.Float64("ttft_ms", ttft).
-						Msg("First chunk received for streaming chat completion")
+				if t.enableOTEL {
+					span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
+				}
+				if keyvals := t.debugLog(ctx, model); keyvals != nil {
+					t.logger.Debug("First chunk received for streaming chat completion", append(keyvals, "ttft_ms", ttft)...)
 				}
 				firstChunkReceived = true
 			}
@@ -206,10 +233,11 @@ func (t *Prompt) ChatCompletionStream(ctx context.Context, model string, args ma
 			usageChan <- chunk
 		}
 
-		t.recordUsageAttributes(span, totalUsage)
-		if log := t.debugLog(ctx, model); log != nil {
-			log.Interface("usage", totalUsage).
-				Msg("Streaming chat completion completed")
+		if t.enableOTEL {
+			t.recordUsageAttributes(span, totalUsage)
+		}
+		if keyvals := t.debugLog(ctx, model); keyvals != nil {
+			t.logger.Debug("Streaming chat completion completed", append(keyvals, "usage", totalUsage)...)
 		}
 	}()
 
