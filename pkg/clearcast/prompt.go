@@ -124,7 +124,7 @@ func (t *Prompt) render(ctx context.Context, values map[string]any) (string, err
 }
 
 // Non-streaming completion
-func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[string]any) (ChatCompletionResponse, error) {
+func (t *Prompt) Run(ctx context.Context, model string, args map[string]any) (RunResponse, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletion")
@@ -138,7 +138,7 @@ func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[stri
 			span.RecordError(err)
 		}
 		t.logger.Error("Error rendering template for chat completion", "model", model, "error", err)
-		return ChatCompletionResponse{}, fmt.Errorf("error rendering template: %w", err)
+		return RunResponse{}, fmt.Errorf("error rendering template: %w", err)
 	}
 
 	req := ChatCompletionRequest{
@@ -153,7 +153,7 @@ func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[stri
 			span.RecordError(err)
 		}
 		t.logger.Error("Chat completion failed", "model", model, "error", err)
-		return ChatCompletionResponse{}, err
+		return RunResponse{}, err
 	}
 
 	ttft := float64(time.Since(startTime).Nanoseconds()) / 1e6
@@ -170,7 +170,7 @@ func (t *Prompt) ChatCompletion(ctx context.Context, model string, args map[stri
 }
 
 // Streaming completion
-func (t *Prompt) ChatCompletionStream(ctx context.Context, model string, args map[string]any) (<-chan ChatCompletionChunk, error) {
+func (t *Prompt) RunStream(ctx context.Context, model string, args map[string]any) (<-chan RunChunk, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
@@ -206,7 +206,7 @@ func (t *Prompt) ChatCompletionStream(ctx context.Context, model string, args ma
 		t.logger.Debug("Streaming chat completion started", keyvals...)
 	}
 
-	usageChan := make(chan ChatCompletionChunk)
+	usageChan := make(chan RunChunk)
 	go func() {
 		defer close(usageChan)
 		var totalUsage Usage

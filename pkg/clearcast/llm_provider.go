@@ -9,8 +9,8 @@ import (
 
 // LLMProvider defines the minimal interface for any chat LLM backend.
 type LLMProvider interface {
-	ChatCompletion(ctx context.Context, req ChatCompletionRequest) (ChatCompletionResponse, error)
-	ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan ChatCompletionChunk, error)
+	ChatCompletion(ctx context.Context, req ChatCompletionRequest) (RunResponse, error)
+	ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan RunChunk, error)
 }
 
 // ChatCompletionRequest is a provider-neutral request type.
@@ -20,11 +20,19 @@ type ChatCompletionRequest struct {
 	Options  map[string]any // extensible for provider-specific options
 }
 
-// ChatCompletionResponse represents a full completion result.
-type ChatCompletionResponse struct {
+// RunResponse represents a full completion result.
+type RunResponse struct {
 	Content string
 	Raw     any // keep raw provider response if needed
 	Usage   Usage
+}
+
+// RunChunk is a streamed chunk of a completion.
+type RunChunk struct {
+	Delta string // partial text delta
+	Done  bool
+	Raw   any
+	Usage Usage
 }
 
 // Usage Represents the total token usage per request.
@@ -50,14 +58,6 @@ type PromptTokenDetails struct {
 	CachedTokens int `json:"cached_tokens"`
 }
 
-// ChatCompletionChunk is a streamed chunk of a completion.
-type ChatCompletionChunk struct {
-	Delta string // partial text delta
-	Done  bool
-	Raw   any
-	Usage Usage
-}
-
 type OpenRouterProvider struct {
 	client *openrouter.Client
 }
@@ -66,7 +66,7 @@ func NewOpenRouterProvider(client *openrouter.Client) *OpenRouterProvider {
 	return &OpenRouterProvider{client: client}
 }
 
-func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (ChatCompletionResponse, error) {
+func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (RunResponse, error) {
 	messages := make([]openrouter.ChatCompletionMessage, len(req.Messages))
 	for i, msg := range req.Messages {
 		messages[i] = openrouter.ChatCompletionMessage{
@@ -82,16 +82,16 @@ func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatComplet
 
 	resp, err := p.client.CreateChatCompletion(ctx, orReq)
 	if err != nil {
-		return ChatCompletionResponse{}, err
+		return RunResponse{}, err
 	}
 
-	return ChatCompletionResponse{
+	return RunResponse{
 		Content: resp.Choices[0].Message.Content.Text,
 		Raw:     resp,
 	}, nil
 }
 
-func (p *OpenRouterProvider) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan ChatCompletionChunk, error) {
+func (p *OpenRouterProvider) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan RunChunk, error) {
 	// Map openrouter's streaming API into your chunk channel here.
 	return nil, fmt.Errorf("streaming not implemented yet")
 }
