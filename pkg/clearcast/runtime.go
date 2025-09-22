@@ -103,7 +103,7 @@ func (r *runtime) RunStream(ctx context.Context, rootAgentID, userInput string) 
 		defer close(eventsChan)
 		/// TODO: record telemetry session
 		agent := r.agents[rootAgentID]
-		if agent.Mode == AgentModePlan {
+		if agent.mode == AgentModePlan {
 			r.runPlan(ctx, eventsChan, rootAgentID, userInput)
 		} else {
 			r.runLoop(ctx, eventsChan, rootAgentID, userInput)
