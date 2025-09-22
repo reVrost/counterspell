@@ -6,8 +6,13 @@ type RuntimeEvent interface {
 	isEvent()
 }
 
+const PlanKindTool = "tool"
+const PlanKindAgent = "agent"
+
 type Plan struct {
-	Tool   string         `json:"tool"`
+	// Kind can be either "tool" or "agent"
+	Kind   string         `json:"kind"`
+	ID     string         `json:"id"`
 	Params map[string]any `json:"params"`
 }
 
