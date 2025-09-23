@@ -29,6 +29,20 @@ func PlanResult(plan []Plan) RuntimeEvent {
 	}
 }
 
+type AgentChoiceEvent struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+	Usage   Usage  `json:"usage"`
+}
+
+func (e *AgentChoiceEvent) isEvent() {}
+
+type AgentReasoningEvent struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+	Usage   Usage  `json:"usage"`
+}
+
 type ErrorEvent struct {
 	Type  string `json:"type"`
 	Error string `json:"error"`
