@@ -2,7 +2,6 @@ package clearcast
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 )
@@ -24,10 +23,35 @@ type runtime struct {
 	workspace     map[string]any
 }
 
-func NewRuntime() *runtime {
-	return &runtime{
+type RuntimeOption func(*runtime)
+
+func WithAgents(agents ...*Agent) RuntimeOption {
+	return func(r *runtime) {
+		for _, agent := range agents {
+			r.agents[agent.ID] = agent
+		}
+		slog.Debug("Agents added", "agents", r.agents)
+	}
+}
+
+func WithTools(tools ...*Tool) RuntimeOption {
+	return func(r *runtime) {
+		for _, tool := range tools {
+			r.tools[tool.ID] = tool
+		}
+	}
+}
+
+func NewRuntime(opts ...RuntimeOption) *runtime {
+	rt := &runtime{
+		agents:    make(map[string]*Agent),
+		tools:     make(map[string]*Tool),
 		workspace: make(map[string]any),
 	}
+	for _, opt := range opts {
+		opt(rt)
+	}
+	return rt
 }
 
 // runLoop is re-act style agent exxecution, it will recursively call itself untill the agent
@@ -48,12 +72,6 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 	// 		}
 	// 		// Sequential execution, start with current agent usually root
 	// }
-}
-
-func DecodeMessage[T any](msg any) (T, error) {
-	var data T
-	err := json.Unmarshal([]byte(msg.(string)), &data)
-	return data, err
 }
 
 // runPlan is a plan-orchestrate execution style agent execution, it will come up with a plan
@@ -98,6 +116,7 @@ func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, ses
 				Content: result.Content,
 				Usage:   result.Usage,
 			}
+			r.workspace[plan.ID] = result.Content
 		default:
 			slog.Debug("Unknown plan step", "agent", sess.RootAgentID, "step", plan)
 			eventsChan <- Final(fmt.Sprintf("Unknown plan step %s", plan))
@@ -112,7 +131,12 @@ func (r *runtime) RunStream(ctx context.Context, sess *Session) <-chan RuntimeEv
 	go func() {
 		defer close(eventsChan)
 		/// TODO: record telemetry session
-		agent := r.agents[sess.RootAgentID]
+		agent, ok := r.agents[sess.RootAgentID]
+		if !ok {
+			slog.Error("Agent not found", "agent", sess.RootAgentID)
+			eventsChan <- Error(fmt.Sprintf("Agent not found: %s", sess.RootAgentID))
+			return
+		}
 		if agent.mode == AgentModePlan {
 			r.runPlan(ctx, eventsChan, sess)
 		} else {

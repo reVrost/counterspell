@@ -131,3 +131,9 @@ func (p *OpenRouterProvider) ChatCompletionStream(ctx context.Context, req ChatC
 	// Map openrouter's streaming API into your chunk channel here.
 	return nil, fmt.Errorf("streaming not implemented yet")
 }
+
+func DecodeMessage[T any](msg ChatCompletionResponse) (T, error) {
+	var data T
+	err := json.Unmarshal([]byte(msg.Content), &data)
+	return data, err
+}
