@@ -133,8 +133,16 @@ func (t *Agent) render(ctx context.Context, values map[string]any) (string, erro
 	return rendered, nil
 }
 
+type StepOption func(*ChatCompletionRequest)
+
+func WithResponseFormat(format ResponseFormat) StepOption {
+	return func(req *ChatCompletionRequest) {
+		req.ResponseFormat = &format
+	}
+}
+
 // Non-streaming completion
-func (t *Agent) Step(ctx context.Context, args map[string]any) (RunResponse, error) {
+func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOption) (ChatCompletionResponse, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletion")
@@ -148,12 +156,16 @@ func (t *Agent) Step(ctx context.Context, args map[string]any) (RunResponse, err
 			span.RecordError(err)
 		}
 		t.logger.Error("Error rendering template for chat completion", "model", t.Model, "error", err)
-		return RunResponse{}, fmt.Errorf("error rendering template: %w", err)
+		return ChatCompletionResponse{}, fmt.Errorf("error rendering template: %w", err)
 	}
 
+	// TODO: add provide for JSON format (structured response)
 	req := ChatCompletionRequest{
 		Model:    t.Model,
 		Messages: []ChatMessage{SystemMessage(rendered)},
+	}
+	for _, opt := range opts {
+		opt(&req)
 	}
 
 	startTime := time.Now()
@@ -163,7 +175,7 @@ func (t *Agent) Step(ctx context.Context, args map[string]any) (RunResponse, err
 			span.RecordError(err)
 		}
 		t.logger.Error("Chat completion failed", "model", t.Model, "error", err)
-		return RunResponse{}, err
+		return ChatCompletionResponse{}, err
 	}
 
 	ttft := float64(time.Since(startTime).Nanoseconds()) / 1e6
@@ -180,7 +192,7 @@ func (t *Agent) Step(ctx context.Context, args map[string]any) (RunResponse, err
 }
 
 // Streaming completion
-func (t *Agent) StepStream(ctx context.Context, model string, args map[string]any) (<-chan RunChunk, error) {
+func (t *Agent) StepStream(ctx context.Context, model string, args map[string]any) (<-chan ChatCompletionChunk, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
@@ -216,7 +228,7 @@ func (t *Agent) StepStream(ctx context.Context, model string, args map[string]an
 		t.logger.Debug("Streaming chat completion started", keyvals...)
 	}
 
-	usageChan := make(chan RunChunk)
+	usageChan := make(chan ChatCompletionChunk)
 	go func() {
 		defer close(usageChan)
 		var totalUsage Usage

@@ -17,20 +17,17 @@ type Plan struct {
 }
 
 type PlanResultEvent struct {
-	Type string `json:"type"`
-	Plan []Plan `json:"plan"`
+	Plans []Plan `json:"plan"`
 }
 
 func (e *PlanResultEvent) isEvent() {}
 func PlanResult(plan []Plan) RuntimeEvent {
 	return &PlanResultEvent{
-		Type: "plan_result",
-		Plan: plan,
+		Plans: plan,
 	}
 }
 
 type AgentChoiceEvent struct {
-	Type    string `json:"type"`
 	Content string `json:"content"`
 	Usage   Usage  `json:"usage"`
 }
@@ -38,7 +35,6 @@ type AgentChoiceEvent struct {
 func (e *AgentChoiceEvent) isEvent() {}
 
 type AgentReasoningEvent struct {
-	Type    string `json:"type"`
 	Content string `json:"content"`
 	Usage   Usage  `json:"usage"`
 }
@@ -58,7 +54,6 @@ func Error(msg string) RuntimeEvent {
 }
 
 type ToolResultEvent struct {
-	Type  string `json:"type"`
 	Data  any    `json:"data"`
 	Error string `json:"error"`
 }
@@ -66,34 +61,29 @@ type ToolResultEvent struct {
 func (e *ToolResultEvent) isEvent() {}
 func ToolResult(data any, err error) RuntimeEvent {
 	return &ToolResultEvent{
-		Type:  "tool_result",
 		Data:  data,
 		Error: err.Error(),
 	}
 }
 
 type TransferAgentEvent struct {
-	Type    string `json:"type"`
 	AgentID string `json:"agent_id"`
 }
 
 func (e *TransferAgentEvent) isEvent() {}
 func TransferAgent(agentID string) RuntimeEvent {
 	return &TransferAgentEvent{
-		Type:    "transfer_agent",
 		AgentID: agentID,
 	}
 }
 
 type FinalEvent struct {
-	Type   string `json:"type"`
 	Output string `json:"output"`
 }
 
 func (e *FinalEvent) isEvent() {}
 func Final(output string) RuntimeEvent {
 	return &FinalEvent{
-		Type:   "final",
 		Output: output,
 	}
 }
