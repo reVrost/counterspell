@@ -81,13 +81,13 @@ func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, ses
 		Type: ResponseFormatTypeJSON,
 	}))
 	if err != nil {
-		slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
+		slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err, "content", planRes)
 		eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
 	}
 
 	plansEvent, err := DecodeMessage[*PlanResultEvent](planRes)
 	if err != nil {
-		slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
+		slog.Debug("Agent decode step error", "agent", sess.RootAgentID, "error", err, "content", planRes)
 		eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
 	}
 	eventsChan <- plansEvent
