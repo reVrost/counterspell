@@ -2,6 +2,7 @@ package clearcast
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 )
@@ -57,21 +58,86 @@ func NewRuntime(opts ...RuntimeOption) *runtime {
 // runLoop is re-act style agent exxecution, it will recursively call itself untill the agent
 // deemed the task is complete or if max iterations is reached
 func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
-	// 	for {
-	// 		if r.iterations >= r.maxIterations {
-	// 			slog.Debug("Maximum iterations reached", "agent", sess.RootAgentID)
-	// 			eventsChan <- Final(fmt.Sprintf("Maximums iterations reached, %d", r.maxIterations))
-	// 			return
-	// 		}
-	// 		r.iterations++
-	// 		// immediate exit if context cancelled e.g ctrl c
-	// 		if err := ctx.Err(); err != nil {
-	// 			slog.Debug("Runtime stream cancelled", "agent", sess.RootAgentID, "error", err)
-	// 			eventsChan <- Final(fmt.Sprintf("Runtime stream cancelled, %s", err))
-	// 			return
-	// 		}
-	// 		// Sequential execution, start with current agent usually root
-	// }
+	agent, ok := r.agents[sess.RootAgentID]
+	if !ok {
+		slog.Error("Agent not found", "agent", sess.RootAgentID)
+		eventsChan <- Error(fmt.Sprintf("Agent not found: %s", sess.RootAgentID))
+		return
+	}
+	for {
+		if r.iterations >= r.maxIterations {
+			slog.Debug("Maximum iterations reached", "agent", sess.RootAgentID)
+			eventsChan <- Final(fmt.Sprintf("Maximum iterations reached, %d", r.maxIterations))
+			return
+		}
+		r.iterations++
+		// immediate exit if context cancelled e.g ctrl c
+		if err := ctx.Err(); err != nil {
+			slog.Debug("Runtime stream cancelled", "agent", sess.RootAgentID, "error", err)
+			eventsChan <- Final(fmt.Sprintf("Runtime stream cancelled, %s", err))
+			return
+		}
+		// Agent takes a step
+		result, err := agent.Step(ctx, sess.ToMap())
+		if err != nil {
+			slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
+			eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
+			return
+		}
+
+		eventsChan <- &AgentChoiceEvent{
+			Content: result.Content,
+			Usage:   result.Usage,
+		}
+
+		var action struct {
+			Tool        string         `json:"tool"`
+			Params      map[string]any `json:"params"`
+			FinalAnswer string         `json:"final_answer"`
+		}
+
+		if err := json.Unmarshal([]byte(result.Content), &action); err != nil {
+			slog.Debug("Could not decode agent action, assuming it's a final answer", "error", err, "content", result.Content)
+			eventsChan <- Final(result.Content)
+			return
+		}
+
+		if action.FinalAnswer != "" {
+			eventsChan <- Final(action.FinalAnswer)
+			return
+		}
+
+		if action.Tool != "" {
+			tool, ok := r.tools[action.Tool]
+			if !ok {
+				errorMsg := fmt.Sprintf("Tool not found: %s", action.Tool)
+				slog.Debug(errorMsg)
+				sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
+				sess.Messages = append(sess.Messages, Message{Role: "tool", Content: fmt.Sprintf("Error: %s", errorMsg)})
+				continue
+			}
+
+			toolResult, err := tool.Execute(ctx, action.Params)
+			if err != nil {
+				errorMsg := fmt.Sprintf("Tool execution error: %s", err)
+				slog.Debug(errorMsg)
+				sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
+				sess.Messages = append(sess.Messages, Message{Role: "tool", Content: fmt.Sprintf("Error: %s", errorMsg)})
+				continue
+			}
+
+			sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
+
+			toolResultBytes, _ := json.Marshal(toolResult)
+			observation := string(toolResultBytes)
+
+			sess.Messages = append(sess.Messages, Message{Role: "tool", Content: observation})
+		} else {
+			// No tool, no final answer. What to do? Assume it's the final answer.
+			eventsChan <- Final(result.Content)
+			return
+		}
+	}
 }
 
 // runPlan is a plan-orchestrate execution style agent execution, it will come up with a plan
@@ -122,6 +188,7 @@ func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, ses
 			eventsChan <- Final(fmt.Sprintf("Unknown plan step %s", plan))
 		}
 	}
+	eventsChan <- Final(fmt.Sprintf("Agent %s finished", sess.RootAgentID))
 }
 
 func (r *runtime) RunStream(ctx context.Context, sess *Session) <-chan RuntimeEvent {
