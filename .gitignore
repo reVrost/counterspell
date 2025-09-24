@@ -2,6 +2,7 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 *.db
 debug.log
+.envrc
 
 node_modules
 # Binaries for programs and plugins
