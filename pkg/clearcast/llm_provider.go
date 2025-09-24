@@ -2,6 +2,7 @@ package clearcast
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/revrost/go-openrouter"
@@ -9,26 +10,47 @@ import (
 
 // LLMProvider defines the minimal interface for any chat LLM backend.
 type LLMProvider interface {
-	ChatCompletion(ctx context.Context, req ChatCompletionRequest) (RunResponse, error)
-	ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan RunChunk, error)
+	ChatCompletion(ctx context.Context, req ChatCompletionRequest) (ChatCompletionResponse, error)
+	ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan ChatCompletionChunk, error)
 }
 
 // ChatCompletionRequest is a provider-neutral request type.
 type ChatCompletionRequest struct {
-	Model    string
-	Messages []ChatMessage
-	Options  map[string]any // extensible for provider-specific options
+	Model          string
+	Messages       []ChatMessage
+	Options        map[string]any
+	ResponseFormat *ResponseFormat
 }
 
-// RunResponse represents a full completion result.
-type RunResponse struct {
+type ResponseFormatType string
+
+const (
+	ResponseFormatTypeJSON       = "json_object"
+	ResponseFormatTypeJSONSchema = "json_schema"
+	ResponseFormatTypeText       = "text"
+)
+
+type ResponseFormat struct {
+	Type       ResponseFormatType
+	JSONSchema *JSONSchema
+}
+
+type JSONSchema struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Schema      json.Marshaler `json:"schema"`
+	Strict      bool           `json:"strict"`
+}
+
+// ChatCompletionResponse represents a full completion result.
+type ChatCompletionResponse struct {
 	Content string
 	Raw     any // keep raw provider response if needed
 	Usage   Usage
 }
 
-// RunChunk is a streamed chunk of a completion.
-type RunChunk struct {
+// ChatCompletionChunk is a streamed chunk of a completion.
+type ChatCompletionChunk struct {
 	Delta string // partial text delta
 	Done  bool
 	Raw   any
@@ -66,7 +88,7 @@ func NewOpenRouterProvider(client *openrouter.Client) *OpenRouterProvider {
 	return &OpenRouterProvider{client: client}
 }
 
-func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (RunResponse, error) {
+func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (ChatCompletionResponse, error) {
 	messages := make([]openrouter.ChatCompletionMessage, len(req.Messages))
 	for i, msg := range req.Messages {
 		messages[i] = openrouter.ChatCompletionMessage{
@@ -80,18 +102,32 @@ func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatComplet
 		Messages: messages,
 	}
 
-	resp, err := p.client.CreateChatCompletion(ctx, orReq)
-	if err != nil {
-		return RunResponse{}, err
+	if req.ResponseFormat != nil {
+		orReq.ResponseFormat = &openrouter.ChatCompletionResponseFormat{
+			Type: openrouter.ChatCompletionResponseFormatType(req.ResponseFormat.Type),
+		}
+		if req.ResponseFormat.JSONSchema != nil {
+			orReq.ResponseFormat.JSONSchema = &openrouter.ChatCompletionResponseFormatJSONSchema{
+				Name:        req.ResponseFormat.JSONSchema.Name,
+				Description: req.ResponseFormat.JSONSchema.Description,
+				Schema:      req.ResponseFormat.JSONSchema.Schema,
+				Strict:      req.ResponseFormat.JSONSchema.Strict,
+			}
+		}
 	}
 
-	return RunResponse{
+	resp, err := p.client.CreateChatCompletion(ctx, orReq)
+	if err != nil {
+		return ChatCompletionResponse{}, err
+	}
+
+	return ChatCompletionResponse{
 		Content: resp.Choices[0].Message.Content.Text,
 		Raw:     resp,
 	}, nil
 }
 
-func (p *OpenRouterProvider) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan RunChunk, error) {
+func (p *OpenRouterProvider) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan ChatCompletionChunk, error) {
 	// Map openrouter's streaming API into your chunk channel here.
 	return nil, fmt.Errorf("streaming not implemented yet")
 }

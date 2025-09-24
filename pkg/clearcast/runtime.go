@@ -2,6 +2,7 @@ package clearcast
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 )
@@ -49,49 +50,57 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 	// }
 }
 
+func DecodeMessage[T any](msg any) (T, error) {
+	var data T
+	err := json.Unmarshal([]byte(msg.(string)), &data)
+	return data, err
+}
+
 // runPlan is a plan-orchestrate execution style agent execution, it will come up with a plan
 // and execute it in a single step
 func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
-	plan, err := r.agents[sess.RootAgentID].Step(ctx, sess.ToMap())
+	planRes, err := r.agents[sess.RootAgentID].Step(ctx, sess.ToMap(), WithResponseFormat(ResponseFormat{
+		Type: ResponseFormatTypeJSON,
+	}))
 	if err != nil {
 		slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
 		eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
 	}
 
-	// Convert run resposne to plan result event
-	planResult := PlanResultEvent{
-
-	planResult, ok := plan.(*PlanResultEvent)
-	if !ok {
-		// not a plan result event, we can't execute it
-		slog.Debug("Agent step not a plan result event", "agent", sess.RootAgentID, "plan", plan)
-		eventsChan <- Error(fmt.Sprintf("Agent step not a plan result event: %s", plan))
+	plansEvent, err := DecodeMessage[*PlanResultEvent](planRes)
+	if err != nil {
+		slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
+		eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
 	}
+	eventsChan <- plansEvent
 
-	for _, stepInPlan := range planResult.Plan {
+	for _, plan := range plansEvent.Plans {
 		// TODO: execute the plan
 		slog.Debug("Executing plan", "agent", sess.RootAgentID, "plan", plan)
-		switch stepInPlan.Kind {
+		switch plan.Kind {
 		case PlanKindTool:
-			result, err := r.tools[stepInPlan.ID].Execute(ctx, stepInPlan.Params)
+			result, err := r.tools[plan.ID].Execute(ctx, plan.Params)
 			if err != nil {
-				slog.Debug("Tool execution error", "tool", stepInPlan.ID, "error", err)
+				slog.Debug("Tool execution error", "tool", plan.ID, "error", err)
 				eventsChan <- Error(fmt.Sprintf("Tool execution error: %s", err.Error()))
 			}
 
 			// append result to the workspace
-			r.workspace[stepInPlan.ID] = result
+			r.workspace[plan.ID] = result
 		case PlanKindAgent:
-			result, err := r.agents[stepInPlan.ID].Step(ctx, sess.ToMap())
+			result, err := r.agents[plan.ID].Step(ctx, sess.ToMap())
 			if err != nil {
-				slog.Debug("Agent step error", "agent", stepInPlan.ID, "error", err)
+				slog.Debug("Agent step error", "agent", plan.ID, "error", err)
 				eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err.Error()))
 			}
 			// stream result chan to events chan delta
-			eventsChan <- result
+			eventsChan <- &AgentChoiceEvent{
+				Content: result.Content,
+				Usage:   result.Usage,
+			}
 		default:
-			slog.Debug("Unknown plan step", "agent", sess.RootAgentID, "step", stepInPlan)
-			eventsChan <- Final(fmt.Sprintf("Unknown plan step %s", stepInPlan))
+			slog.Debug("Unknown plan step", "agent", sess.RootAgentID, "step", plan)
+			eventsChan <- Final(fmt.Sprintf("Unknown plan step %s", plan))
 		}
 	}
 }
@@ -114,7 +123,7 @@ func (r *runtime) RunStream(ctx context.Context, sess *Session) <-chan RuntimeEv
 }
 
 func (r *runtime) Run(ctx context.Context, sess *Session) (string, error) {
-	eventsChan := r.RunStream(ctx, sess.RootAgentID, sess)
+	eventsChan := r.RunStream(ctx, sess)
 	for {
 		select {
 		case <-ctx.Done():
