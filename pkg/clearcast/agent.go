@@ -16,6 +16,26 @@ import (
 
 const AgentModePlan = "plan"
 const AgentModeLoop = "loop"
+const AgentModeSingle = "single"
+
+const planModePromptAddition = `
+	## OUTPUT FORMAT
+	kind: Either "agent" or "tool"
+	id: The ID of the agent or tool to execute
+	params: The parameters to pass to the agent or tool
+
+	## EXAMPLE
+		Your output must be a JSON object matching this schema:
+		{
+			"plan": [
+				{
+					"kind": "agent",
+					"id": "final_writer",
+					"params": {}
+				}
+			]
+		}
+`
 
 // DebugContextKey for context-based debug flag
 type DebugContextKey struct{}
@@ -67,6 +87,9 @@ func NewAgent(id, mode, model, template string,
 		tracer:     otel.Tracer("clearcast/prompt"),
 		enableOTEL: true,
 	}
+	if mode == "" {
+		p.mode = AgentModeSingle
+	}
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -94,25 +117,25 @@ func (t *Agent) debugLog(ctx context.Context, model string) []any {
 	return nil
 }
 
-func (t *Agent) render(ctx context.Context, values map[string]any) (string, error) {
+func (t *Agent) render(ctx context.Context, promptTemplate string, values map[string]any) (string, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.Render")
 		defer span.End()
 		span.SetAttributes(
-			attribute.String("template.content", t.Prompt),
+			attribute.String("template.content", promptTemplate),
 			attribute.Int("values.count", len(values)),
 		)
 	}
 
 	parsedTmpl, err := template.New("template").
 		Option("missingkey=error").
-		Parse(t.Prompt)
+		Parse(promptTemplate)
 	if err != nil {
 		if t.enableOTEL {
 			span.RecordError(err)
 		}
-		t.logger.Error("Failed to parse template", "template", t.Prompt, "error", err)
+		t.logger.Error("Failed to parse template", "template", promptTemplate, "error", err)
 		return "", err
 	}
 
@@ -150,7 +173,12 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 		span.SetAttributes(attribute.String("model", t.Model))
 	}
 
-	rendered, err := t.render(ctx, args)
+	prompt := t.Prompt
+	if t.mode == AgentModePlan {
+		prompt += planModePromptAddition
+	}
+
+	rendered, err := t.render(ctx, prompt, args)
 	if err != nil {
 		if t.enableOTEL {
 			span.RecordError(err)
@@ -200,7 +228,12 @@ func (t *Agent) StepStream(ctx context.Context, model string, args map[string]an
 		span.SetAttributes(attribute.String("model", model))
 	}
 
-	rendered, err := t.render(ctx, args)
+	prompt := t.Prompt
+	if t.mode == AgentModePlan {
+		prompt += planModePromptAddition
+	}
+
+	rendered, err := t.render(ctx, prompt, args)
 	if err != nil {
 		if t.enableOTEL {
 			span.RecordError(err)
