@@ -19,9 +19,28 @@ type Runtime interface {
 type runtime struct {
 	maxIterations int
 	iterations    int
-	agents        map[string]*Agent
-	tools         map[string]*Tool
+	agents        Agents
+	tools         Tools
 	workspace     map[string]any
+}
+
+type Tools map[string]*Tool
+type Agents map[string]*Agent
+
+func (a Agents) Step(ctx context.Context, agentID string, sess *Session, opts ...StepOption) (ChatCompletionResponse, error) {
+	agent, ok := a[agentID]
+	if !ok {
+		return ChatCompletionResponse{}, fmt.Errorf("agent not found: %s", agentID)
+	}
+	return agent.Step(ctx, sess.ToMap(), opts...)
+}
+
+func (t Tools) Execute(ctx context.Context, toolID string, params map[string]any) (any, error) {
+	tool, ok := t[toolID]
+	if !ok {
+		return ChatCompletionResponse{}, fmt.Errorf("tool not found: %s", toolID)
+	}
+	return tool.Execute(ctx, params)
 }
 
 type RuntimeOption func(*runtime)
@@ -58,12 +77,6 @@ func NewRuntime(opts ...RuntimeOption) *runtime {
 // runLoop is re-act style agent exxecution, it will recursively call itself untill the agent
 // deemed the task is complete or if max iterations is reached
 func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
-	agent, ok := r.agents[sess.RootAgentID]
-	if !ok {
-		slog.Error("Agent not found", "agent", sess.RootAgentID)
-		eventsChan <- Error(fmt.Sprintf("Agent not found: %s", sess.RootAgentID))
-		return
-	}
 	for {
 		if r.iterations >= r.maxIterations {
 			slog.Debug("Maximum iterations reached", "agent", sess.RootAgentID)
@@ -78,7 +91,7 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 			return
 		}
 		// Agent takes a step
-		result, err := agent.Step(ctx, sess.ToMap())
+		result, err := r.agents.Step(ctx, sess.RootAgentID, sess)
 		if err != nil {
 			slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
 			eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
@@ -143,7 +156,7 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 // runPlan is a plan-orchestrate execution style agent execution, it will come up with a plan
 // and execute it in a single step
 func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
-	planRes, err := r.agents[sess.RootAgentID].Step(ctx, sess.ToMap(), WithResponseFormat(ResponseFormat{
+	planRes, err := r.agents.Step(ctx, sess.RootAgentID, sess, WithResponseFormat(ResponseFormat{
 		Type: ResponseFormatTypeJSON,
 	}))
 	if err != nil {
@@ -163,7 +176,7 @@ func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, ses
 		slog.Debug("Executing plan", "agent", sess.RootAgentID, "plan", plan)
 		switch plan.Kind {
 		case PlanKindTool:
-			result, err := r.tools[plan.ID].Execute(ctx, plan.Params)
+			result, err := r.tools.Execute(ctx, plan.ID, plan.Params)
 			if err != nil {
 				slog.Debug("Tool execution error", "tool", plan.ID, "error", err)
 				eventsChan <- Error(fmt.Sprintf("Tool execution error: %s", err.Error()))
@@ -172,7 +185,7 @@ func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, ses
 			// append result to the workspace
 			r.workspace[plan.ID] = result
 		case PlanKindAgent:
-			result, err := r.agents[plan.ID].Step(ctx, sess.ToMap())
+			result, err := r.agents.Step(ctx, plan.ID, sess)
 			if err != nil {
 				slog.Debug("Agent step error", "agent", plan.ID, "error", err)
 				eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err.Error()))
