@@ -7,7 +7,6 @@ linters:
   # Start simple: only "critical" or high signal linters
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
