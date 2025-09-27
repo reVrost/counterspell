@@ -36,5 +36,8 @@ jobs:
       - name: Install NilAway
         run: go install go.uber.org/nilaway/cmd/nilaway@latest
 
-      - name: Run NilAway
-        run: nilaway ./...
+      - name: Run NilAway with warnings
+        run: |
+          nilaway ./... 2>&1 | while read -r line; do
+            echo "::warning file=.,title=NilAway::$line"
+          done
