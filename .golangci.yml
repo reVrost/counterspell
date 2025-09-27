@@ -3,7 +3,7 @@ run:
   tests: false
 
 linters:
-  default: fast
+  default: standard
   # Start simple: only "critical" or high signal linters
   enable:
     - errcheck
@@ -11,3 +11,13 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+
+  disable:
+    - depguard
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*net/http.Response).Body.Close
+        - (*database/sql.DB).Close
+        - (io.ReadCloser).Close
