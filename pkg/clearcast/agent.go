@@ -220,12 +220,12 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 }
 
 // Streaming completion
-func (t *Agent) StepStream(ctx context.Context, model string, args map[string]any) (<-chan ChatCompletionChunk, error) {
+func (t *Agent) StepStream(ctx context.Context, args map[string]any) (<-chan ChatCompletionChunk, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
 		defer span.End()
-		span.SetAttributes(attribute.String("model", model))
+		span.SetAttributes(attribute.String("model", t.Model))
 	}
 
 	prompt := t.Prompt
@@ -238,12 +238,12 @@ func (t *Agent) StepStream(ctx context.Context, model string, args map[string]an
 		if t.enableOTEL {
 			span.RecordError(err)
 		}
-		t.logger.Error("Error rendering template for streaming chat completion", "model", model, "error", err)
+		t.logger.Error("Error rendering template for streaming chat completion", "model", t.Model, "error", err)
 		return nil, fmt.Errorf("error rendering template: %w", err)
 	}
 
 	req := ChatCompletionRequest{
-		Model:    model,
+		Model:    t.Model,
 		Messages: []ChatMessage{SystemMessage(rendered)},
 	}
 
@@ -253,11 +253,11 @@ func (t *Agent) StepStream(ctx context.Context, model string, args map[string]an
 		if t.enableOTEL {
 			span.RecordError(err)
 		}
-		t.logger.Error("Streaming chat completion failed", "model", model, "error", err)
+		t.logger.Error("Streaming chat completion failed", "model", t.Model, "error", err)
 		return nil, err
 	}
 
-	if keyvals := t.debugLog(ctx, model); keyvals != nil {
+	if keyvals := t.debugLog(ctx, t.Model); keyvals != nil {
 		t.logger.Debug("Streaming chat completion started", keyvals...)
 	}
 
@@ -272,7 +272,7 @@ func (t *Agent) StepStream(ctx context.Context, model string, args map[string]an
 				if t.enableOTEL {
 					span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
 				}
-				if keyvals := t.debugLog(ctx, model); keyvals != nil {
+				if keyvals := t.debugLog(ctx, t.Model); keyvals != nil {
 					t.logger.Debug("First chunk received for streaming chat completion", append(keyvals, "ttft_ms", ttft)...)
 				}
 				firstChunkReceived = true
@@ -291,7 +291,7 @@ func (t *Agent) StepStream(ctx context.Context, model string, args map[string]an
 		if t.enableOTEL {
 			t.recordUsageAttributes(span, totalUsage)
 		}
-		if keyvals := t.debugLog(ctx, model); keyvals != nil {
+		if keyvals := t.debugLog(ctx, t.Model); keyvals != nil {
 			t.logger.Debug("Streaming chat completion completed", append(keyvals, "usage", totalUsage)...)
 		}
 	}()

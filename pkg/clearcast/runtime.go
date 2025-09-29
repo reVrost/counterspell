@@ -35,6 +35,14 @@ func (a Agents) Step(ctx context.Context, agentID string, sess *Session, opts ..
 	return agent.Step(ctx, sess.ToMap(), opts...)
 }
 
+func (a Agents) StepStream(ctx context.Context, agentID string, sess *Session, opts ...StepOption) (<-chan ChatCompletionChunk, error) {
+	agent, ok := a[agentID]
+	if !ok {
+		return nil, fmt.Errorf("agent not found: %s", agentID)
+	}
+	return agent.StepStream(ctx, sess.ToMap(), opts...)
+}
+
 func (t Tools) Execute(ctx context.Context, toolID string, params map[string]any) (any, error) {
 	tool, ok := t[toolID]
 	if !ok {

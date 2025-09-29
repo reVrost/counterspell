@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/revrost/go-openrouter"
+	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 
 	"github.com/revrost/counterspell/pkg/clearcast"
@@ -111,31 +111,27 @@ func EnableDebug() {
 	slog.SetDefault(slog.New(handler))
 }
 
-// main is the entry point for the CLI application.
-// It takes a YAML file as input, initializes and runs a clearcast agent.
-func main() {
-	EnableDebug()
-	flag.Parse()
-	yamlFile := flag.Arg(0)
+func runCommand(ctx context.Context, cmd *cli.Command) error {
+	yamlFile := cmd.Args().First()
 	if yamlFile == "" {
-		log.Fatal("Usage: cspell run <yaml_file>")
+		return fmt.Errorf("Usage: cspell run <yaml_file>")
 	}
 
 	data, err := os.ReadFile(yamlFile)
 	if err != nil {
-		log.Fatalf("Failed to read file '%s': %v", yamlFile, err)
+		return fmt.Errorf("failed to read file '%s': %w", yamlFile, err)
 	}
 
 	var config OrchestrationFile
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		log.Fatalf("Failed to unmarshal YAML: %v", err)
+		return fmt.Errorf("failed to unmarshal YAML: %w", err)
 	}
 	b, _ := json.MarshalIndent(config, "", "\t")
 	fmt.Printf("config :\n %s\n", string(b))
 
 	apiKey := os.Getenv("OPENROUTER_API_KEY")
 	if apiKey == "" {
-		log.Fatal("OPENROUTER_API_KEY environment variable not set")
+		return fmt.Errorf("OPENROUTER_API_KEY environment variable not set")
 	}
 	orClient := openrouter.NewClient(apiKey)
 	llmProvider := clearcast.NewOpenRouterProvider(orClient)
@@ -161,7 +157,6 @@ func main() {
 		MaxIterations: 10, // Default max iterations
 	}
 
-	ctx := context.Background()
 	eventsChan := rt.RunStream(ctx, sess)
 
 	for event := range eventsChan {
@@ -175,7 +170,7 @@ func main() {
 			fmt.Println("\n=== Agent Output ===")
 			fmt.Println(e.Content)
 		case *clearcast.ErrorEvent:
-			log.Fatalf("Runtime Error: %s", e.Error)
+			return fmt.Errorf("runtime Error: %w", e.Error)
 		case *clearcast.FinalEvent:
 			fmt.Println("\n=== Execution Finished ===")
 			fmt.Println(e.Output)
@@ -183,5 +178,27 @@ func main() {
 			// Optionally log unhandled event types
 			// log.Printf("Received unhandled event type: %T\n", e)
 		}
+	}
+	return nil
+}
+
+// main is the entry point for the CLI application.
+// It takes a YAML file as input, initializes and runs a clearcast agent.
+func main() {
+	EnableDebug()
+	cmd := &cli.Command{
+		Name:  "cspell",
+		Usage: "A CLI for running agents",
+		Commands: []*cli.Command{
+			{
+				Name:   "run",
+				Usage:  "run an agent from a yaml file",
+				Action: runCommand,
+			},
+		},
+	}
+
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		log.Fatal(err)
 	}
 }
