@@ -220,7 +220,7 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 }
 
 // Streaming completion
-func (t *Agent) StepStream(ctx context.Context, args map[string]any) (<-chan ChatCompletionChunk, error) {
+func (t *Agent) StepStream(ctx context.Context, args map[string]any, opts ...StepOption) (<-chan ChatCompletionChunk, error) {
 	var span trace.Span
 	if t.enableOTEL {
 		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
@@ -245,6 +245,9 @@ func (t *Agent) StepStream(ctx context.Context, args map[string]any) (<-chan Cha
 	req := ChatCompletionRequest{
 		Model:    t.Model,
 		Messages: []ChatMessage{SystemMessage(rendered)},
+	}
+	for _, opt := range opts {
+		opt(&req)
 	}
 
 	startTime := time.Now()
