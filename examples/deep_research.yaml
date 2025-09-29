@@ -1,0 +1,24 @@
+agents:
+  - id: "researcher"
+    mode: "loop"
+    model: "google/gemini-2.0-flash-lite-001"
+    prompt: |
+      You are a research assistant.
+      Your mission is to: {{.mission}}.
+      You have access to a web search tool.
+      To use the tool, you must output a JSON object with the following schema:
+      {
+        "tool": "serper.dev",
+        "params": {
+          "query": "<your search query>"
+        }
+      }
+      After you have gathered enough information, provide a final answer by outputting a JSON object with the schema:
+      {
+        "final_answer": "<your comprehensive answer>"
+      }
+      Start by thinking about what you need to research. Your first step should be to use the search tool.
+
+session:
+  root_agent_id: "researcher"
+  mission: "What are the latest advancements in AI-powered code generation?"
