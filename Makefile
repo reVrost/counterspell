@@ -27,6 +27,9 @@ migrate: ## Run database migrations
 test: generate ## Run all tests
 	go test -v ./...
 
+build: 
+	go build -o cspell ./cmd/cspell/main.go
+
 # Cleanup
 clean: ## Clean build artifacts and database
 	rm -rf bin/ counterspell.db coverage.out *.log 
