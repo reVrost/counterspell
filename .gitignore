@@ -3,8 +3,6 @@
 *.db
 debug.log
 .envrc
-cspell
-counterspell
 
 node_modules
 # Binaries for programs and plugins
