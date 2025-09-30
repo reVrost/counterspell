@@ -138,7 +138,7 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 		cleanContent := stripMarkdownCodeBlock(result.Content)
 
 		if err := json.Unmarshal([]byte(cleanContent), &action); err != nil {
-			slog.Debug("Could not decode agent action, assuming it's a final answer", "error", err, "content", result.Content, "cleaned", cleanContent)
+			slog.Debug("Could not decode agent action, assuming it's a final answer", "error", err, "content", result.Content, "cleaned", cleanContent, "result", result)
 			eventsChan <- Final(result.Content)
 			return
 		}
@@ -163,7 +163,7 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 				errorMsg := fmt.Sprintf("Tool execution error: %s", err)
 				slog.Debug(errorMsg)
 				sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
-				sess.Messages = append(sess.Messages, Message{Role: "tool", Content: fmt.Sprintf("Error: %s", errorMsg)})
+				sess.Messages = append(sess.Messages, Message{Role: "tool_call", Content: fmt.Sprintf("Error: %s", errorMsg)})
 				continue
 			}
 
@@ -172,7 +172,7 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 			toolResultBytes, _ := json.Marshal(toolResult)
 			observation := string(toolResultBytes)
 
-			sess.Messages = append(sess.Messages, Message{Role: "tool", Content: observation})
+			sess.Messages = append(sess.Messages, Message{Role: "tool_call", Content: observation})
 		} else {
 			// No tool, no final answer. What to do? Assume it's the final answer.
 			eventsChan <- Final(result.Content)
