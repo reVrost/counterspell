@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/revrost/go-openrouter"
 )
@@ -89,6 +90,7 @@ func NewOpenRouterProvider(client *openrouter.Client) *OpenRouterProvider {
 }
 
 func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (ChatCompletionResponse, error) {
+	slog.Debug("calling OpenRouter provider with request", "request", req)
 	messages := make([]openrouter.ChatCompletionMessage, len(req.Messages))
 	for i, msg := range req.Messages {
 		messages[i] = openrouter.ChatCompletionMessage{

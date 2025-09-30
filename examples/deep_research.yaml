@@ -1,7 +1,7 @@
 agents:
   - id: "researcher"
     mode: "loop"
-    model: "google/gemini-2.5-flash"
+    model: "qwen/qwen3-next-80b-a3b-instruct"
     prompt: |
       You are a research assistant specializing in technology and business analysis.
 
