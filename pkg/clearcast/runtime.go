@@ -62,6 +62,19 @@ func WithAgents(agents ...*Agent) RuntimeOption {
 	}
 }
 
+func WithDefaultTools(IDs ...string) RuntimeOption {
+	defaultToolsMap := map[string]*Tool{
+		"serper_dev": SerperDevTool(),
+	}
+	return func(r *runtime) {
+		for _, ID := range IDs {
+			if _, ok := defaultToolsMap[ID]; !ok {
+				r.tools[ID] = defaultToolsMap[ID]
+			}
+		}
+	}
+}
+
 func WithTools(tools ...*Tool) RuntimeOption {
 	return func(r *runtime) {
 		for _, tool := range tools {
