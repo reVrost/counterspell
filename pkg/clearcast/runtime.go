@@ -5,9 +5,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 )
 
 type EventKind string
+
+// stripMarkdownCodeBlock removes markdown code block formatting from JSON responses
+// LLMs often wrap JSON in ```json ... ``` blocks
+func stripMarkdownCodeBlock(content string) string {
+	content = strings.TrimSpace(content)
+
+	// Remove ```json ... ``` blocks
+	if strings.HasPrefix(content, "```json") {
+		content = strings.TrimPrefix(content, "```json")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+	} else if strings.HasPrefix(content, "```") {
+		// Remove generic ``` ... ``` blocks
+		content = strings.TrimPrefix(content, "```")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+	}
+
+	return content
+}
 
 // Runtime is an execution environment that can run tasks (agents or plain functions)
 type Runtime interface {
@@ -20,7 +41,6 @@ type runtime struct {
 	maxIterations int
 	iterations    int
 	agents        Agents
-	tools         Tools
 	workspace     map[string]any
 }
 
@@ -32,6 +52,7 @@ func (a Agents) Step(ctx context.Context, agentID string, sess *Session, opts ..
 	if !ok {
 		return ChatCompletionResponse{}, fmt.Errorf("agent not found: %s", agentID)
 	}
+
 	return agent.Step(ctx, sess.ToMap(), opts...)
 }
 
@@ -62,31 +83,9 @@ func WithAgents(agents ...*Agent) RuntimeOption {
 	}
 }
 
-func WithDefaultTools(IDs ...string) RuntimeOption {
-	defaultToolsMap := map[string]*Tool{
-		"serper_dev": SerperDevTool(),
-	}
-	return func(r *runtime) {
-		for _, ID := range IDs {
-			if _, ok := defaultToolsMap[ID]; !ok {
-				r.tools[ID] = defaultToolsMap[ID]
-			}
-		}
-	}
-}
-
-func WithTools(tools ...*Tool) RuntimeOption {
-	return func(r *runtime) {
-		for _, tool := range tools {
-			r.tools[tool.ID] = tool
-		}
-	}
-}
-
 func NewRuntime(opts ...RuntimeOption) *runtime {
 	rt := &runtime{
 		agents:    make(map[string]*Agent),
-		tools:     make(map[string]*Tool),
 		workspace: make(map[string]any),
 	}
 	for _, opt := range opts {
@@ -98,10 +97,15 @@ func NewRuntime(opts ...RuntimeOption) *runtime {
 // runLoop is re-act style agent exxecution, it will recursively call itself untill the agent
 // deemed the task is complete or if max iterations is reached
 func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
+	maxIterations := sess.MaxIterations
+	if maxIterations == 0 {
+		maxIterations = 10 // Default
+	}
+
 	for {
-		if r.iterations >= r.maxIterations {
+		if r.iterations >= maxIterations {
 			slog.Debug("Maximum iterations reached", "agent", sess.RootAgentID)
-			eventsChan <- Final(fmt.Sprintf("Maximum iterations reached, %d", r.maxIterations))
+			eventsChan <- Final(fmt.Sprintf("Maximum iterations reached, %d", maxIterations))
 			return
 		}
 		r.iterations++
@@ -130,8 +134,11 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 			FinalAnswer string         `json:"final_answer"`
 		}
 
-		if err := json.Unmarshal([]byte(result.Content), &action); err != nil {
-			slog.Debug("Could not decode agent action, assuming it's a final answer", "error", err, "content", result.Content)
+		// Strip markdown code blocks before parsing JSON
+		cleanContent := stripMarkdownCodeBlock(result.Content)
+
+		if err := json.Unmarshal([]byte(cleanContent), &action); err != nil {
+			slog.Debug("Could not decode agent action, assuming it's a final answer", "error", err, "content", result.Content, "cleaned", cleanContent)
 			eventsChan <- Final(result.Content)
 			return
 		}
@@ -142,16 +149,16 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 		}
 
 		if action.Tool != "" {
-			tool, ok := r.tools[action.Tool]
+			// Get the agent to execute the tool
+			agent, ok := r.agents[sess.RootAgentID]
 			if !ok {
-				errorMsg := fmt.Sprintf("Tool not found: %s", action.Tool)
+				errorMsg := fmt.Sprintf("Agent not found: %s", sess.RootAgentID)
 				slog.Debug(errorMsg)
-				sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
-				sess.Messages = append(sess.Messages, Message{Role: "tool", Content: fmt.Sprintf("Error: %s", errorMsg)})
-				continue
+				eventsChan <- Error(errorMsg)
+				return
 			}
 
-			toolResult, err := tool.Execute(ctx, action.Params)
+			toolResult, err := agent.ExecuteTool(ctx, action.Tool, action.Params)
 			if err != nil {
 				errorMsg := fmt.Sprintf("Tool execution error: %s", err)
 				slog.Debug(errorMsg)
@@ -192,12 +199,19 @@ func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, ses
 	}
 	eventsChan <- plansEvent
 
+	// Get the planner agent for tool execution
+	plannerAgent, ok := r.agents[sess.RootAgentID]
+	if !ok {
+		eventsChan <- Error(fmt.Sprintf("Planner agent not found: %s", sess.RootAgentID))
+		return
+	}
+
 	for _, plan := range plansEvent.Plans {
 		// TODO: execute the plan
 		slog.Debug("Executing plan", "agent", sess.RootAgentID, "plan", plan)
 		switch plan.Kind {
 		case PlanKindTool:
-			result, err := r.tools.Execute(ctx, plan.ID, plan.Params)
+			result, err := plannerAgent.ExecuteTool(ctx, plan.ID, plan.Params)
 			if err != nil {
 				slog.Debug("Tool execution error", "tool", plan.ID, "error", err)
 				eventsChan <- Error(fmt.Sprintf("Tool execution error: %s", err.Error()))

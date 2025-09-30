@@ -37,6 +37,39 @@ const planModePromptAddition = `
 		}
 `
 
+const loopModePromptAddition = `
+
+## AVAILABLE TOOLS
+{{range .tools}}
+- **{{.id}}**: {{.description}}
+{{end}}
+
+## TOOL USAGE INSTRUCTIONS
+You can use the available tools to gather information and accomplish your task. Follow these steps:
+
+1. **To use a tool**, respond with ONLY a JSON object (no markdown, no code blocks):
+   {
+     "tool": "exact_tool_id_from_above",
+     "params": {"param_name": "param_value"}
+   }
+   
+   **IMPORTANT**: Use the EXACT tool ID as listed above (e.g., "serper_dev", NOT "search" or any other name)
+
+2. **When you have completed your task**, respond with ONLY a JSON object:
+   {
+     "final_answer": "your comprehensive answer here"
+   }
+
+**Critical Requirements:**
+- Respond with PLAIN JSON only - do NOT wrap in markdown code blocks (no ` + "```" + `)
+- Each response must be a single valid JSON object
+- Use the EXACT tool IDs as listed in "AVAILABLE TOOLS" above
+- For web search, use tool ID: "serper_dev" with params: {"query": "your search query"}
+- Use tools iteratively to gather information
+- Provide a final_answer only when you have sufficient information
+- Be thorough in your research before concluding
+`
+
 // DebugContextKey for context-based debug flag
 type DebugContextKey struct{}
 
@@ -62,30 +95,76 @@ func WithOTEL(enabled bool) AgentOption {
 	}
 }
 
+func WithDefaultTools(IDs ...string) AgentOption {
+	defaultToolsMap := map[string]*Tool{
+		"serper_dev": SerperDevTool(),
+	}
+	return func(r *Agent) {
+		for _, ID := range IDs {
+			if tool, ok := defaultToolsMap[ID]; ok {
+				r.tools[ID] = tool
+			}
+		}
+	}
+}
+
+func WithTools(tools ...*Tool) AgentOption {
+	return func(r *Agent) {
+		for _, tool := range tools {
+			r.tools[tool.ID] = tool
+		}
+	}
+}
+
+// WithAutoToolInstructions controls whether to auto-add tool instructions for loop mode
+func WithAutoToolInstructions(enabled bool) AgentOption {
+	return func(p *Agent) {
+		p.autoToolInstructions = enabled
+	}
+}
+
+// ExecuteTool executes a tool by ID with the given parameters
+func (a *Agent) ExecuteTool(ctx context.Context, toolID string, params map[string]any) (any, error) {
+	tool, ok := a.tools[toolID]
+	if !ok {
+		return nil, fmt.Errorf("tool not found: %s", toolID)
+	}
+	return tool.Execute(ctx, params)
+}
+
+// GetTools returns the agent's tools
+func (a *Agent) GetTools() Tools {
+	return a.tools
+}
+
 // Agent struct with slog and OTEL toggle
 type Agent struct {
-	ID         string
-	Model      string
-	Prompt     string
-	mode       string
-	llm        LLMProvider
-	logger     *slog.Logger
-	tracer     trace.Tracer
-	enableOTEL bool
+	ID                   string
+	Model                string
+	Prompt               string
+	mode                 string
+	autoToolInstructions bool // Auto-add tool instructions for loop mode
+	llm                  LLMProvider
+	logger               *slog.Logger
+	tracer               trace.Tracer
+	enableOTEL           bool
+	tools                Tools
 }
 
 // NewAgent creates a new Prompt with slog (JSON handler) and OTEL enabled by default
 func NewAgent(id, mode, model, template string,
 	llm LLMProvider, opts ...AgentOption) *Agent {
 	p := &Agent{
-		ID:         id,
-		Model:      model,
-		mode:       mode,
-		Prompt:     template,
-		llm:        llm,
-		logger:     slog.New(slog.NewJSONHandler(os.Stdout, nil)),
-		tracer:     otel.Tracer("clearcast/prompt"),
-		enableOTEL: true,
+		ID:                   id,
+		Model:                model,
+		mode:                 mode,
+		Prompt:               template,
+		autoToolInstructions: true, // Default: auto-add tool instructions
+		llm:                  llm,
+		logger:               slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+		tracer:               otel.Tracer("clearcast/prompt"),
+		enableOTEL:           true,
+		tools:                make(Tools),
 	}
 	if mode == "" {
 		p.mode = AgentModeSingle
@@ -176,6 +255,8 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 	prompt := t.Prompt
 	if t.mode == AgentModePlan {
 		prompt += planModePromptAddition
+	} else if t.mode == AgentModeLoop && t.autoToolInstructions {
+		prompt += loopModePromptAddition
 	}
 
 	rendered, err := t.render(ctx, prompt, args)
@@ -187,10 +268,34 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 		return ChatCompletionResponse{}, fmt.Errorf("error rendering template: %w", err)
 	}
 
-	// TODO: add provide for JSON format (structured response)
+	// Build messages: start with system prompt, then add session messages
+	messages := []ChatMessage{SystemMessage(rendered)}
+
+	// Add session messages if available in args
+	if sessionMessages, ok := args["messages"].([]Message); ok {
+		for _, msg := range sessionMessages {
+			messages = append(messages, ChatMessage{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		}
+	}
+
+	// Add tools information to session for loop mode agents
+	if len(t.tools) > 0 {
+		toolsList := make([]map[string]string, 0, len(t.tools))
+		for _, tool := range t.tools {
+			toolsList = append(toolsList, map[string]string{
+				"id":          tool.ID,
+				"description": tool.Description,
+			})
+		}
+		args["tools"] = toolsList
+	}
+
 	req := ChatCompletionRequest{
 		Model:    t.Model,
-		Messages: []ChatMessage{SystemMessage(rendered)},
+		Messages: messages,
 	}
 	for _, opt := range opts {
 		opt(&req)
@@ -231,6 +336,8 @@ func (t *Agent) StepStream(ctx context.Context, args map[string]any, opts ...Ste
 	prompt := t.Prompt
 	if t.mode == AgentModePlan {
 		prompt += planModePromptAddition
+	} else if t.mode == AgentModeLoop && t.autoToolInstructions {
+		prompt += loopModePromptAddition
 	}
 
 	rendered, err := t.render(ctx, prompt, args)
@@ -242,9 +349,34 @@ func (t *Agent) StepStream(ctx context.Context, args map[string]any, opts ...Ste
 		return nil, fmt.Errorf("error rendering template: %w", err)
 	}
 
+	// Build messages: start with system prompt, then add session messages
+	messages := []ChatMessage{SystemMessage(rendered)}
+
+	// Add session messages if available in args
+	if sessionMessages, ok := args["messages"].([]Message); ok {
+		for _, msg := range sessionMessages {
+			messages = append(messages, ChatMessage{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		}
+	}
+
+	// Add tools information to session for loop mode agents
+	if len(t.tools) > 0 {
+		toolsList := make([]map[string]string, 0, len(t.tools))
+		for _, tool := range t.tools {
+			toolsList = append(toolsList, map[string]string{
+				"id":          tool.ID,
+				"description": tool.Description,
+			})
+		}
+		args["tools"] = toolsList
+	}
+
 	req := ChatCompletionRequest{
 		Model:    t.Model,
-		Messages: []ChatMessage{SystemMessage(rendered)},
+		Messages: messages,
 	}
 	for _, opt := range opts {
 		opt(&req)

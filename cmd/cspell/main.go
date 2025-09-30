@@ -19,10 +19,12 @@ import (
 
 // AgentDef defines the structure for an agent in the YAML configuration.
 type AgentDef struct {
-	ID     string `yaml:"id"`
-	Mode   string `yaml:"mode"`
-	Model  string `yaml:"model"`
-	Prompt string `yaml:"prompt"`
+	ID                   string    `yaml:"id"`
+	Mode                 string    `yaml:"mode"`
+	Model                string    `yaml:"model"`
+	Prompt               string    `yaml:"prompt"`
+	AutoToolInstructions *bool     `yaml:"auto_tool_instructions,omitempty"` // nil = default (true), false = disable
+	Tools                []ToolDef `yaml:"tools,omitempty"`                  // Tools specific to this agent
 }
 
 type ToolDef struct {
@@ -31,14 +33,14 @@ type ToolDef struct {
 
 // SessionDef defines the structure for the session in the YAML configuration.
 type SessionDef struct {
-	RootAgentID string `yaml:"root_agent_id"`
-	Mission     string `yaml:"mission"`
+	RootAgentID string         `yaml:"root_agent_id"`
+	Mission     string         `yaml:"mission"`
+	Extra       map[string]any `yaml:",inline"` // Captures all other fields like topic, etc.
 }
 
 // OrchestrationFile defines the top-level structure of the YAML file.
 type OrchestrationFile struct {
 	Agents  []AgentDef `yaml:"agents"`
-	Tools   []ToolDef  `yaml:"tools"`
 	Session SessionDef `yaml:"session"`
 }
 
@@ -80,24 +82,38 @@ func runCommand(ctx context.Context, cmd *cli.Command) error {
 
 	agents := make([]*clearcast.Agent, 0, len(config.Agents))
 	for _, agentDef := range config.Agents {
-		agent := clearcast.NewAgent(agentDef.ID, agentDef.Mode, agentDef.Model, agentDef.Prompt, llmProvider)
-		agents = append(agents, agent)
-	}
+		opts := []clearcast.AgentOption{}
+		if agentDef.AutoToolInstructions != nil {
+			opts = append(opts, clearcast.WithAutoToolInstructions(*agentDef.AutoToolInstructions))
+		}
 
-	defaultTools := make([]string, 0, len(config.Tools))
-	for _, toolDef := range config.Tools {
-		defaultTools = append(defaultTools, toolDef.ID)
+		// Add tools to agent
+		if len(agentDef.Tools) > 0 {
+			toolIDs := make([]string, 0, len(agentDef.Tools))
+			for _, toolDef := range agentDef.Tools {
+				toolIDs = append(toolIDs, toolDef.ID)
+			}
+			opts = append(opts, clearcast.WithDefaultTools(toolIDs...))
+		}
+
+		agent := clearcast.NewAgent(agentDef.ID, agentDef.Mode, agentDef.Model, agentDef.Prompt, llmProvider, opts...)
+		agents = append(agents, agent)
 	}
 
 	rt := clearcast.NewRuntime(
 		clearcast.WithAgents(agents...),
-		clearcast.WithDefaultTools(defaultTools...),
 	)
+
+	// Initialize workspace with session extra fields (like topic)
+	workspace := make(map[string]any)
+	for k, v := range config.Session.Extra {
+		workspace[k] = v
+	}
 
 	sess := &clearcast.Session{
 		RootAgentID:   config.Session.RootAgentID,
 		Mission:       config.Session.Mission,
-		Workspace:     make(map[string]any),
+		Workspace:     workspace,
 		Memory:        make(map[string]any),
 		Messages:      []clearcast.Message{},
 		CreatedAt:     time.Now(),
@@ -117,7 +133,7 @@ func runCommand(ctx context.Context, cmd *cli.Command) error {
 			fmt.Println("\n=== Agent Output ===")
 			fmt.Println(e.Content)
 		case *clearcast.ErrorEvent:
-			return fmt.Errorf("runtime Error: %w", e.Error)
+			return fmt.Errorf("runtime error: %s", e.Error)
 		case *clearcast.FinalEvent:
 			fmt.Println("\n=== Execution Finished ===")
 			fmt.Println(e.Output)

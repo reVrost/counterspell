@@ -13,7 +13,13 @@ import (
 // SerperDevTool creates a new tool for interacting with the Serper.dev API.
 func SerperDevTool() *Tool {
 	return &Tool{
-		ID:          "serper_dev",
+		ID: "serper_dev",
+		Usage: `You can use serper_dev. To use serper_dev, respond with JSON in this format:
+      {
+        "tool": "serper_dev",
+        "params": {"query": "what ever you would like to ask"}
+      }
+		`,
 		Description: "Searches the web using Serper.dev",
 		Execute: func(ctx context.Context, params map[string]any) (any, error) {
 			query, ok := params["query"].(string)

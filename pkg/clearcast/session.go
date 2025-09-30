@@ -14,6 +14,7 @@ type Session struct {
 	InputTokens  int     `json:"input_tokens"`
 	OutputTokens int     `json:"output_tokens"`
 	Cost         float64 `json:"cost"`
+	Tools        []*Tool `json:"tools"`
 }
 
 type Message struct {
@@ -25,7 +26,7 @@ type Message struct {
 
 // to map[string]any
 func (s *Session) ToMap() map[string]any {
-	return map[string]any{
+	result := map[string]any{
 		"workspace":      s.Workspace,
 		"mission":        s.Mission,
 		"memory":         s.Memory,
@@ -36,5 +37,13 @@ func (s *Session) ToMap() map[string]any {
 		"input_tokens":  s.InputTokens,
 		"output_tokens": s.OutputTokens,
 		"cost":          s.Cost,
+		"tools":         s.Tools,
 	}
+
+	// Merge workspace fields at top level for template access
+	for k, v := range s.Workspace {
+		result[k] = v
+	}
+
+	return result
 }
