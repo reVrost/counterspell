@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -27,6 +25,10 @@ type AgentDef struct {
 	Prompt string `yaml:"prompt"`
 }
 
+type ToolDef struct {
+	ID string `yaml:"id"`
+}
+
 // SessionDef defines the structure for the session in the YAML configuration.
 type SessionDef struct {
 	RootAgentID string `yaml:"root_agent_id"`
@@ -36,68 +38,8 @@ type SessionDef struct {
 // OrchestrationFile defines the top-level structure of the YAML file.
 type OrchestrationFile struct {
 	Agents  []AgentDef `yaml:"agents"`
+	Tools   []ToolDef  `yaml:"tools"`
 	Session SessionDef `yaml:"session"`
-}
-
-// SerperDevTool creates a new tool for interacting with the Serper.dev API.
-func SerperDevTool() *clearcast.Tool {
-	return &clearcast.Tool{
-		ID:          "serper.dev",
-		Description: "Searches the web using Serper.dev",
-		Execute: func(ctx context.Context, params map[string]any) (any, error) {
-			query, ok := params["query"].(string)
-			if !ok {
-				return nil, fmt.Errorf("query parameter is required and must be a string")
-			}
-
-			apiKey := os.Getenv("SERPER_API_KEY")
-			if apiKey == "" {
-				return nil, fmt.Errorf("SERPER_API_KEY environment variable not set")
-			}
-
-			// Prepare the request body
-			requestBody, err := json.Marshal(map[string]string{"q": query})
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal request body: %w", err)
-			}
-
-			// Create the HTTP request
-			req, err := http.NewRequestWithContext(ctx, "POST", "https://google.serper.dev/search", bytes.NewBuffer(requestBody))
-			if err != nil {
-				return nil, fmt.Errorf("failed to create request: %w", err)
-			}
-
-			// Set headers
-			req.Header.Set("X-API-KEY", apiKey)
-			req.Header.Set("Content-Type", "application/json")
-
-			// Execute the request
-			client := &http.Client{}
-			resp, err := client.Do(req)
-			if err != nil {
-				return nil, fmt.Errorf("failed to execute request: %w", err)
-			}
-			defer resp.Body.Close()
-
-			// Read the response body
-			responseBody, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %w", err)
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(responseBody))
-			}
-
-			// Unmarshal the response into a generic map
-			var result any
-			if err := json.Unmarshal(responseBody, &result); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-			}
-
-			return result, nil
-		},
-	}
 }
 
 // EnableDebug sets slog to debug level with a default text handler
@@ -114,7 +56,7 @@ func EnableDebug() {
 func runCommand(ctx context.Context, cmd *cli.Command) error {
 	yamlFile := cmd.Args().First()
 	if yamlFile == "" {
-		return fmt.Errorf("Usage: cspell run <yaml_file>")
+		return errors.New("usage: cspell run <yaml_file>")
 	}
 
 	data, err := os.ReadFile(yamlFile)
@@ -142,9 +84,14 @@ func runCommand(ctx context.Context, cmd *cli.Command) error {
 		agents = append(agents, agent)
 	}
 
+	defaultTools := make([]string, 0, len(config.Tools))
+	for _, toolDef := range config.Tools {
+		defaultTools = append(defaultTools, toolDef.ID)
+	}
+
 	rt := clearcast.NewRuntime(
 		clearcast.WithAgents(agents...),
-		clearcast.WithTools(SerperDevTool()),
+		clearcast.WithDefaultTools(defaultTools...),
 	)
 
 	sess := &clearcast.Session{
