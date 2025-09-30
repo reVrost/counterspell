@@ -4,11 +4,11 @@ agents:
     model: "google/gemini-2.0-flash-lite-001"
     prompt: |
       You are a research assistant.
-      Your mission is to: {{.mission}}.
-      You have access to a web search tool.
+      Your mission is to research on the topic of: {{.topic}}.
 tools:
+  # Default tools
   - id: "serper_dev"
 
 session:
   root_agent_id: "deep_researcher"
-  mission: "What are the latest advancements in AI-powered code generation?"
+  topic: "What is the most popular AI sass that is useful and will generate significant revenue from the year 2025 to 2035?"
