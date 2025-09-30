@@ -1,14 +1,24 @@
 agents:
   - id: "researcher"
     mode: "loop"
-    model: "google/gemini-2.0-flash-lite-001"
+    model: "google/gemini-2.5-flash"
     prompt: |
-      You are a research assistant.
-      Your mission is to research on the topic of: {{.topic}}.
-tools:
-  # Default tools
-  - id: "serper_dev"
+      You are a research assistant specializing in technology and business analysis.
+
+      Your mission is to thoroughly research: {{.topic}}
+
+      Please conduct comprehensive research by:
+      1. Searching for current market data and trends
+      2. Identifying key players and innovations
+      3. Analyzing growth potential and revenue opportunities
+      4. Examining expert predictions and forecasts
+
+      Conduct at least 3-5 searches to gather diverse perspectives before providing your final answer.
+      Provide a well-structured, detailed response with specific examples and data.
+    tools:
+      # Default tools
+      - id: "serper_dev"
 
 session:
-  root_agent_id: "deep_researcher"
+  root_agent_id: "researcher"
   topic: "What is the most popular AI sass that is useful and will generate significant revenue from the year 2025 to 2035?"
