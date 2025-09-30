@@ -52,7 +52,7 @@ You can use the available tools to gather information and accomplish your task. 
      "tool": "exact_tool_id_from_above",
      "params": {"param_name": "param_value"}
    }
-   
+
    **IMPORTANT**: Use the EXACT tool ID as listed above (e.g., "serper_dev", NOT "search" or any other name)
 
 2. **When you have completed your task**, respond with ONLY a JSON object:
@@ -307,7 +307,7 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 		if t.enableOTEL {
 			span.RecordError(err)
 		}
-		t.logger.Error("Chat completion failed", "model", t.Model, "error", err)
+		t.logger.Error("Chat completion failed", "model", t.Model, "error", err, "request", req)
 		return ChatCompletionResponse{}, err
 	}
 
