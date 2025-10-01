@@ -2,6 +2,8 @@
 
 Counterspell is an LLM agent execution runtime with a focus on observability. It provides a framework for defining and running LLM-powered agents, configured via simple YAML files. With its built-in web UI, you can monitor traces, logs, and interact with your agents in real-time.
 
+It uses Docker/cagent as its agent execution engine, while this project layers on a React UI, telemetry, prompt optimization evaluation, and an agent scheduler with parallel execution powered by https://github.com/panjf2000/ants.
+
 **⚠️ This project is a work in progress and is not yet ready for production use. ⚠️**
 
 ## Key Features
@@ -9,7 +11,10 @@ Counterspell is an LLM agent execution runtime with a focus on observability. It
 - **LLM Agent Execution Runtime**: Define and run complex agents with different execution modes (`plan`, `loop`, `single`).
 - **YAML-based Configuration**: Easily configure your agents, models, and prompts using simple YAML files.
 - **Built-in Observability**: Comes with OpenTelemetry tracing and logging out-of-the-box, backed by a local SQLite database.
-- **Web UI**: A comprehensive web interface for visualizing traces, inspecting logs, and interacting with your agents.
+- **Web UI (React)**: A comprehensive web interface for visualizing traces, inspecting logs, and interacting with your agents.
+- **Telemetry**: End-to-end tracing, logs, and metrics.
+- **Prompt Optimization Eval**: Evaluate and iterate on prompts with built-in evaluation workflows.
+- **Agent Scheduler**: Orchestrates agent runs, supporting parallel execution via ants.
 - **Go Backend, React Frontend**: A modern and performant tech stack.
 - **REST and RPC APIs**: For programmatic access to the runtime and observability data.
 
