@@ -61,8 +61,10 @@ message Agent {
 // ---------- ROOT CONFIG ----------
 message Blueprint {
   string version = 1;
-  map<string, Model> models = 2; // planning_model, thinking_model, etc.
-  map<string, Agent> agents = 3; // planner, stock_pricer, etc.
+  // cagent or clearcast
+  string type = 2;
+  // flexible field that can vary by type
+  google.protobuf.Struct config = 3;
 }
 
 message CreateBlueprintRequest {
