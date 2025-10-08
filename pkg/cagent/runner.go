@@ -21,10 +21,12 @@ type configSource struct {
 
 // Runner is the orchestrator for loading configuration and running agents.
 type Runner struct {
-	src           configSource
-	openRouterCfg any
-	telemetryCfg  any
-	schedulerCfg  any
+	src              configSource
+	openRouterCfg    any
+	telemetryCfg     any
+	schedulerCfg     any
+	firstMessage     string
+	autoApproveTools bool
 }
 
 var runConfig config.RuntimeConfig
@@ -35,6 +37,8 @@ type RunnerOption func(*Runner)
 func WithOpenRouter(v any) RunnerOption   { return func(r *Runner) { r.openRouterCfg = v } }
 func WithTelemetry(v any) RunnerOption    { return func(r *Runner) { r.telemetryCfg = v } }
 func ScheduleWithAnts(v any) RunnerOption { return func(r *Runner) { r.schedulerCfg = v } }
+func WithFirstMessage(msg string) RunnerOption { return func(r *Runner) { r.firstMessage = msg } }
+func WithAutoApproveTools(v bool) RunnerOption { return func(r *Runner) { r.autoApproveTools = v } }
 
 // --- Constructors ---
 
@@ -85,7 +89,12 @@ func (r *Runner) Run() error {
 	}
 
 	sess := session.New()
-	sess.AddMessage(session.UserMessage(abs, "Follow the default instructions"))
+	sess.ToolsApproved = r.autoApproveTools
+	msg := r.firstMessage
+	if msg == "" {
+		msg = "Follow the default instructions"
+	}
+	sess.AddMessage(session.UserMessage(abs, msg))
 
 	st := rt.RunStream(ctx, sess)
 
