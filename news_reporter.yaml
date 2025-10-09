@@ -35,16 +35,6 @@ agents:
       - Summarize key insights: e.g., "STOCK1 overvalued, STOCK2 good news on partnership, STOCK3 Uber-Waymo deal".
       - Ensure briefing is concise, personalized, and actionable.
 
-      **Completion Criteria**
-      At the end of your plan, one of the following JSON item must exist;
-      ```json
-      {"done": true, "final_output": "<Markdown-formatted final briefing text>"}
-      ```
-      If further research or data is needed, output:
-      ```json
-      {"done": false, "next_hints": "Describe what’s missing or unclear"}
-      ```
-
     toolsets:
       - type: mcp
         remote:

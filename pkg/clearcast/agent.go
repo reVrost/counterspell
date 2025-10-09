@@ -19,17 +19,23 @@ const AgentModePlan = "plan"
 const AgentModeLoop = "loop"
 const AgentModeSingle = "single"
 
-const availableToolsPrompt = `
-## Iterations guideline
-	If you are one off to the max iterations, make the best out of what you have and end your plan with done: true to produce the final output.
-
-CURRENT ITERATION: {{.iteration}}
-MAX ITERATIONS: {{.max_iterations}}
-
+const augmentedPrompt = `
+## HINTS FROM PREVIOUS RUN
 {{if .next_hints}}
 	## PREVIOUS HINTS
 	{{.next_hints}}
 {{end}}
+
+## TOOL CALL HISTORY
+{{- if .tool_calls}}
+{{range .tool_calls}}
+- tool: {{.tool}}
+  params: {{.params}}
+  {{- if .result}}
+  result: {{.result}}
+  {{- end}}
+{{end}}
+{{- end}}
 
 ## AVAILABLE TOOLS
 {{range .tools}}
@@ -53,6 +59,17 @@ You can use the available tools to gather information and accomplish your task. 
 - Each response must be a single valid JSON object
 - Use the EXACT tool IDs as listed in "AVAILABLE TOOLS" above
 - Use tools iteratively to gather information
+
+## FINAL PLAN AND ITERATIONS GUIDELINE
+	If you are one off to the max iterations e.g 3/4 or 1/2, make sure to wrap up and include the final plan output includes a terminating plan based on your goal of {"done": true, "final_output": "<Markdown-formatted final briefing text>"}
+
+**CURRENT ITERATION**: {{.iteration}}/{{.max_iterations}}
+
+## Completion Criteria
+At the end of your plan, one of the following JSON item must exist;
+{"done": true, "final_output": "<Markdown-formatted final briefing text>"}
+If further research or data is needed, output:
+{"done": false, "next_hints": "Describe what’s missing or unclear"}
 `
 
 // DebugContextKey for context-based debug flag
@@ -229,7 +246,7 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...ResponseO
 		span.SetAttributes(attribute.String("model", t.Model))
 	}
 
-	prompt := t.Prompt + availableToolsPrompt
+	prompt := t.Prompt + augmentedPrompt
 	// convert t.tools to map[string]any
 	maps.Copy(args, t.tools.toMap())
 
@@ -242,8 +259,13 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...ResponseO
 		return ChatCompletionResponse{}, fmt.Errorf("error rendering template: %w", err)
 	}
 
-	// Build messages: start with system prompt, then add session messages
+	// Build messages: start with system prompt, then add session/user/assistant messages if provided
 	messages := []ChatMessage{SystemMessage(rendered)}
+	if msgs, ok := args["messages"].([]Message); ok {
+		for _, m := range msgs {
+			messages = append(messages, ChatMessage{Role: m.Role, Content: m.Content})
+		}
+	}
 
 	req := ChatCompletionRequest{
 		Model:    t.Model,
