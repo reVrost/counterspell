@@ -1,22 +1,18 @@
 # Counterspell
 
-Counterspell is an LLM agent execution runtime with a focus on observability. It provides a framework for defining and running LLM-powered agents, configured via simple YAML files. With its built-in web UI, you can monitor traces, logs, and interact with your agents in real-time.
-
-It uses Docker/cagent as its agent execution engine, while this project layers on a React UI, telemetry, prompt optimization evaluation, and an agent scheduler with parallel execution powered by https://github.com/panjf2000/ants.
+A lightweight, embedded observability tool for Go applications that provides OpenTelemetry tracing and logging capabilities with a local SQLite database backend and REST API for data querying.
 
 **⚠️ This project is a work in progress and is not yet ready for production use. ⚠️**
 
-## Key Features
+## What it is
 
-- **LLM Agent Execution Runtime**: Define and run complex agents with different execution modes (`plan`, `loop`, `single`).
-- **YAML-based Configuration**: Easily configure your agents, models, and prompts using simple YAML files.
-- **Built-in Observability**: Comes with OpenTelemetry tracing and logging out-of-the-box, backed by a local SQLite database.
-- **Web UI (React)**: A comprehensive web interface for visualizing traces, inspecting logs, and interacting with your agents.
-- **Telemetry**: End-to-end tracing, logs, and metrics.
-- **Prompt Optimization Eval**: Evaluate and iterate on prompts with built-in evaluation workflows.
-- **Agent Scheduler**: Orchestrates agent runs, supporting parallel execution via ants.
-- **Go Backend, React Frontend**: A modern and performant tech stack.
-- **REST and RPC APIs**: For programmatic access to the runtime and observability data.
+- Fast and easy to get started, no added extra cost
+- Gives you observability UI for your LLM calls with the greatest of ease
+- Prompt evals
+- Prompt optimizer
+- Embedded observability with otel, zerolog (uses sqlite), throwaway sqlite db
+- Means no external dependencies, no xtra docker containers
+- Writes logs on a separate goroutine, so your app is not affected
 
 ## Getting Started
 
@@ -47,54 +43,66 @@ For development, you can use the provided `dev.sh` script, which uses `kitty` to
 ./dev.sh
 ```
 
-## How it Works
+# Counterspell
 
-Counterspell's core concepts are **Agents**, **Runtimes**, and **Sessions**.
+## Installation
 
-- **Agents**: The basic building blocks of your LLM-powered applications. An agent is defined by its ID, model, prompt, and execution mode.
-- **Runtime**: The execution environment for your agents. The runtime manages the lifecycle of agents and executes them according to their configuration.
-- **Session**: Represents a single interaction with an agent, including the initial mission and any intermediate messages.
-
-### Agent Configuration
-
-Agents are configured in YAML files. Here's an example of a simple "writer" agent:
-
-```yaml
-agents:
-  - id: "writer"
-    mode: "plan"
-    model: "google/gemini-2.0-flash-lite-001"
-    prompt: |
-      You are a creative writer.
-      Your mission is to: {{.mission}}.
-      Your output must be a JSON object matching this schema:
-      {
-        "plan": [
-          {
-            "kind": "agent",
-            "id": "final_writer",
-            "params": {}
-          }
-        ]
-      }
-  - id: "final_writer"
-    model: "google/gemini-2.0-flash-lite-001"
-    mode: "single"
-    prompt: |
-      Write a short story about {{.mission}}.
-
-session:
-  root_agent_id: "writer"
-  mission: "a robot who discovers music"
+```bash
+go get github.com/revrost/counterspell
 ```
 
-## Architecture
+## Todo
 
-Counterspell consists of three main components:
+- [ ] Protobuf schemas
+- [ ] Agent configuration/blueprint framework
+- [ ] Openrouter integration
+- [ ] Lightweight execution runtime utilize goroutine (cadence/go-workflow)
+- [ ] Create agent, run agent, watch UI
+- [ ] Orchestrator-Executor MVP via ui
+- [ ] Otel integration
+- [ ] Openapi streaming spec
+- [ ] Move sqlite to postgres (later)
 
-- **Backend**: A Go server built with the Echo framework. It provides the core runtime, APIs, and serves the web UI.
-- **Frontend**: A React application built with Vite and Mantine for the UI.
-- **Database**: A local SQLite database for storing traces and logs.
+## Quick Start
+
+The simplest way to add Counterspell to your application:
+
+```go
+func main() {
+	// Example 1: Using Echo router
+	log.Info().Msg("Starting Echo server with Counterspell...")
+	e := echo.New()
+
+	// Use echo
+	e.Use(otelecho.Middleware("counterspell-example"))
+
+	// Add Counterspell to Echo router
+	if err := counterspell.AddToEcho(e,
+		counterspell.WithAuthToken("my-secret-token"),
+		counterspell.WithDBPath("counterspell_echo.db"),
+	); err != nil {
+		log.Fatal().Err(err).Msg("Failed to add Counterspell to Echo")
+	}
+
+	// Add your application routes
+	e.GET("/hello", func(c echo.Context) error {
+		log.Ctx(c.Request().Context()).Debug().Str("user", "demo").Msg("Hello from Echo with Counterspell!")
+		log.Ctx(c.Request().Context()).Error().Msg("Hello from Echo with Counterspell!")
+		return c.String(http.StatusOK, "Hello from Echo with Counterspell!")
+	})
+
+	log.Info().Msg("Echo server listening on :8080")
+	log.Info().Msg("Counterspell UI available at: http://localhost:8080/counterspell/health")
+	log.Info().Msg("Counterspell API available at: http://localhost:8080/counterspell/api/logs?secret=my-secret-token")
+	if err := e.Start(":8080"); err != nil {
+		log.Printf("Echo server stopped: %v", err)
+	}
+}
+```
+
+## API Endpoints
+
+All API endpoints require authentication via the `Authorization: Bearer <token>` header or `auth` query parameter.
 
 ## Contributing
 
@@ -106,5 +114,4 @@ Counterspell consists of three main components:
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
+This project is licensed under the [Apache-2.0 License](LICENSE).
