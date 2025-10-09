@@ -15,7 +15,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
-	"github.com/revrost/counterspell/pkg/counterspell"
+	"github.com/revrost/counterspell"
 	"github.com/revrost/counterspell/pkg/gen/proto/counterspell/v1/counterspellv1connect"
 	slogmulti "github.com/samber/slog-multi"
 	"go.opentelemetry.io/otel"
