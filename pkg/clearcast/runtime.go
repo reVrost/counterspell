@@ -5,30 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 )
 
 type EventKind string
-
-// stripMarkdownCodeBlock removes markdown code block formatting from JSON responses
-// LLMs often wrap JSON in ```json ... ``` blocks
-func stripMarkdownCodeBlock(content string) string {
-	content = strings.TrimSpace(content)
-
-	// Remove ```json ... ``` blocks
-	if strings.HasPrefix(content, "```json") {
-		content = strings.TrimPrefix(content, "```json")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	} else if strings.HasPrefix(content, "```") {
-		// Remove generic ``` ... ``` blocks
-		content = strings.TrimPrefix(content, "```")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-	}
-
-	return content
-}
 
 // Runtime is an execution environment that can run tasks (agents or plain functions)
 type Runtime interface {

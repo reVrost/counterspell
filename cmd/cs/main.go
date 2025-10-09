@@ -81,7 +81,7 @@ func runClearcast(ctx context.Context, cmd *cli.Command) error {
 
 		default:
 			// Optionally log unhandled event types
-			slog.Warn("Received unhandled event type: %T\n", e)
+			slog.Warn("Received unhandled event type", "event", e)
 		}
 	}
 	return nil

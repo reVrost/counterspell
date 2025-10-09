@@ -34,9 +34,9 @@ var runConfig config.RuntimeConfig
 // RunnerOption allows optional configuration of the Runner.
 type RunnerOption func(*Runner)
 
-func WithOpenRouter(v any) RunnerOption   { return func(r *Runner) { r.openRouterCfg = v } }
-func WithTelemetry(v any) RunnerOption    { return func(r *Runner) { r.telemetryCfg = v } }
-func ScheduleWithAnts(v any) RunnerOption { return func(r *Runner) { r.schedulerCfg = v } }
+func WithOpenRouter(v any) RunnerOption        { return func(r *Runner) { r.openRouterCfg = v } }
+func WithTelemetry(v any) RunnerOption         { return func(r *Runner) { r.telemetryCfg = v } }
+func ScheduleWithAnts(v any) RunnerOption      { return func(r *Runner) { r.schedulerCfg = v } }
 func WithFirstMessage(msg string) RunnerOption { return func(r *Runner) { r.firstMessage = msg } }
 func WithAutoApproveTools(v bool) RunnerOption { return func(r *Runner) { r.autoApproveTools = v } }
 
@@ -81,7 +81,7 @@ func (r *Runner) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to load team: %w", err)
 	}
-	defer agents.StopToolSets()
+	defer func() { _ = agents.StopToolSets() }()
 
 	rt, err := runtime.New(agents, runtime.WithCurrentAgent("root"))
 	if err != nil {
