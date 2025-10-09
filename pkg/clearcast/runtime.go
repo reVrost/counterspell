@@ -22,6 +22,22 @@ type runtime struct {
 	sess      *Session
 }
 
+func (r *runtime) appendToolCall(tool string, params map[string]any, result any, err error) {
+	entry := map[string]any{
+		"tool":   tool,
+		"params": params,
+	}
+	if err != nil {
+		entry["error"] = err.Error()
+	} else {
+		entry["result"] = result
+	}
+	// ensure slice exists
+	tc, _ := r.workspace["tool_calls"].([]map[string]any)
+	tc = append(tc, entry)
+	r.workspace["tool_calls"] = tc
+}
+
 type Tools map[string]*Tool
 type Agents map[string]*Agent
 
@@ -97,12 +113,16 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 	}
 
 	r.workspace["next_hints"] = ""
+	// initialize tool_calls as an array on the workspace
+	r.workspace["tool_calls"] = []map[string]any{}
 	// The main execution loop. It will run for a maximum of `maxTurns`.
 	for i := range maxTurns {
 		r.workspace["iteration"] = i
 		r.workspace["max_iterations"] = maxTurns
 		// 1. PLAN: The agent thinks about what to do next based on the current workspace.
-		planRes, err := rootAgent.Step(ctx, r.workspace, WithResponseFormat(ResponseFormat{
+		// pass session map so Agent.Step can include messages
+		args := sess.ToMap()
+		planRes, err := rootAgent.Step(ctx, args, WithResponseFormat(ResponseFormat{
 			Type: ResponseFormatTypeJSON,
 		}))
 		if err != nil {
@@ -164,10 +184,14 @@ func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, ses
 					// It's often better to feed the error back to the agent rather than halting.
 					// This allows the agent to self-correct.
 					r.workspace[plan.Tool] = fmt.Sprintf("error executing tool: %v", err)
+					// also append to a structured tool_calls list
+					r.appendToolCall(plan.Tool, plan.Params, nil, err)
 					eventsChan <- ToolError(plan.Tool, plan.Params, err)
 				} else {
 					// Append successful result to the workspace for the next planning step.
 					r.workspace[plan.Tool] = result
+					// also append to a structured tool_calls list
+					r.appendToolCall(plan.Tool, plan.Params, result, nil)
 					eventsChan <- ToolResult(plan.Tool, result)
 				}
 			}
