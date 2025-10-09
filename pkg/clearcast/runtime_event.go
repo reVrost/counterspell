@@ -6,18 +6,15 @@ type RuntimeEvent interface {
 	isEvent()
 }
 
-const PlanKindTool = "tool"
-const PlanKindAgent = "agent"
-
 type Plan struct {
 	// Kind can be either "tool" or "agent"
-	Kind   string         `json:"kind"`
-	ID     string         `json:"id"`
+	// Kind   string         `json:"kind"`
+	Tool   string         `json:"tool"`
 	Params map[string]any `json:"params"`
 }
 
 type PlanResultEvent struct {
-	Plans []Plan `json:"plan"`
+	Plans []Plan `json:"plans"`
 }
 
 func (e *PlanResultEvent) isEvent() {}
@@ -53,16 +50,31 @@ func Error(msg string) RuntimeEvent {
 	}
 }
 
+type ToolErrorEvent struct {
+	Tool   string `json:"tool"`
+	Error  string `json:"error"`
+	Params any    `json:"params"`
+}
+
+func (e *ToolErrorEvent) isEvent() {}
+func ToolError(tool string, params any, err error) RuntimeEvent {
+	return &ToolErrorEvent{
+		Tool:   tool,
+		Error:  err.Error(),
+		Params: params,
+	}
+}
+
 type ToolResultEvent struct {
-	Data  any    `json:"data"`
-	Error string `json:"error"`
+	Tool   string `json:"tool"`
+	Result any    `json:"result"`
+	Error  string `json:"error"`
 }
 
 func (e *ToolResultEvent) isEvent() {}
-func ToolResult(data any, err error) RuntimeEvent {
+func ToolResult(key string, result any) RuntimeEvent {
 	return &ToolResultEvent{
-		Data:  data,
-		Error: err.Error(),
+		Result: result,
 	}
 }
 

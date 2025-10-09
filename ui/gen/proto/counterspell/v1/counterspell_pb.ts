@@ -6,13 +6,13 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_annotations } from "../../../google/api/annotations_pb";
 import { file_google_protobuf_any, file_google_protobuf_struct, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file proto/counterspell/v1/counterspell.proto.
  */
 export const file_proto_counterspell_v1_counterspell: GenFile = /*@__PURE__*/
-  fileDesc("Cihwcm90by9jb3VudGVyc3BlbGwvdjEvY291bnRlcnNwZWxsLnByb3RvEg9jb3VudGVyc3BlbGwudjEiKQoKUGFnaW5hdGlvbhINCgVsaW1pdBgBIAEoBRIMCgRwYWdlGAIgASgFIigKBU1vZGVsEhAKCHByb3ZpZGVyGAEgASgJEg0KBW1vZGVsGAIgASgJIl0KCVRvb2xQYXJhbRIMCgRuYW1lGAEgASgJEgwKBHR5cGUYAiABKAkSEAoIcmVxdWlyZWQYAyABKAgSEwoLZGVzY3JpcHRpb24YBCABKAkSDQoFaXRlbXMYBSADKAkipwEKBFRvb2wSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIxCgZwYXJhbXMYAyADKAsyIS5jb3VudGVyc3BlbGwudjEuVG9vbC5QYXJhbXNFbnRyeRpJCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSKQoFdmFsdWUYAiABKAsyGi5jb3VudGVyc3BlbGwudjEuVG9vbFBhcmFtOgI4ASJPCgdUb29sc2V0EgwKBHR5cGUYASABKAkSEAoIYmFzZV91cmwYAiABKAkSJAoFdG9vbHMYAyADKAsyFS5jb3VudGVyc3BlbGwudjEuVG9vbCJBCgtTeW50aGVzaXplchINCgVtb2RlbBgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIOCgZwcm9tcHQYAyABKAkiswEKBUFnZW50Eg0KBW1vZGVsGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEhMKC2luc3RydWN0aW9uGAMgASgJEhIKCnN1Yl9hZ2VudHMYBCADKAkSKgoIdG9vbHNldHMYBSADKAsyGC5jb3VudGVyc3BlbGwudjEuVG9vbHNldBIxCgtzeW50aGVzaXplchgGIAEoCzIcLmNvdW50ZXJzcGVsbC52MS5TeW50aGVzaXplciKaAgoJQmx1ZXByaW50Eg8KB3ZlcnNpb24YASABKAkSNgoGbW9kZWxzGAIgAygLMiYuY291bnRlcnNwZWxsLnYxLkJsdWVwcmludC5Nb2RlbHNFbnRyeRI2CgZhZ2VudHMYAyADKAsyJi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50LkFnZW50c0VudHJ5GkUKC01vZGVsc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmNvdW50ZXJzcGVsbC52MS5Nb2RlbDoCOAEaRQoLQWdlbnRzRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuY291bnRlcnNwZWxsLnYxLkFnZW50OgI4ASI2ChZDcmVhdGVCbHVlcHJpbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGY29uZmlnGAIgASgJIkgKF0NyZWF0ZUJsdWVwcmludFJlc3BvbnNlEi0KCWJsdWVwcmludBgBIAEoCzIaLmNvdW50ZXJzcGVsbC52MS5CbHVlcHJpbnQiSAoVTGlzdEJsdWVwcmludHNSZXF1ZXN0Ei8KCnBhZ2luYXRpb24YASABKAsyGy5jb3VudGVyc3BlbGwudjEuUGFnaW5hdGlvbiJIChZMaXN0Qmx1ZXByaW50c1Jlc3BvbnNlEi4KCmJsdWVwcmludHMYASADKAsyGi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50IiEKE0dldEJsdWVwcmludFJlcXVlc3QSCgoCaWQYASABKAkiRQoUR2V0Qmx1ZXByaW50UmVzcG9uc2USLQoJYmx1ZXByaW50GAEgASgLMhouY291bnRlcnNwZWxsLnYxLkJsdWVwcmludCKJAQoPTGlzdExvZ3NSZXF1ZXN0Ei8KCnBhZ2luYXRpb24YASABKAsyGy5jb3VudGVyc3BlbGwudjEuUGFnaW5hdGlvbhINCgVsZXZlbBgCIAEoCRIQCgh0cmFjZV9pZBgDIAEoCRISCgpzdGFydF90aW1lGAQgASgJEhAKCGVuZF90aW1lGAUgASgJIjYKEExpc3RMb2dzUmVzcG9uc2USIgoEbG9ncxgBIAMoCzIULmNvdW50ZXJzcGVsbC52MS5Mb2cibwoRTGlzdFRyYWNlc1JlcXVlc3QSLwoKcGFnaW5hdGlvbhgBIAEoCzIbLmNvdW50ZXJzcGVsbC52MS5QYWdpbmF0aW9uEhYKDnJvb3Rfc3Bhbl9uYW1lGAIgASgJEhEKCWhhc19lcnJvchgDIAEoCCI8ChJMaXN0VHJhY2VzUmVzcG9uc2USJgoGdHJhY2VzGAEgAygLMhYuY291bnRlcnNwZWxsLnYxLlRyYWNlItQBCgNMb2cSCgoCaWQYASABKAkSEQoJdGltZXN0YW1wGAIgASgJEg0KBWxldmVsGAMgASgJEg8KB21lc3NhZ2UYBCABKAkSEAoIdHJhY2VfaWQYBSABKAkSDwoHc3Bhbl9pZBgGIAEoCRI4CgphdHRyaWJ1dGVzGAcgAygLMiQuY291bnRlcnNwZWxsLnYxLkxvZy5BdHRyaWJ1dGVzRW50cnkaMQoPQXR0cmlidXRlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEingEKBVRyYWNlEgoKAmlkGAEgASgJEhAKCHRyYWNlX2lkGAIgASgJEhYKDnJvb3Rfc3Bhbl9uYW1lGAMgASgJEhIKCnN0YXJ0X3RpbWUYBCABKAkSEAoIZW5kX3RpbWUYBSABKAkSEwoLZHVyYXRpb25fbXMYBiABKAMSJAoFc3BhbnMYByADKAsyFS5jb3VudGVyc3BlbGwudjEuU3BhbiKcAgoEU3BhbhIKCgJpZBgBIAEoCRIQCgh0cmFjZV9pZBgCIAEoCRIWCg5wYXJlbnRfc3Bhbl9pZBgDIAEoCRIMCgRuYW1lGAQgASgJEhIKCnN0YXJ0X3RpbWUYBSABKAkSEAoIZW5kX3RpbWUYBiABKAkSEwoLZHVyYXRpb25fbnMYByABKAMSFAoMc2VydmljZV9uYW1lGAggASgJEhEKCWhhc19lcnJvchgJIAEoCBI5CgphdHRyaWJ1dGVzGAogAygLMiUuY291bnRlcnNwZWxsLnYxLlNwYW4uQXR0cmlidXRlc0VudHJ5GjEKD0F0dHJpYnV0ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIh0KD0dldFRyYWNlUmVxdWVzdBIKCgJpZBgBIAEoCSI5ChBHZXRUcmFjZVJlc3BvbnNlEiUKBXRyYWNlGAEgASgLMhYuY291bnRlcnNwZWxsLnYxLlRyYWNlMp8GCgdTZXJ2aWNlEpYBCg9DcmVhdGVCbHVlcHJpbnQSJy5jb3VudGVyc3BlbGwudjEuQ3JlYXRlQmx1ZXByaW50UmVxdWVzdBooLmNvdW50ZXJzcGVsbC52MS5DcmVhdGVCbHVlcHJpbnRSZXNwb25zZSIwgtPkkwIqIigvdjEvYmx1ZXByaW50cz9saW1pdD17bGltaXR9JnBhZ2U9e3BhZ2V9EngKDEdldEJsdWVwcmludBIkLmNvdW50ZXJzcGVsbC52MS5HZXRCbHVlcHJpbnRSZXF1ZXN0GiUuY291bnRlcnNwZWxsLnYxLkdldEJsdWVwcmludFJlc3BvbnNlIhuC0+STAhUSEy92MS9ibHVlcHJpbnRzL3tpZH0SkwEKDkxpc3RCbHVlcHJpbnRzEiYuY291bnRlcnNwZWxsLnYxLkxpc3RCbHVlcHJpbnRzUmVxdWVzdBonLmNvdW50ZXJzcGVsbC52MS5MaXN0Qmx1ZXByaW50c1Jlc3BvbnNlIjCC0+STAioSKC92MS9ibHVlcHJpbnRzP2xpbWl0PXtsaW1pdH0mcGFnZT17cGFnZX0SewoITGlzdExvZ3MSIC5jb3VudGVyc3BlbGwudjEuTGlzdExvZ3NSZXF1ZXN0GiEuY291bnRlcnNwZWxsLnYxLkxpc3RMb2dzUmVzcG9uc2UiKoLT5JMCJBIiL3YxL2xvZ3M/bGltaXQ9e2xpbWl0fSZwYWdlPXtwYWdlfRKDAQoKTGlzdFRyYWNlcxIiLmNvdW50ZXJzcGVsbC52MS5MaXN0VHJhY2VzUmVxdWVzdBojLmNvdW50ZXJzcGVsbC52MS5MaXN0VHJhY2VzUmVzcG9uc2UiLILT5JMCJhIkL3YxL3RyYWNlcz9saW1pdD17bGltaXR9JnBhZ2U9e3BhZ2V9EmgKCEdldFRyYWNlEiAuY291bnRlcnNwZWxsLnYxLkdldFRyYWNlUmVxdWVzdBohLmNvdW50ZXJzcGVsbC52MS5HZXRUcmFjZVJlc3BvbnNlIheC0+STAhESDy92MS90cmFjZXMve2lkfUJOWkxnaXRodWIuY29tL3JldnJvc3QvY291bnRlcnNwZWxsL3BrZy9nZW4vcHJvdG8vY291bnRlcnNwZWxsL3YxO2NvdW50ZXJzcGVsbHYxYgZwcm90bzM", [file_google_api_annotations, file_google_protobuf_any, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("Cihwcm90by9jb3VudGVyc3BlbGwvdjEvY291bnRlcnNwZWxsLnByb3RvEg9jb3VudGVyc3BlbGwudjEiKQoKUGFnaW5hdGlvbhINCgVsaW1pdBgBIAEoBRIMCgRwYWdlGAIgASgFIigKBU1vZGVsEhAKCHByb3ZpZGVyGAEgASgJEg0KBW1vZGVsGAIgASgJIl0KCVRvb2xQYXJhbRIMCgRuYW1lGAEgASgJEgwKBHR5cGUYAiABKAkSEAoIcmVxdWlyZWQYAyABKAgSEwoLZGVzY3JpcHRpb24YBCABKAkSDQoFaXRlbXMYBSADKAkiYwoHVG9vbHNldBIMCgR0eXBlGAEgASgJEgoKAmlkGAIgASgJEjMKBnJlbW90ZRgDIAEoCzIeLmNvdW50ZXJzcGVsbC52MS5SZW1vdGVUb29sc2V0SACIAQFCCQoHX3JlbW90ZSI0Cg1SZW1vdGVUb29sc2V0EgsKA3VybBgBIAEoCRIWCg50cmFuc3BvcnRfdHlwZRgCIAEoCSJBCgtTeW50aGVzaXplchINCgVtb2RlbBgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIOCgZwcm9tcHQYAyABKAkiwAEKBUFnZW50EgoKAmlkGAEgASgJEhIKCnBsYW5fbW9kZWwYAiABKAkSFQoNcmVmbGVjdF9tb2RlbBgDIAEoCRITCgtwbGFuX3Byb21wdBgEIAEoCRIWCg5yZWZsZWN0X3Byb21wdBgFIAEoCRIpCgd0b29sc2V0GAYgAygLMhguY291bnRlcnNwZWxsLnYxLlRvb2xzZXQSKAoHbWV0ZGF0YRgHIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QiqAIKCUJsdWVwcmludBIPCgd2ZXJzaW9uGAEgASgJEgwKBHR5cGUYAiABKAkSNgoGbW9kZWxzGAMgAygLMiYuY291bnRlcnNwZWxsLnYxLkJsdWVwcmludC5Nb2RlbHNFbnRyeRI2CgZhZ2VudHMYBCADKAsyJi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50LkFnZW50c0VudHJ5GkUKC01vZGVsc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmNvdW50ZXJzcGVsbC52MS5Nb2RlbDoCOAEaRQoLQWdlbnRzRW50cnkSCwoDa2V5GAEgASgJEiUKBXZhbHVlGAIgASgLMhYuY291bnRlcnNwZWxsLnYxLkFnZW50OgI4ASI2ChZDcmVhdGVCbHVlcHJpbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGY29uZmlnGAIgASgJIkgKF0NyZWF0ZUJsdWVwcmludFJlc3BvbnNlEi0KCWJsdWVwcmludBgBIAEoCzIaLmNvdW50ZXJzcGVsbC52MS5CbHVlcHJpbnQiSAoVTGlzdEJsdWVwcmludHNSZXF1ZXN0Ei8KCnBhZ2luYXRpb24YASABKAsyGy5jb3VudGVyc3BlbGwudjEuUGFnaW5hdGlvbiJIChZMaXN0Qmx1ZXByaW50c1Jlc3BvbnNlEi4KCmJsdWVwcmludHMYASADKAsyGi5jb3VudGVyc3BlbGwudjEuQmx1ZXByaW50IiEKE0dldEJsdWVwcmludFJlcXVlc3QSCgoCaWQYASABKAkiRQoUR2V0Qmx1ZXByaW50UmVzcG9uc2USLQoJYmx1ZXByaW50GAEgASgLMhouY291bnRlcnNwZWxsLnYxLkJsdWVwcmludCKJAQoPTGlzdExvZ3NSZXF1ZXN0Ei8KCnBhZ2luYXRpb24YASABKAsyGy5jb3VudGVyc3BlbGwudjEuUGFnaW5hdGlvbhINCgVsZXZlbBgCIAEoCRIQCgh0cmFjZV9pZBgDIAEoCRISCgpzdGFydF90aW1lGAQgASgJEhAKCGVuZF90aW1lGAUgASgJIjYKEExpc3RMb2dzUmVzcG9uc2USIgoEbG9ncxgBIAMoCzIULmNvdW50ZXJzcGVsbC52MS5Mb2cibwoRTGlzdFRyYWNlc1JlcXVlc3QSLwoKcGFnaW5hdGlvbhgBIAEoCzIbLmNvdW50ZXJzcGVsbC52MS5QYWdpbmF0aW9uEhYKDnJvb3Rfc3Bhbl9uYW1lGAIgASgJEhEKCWhhc19lcnJvchgDIAEoCCI8ChJMaXN0VHJhY2VzUmVzcG9uc2USJgoGdHJhY2VzGAEgAygLMhYuY291bnRlcnNwZWxsLnYxLlRyYWNlItQBCgNMb2cSCgoCaWQYASABKAkSEQoJdGltZXN0YW1wGAIgASgJEg0KBWxldmVsGAMgASgJEg8KB21lc3NhZ2UYBCABKAkSEAoIdHJhY2VfaWQYBSABKAkSDwoHc3Bhbl9pZBgGIAEoCRI4CgphdHRyaWJ1dGVzGAcgAygLMiQuY291bnRlcnNwZWxsLnYxLkxvZy5BdHRyaWJ1dGVzRW50cnkaMQoPQXR0cmlidXRlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEingEKBVRyYWNlEgoKAmlkGAEgASgJEhAKCHRyYWNlX2lkGAIgASgJEhYKDnJvb3Rfc3Bhbl9uYW1lGAMgASgJEhIKCnN0YXJ0X3RpbWUYBCABKAkSEAoIZW5kX3RpbWUYBSABKAkSEwoLZHVyYXRpb25fbXMYBiABKAMSJAoFc3BhbnMYByADKAsyFS5jb3VudGVyc3BlbGwudjEuU3BhbiKcAgoEU3BhbhIKCgJpZBgBIAEoCRIQCgh0cmFjZV9pZBgCIAEoCRIWCg5wYXJlbnRfc3Bhbl9pZBgDIAEoCRIMCgRuYW1lGAQgASgJEhIKCnN0YXJ0X3RpbWUYBSABKAkSEAoIZW5kX3RpbWUYBiABKAkSEwoLZHVyYXRpb25fbnMYByABKAMSFAoMc2VydmljZV9uYW1lGAggASgJEhEKCWhhc19lcnJvchgJIAEoCBI5CgphdHRyaWJ1dGVzGAogAygLMiUuY291bnRlcnNwZWxsLnYxLlNwYW4uQXR0cmlidXRlc0VudHJ5GjEKD0F0dHJpYnV0ZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIh0KD0dldFRyYWNlUmVxdWVzdBIKCgJpZBgBIAEoCSI5ChBHZXRUcmFjZVJlc3BvbnNlEiUKBXRyYWNlGAEgASgLMhYuY291bnRlcnNwZWxsLnYxLlRyYWNlMp8GCgdTZXJ2aWNlEpYBCg9DcmVhdGVCbHVlcHJpbnQSJy5jb3VudGVyc3BlbGwudjEuQ3JlYXRlQmx1ZXByaW50UmVxdWVzdBooLmNvdW50ZXJzcGVsbC52MS5DcmVhdGVCbHVlcHJpbnRSZXNwb25zZSIwgtPkkwIqIigvdjEvYmx1ZXByaW50cz9saW1pdD17bGltaXR9JnBhZ2U9e3BhZ2V9EngKDEdldEJsdWVwcmludBIkLmNvdW50ZXJzcGVsbC52MS5HZXRCbHVlcHJpbnRSZXF1ZXN0GiUuY291bnRlcnNwZWxsLnYxLkdldEJsdWVwcmludFJlc3BvbnNlIhuC0+STAhUSEy92MS9ibHVlcHJpbnRzL3tpZH0SkwEKDkxpc3RCbHVlcHJpbnRzEiYuY291bnRlcnNwZWxsLnYxLkxpc3RCbHVlcHJpbnRzUmVxdWVzdBonLmNvdW50ZXJzcGVsbC52MS5MaXN0Qmx1ZXByaW50c1Jlc3BvbnNlIjCC0+STAioSKC92MS9ibHVlcHJpbnRzP2xpbWl0PXtsaW1pdH0mcGFnZT17cGFnZX0SewoITGlzdExvZ3MSIC5jb3VudGVyc3BlbGwudjEuTGlzdExvZ3NSZXF1ZXN0GiEuY291bnRlcnNwZWxsLnYxLkxpc3RMb2dzUmVzcG9uc2UiKoLT5JMCJBIiL3YxL2xvZ3M/bGltaXQ9e2xpbWl0fSZwYWdlPXtwYWdlfRKDAQoKTGlzdFRyYWNlcxIiLmNvdW50ZXJzcGVsbC52MS5MaXN0VHJhY2VzUmVxdWVzdBojLmNvdW50ZXJzcGVsbC52MS5MaXN0VHJhY2VzUmVzcG9uc2UiLILT5JMCJhIkL3YxL3RyYWNlcz9saW1pdD17bGltaXR9JnBhZ2U9e3BhZ2V9EmgKCEdldFRyYWNlEiAuY291bnRlcnNwZWxsLnYxLkdldFRyYWNlUmVxdWVzdBohLmNvdW50ZXJzcGVsbC52MS5HZXRUcmFjZVJlc3BvbnNlIheC0+STAhESDy92MS90cmFjZXMve2lkfUJOWkxnaXRodWIuY29tL3JldnJvc3QvY291bnRlcnNwZWxsL3BrZy9nZW4vcHJvdG8vY291bnRlcnNwZWxsL3YxO2NvdW50ZXJzcGVsbHYxYgZwcm90bzM", [file_google_api_annotations, file_google_protobuf_any, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message counterspell.v1.Pagination
@@ -106,33 +106,6 @@ export const ToolParamSchema: GenMessage<ToolParam> = /*@__PURE__*/
   messageDesc(file_proto_counterspell_v1_counterspell, 2);
 
 /**
- * @generated from message counterspell.v1.Tool
- */
-export type Tool = Message<"counterspell.v1.Tool"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string description = 2;
-   */
-  description: string;
-
-  /**
-   * @generated from field: map<string, counterspell.v1.ToolParam> params = 3;
-   */
-  params: { [key: string]: ToolParam };
-};
-
-/**
- * Describes the message counterspell.v1.Tool.
- * Use `create(ToolSchema)` to create a new message.
- */
-export const ToolSchema: GenMessage<Tool> = /*@__PURE__*/
-  messageDesc(file_proto_counterspell_v1_counterspell, 3);
-
-/**
  * @generated from message counterspell.v1.Toolset
  */
 export type Toolset = Message<"counterspell.v1.Toolset"> & {
@@ -142,14 +115,14 @@ export type Toolset = Message<"counterspell.v1.Toolset"> & {
   type: string;
 
   /**
-   * @generated from field: string base_url = 2;
+   * @generated from field: string id = 2;
    */
-  baseUrl: string;
+  id: string;
 
   /**
-   * @generated from field: repeated counterspell.v1.Tool tools = 3;
+   * @generated from field: optional counterspell.v1.RemoteToolset remote = 3;
    */
-  tools: Tool[];
+  remote?: RemoteToolset;
 };
 
 /**
@@ -157,6 +130,28 @@ export type Toolset = Message<"counterspell.v1.Toolset"> & {
  * Use `create(ToolsetSchema)` to create a new message.
  */
 export const ToolsetSchema: GenMessage<Toolset> = /*@__PURE__*/
+  messageDesc(file_proto_counterspell_v1_counterspell, 3);
+
+/**
+ * @generated from message counterspell.v1.RemoteToolset
+ */
+export type RemoteToolset = Message<"counterspell.v1.RemoteToolset"> & {
+  /**
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string transport_type = 2;
+   */
+  transportType: string;
+};
+
+/**
+ * Describes the message counterspell.v1.RemoteToolset.
+ * Use `create(RemoteToolsetSchema)` to create a new message.
+ */
+export const RemoteToolsetSchema: GenMessage<RemoteToolset> = /*@__PURE__*/
   messageDesc(file_proto_counterspell_v1_counterspell, 4);
 
 /**
@@ -195,38 +190,51 @@ export const SynthesizerSchema: GenMessage<Synthesizer> = /*@__PURE__*/
  */
 export type Agent = Message<"counterspell.v1.Agent"> & {
   /**
-   * reference to model key
+   * Plan -> Execute -> Reflect loop fields
    *
-   * @generated from field: string model = 1;
+   * @generated from field: string id = 1;
    */
-  model: string;
+  id: string;
 
   /**
-   * @generated from field: string description = 2;
-   */
-  description: string;
-
-  /**
-   * @generated from field: string instruction = 3;
-   */
-  instruction: string;
-
-  /**
-   * references other agents
+   * reference to model key for planning
    *
-   * @generated from field: repeated string sub_agents = 4;
+   * @generated from field: string plan_model = 2;
    */
-  subAgents: string[];
+  planModel: string;
 
   /**
-   * @generated from field: repeated counterspell.v1.Toolset toolsets = 5;
+   * reference to model key for reflection
+   *
+   * @generated from field: string reflect_model = 3;
    */
-  toolsets: Toolset[];
+  reflectModel: string;
 
   /**
-   * @generated from field: counterspell.v1.Synthesizer synthesizer = 6;
+   * planning prompt template
+   *
+   * @generated from field: string plan_prompt = 4;
    */
-  synthesizer?: Synthesizer;
+  planPrompt: string;
+
+  /**
+   * reflection prompt template
+   *
+   * @generated from field: string reflect_prompt = 5;
+   */
+  reflectPrompt: string;
+
+  /**
+   * Tools available to this agent
+   *
+   * @generated from field: repeated counterspell.v1.Toolset toolset = 6;
+   */
+  toolset: Toolset[];
+
+  /**
+   * @generated from field: google.protobuf.Struct metdata = 7;
+   */
+  metdata?: JsonObject;
 };
 
 /**
@@ -248,16 +256,23 @@ export type Blueprint = Message<"counterspell.v1.Blueprint"> & {
   version: string;
 
   /**
-   * planning_model, thinking_model, etc.
+   * e.g., counterspell
    *
-   * @generated from field: map<string, counterspell.v1.Model> models = 2;
+   * @generated from field: string type = 2;
+   */
+  type: string;
+
+  /**
+   * models by id
+   *
+   * @generated from field: map<string, counterspell.v1.Model> models = 3;
    */
   models: { [key: string]: Model };
 
   /**
-   * planner, stock_pricer, etc.
+   * agents by key, including root
    *
-   * @generated from field: map<string, counterspell.v1.Agent> agents = 3;
+   * @generated from field: map<string, counterspell.v1.Agent> agents = 4;
    */
   agents: { [key: string]: Agent };
 };

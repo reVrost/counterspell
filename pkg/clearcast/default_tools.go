@@ -6,22 +6,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 )
 
-// SerperDevTool creates a new tool for interacting with the Serper.dev API.
-func SerperDevTool() *Tool {
+// WebSearchTool creates a new tool for interacting with the Serper.dev API.
+func WebSearchTool() *Tool {
 	return &Tool{
-		ID: "serper_dev",
-		Usage: `You can use serper_dev. To use serper_dev, respond with JSON in this format:
+		ID: "web_search",
+		Usage: `You can use web_search. It is calling serper api (serper.dev) in the background To use serper_dev, respond with JSON in this format:
       {
-        "tool": "serper_dev",
+        "tool": "web_search",
         "params": {"query": "what ever you would like to ask"}
       }
 		`,
 		Description: "Searches the web using Serper.dev",
 		Execute: func(ctx context.Context, params map[string]any) (any, error) {
+			slog.Debug("Executing web_search tool", "params", params)
 			query, ok := params["query"].(string)
 			if !ok {
 				return nil, fmt.Errorf("query parameter is required and must be a string")

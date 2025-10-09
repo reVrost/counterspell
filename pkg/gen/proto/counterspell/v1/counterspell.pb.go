@@ -11,7 +11,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/known/anypb"
-	_ "google.golang.org/protobuf/types/known/structpb"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -207,78 +207,18 @@ func (x *ToolParam) GetItems() []string {
 	return nil
 }
 
-type Tool struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Params        map[string]*ToolParam  `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Tool) Reset() {
-	*x = Tool{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Tool) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Tool) ProtoMessage() {}
-
-func (x *Tool) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Tool.ProtoReflect.Descriptor instead.
-func (*Tool) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *Tool) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Tool) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Tool) GetParams() map[string]*ToolParam {
-	if x != nil {
-		return x.Params
-	}
-	return nil
-}
-
 type Toolset struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	BaseUrl       string                 `protobuf:"bytes,2,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
-	Tools         []*Tool                `protobuf:"bytes,3,rep,name=tools,proto3" json:"tools,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Remote        *RemoteToolset         `protobuf:"bytes,3,opt,name=remote,proto3,oneof" json:"remote,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Toolset) Reset() {
 	*x = Toolset{}
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -290,7 +230,7 @@ func (x *Toolset) String() string {
 func (*Toolset) ProtoMessage() {}
 
 func (x *Toolset) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -303,7 +243,7 @@ func (x *Toolset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Toolset.ProtoReflect.Descriptor instead.
 func (*Toolset) Descriptor() ([]byte, []int) {
-	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{4}
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Toolset) GetType() string {
@@ -313,18 +253,70 @@ func (x *Toolset) GetType() string {
 	return ""
 }
 
-func (x *Toolset) GetBaseUrl() string {
+func (x *Toolset) GetId() string {
 	if x != nil {
-		return x.BaseUrl
+		return x.Id
 	}
 	return ""
 }
 
-func (x *Toolset) GetTools() []*Tool {
+func (x *Toolset) GetRemote() *RemoteToolset {
 	if x != nil {
-		return x.Tools
+		return x.Remote
 	}
 	return nil
+}
+
+type RemoteToolset struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	TransportType string                 `protobuf:"bytes,2,opt,name=transport_type,json=transportType,proto3" json:"transport_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteToolset) Reset() {
+	*x = RemoteToolset{}
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteToolset) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteToolset) ProtoMessage() {}
+
+func (x *RemoteToolset) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_counterspell_v1_counterspell_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteToolset.ProtoReflect.Descriptor instead.
+func (*RemoteToolset) Descriptor() ([]byte, []int) {
+	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RemoteToolset) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *RemoteToolset) GetTransportType() string {
+	if x != nil {
+		return x.TransportType
+	}
+	return ""
 }
 
 // ---------- SYNTHESIZER ----------
@@ -390,13 +382,16 @@ func (x *Synthesizer) GetPrompt() string {
 
 // ---------- AGENT ----------
 type Agent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Model         string                 `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"` // reference to model key
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Instruction   string                 `protobuf:"bytes,3,opt,name=instruction,proto3" json:"instruction,omitempty"`
-	SubAgents     []string               `protobuf:"bytes,4,rep,name=sub_agents,json=subAgents,proto3" json:"sub_agents,omitempty"` // references other agents
-	Toolsets      []*Toolset             `protobuf:"bytes,5,rep,name=toolsets,proto3" json:"toolsets,omitempty"`
-	Synthesizer   *Synthesizer           `protobuf:"bytes,6,opt,name=synthesizer,proto3" json:"synthesizer,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Plan -> Execute -> Reflect loop fields
+	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PlanModel     string `protobuf:"bytes,2,opt,name=plan_model,json=planModel,proto3" json:"plan_model,omitempty"`             // reference to model key for planning
+	ReflectModel  string `protobuf:"bytes,3,opt,name=reflect_model,json=reflectModel,proto3" json:"reflect_model,omitempty"`    // reference to model key for reflection
+	PlanPrompt    string `protobuf:"bytes,4,opt,name=plan_prompt,json=planPrompt,proto3" json:"plan_prompt,omitempty"`          // planning prompt template
+	ReflectPrompt string `protobuf:"bytes,5,opt,name=reflect_prompt,json=reflectPrompt,proto3" json:"reflect_prompt,omitempty"` // reflection prompt template
+	// Tools available to this agent
+	Toolset       []*Toolset       `protobuf:"bytes,6,rep,name=toolset,proto3" json:"toolset,omitempty"`
+	Metdata       *structpb.Struct `protobuf:"bytes,7,opt,name=metdata,proto3" json:"metdata,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -431,44 +426,51 @@ func (*Agent) Descriptor() ([]byte, []int) {
 	return file_proto_counterspell_v1_counterspell_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *Agent) GetModel() string {
+func (x *Agent) GetId() string {
 	if x != nil {
-		return x.Model
+		return x.Id
 	}
 	return ""
 }
 
-func (x *Agent) GetDescription() string {
+func (x *Agent) GetPlanModel() string {
 	if x != nil {
-		return x.Description
+		return x.PlanModel
 	}
 	return ""
 }
 
-func (x *Agent) GetInstruction() string {
+func (x *Agent) GetReflectModel() string {
 	if x != nil {
-		return x.Instruction
+		return x.ReflectModel
 	}
 	return ""
 }
 
-func (x *Agent) GetSubAgents() []string {
+func (x *Agent) GetPlanPrompt() string {
 	if x != nil {
-		return x.SubAgents
+		return x.PlanPrompt
+	}
+	return ""
+}
+
+func (x *Agent) GetReflectPrompt() string {
+	if x != nil {
+		return x.ReflectPrompt
+	}
+	return ""
+}
+
+func (x *Agent) GetToolset() []*Toolset {
+	if x != nil {
+		return x.Toolset
 	}
 	return nil
 }
 
-func (x *Agent) GetToolsets() []*Toolset {
+func (x *Agent) GetMetdata() *structpb.Struct {
 	if x != nil {
-		return x.Toolsets
-	}
-	return nil
-}
-
-func (x *Agent) GetSynthesizer() *Synthesizer {
-	if x != nil {
-		return x.Synthesizer
+		return x.Metdata
 	}
 	return nil
 }
@@ -477,8 +479,9 @@ func (x *Agent) GetSynthesizer() *Synthesizer {
 type Blueprint struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Version       string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
-	Models        map[string]*Model      `protobuf:"bytes,2,rep,name=models,proto3" json:"models,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // planning_model, thinking_model, etc.
-	Agents        map[string]*Agent      `protobuf:"bytes,3,rep,name=agents,proto3" json:"agents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // planner, stock_pricer, etc.
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`                                                                               // e.g., counterspell
+	Models        map[string]*Model      `protobuf:"bytes,3,rep,name=models,proto3" json:"models,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // models by id
+	Agents        map[string]*Agent      `protobuf:"bytes,4,rep,name=agents,proto3" json:"agents,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // agents by key, including root
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -516,6 +519,13 @@ func (*Blueprint) Descriptor() ([]byte, []int) {
 func (x *Blueprint) GetVersion() string {
 	if x != nil {
 		return x.Version
+	}
+	return ""
+}
+
+func (x *Blueprint) GetType() string {
+	if x != nil {
+		return x.Type
 	}
 	return ""
 }
@@ -1435,34 +1445,34 @@ const file_proto_counterspell_v1_counterspell_proto_rawDesc = "" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
 	"\brequired\x18\x03 \x01(\bR\brequired\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x14\n" +
-	"\x05items\x18\x05 \x03(\tR\x05items\"\xce\x01\n" +
-	"\x04Tool\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x129\n" +
-	"\x06params\x18\x03 \x03(\v2!.counterspell.v1.Tool.ParamsEntryR\x06params\x1aU\n" +
-	"\vParamsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
-	"\x05value\x18\x02 \x01(\v2\x1a.counterspell.v1.ToolParamR\x05value:\x028\x01\"e\n" +
+	"\x05items\x18\x05 \x03(\tR\x05items\"u\n" +
 	"\aToolset\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12\x19\n" +
-	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\x12+\n" +
-	"\x05tools\x18\x03 \x03(\v2\x15.counterspell.v1.ToolR\x05tools\"]\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\x12;\n" +
+	"\x06remote\x18\x03 \x01(\v2\x1e.counterspell.v1.RemoteToolsetH\x00R\x06remote\x88\x01\x01B\t\n" +
+	"\a_remote\"H\n" +
+	"\rRemoteToolset\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12%\n" +
+	"\x0etransport_type\x18\x02 \x01(\tR\rtransportType\"]\n" +
 	"\vSynthesizer\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x16\n" +
-	"\x06prompt\x18\x03 \x01(\tR\x06prompt\"\xf6\x01\n" +
-	"\x05Agent\x12\x14\n" +
-	"\x05model\x18\x01 \x01(\tR\x05model\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x12 \n" +
-	"\vinstruction\x18\x03 \x01(\tR\vinstruction\x12\x1d\n" +
+	"\x06prompt\x18\x03 \x01(\tR\x06prompt\"\x8a\x02\n" +
+	"\x05Agent\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"sub_agents\x18\x04 \x03(\tR\tsubAgents\x124\n" +
-	"\btoolsets\x18\x05 \x03(\v2\x18.counterspell.v1.ToolsetR\btoolsets\x12>\n" +
-	"\vsynthesizer\x18\x06 \x01(\v2\x1c.counterspell.v1.SynthesizerR\vsynthesizer\"\xcb\x02\n" +
+	"plan_model\x18\x02 \x01(\tR\tplanModel\x12#\n" +
+	"\rreflect_model\x18\x03 \x01(\tR\freflectModel\x12\x1f\n" +
+	"\vplan_prompt\x18\x04 \x01(\tR\n" +
+	"planPrompt\x12%\n" +
+	"\x0ereflect_prompt\x18\x05 \x01(\tR\rreflectPrompt\x122\n" +
+	"\atoolset\x18\x06 \x03(\v2\x18.counterspell.v1.ToolsetR\atoolset\x121\n" +
+	"\ametdata\x18\a \x01(\v2\x17.google.protobuf.StructR\ametdata\"\xdf\x02\n" +
 	"\tBlueprint\x12\x18\n" +
-	"\aversion\x18\x01 \x01(\tR\aversion\x12>\n" +
-	"\x06models\x18\x02 \x03(\v2&.counterspell.v1.Blueprint.ModelsEntryR\x06models\x12>\n" +
-	"\x06agents\x18\x03 \x03(\v2&.counterspell.v1.Blueprint.AgentsEntryR\x06agents\x1aQ\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12>\n" +
+	"\x06models\x18\x03 \x03(\v2&.counterspell.v1.Blueprint.ModelsEntryR\x06models\x12>\n" +
+	"\x06agents\x18\x04 \x03(\v2&.counterspell.v1.Blueprint.AgentsEntryR\x06agents\x1aQ\n" +
 	"\vModelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
 	"\x05value\x18\x02 \x01(\v2\x16.counterspell.v1.ModelR\x05value:\x028\x01\x1aQ\n" +
@@ -1572,13 +1582,13 @@ func file_proto_counterspell_v1_counterspell_proto_rawDescGZIP() []byte {
 	return file_proto_counterspell_v1_counterspell_proto_rawDescData
 }
 
-var file_proto_counterspell_v1_counterspell_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_proto_counterspell_v1_counterspell_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_proto_counterspell_v1_counterspell_proto_goTypes = []any{
 	(*Pagination)(nil),              // 0: counterspell.v1.Pagination
 	(*Model)(nil),                   // 1: counterspell.v1.Model
 	(*ToolParam)(nil),               // 2: counterspell.v1.ToolParam
-	(*Tool)(nil),                    // 3: counterspell.v1.Tool
-	(*Toolset)(nil),                 // 4: counterspell.v1.Toolset
+	(*Toolset)(nil),                 // 3: counterspell.v1.Toolset
+	(*RemoteToolset)(nil),           // 4: counterspell.v1.RemoteToolset
 	(*Synthesizer)(nil),             // 5: counterspell.v1.Synthesizer
 	(*Agent)(nil),                   // 6: counterspell.v1.Agent
 	(*Blueprint)(nil),               // 7: counterspell.v1.Blueprint
@@ -1597,51 +1607,49 @@ var file_proto_counterspell_v1_counterspell_proto_goTypes = []any{
 	(*Span)(nil),                    // 20: counterspell.v1.Span
 	(*GetTraceRequest)(nil),         // 21: counterspell.v1.GetTraceRequest
 	(*GetTraceResponse)(nil),        // 22: counterspell.v1.GetTraceResponse
-	nil,                             // 23: counterspell.v1.Tool.ParamsEntry
-	nil,                             // 24: counterspell.v1.Blueprint.ModelsEntry
-	nil,                             // 25: counterspell.v1.Blueprint.AgentsEntry
-	nil,                             // 26: counterspell.v1.Log.AttributesEntry
-	nil,                             // 27: counterspell.v1.Span.AttributesEntry
+	nil,                             // 23: counterspell.v1.Blueprint.ModelsEntry
+	nil,                             // 24: counterspell.v1.Blueprint.AgentsEntry
+	nil,                             // 25: counterspell.v1.Log.AttributesEntry
+	nil,                             // 26: counterspell.v1.Span.AttributesEntry
+	(*structpb.Struct)(nil),         // 27: google.protobuf.Struct
 }
 var file_proto_counterspell_v1_counterspell_proto_depIdxs = []int32{
-	23, // 0: counterspell.v1.Tool.params:type_name -> counterspell.v1.Tool.ParamsEntry
-	3,  // 1: counterspell.v1.Toolset.tools:type_name -> counterspell.v1.Tool
-	4,  // 2: counterspell.v1.Agent.toolsets:type_name -> counterspell.v1.Toolset
-	5,  // 3: counterspell.v1.Agent.synthesizer:type_name -> counterspell.v1.Synthesizer
-	24, // 4: counterspell.v1.Blueprint.models:type_name -> counterspell.v1.Blueprint.ModelsEntry
-	25, // 5: counterspell.v1.Blueprint.agents:type_name -> counterspell.v1.Blueprint.AgentsEntry
-	7,  // 6: counterspell.v1.CreateBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
-	0,  // 7: counterspell.v1.ListBlueprintsRequest.pagination:type_name -> counterspell.v1.Pagination
-	7,  // 8: counterspell.v1.ListBlueprintsResponse.blueprints:type_name -> counterspell.v1.Blueprint
-	7,  // 9: counterspell.v1.GetBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
-	0,  // 10: counterspell.v1.ListLogsRequest.pagination:type_name -> counterspell.v1.Pagination
-	18, // 11: counterspell.v1.ListLogsResponse.logs:type_name -> counterspell.v1.Log
-	0,  // 12: counterspell.v1.ListTracesRequest.pagination:type_name -> counterspell.v1.Pagination
-	19, // 13: counterspell.v1.ListTracesResponse.traces:type_name -> counterspell.v1.Trace
-	26, // 14: counterspell.v1.Log.attributes:type_name -> counterspell.v1.Log.AttributesEntry
-	20, // 15: counterspell.v1.Trace.spans:type_name -> counterspell.v1.Span
-	27, // 16: counterspell.v1.Span.attributes:type_name -> counterspell.v1.Span.AttributesEntry
-	19, // 17: counterspell.v1.GetTraceResponse.trace:type_name -> counterspell.v1.Trace
-	2,  // 18: counterspell.v1.Tool.ParamsEntry.value:type_name -> counterspell.v1.ToolParam
-	1,  // 19: counterspell.v1.Blueprint.ModelsEntry.value:type_name -> counterspell.v1.Model
-	6,  // 20: counterspell.v1.Blueprint.AgentsEntry.value:type_name -> counterspell.v1.Agent
-	8,  // 21: counterspell.v1.Service.CreateBlueprint:input_type -> counterspell.v1.CreateBlueprintRequest
-	12, // 22: counterspell.v1.Service.GetBlueprint:input_type -> counterspell.v1.GetBlueprintRequest
-	10, // 23: counterspell.v1.Service.ListBlueprints:input_type -> counterspell.v1.ListBlueprintsRequest
-	14, // 24: counterspell.v1.Service.ListLogs:input_type -> counterspell.v1.ListLogsRequest
-	16, // 25: counterspell.v1.Service.ListTraces:input_type -> counterspell.v1.ListTracesRequest
-	21, // 26: counterspell.v1.Service.GetTrace:input_type -> counterspell.v1.GetTraceRequest
-	9,  // 27: counterspell.v1.Service.CreateBlueprint:output_type -> counterspell.v1.CreateBlueprintResponse
-	13, // 28: counterspell.v1.Service.GetBlueprint:output_type -> counterspell.v1.GetBlueprintResponse
-	11, // 29: counterspell.v1.Service.ListBlueprints:output_type -> counterspell.v1.ListBlueprintsResponse
-	15, // 30: counterspell.v1.Service.ListLogs:output_type -> counterspell.v1.ListLogsResponse
-	17, // 31: counterspell.v1.Service.ListTraces:output_type -> counterspell.v1.ListTracesResponse
-	22, // 32: counterspell.v1.Service.GetTrace:output_type -> counterspell.v1.GetTraceResponse
-	27, // [27:33] is the sub-list for method output_type
-	21, // [21:27] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	4,  // 0: counterspell.v1.Toolset.remote:type_name -> counterspell.v1.RemoteToolset
+	3,  // 1: counterspell.v1.Agent.toolset:type_name -> counterspell.v1.Toolset
+	27, // 2: counterspell.v1.Agent.metdata:type_name -> google.protobuf.Struct
+	23, // 3: counterspell.v1.Blueprint.models:type_name -> counterspell.v1.Blueprint.ModelsEntry
+	24, // 4: counterspell.v1.Blueprint.agents:type_name -> counterspell.v1.Blueprint.AgentsEntry
+	7,  // 5: counterspell.v1.CreateBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
+	0,  // 6: counterspell.v1.ListBlueprintsRequest.pagination:type_name -> counterspell.v1.Pagination
+	7,  // 7: counterspell.v1.ListBlueprintsResponse.blueprints:type_name -> counterspell.v1.Blueprint
+	7,  // 8: counterspell.v1.GetBlueprintResponse.blueprint:type_name -> counterspell.v1.Blueprint
+	0,  // 9: counterspell.v1.ListLogsRequest.pagination:type_name -> counterspell.v1.Pagination
+	18, // 10: counterspell.v1.ListLogsResponse.logs:type_name -> counterspell.v1.Log
+	0,  // 11: counterspell.v1.ListTracesRequest.pagination:type_name -> counterspell.v1.Pagination
+	19, // 12: counterspell.v1.ListTracesResponse.traces:type_name -> counterspell.v1.Trace
+	25, // 13: counterspell.v1.Log.attributes:type_name -> counterspell.v1.Log.AttributesEntry
+	20, // 14: counterspell.v1.Trace.spans:type_name -> counterspell.v1.Span
+	26, // 15: counterspell.v1.Span.attributes:type_name -> counterspell.v1.Span.AttributesEntry
+	19, // 16: counterspell.v1.GetTraceResponse.trace:type_name -> counterspell.v1.Trace
+	1,  // 17: counterspell.v1.Blueprint.ModelsEntry.value:type_name -> counterspell.v1.Model
+	6,  // 18: counterspell.v1.Blueprint.AgentsEntry.value:type_name -> counterspell.v1.Agent
+	8,  // 19: counterspell.v1.Service.CreateBlueprint:input_type -> counterspell.v1.CreateBlueprintRequest
+	12, // 20: counterspell.v1.Service.GetBlueprint:input_type -> counterspell.v1.GetBlueprintRequest
+	10, // 21: counterspell.v1.Service.ListBlueprints:input_type -> counterspell.v1.ListBlueprintsRequest
+	14, // 22: counterspell.v1.Service.ListLogs:input_type -> counterspell.v1.ListLogsRequest
+	16, // 23: counterspell.v1.Service.ListTraces:input_type -> counterspell.v1.ListTracesRequest
+	21, // 24: counterspell.v1.Service.GetTrace:input_type -> counterspell.v1.GetTraceRequest
+	9,  // 25: counterspell.v1.Service.CreateBlueprint:output_type -> counterspell.v1.CreateBlueprintResponse
+	13, // 26: counterspell.v1.Service.GetBlueprint:output_type -> counterspell.v1.GetBlueprintResponse
+	11, // 27: counterspell.v1.Service.ListBlueprints:output_type -> counterspell.v1.ListBlueprintsResponse
+	15, // 28: counterspell.v1.Service.ListLogs:output_type -> counterspell.v1.ListLogsResponse
+	17, // 29: counterspell.v1.Service.ListTraces:output_type -> counterspell.v1.ListTracesResponse
+	22, // 30: counterspell.v1.Service.GetTrace:output_type -> counterspell.v1.GetTraceResponse
+	25, // [25:31] is the sub-list for method output_type
+	19, // [19:25] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_proto_counterspell_v1_counterspell_proto_init() }
@@ -1649,13 +1657,14 @@ func file_proto_counterspell_v1_counterspell_proto_init() {
 	if File_proto_counterspell_v1_counterspell_proto != nil {
 		return
 	}
+	file_proto_counterspell_v1_counterspell_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_counterspell_v1_counterspell_proto_rawDesc), len(file_proto_counterspell_v1_counterspell_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

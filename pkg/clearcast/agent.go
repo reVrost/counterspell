@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"strings"
 	"text/template"
@@ -18,30 +19,22 @@ const AgentModePlan = "plan"
 const AgentModeLoop = "loop"
 const AgentModeSingle = "single"
 
-const planModePromptAddition = `
-	## OUTPUT FORMAT
-	kind: Either "agent" or "tool"
-	id: The ID of the agent or tool to execute
-	params: The parameters to pass to the agent or tool
+const availableToolsPrompt = `
+## Iterations guideline
+	If you are one off to the max iterations, make the best out of what you have and end your plan with done: true to produce the final output.
 
-	## EXAMPLE
-		Your output must be a JSON object matching this schema:
-		{
-			"plan": [
-				{
-					"kind": "agent",
-					"id": "final_writer",
-					"params": {}
-				}
-			]
-		}
-`
+CURRENT ITERATION: {{.iteration}}
+MAX ITERATIONS: {{.max_iterations}}
 
-const loopModePromptAddition = `
+{{if .next_hints}}
+	## PREVIOUS HINTS
+	{{.next_hints}}
+{{end}}
 
 ## AVAILABLE TOOLS
 {{range .tools}}
 - **{{.id}}**: {{.description}}
+	USAGE: {{.usage}}
 {{end}}
 
 ## TOOL USAGE INSTRUCTIONS
@@ -55,19 +48,11 @@ You can use the available tools to gather information and accomplish your task. 
 
    **IMPORTANT**: Use the EXACT tool ID as listed above (e.g., "serper_dev", NOT "search" or any other name)
 
-2. **When you have completed your task**, respond with ONLY a JSON object:
-   {
-     "final_answer": "your comprehensive answer here"
-   }
-
 **Critical Requirements:**
 - Respond with PLAIN JSON only - do NOT wrap in markdown code blocks (no ` + "```" + `)
 - Each response must be a single valid JSON object
 - Use the EXACT tool IDs as listed in "AVAILABLE TOOLS" above
-- For web search, use tool ID: "serper_dev" with params: {"query": "your search query"}
 - Use tools iteratively to gather information
-- Provide a final_answer only when you have sufficient information
-- Be thorough in your research before concluding
 `
 
 // DebugContextKey for context-based debug flag
@@ -97,7 +82,7 @@ func WithOTEL(enabled bool) AgentOption {
 
 func WithDefaultTools(IDs ...string) AgentOption {
 	defaultToolsMap := map[string]*Tool{
-		"serper_dev": SerperDevTool(),
+		"web_search": WebSearchTool(),
 	}
 	return func(r *Agent) {
 		for _, ID := range IDs {
@@ -116,10 +101,9 @@ func WithTools(tools ...*Tool) AgentOption {
 	}
 }
 
-// WithAutoToolInstructions controls whether to auto-add tool instructions for loop mode
-func WithAutoToolInstructions(enabled bool) AgentOption {
-	return func(p *Agent) {
-		p.autoToolInstructions = enabled
+func WithTool(tool *Tool) AgentOption {
+	return func(r *Agent) {
+		r.tools[tool.ID] = tool
 	}
 }
 
@@ -139,35 +123,28 @@ func (a *Agent) GetTools() Tools {
 
 // Agent struct with slog and OTEL toggle
 type Agent struct {
-	ID                   string
-	Model                string
-	Prompt               string
-	mode                 string
-	autoToolInstructions bool // Auto-add tool instructions for loop mode
-	llm                  LLMProvider
-	logger               *slog.Logger
-	tracer               trace.Tracer
-	enableOTEL           bool
-	tools                Tools
+	ID         string
+	Prompt     string
+	Iteration  int
+	Model      string
+	llm        LLMProvider
+	logger     *slog.Logger
+	tracer     trace.Tracer
+	enableOTEL bool
+	tools      Tools
 }
 
 // NewAgent creates a new Prompt with slog (JSON handler) and OTEL enabled by default
-func NewAgent(id, mode, model, template string,
-	llm LLMProvider, opts ...AgentOption) *Agent {
+func NewAgent(id, model, prompt string, llm LLMProvider, opts ...AgentOption) *Agent {
 	p := &Agent{
-		ID:                   id,
-		Model:                model,
-		mode:                 mode,
-		Prompt:               template,
-		autoToolInstructions: true, // Default: auto-add tool instructions
-		llm:                  llm,
-		logger:               slog.New(slog.NewJSONHandler(os.Stdout, nil)),
-		tracer:               otel.Tracer("clearcast/prompt"),
-		enableOTEL:           true,
-		tools:                make(Tools),
-	}
-	if mode == "" {
-		p.mode = AgentModeSingle
+		ID:         id,
+		Model:      model,
+		Prompt:     prompt,
+		llm:        llm,
+		logger:     slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+		tracer:     otel.Tracer("clearcast/prompt"),
+		enableOTEL: true,
+		tools:      make(Tools),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -235,63 +212,38 @@ func (t *Agent) render(ctx context.Context, promptTemplate string, values map[st
 	return rendered, nil
 }
 
-type StepOption func(*ChatCompletionRequest)
+type ResponseOption func(*ChatCompletionRequest)
 
-func WithResponseFormat(format ResponseFormat) StepOption {
+func WithResponseFormat(format ResponseFormat) ResponseOption {
 	return func(req *ChatCompletionRequest) {
 		req.ResponseFormat = &format
 	}
 }
 
 // Non-streaming completion
-func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOption) (ChatCompletionResponse, error) {
+func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...ResponseOption) (ChatCompletionResponse, error) {
 	var span trace.Span
 	if t.enableOTEL {
-		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletion")
+		ctx, span = t.tracer.Start(ctx, "Agent.Plan")
 		defer span.End()
 		span.SetAttributes(attribute.String("model", t.Model))
 	}
 
-	prompt := t.Prompt
-	if t.mode == AgentModePlan {
-		prompt += planModePromptAddition
-	} else if t.mode == AgentModeLoop && t.autoToolInstructions {
-		prompt += loopModePromptAddition
-	}
+	prompt := t.Prompt + availableToolsPrompt
+	// convert t.tools to map[string]any
+	maps.Copy(args, t.tools.toMap())
 
 	rendered, err := t.render(ctx, prompt, args)
 	if err != nil {
 		if t.enableOTEL {
 			span.RecordError(err)
 		}
-		t.logger.Error("Error rendering template for chat completion", "model", t.Model, "error", err)
+		t.logger.Error("Error rendering template for plan completion", "model", t.Model, "error", err)
 		return ChatCompletionResponse{}, fmt.Errorf("error rendering template: %w", err)
 	}
 
 	// Build messages: start with system prompt, then add session messages
 	messages := []ChatMessage{SystemMessage(rendered)}
-
-	// Add session messages if available in args
-	if sessionMessages, ok := args["messages"].([]Message); ok {
-		for _, msg := range sessionMessages {
-			messages = append(messages, ChatMessage{
-				Role:    msg.Role,
-				Content: msg.Content,
-			})
-		}
-	}
-
-	// Add tools information to session for loop mode agents
-	if len(t.tools) > 0 {
-		toolsList := make([]map[string]string, 0, len(t.tools))
-		for _, tool := range t.tools {
-			toolsList = append(toolsList, map[string]string{
-				"id":          tool.ID,
-				"description": tool.Description,
-			})
-		}
-		args["tools"] = toolsList
-	}
 
 	req := ChatCompletionRequest{
 		Model:    t.Model,
@@ -321,115 +273,88 @@ func (t *Agent) Step(ctx context.Context, args map[string]any, opts ...StepOptio
 		t.logger.Debug("Chat completion successful", append(keyvals, "response", resp, "ttft_ms", ttft, "usage", resp.Usage)...)
 	}
 
+	t.logger.Info("Chat completion successful", "response", resp, "ttft_ms", ttft, "usage", resp.Usage)
+
 	return resp, nil
 }
 
 // Streaming completion
-func (t *Agent) StepStream(ctx context.Context, args map[string]any, opts ...StepOption) (<-chan ChatCompletionChunk, error) {
-	var span trace.Span
-	if t.enableOTEL {
-		ctx, span = t.tracer.Start(ctx, "Prompt.ChatCompletionStream")
-		defer span.End()
-		span.SetAttributes(attribute.String("model", t.Model))
-	}
+// func (t *Agent) Reflect(ctx context.Context, args map[string]any, opts ...ResponseOption) (<-chan ChatCompletionChunk, error) {
+// 	var span trace.Span
+// 	if t.enableOTEL {
+// 		ctx, span = t.tracer.Start(ctx, "Agent.Reflect")
+// 		defer span.End()
+// 		span.SetAttributes(attribute.String("model", t.ReflectModel))
+// 	}
+//
+// 	rendered, err := t.render(ctx, t.ReflectPrompt, args)
+// 	if err != nil {
+// 		if t.enableOTEL {
+// 			span.RecordError(err)
+// 		}
+// 		t.logger.Error("Error rendering template for streaming chat completion", "model", t.ReflectModel, "error", err)
+// 		return nil, fmt.Errorf("error rendering template: %w", err)
+// 	}
+//
+// 	// Build messages: start with system prompt, then add session messages
+// 	messages := []ChatMessage{SystemMessage(rendered)}
+// 	req := ChatCompletionRequest{
+// 		Model:    t.ReflectModel,
+// 		Messages: messages,
+// 	}
+// 	for _, opt := range opts {
+// 		opt(&req)
+// 	}
+//
+// 	t.logger.Info("Reflecting", "prompt", rendered, "args", args)
+// 	// startTime := time.Now()
+// 	stream, err := t.llm.ChatCompletionStream(ctx, req)
+// 	if err != nil {
+// 		if t.enableOTEL {
+// 			span.RecordError(err)
+// 		}
+// 		t.logger.Error("Streaming chat completion failed", "model", t.ReflectModel, "error", err)
+// 		return nil, err
+// 	}
 
-	prompt := t.Prompt
-	if t.mode == AgentModePlan {
-		prompt += planModePromptAddition
-	} else if t.mode == AgentModeLoop && t.autoToolInstructions {
-		prompt += loopModePromptAddition
-	}
+// if keyvals := t.debugLog(ctx, t.ReflectModel); keyvals != nil {
+// 	t.logger.Debug("Streaming chat completion started", keyvals...)
+// }
 
-	rendered, err := t.render(ctx, prompt, args)
-	if err != nil {
-		if t.enableOTEL {
-			span.RecordError(err)
-		}
-		t.logger.Error("Error rendering template for streaming chat completion", "model", t.Model, "error", err)
-		return nil, fmt.Errorf("error rendering template: %w", err)
-	}
+// resultChan := make(chan ChatCompletionChunk)
+// go func() {
+// 	defer close(resultChan)
+// 	var totalUsage Usage
+// 	firstChunkReceived := false
+// 	for chunk := range stream {
+// 		if !firstChunkReceived {
+// 			ttft := float64(time.Since(startTime).Nanoseconds()) / 1e6
+// 			if t.enableOTEL {
+// 				span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
+// 			}
+// 			if keyvals := t.debugLog(ctx, t.ReflectModel); keyvals != nil {
+// 				t.logger.Debug("First chunk received for streaming chat completion", append(keyvals, "ttft_ms", ttft)...)
+// 			}
+// 			firstChunkReceived = true
+// 		}
+//
+// 		totalUsage.PromptTokens += chunk.Usage.PromptTokens
+// 		totalUsage.CompletionTokens += chunk.Usage.CompletionTokens
+// 		totalUsage.TotalTokens += chunk.Usage.TotalTokens
+// 		totalUsage.Cost += chunk.Usage.Cost
+// 		totalUsage.CompletionTokenDetails.ReasoningTokens += chunk.Usage.CompletionTokenDetails.ReasoningTokens
+// 		totalUsage.PromptTokenDetails.CachedTokens += chunk.Usage.PromptTokenDetails.CachedTokens
+// 		totalUsage.CostDetails.UpstreamInferenceCost += chunk.Usage.CostDetails.UpstreamInferenceCost
+// 		resultChan <- chunk
+// 	}
+//
+// 	if t.enableOTEL {
+// 		t.recordUsageAttributes(span, totalUsage)
+// 	}
+// 	if keyvals := t.debugLog(ctx, t.ReflectModel); keyvals != nil {
+// 		t.logger.Debug("Streaming chat completion completed", append(keyvals, "usage", totalUsage)...)
+// 	}
+// }()
 
-	// Build messages: start with system prompt, then add session messages
-	messages := []ChatMessage{SystemMessage(rendered)}
-
-	// Add session messages if available in args
-	if sessionMessages, ok := args["messages"].([]Message); ok {
-		for _, msg := range sessionMessages {
-			messages = append(messages, ChatMessage{
-				Role:    msg.Role,
-				Content: msg.Content,
-			})
-		}
-	}
-
-	// Add tools information to session for loop mode agents
-	if len(t.tools) > 0 {
-		toolsList := make([]map[string]string, 0, len(t.tools))
-		for _, tool := range t.tools {
-			toolsList = append(toolsList, map[string]string{
-				"id":          tool.ID,
-				"description": tool.Description,
-			})
-		}
-		args["tools"] = toolsList
-	}
-
-	req := ChatCompletionRequest{
-		Model:    t.Model,
-		Messages: messages,
-	}
-	for _, opt := range opts {
-		opt(&req)
-	}
-
-	startTime := time.Now()
-	stream, err := t.llm.ChatCompletionStream(ctx, req)
-	if err != nil {
-		if t.enableOTEL {
-			span.RecordError(err)
-		}
-		t.logger.Error("Streaming chat completion failed", "model", t.Model, "error", err)
-		return nil, err
-	}
-
-	if keyvals := t.debugLog(ctx, t.Model); keyvals != nil {
-		t.logger.Debug("Streaming chat completion started", keyvals...)
-	}
-
-	usageChan := make(chan ChatCompletionChunk)
-	go func() {
-		defer close(usageChan)
-		var totalUsage Usage
-		firstChunkReceived := false
-		for chunk := range stream {
-			if !firstChunkReceived {
-				ttft := float64(time.Since(startTime).Nanoseconds()) / 1e6
-				if t.enableOTEL {
-					span.SetAttributes(attribute.Float64("metrics.ttft_ms", ttft))
-				}
-				if keyvals := t.debugLog(ctx, t.Model); keyvals != nil {
-					t.logger.Debug("First chunk received for streaming chat completion", append(keyvals, "ttft_ms", ttft)...)
-				}
-				firstChunkReceived = true
-			}
-
-			totalUsage.PromptTokens += chunk.Usage.PromptTokens
-			totalUsage.CompletionTokens += chunk.Usage.CompletionTokens
-			totalUsage.TotalTokens += chunk.Usage.TotalTokens
-			totalUsage.Cost += chunk.Usage.Cost
-			totalUsage.CompletionTokenDetails.ReasoningTokens += chunk.Usage.CompletionTokenDetails.ReasoningTokens
-			totalUsage.PromptTokenDetails.CachedTokens += chunk.Usage.PromptTokenDetails.CachedTokens
-			totalUsage.CostDetails.UpstreamInferenceCost += chunk.Usage.CostDetails.UpstreamInferenceCost
-			usageChan <- chunk
-		}
-
-		if t.enableOTEL {
-			t.recordUsageAttributes(span, totalUsage)
-		}
-		if keyvals := t.debugLog(ctx, t.Model); keyvals != nil {
-			t.logger.Debug("Streaming chat completion completed", append(keyvals, "usage", totalUsage)...)
-		}
-	}()
-
-	return usageChan, nil
-}
+// return stream, nil
+// }

@@ -32,37 +32,41 @@ func stripMarkdownCodeBlock(content string) string {
 
 // Runtime is an execution environment that can run tasks (agents or plain functions)
 type Runtime interface {
-	Run(ctx context.Context, sess *Session) (string, error)
-	RunStream(ctx context.Context, sess *Session) <-chan RuntimeEvent
+	Run(ctx context.Context) (string, error)
+	RunStream(ctx context.Context) <-chan RuntimeEvent
 }
 
 // manages the execution of agents or tools
 type runtime struct {
-	maxIterations int
-	iterations    int
-	agents        Agents
-	workspace     map[string]any
+	agents    Agents
+	workspace map[string]any
+	sess      *Session
 }
 
 type Tools map[string]*Tool
 type Agents map[string]*Agent
 
-func (a Agents) Step(ctx context.Context, agentID string, sess *Session, opts ...StepOption) (ChatCompletionResponse, error) {
-	agent, ok := a[agentID]
-	if !ok {
-		return ChatCompletionResponse{}, fmt.Errorf("agent not found: %s", agentID)
+func (t Tools) toMap() map[string]any {
+	m := make(map[string]any)
+	toolsList := make([]map[string]string, 0, len(t))
+	for _, tool := range t {
+		toolsList = append(toolsList, map[string]string{
+			"id":          tool.ID,
+			"description": tool.Description,
+			"usage":       tool.Usage,
+		})
 	}
-
-	return agent.Step(ctx, sess.ToMap(), opts...)
+	m["tools"] = toolsList
+	return m
 }
 
-func (a Agents) StepStream(ctx context.Context, agentID string, sess *Session, opts ...StepOption) (<-chan ChatCompletionChunk, error) {
-	agent, ok := a[agentID]
-	if !ok {
-		return nil, fmt.Errorf("agent not found: %s", agentID)
-	}
-	return agent.StepStream(ctx, sess.ToMap(), opts...)
-}
+// func (a Agents) StepStream(ctx context.Context, agentID string, sess *Session, opts ...StepOption) (<-chan ChatCompletionChunk, error) {
+// 	agent, ok := a[agentID]
+// 	if !ok {
+// 		return nil, fmt.Errorf("agent not found: %s", agentID)
+// 	}
+// 	return agent.StepStream(ctx, sess.ToMap(), opts...)
+// }
 
 func (t Tools) Execute(ctx context.Context, toolID string, params map[string]any) (any, error) {
 	tool, ok := t[toolID]
@@ -83,6 +87,13 @@ func WithAgents(agents ...*Agent) RuntimeOption {
 	}
 }
 
+func WithSession(sess *Session) RuntimeOption {
+	return func(r *runtime) {
+		r.sess = sess
+		r.workspace = sess.Workspace
+	}
+}
+
 func NewRuntime(opts ...RuntimeOption) *runtime {
 	rt := &runtime{
 		agents:    make(map[string]*Agent),
@@ -94,175 +105,115 @@ func NewRuntime(opts ...RuntimeOption) *runtime {
 	return rt
 }
 
-// runLoop is re-act style agent exxecution, it will recursively call itself untill the agent
-// deemed the task is complete or if max iterations is reached
+const maxTurns = 2
+
+// runLoop is a plan-orchestrate execution style agent execution. It will
+// iteratively plan and execute until a final answer is reached or max turns are exceeded.
 func (r *runtime) runLoop(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
-	maxIterations := sess.MaxIterations
-	if maxIterations == 0 {
-		maxIterations = 10 // Default
-	}
-
-	for {
-		if r.iterations >= maxIterations {
-			slog.Debug("Maximum iterations reached", "agent", sess.RootAgentID)
-			eventsChan <- Final(fmt.Sprintf("Maximum iterations reached, %d", maxIterations))
-			return
-		}
-		r.iterations++
-		// immediate exit if context cancelled e.g ctrl c
-		if err := ctx.Err(); err != nil {
-			slog.Debug("Runtime stream cancelled", "agent", sess.RootAgentID, "error", err)
-			eventsChan <- Final(fmt.Sprintf("Runtime stream cancelled, %s", err))
-			return
-		}
-		// Agent takes a step
-		result, err := r.agents.Step(ctx, sess.RootAgentID, sess)
-		if err != nil {
-			slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err)
-			eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
-			return
-		}
-
-		eventsChan <- &AgentChoiceEvent{
-			Content: result.Content,
-			Usage:   result.Usage,
-		}
-
-		var action struct {
-			Tool        string         `json:"tool"`
-			Params      map[string]any `json:"params"`
-			FinalAnswer string         `json:"final_answer"`
-		}
-
-		// Strip markdown code blocks before parsing JSON
-		cleanContent := stripMarkdownCodeBlock(result.Content)
-
-		if err := json.Unmarshal([]byte(cleanContent), &action); err != nil {
-			slog.Debug("Could not decode agent action, assuming it's a final answer", "error", err, "content", result.Content, "cleaned", cleanContent, "result", result)
-			eventsChan <- Final(result.Content)
-			return
-		}
-
-		if action.FinalAnswer != "" {
-			eventsChan <- Final(action.FinalAnswer)
-			return
-		}
-
-		if action.Tool != "" {
-			// Get the agent to execute the tool
-			agent, ok := r.agents[sess.RootAgentID]
-			if !ok {
-				errorMsg := fmt.Sprintf("Agent not found: %s", sess.RootAgentID)
-				slog.Debug(errorMsg)
-				eventsChan <- Error(errorMsg)
-				return
-			}
-
-			toolResult, err := agent.ExecuteTool(ctx, action.Tool, action.Params)
-			if err != nil {
-				errorMsg := fmt.Sprintf("Tool execution error: %s", err)
-				slog.Debug(errorMsg)
-				sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
-				sess.Messages = append(sess.Messages, Message{Role: "tool_call", Content: fmt.Sprintf("Error: %s", errorMsg)})
-				continue
-			}
-
-			sess.Messages = append(sess.Messages, Message{Role: "assistant", Content: result.Content})
-
-			toolResultBytes, _ := json.Marshal(toolResult)
-			observation := string(toolResultBytes)
-
-			sess.Messages = append(sess.Messages, Message{Role: "tool_call", Content: observation})
-		} else {
-			// No tool, no final answer. What to do? Assume it's the final answer.
-			eventsChan <- Final(result.Content)
-			return
-		}
-	}
-}
-
-// runPlan is a plan-orchestrate execution style agent execution, it will come up with a plan
-// and execute it in a single step
-func (r *runtime) runPlan(ctx context.Context, eventsChan chan RuntimeEvent, sess *Session) {
-	planRes, err := r.agents.Step(ctx, sess.RootAgentID, sess, WithResponseFormat(ResponseFormat{
-		Type: ResponseFormatTypeJSON,
-	}))
-	if err != nil {
-		slog.Debug("Agent step error", "agent", sess.RootAgentID, "error", err, "content", planRes)
-		eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
-	}
-
-	plansEvent, err := DecodeMessage[*PlanResultEvent](planRes)
-	if err != nil {
-		slog.Debug("Agent decode step error", "agent", sess.RootAgentID, "error", err, "content", planRes)
-		eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err))
-	}
-	eventsChan <- plansEvent
-
-	// Get the planner agent for tool execution
-	plannerAgent, ok := r.agents[sess.RootAgentID]
+	rootAgent, ok := r.agents[sess.RootAgentID]
 	if !ok {
-		eventsChan <- Error(fmt.Sprintf("Planner agent not found: %s", sess.RootAgentID))
+		slog.Error("Agent not found", "agent", sess.RootAgentID)
+		eventsChan <- Error(fmt.Sprintf("Agent not found: %s", sess.RootAgentID))
 		return
 	}
 
-	for _, plan := range plansEvent.Plans {
-		// TODO: execute the plan
-		slog.Debug("Executing plan", "agent", sess.RootAgentID, "plan", plan)
-		switch plan.Kind {
-		case PlanKindTool:
-			result, err := plannerAgent.ExecuteTool(ctx, plan.ID, plan.Params)
-			if err != nil {
-				slog.Debug("Tool execution error", "tool", plan.ID, "error", err)
-				eventsChan <- Error(fmt.Sprintf("Tool execution error: %s", err.Error()))
-			}
+	r.workspace["next_hints"] = ""
+	// The main execution loop. It will run for a maximum of `maxTurns`.
+	for i := range maxTurns {
+		r.workspace["iteration"] = i
+		r.workspace["max_iterations"] = maxTurns
+		// 1. PLAN: The agent thinks about what to do next based on the current workspace.
+		planRes, err := rootAgent.Step(ctx, r.workspace, WithResponseFormat(ResponseFormat{
+			Type: ResponseFormatTypeJSON,
+		}))
+		if err != nil {
+			slog.Debug("Agent plan error", "agent", sess.RootAgentID, "error", err, "turn", i)
+			eventsChan <- Error(fmt.Sprintf("Agent plan error: %s", err))
+			return
+		}
 
-			// append result to the workspace
-			r.workspace[plan.ID] = result
-		case PlanKindAgent:
-			result, err := r.agents.Step(ctx, plan.ID, sess)
-			if err != nil {
-				slog.Debug("Agent step error", "agent", plan.ID, "error", err)
-				eventsChan <- Error(fmt.Sprintf("Agent step error: %s", err.Error()))
+		plansEvent, err := DecodeMessage[*PlanResultEvent](planRes)
+		if err != nil {
+			slog.Debug("Agent decode plan error", "agent", sess.RootAgentID, "error", err, "content", planRes)
+			eventsChan <- Error(fmt.Sprintf("Agent decode plan error: %s", err))
+			return
+		}
+
+		if plansEvent != nil {
+			eventsChan <- plansEvent
+		}
+
+		// 2. EXECUTE: The runtime executes the steps in the plan.
+		for _, plan := range plansEvent.Plans {
+			switch plan.Tool {
+			case "plan": // This is the special tool indicating the end of a thought process.
+				type Termination struct {
+					Done        bool   `json:"done"`
+					NextHints   string `json:"next_hints"` // Renamed from FinalOutput for clarity in non-done case
+					FinalOutput string `json:"final_output"`
+				}
+				var termination Termination
+
+				// More robust way to convert map[string]any to a struct
+				jsonBytes, err := json.Marshal(plan.Params)
+				if err != nil {
+					eventsChan <- Error(fmt.Sprintf("Could not marshal plan termination: %s", err))
+					return
+				}
+				if err := json.Unmarshal(jsonBytes, &termination); err != nil {
+					eventsChan <- Error(fmt.Sprintf("Could not unmarshal plan termination: %s", err))
+					return
+				}
+
+				if termination.Done {
+					// The agent has finished. Send the final answer and exit.
+					slog.Info("Agent has finished.", "agent", sess.RootAgentID)
+					eventsChan <- Final(termination.FinalOutput)
+					return // Success! Exit the function.
+				}
+
+				// Not done yet. We need to loop again.
+				// Add the "next_hints" to the workspace so the next Plan() call has this context.
+				slog.Debug("Continuing ReAct loop", "next_hints", termination.NextHints)
+				r.workspace["next_hints"] = termination.NextHints
+
+			default: // This is a standard tool call.
+				slog.Debug("Executing tool", "agent", sess.RootAgentID, "tool", plan.Tool, "params", plan.Params)
+				result, err := rootAgent.ExecuteTool(ctx, plan.Tool, plan.Params)
+				if err != nil {
+					slog.Debug("Tool execution error", "tool", plan.Tool, "error", err)
+					// It's often better to feed the error back to the agent rather than halting.
+					// This allows the agent to self-correct.
+					r.workspace[plan.Tool] = fmt.Sprintf("error executing tool: %v", err)
+					eventsChan <- ToolError(plan.Tool, plan.Params, err)
+				} else {
+					// Append successful result to the workspace for the next planning step.
+					r.workspace[plan.Tool] = result
+					eventsChan <- ToolResult(plan.Tool, result)
+				}
 			}
-			// stream result chan to events chan delta
-			eventsChan <- &AgentChoiceEvent{
-				Content: result.Content,
-				Usage:   result.Usage,
-			}
-			r.workspace[plan.ID] = result.Content
-		default:
-			slog.Debug("Unknown plan step", "agent", sess.RootAgentID, "step", plan)
-			eventsChan <- Final(fmt.Sprintf("Unknown plan step %s", plan))
 		}
 	}
-	eventsChan <- Final(fmt.Sprintf("Agent %s finished", sess.RootAgentID))
+
+	// 3. HANDLE LOOP EXIT: If the for loop finishes, it means we hit maxTurns.
+	slog.Warn("Agent exceeded max turns", "agent", sess.RootAgentID, "maxTurns", maxTurns)
+	eventsChan <- Error(fmt.Sprintf("Agent %s exceeded maximum number of turns (%d)", sess.RootAgentID, maxTurns))
 }
 
-func (r *runtime) RunStream(ctx context.Context, sess *Session) <-chan RuntimeEvent {
-	slog.Debug("Starting runtime stream", "agent", sess.RootAgentID)
+func (r *runtime) RunStream(ctx context.Context) <-chan RuntimeEvent {
+	slog.Debug("Starting runtime stream", "agent", r.sess.RootAgentID)
 	eventsChan := make(chan RuntimeEvent)
 
 	go func() {
 		defer close(eventsChan)
 		/// TODO: record telemetry session
-		agent, ok := r.agents[sess.RootAgentID]
-		if !ok {
-			slog.Error("Agent not found", "agent", sess.RootAgentID)
-			eventsChan <- Error(fmt.Sprintf("Agent not found: %s", sess.RootAgentID))
-			return
-		}
-		if agent.mode == AgentModePlan {
-			r.runPlan(ctx, eventsChan, sess)
-		} else {
-			r.runLoop(ctx, eventsChan, sess)
-		}
+		r.runLoop(ctx, eventsChan, r.sess)
 	}()
 	return eventsChan
 }
 
-func (r *runtime) Run(ctx context.Context, sess *Session) (string, error) {
-	eventsChan := r.RunStream(ctx, sess)
+func (r *runtime) Run(ctx context.Context) (string, error) {
+	eventsChan := r.RunStream(ctx)
 	for {
 		select {
 		case <-ctx.Done():
