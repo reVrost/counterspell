@@ -3,7 +3,9 @@ package clearcast
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 
 	"github.com/revrost/go-openrouter"
@@ -131,7 +133,46 @@ func (p *OpenRouterProvider) ChatCompletion(ctx context.Context, req ChatComplet
 
 func (p *OpenRouterProvider) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest) (<-chan ChatCompletionChunk, error) {
 	// Map openrouter's streaming API into your chunk channel here.
-	return nil, fmt.Errorf("streaming not implemented yet")
+	slog.Info("stream calling OpenRouter provider with request", "request", req)
+
+	messages := make([]openrouter.ChatCompletionMessage, len(req.Messages))
+	for i, msg := range req.Messages {
+		messages[i] = openrouter.ChatCompletionMessage{
+			Role:    msg.Role,
+			Content: openrouter.Content{Text: msg.Content},
+		}
+	}
+	stream, err := p.client.CreateChatCompletionStream(
+		context.Background(), openrouter.ChatCompletionRequest{
+			Model:    req.Model,
+			Messages: messages,
+			Stream:   true,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating chat completion stream: %w", err)
+	}
+	defer stream.Close()
+
+	responseChan := make(chan ChatCompletionChunk)
+
+	go func() {
+		for {
+			response, err := stream.Recv()
+			slog.Info("Received response", "response", response)
+			if errors.Is(err, io.EOF) {
+				slog.Warn("Stream closed, exiting")
+				break
+			}
+			responseChan <- ChatCompletionChunk{
+				Delta: response.Choices[0].Delta.Content,
+				Done:  response.Choices[0].FinishReason == "stop",
+				Raw:   response,
+			}
+		}
+	}()
+
+	return responseChan, nil
 }
 
 func DecodeMessage[T any](msg ChatCompletionResponse) (T, error) {
