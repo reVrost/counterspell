@@ -13,7 +13,15 @@ all: dev
 
 dev: generate build
 	@echo "Starting $(PROJECT_NAME) in development mode..."
-	@$(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
+	@direnv exec $(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
+
+air:
+	@echo "Starting air with direnv..."
+	@./air-dev.sh
+
+run: build
+	@echo "Starting $(PROJECT_NAME)..."
+	@direnv exec $(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
 
 run: build
 	@$(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db

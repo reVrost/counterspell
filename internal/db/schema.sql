@@ -22,6 +22,27 @@ CREATE TABLE IF NOT EXISTS agent_logs (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 3. GitHub Connections
+CREATE TABLE IF NOT EXISTS github_connections (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL CHECK(type IN ('org', 'user')),
+    login TEXT NOT NULL,
+    avatar_url TEXT,
+    token TEXT NOT NULL,
+    scope TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Projects (connected GitHub repos)
+CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    github_owner TEXT NOT NULL,
+    github_repo TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indices for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id);
+CREATE INDEX IF NOT EXISTS idx_github_connections_type ON github_connections(type);
+CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(github_owner);

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/services"
 	"github.com/revrost/code/counterspell/internal/ui"
@@ -16,29 +17,38 @@ import (
 
 // Handlers contains all HTTP handlers.
 type Handlers struct {
-	tasks       *services.TaskService
-	events      *services.EventBus
-	agent       *services.AgentRunner
-	clientID    string
+	tasks        *services.TaskService
+	events       *services.EventBus
+	agent        *services.AgentRunner
+	github       *services.GitHubService
+	clientID     string
 	clientSecret string
 	redirectURI  string
 }
 
 // NewHandlers creates new HTTP handlers.
-func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *services.AgentRunner) *Handlers {
+func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *services.AgentRunner, db *db.DB) *Handlers {
+	clientID := os.Getenv("GITHUB_CLIENT_ID")
+	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
+	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
+
 	return &Handlers{
-		tasks:       tasks,
-		events:      events,
-		agent:       agent,
-		clientID:    os.Getenv("GITHUB_CLIENT_ID"),
-		clientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
-		redirectURI:  os.Getenv("GITHUB_REDIRECT_URI"),
+		tasks:        tasks,
+		events:       events,
+		agent:        agent,
+		github:       services.NewGitHubService(clientID, clientSecret, redirectURI, db),
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		redirectURI:  redirectURI,
 	}
 }
 
 // RegisterRoutes registers all routes on the router.
 func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Get("/", h.HandleHome)
+	r.Get("/projects", h.HandleProjects)
+	r.Post("/projects/refresh", h.HandleRefreshProjects)
+	r.Post("/disconnect", h.HandleDisconnect)
 	r.Get("/board", h.HandleKanban)
 	r.Get("/github/authorize", h.HandleGitHubAuthorize)
 	r.Get("/github/callback", h.HandleGitHubCallback)
@@ -53,20 +63,89 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 
 // HandleHome renders home page.
 func (h *Handlers) HandleHome(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// Check if GitHub is connected
+	conn, err := h.github.GetActiveConnection(ctx)
+	if err == nil && conn != nil {
+		// Connected, redirect to projects
+		http.Redirect(w, r, "/projects", http.StatusFound)
+		return
+	}
+	
+	// Not connected, show connect page
 	component := ui.HomeLayout("counterspell", ui.GitHubConnectPage())
 	component.Render(r.Context(), w)
+}
+
+// HandleProjects renders the projects page.
+func (h *Handlers) HandleProjects(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projects, err := h.github.GetProjects(ctx)
+	if err != nil {
+		projects = []models.Project{}
+	}
+
+	recentProjects, err := h.github.GetRecentProjects(ctx)
+	if err != nil {
+		recentProjects = []models.Project{}
+	}
+
+	conn, err := h.github.GetActiveConnection(ctx)
+	if err != nil {
+		conn = nil
+	}
+
+	component := ui.HomeLayout("counterspell - Projects", ui.ProjectsPage(projects, recentProjects, conn))
+	component.Render(r.Context(), w)
+}
+
+// HandleRefreshProjects fetches repositories from GitHub and returns updated projects page.
+func (h *Handlers) HandleRefreshProjects(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get connection
+	conn, err := h.github.GetActiveConnection(ctx)
+	if err != nil {
+		http.Error(w, "No GitHub connection", http.StatusNotFound)
+		return
+	}
+
+	// Fetch and save repositories
+	if err := h.github.FetchAndSaveRepositories(ctx, conn); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to fetch repositories: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get updated projects
+	projects, err := h.github.GetProjects(ctx)
+	if err != nil {
+		projects = []models.Project{}
+	}
+
+	recentProjects, err := h.github.GetRecentProjects(ctx)
+	if err != nil {
+		recentProjects = []models.Project{}
+	}
+
+	// Render updated projects section
+	w.Header().Set("Content-Type", "text/html")
+	ui.ProjectsPage(projects, recentProjects, conn).Render(r.Context(), w)
 }
 
 // HandleGitHubAuthorize initiates GitHub OAuth flow.
 func (h *Handlers) HandleGitHubAuthorize(w http.ResponseWriter, r *http.Request) {
 	connType := r.URL.Query().Get("type") // "org" or "user"
-	
+
+	fmt.Printf("GitHub authorize request - type: %s, clientID: %s\n", connType, h.clientID)
+
 	// Fallback redirect URI if not set
 	redirectURI := h.redirectURI
 	if redirectURI == "" {
 		redirectURI = "http://localhost:8710/github/callback"
 	}
-	
+
 	// Redirect to GitHub OAuth
 	// URL: https://github.com/login/oauth/authorize
 	// Params: client_id, redirect_uri, scope, state
@@ -74,35 +153,82 @@ func (h *Handlers) HandleGitHubAuthorize(w http.ResponseWriter, r *http.Request)
 		h.clientID,
 		redirectURI,
 		connType)
-	
+
+	fmt.Printf("Redirecting to: %s\n", authURL)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
 // HandleGitHubCallback handles GitHub OAuth return.
 func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	code := r.URL.Query().Get("code")
-	state := r.URL.Query().Get("state")
+	connType := r.URL.Query().Get("state")
 
-	// Log the auth code (in production, remove this!)
-	fmt.Printf("GitHub OAuth Code: %s, State: %s\n", code, state)
+	if code == "" {
+		http.Error(w, "No code provided", http.StatusBadRequest)
+		return
+	}
 
-	// Exchange code for access_token
-	// POST https://github.com/login/oauth/access_token
-	// Headers: Accept: application/json
-	// Body: client_id, client_secret, code, redirect_uri
-	//
-	// Response:
-	// {
-	//   "access_token": "gho_...",
-	//   "token_type": "bearer",
-	//   "scope": "repo,read:user,read:org"
-	// }
-	//
-	// TODO: Implement actual token exchange
-	// For now, we'll skip the exchange and just redirect
+	// Exchange code for access token
+	token, err := h.github.ExchangeCodeForToken(ctx, code)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to exchange token: %v", err), http.StatusInternalServerError)
+		return
+	}
 
-	// Redirect to Kanban board
-	http.Redirect(w, r, "/board", http.StatusTemporaryRedirect)
+	fmt.Printf("Token received successfully\n")
+
+	// Get user info
+	login, avatarURL, err := h.github.GetUserInfo(ctx, token)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get user info: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("User info: login=%s\n", login)
+
+	// Save connection
+	err = h.github.SaveConnection(ctx, connType, login, avatarURL, token, "repo,read:user,read:org")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to save connection: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("Connection saved\n")
+
+	// Fetch and save repositories (synchronous for debugging)
+	conn, err := h.github.GetActiveConnection(ctx)
+	if err == nil && conn != nil {
+		fmt.Printf("Fetching repositories for %s (type: %s)\n", conn.Login, conn.Type)
+		if err := h.github.FetchAndSaveRepositories(ctx, conn); err != nil {
+			fmt.Printf("Failed to fetch repositories: %v\n", err)
+		} else {
+			fmt.Printf("Successfully fetched repositories\n")
+		}
+	} else {
+		fmt.Printf("No active connection found: %v\n", err)
+	}
+
+	// Redirect to Projects page
+	http.Redirect(w, r, "/projects", http.StatusTemporaryRedirect)
+}
+
+// HandleDisconnect disconnects GitHub and clears data.
+func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fmt.Printf("Disconnecting GitHub...\n")
+
+	// Delete connection and projects
+	if err := h.github.DeleteConnection(ctx); err != nil {
+		fmt.Printf("Failed to delete connection: %v\n", err)
+	}
+	if err := h.github.DeleteAllProjects(ctx); err != nil {
+		fmt.Printf("Failed to delete projects: %v\n", err)
+	}
+
+	fmt.Printf("Disconnected successfully, redirecting to home\n")
+	// Redirect to home
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 // HandleKanban renders the Kanban board.
