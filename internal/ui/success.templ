@@ -1,0 +1,22 @@
+package ui
+
+templ GitHubSuccess(connType string) {
+	<div class="bg-white rounded-xl p-8 text-center max-w-md mx-auto">
+		<div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+			<svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+			</svg>
+		</div>
+		<h2 class="text-xl font-bold mb-2 text-gray-900">
+			if connType == "org" {
+				GitHub Organization Connected
+			} else {
+				GitHub Account Connected
+			}
+		</h2>
+		<p class="text-gray-600 mb-4">Your { connType } has been connected successfully.</p>
+		<a href="/" class="inline-block bg-black hover:bg-gray-900 text-white px-6 py-2 rounded-lg text-sm font-medium transition-all active:scale-95">
+			Continue to Projects
+		</a>
+	</div>
+}

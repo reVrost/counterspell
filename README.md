@@ -1,98 +1,151 @@
-# Counterspell
+# counterspell
 
-A lightweight, embedded observability tool for Go applications that provides OpenTelemetry tracing and logging capabilities with a local SQLite database backend and REST API for data querying.
+A mobile-first, self-hosted AI agent orchestration system that allows parallel coding tasks ("fire and forget"). The system acts as a "Command & Control" center where humans define intent, and AI agents execute, review, and report back.
 
-**⚠️ This project is a work in progress and is not yet ready for production use. ⚠️**
+## Features
 
-## What it is
+- **GitHub Integration**: Connect your personal account or organization (similar to Vercel)
+- **Mobile-First PWA**: Native-feeling mobile interface with tab navigation for phones, grid for desktop
+- **Optimistic UI**: Drag-and-drop with instant feedback using HTMX and Alpine.js
+- **Real-Time Logs**: SSE streaming of agent execution logs (the "Matrix Rain" console)
+- **Git Worktrees**: Isolated agent workspaces for safe code execution
+- **Task State Machine**: Rigid status flow (backlog → in_progress → review → done)
+- **Offline Support**: Service worker caching for offline access
 
-- Fast and easy to get started, no added extra cost
-- Gives you observability UI for your LLM calls with the greatest of ease
-- Prompt evals
-- Prompt optimizer
-- Embedded observability with otel, zerolog (uses sqlite), throwaway sqlite db
-- Means no external dependencies, no xtra docker containers
-- Writes logs on a separate goroutine, so your app is not affected
+## Tech Stack
+
+- **Backend**: Go 1.25+
+- **Routing**: `go-chi/chi`
+- **Database**: SQLite (WAL mode)
+- **Frontend**: HTMX + Alpine.js + TailwindCSS
+- **Drag & Drop**: SortableJS with haptic feedback
+- **Real-time**: SSE (Server-Sent Events)
+- **Agent Engine**: Orion (LLM orchestration)
+
+## Project Structure
+
+```
+counterspell/
+├── cmd/app/           # Application entry point
+├── internal/
+│   ├── db/           # SQLite database layer
+│   ├── git/          # Git worktree management
+│   ├── handlers/      # HTTP handlers
+│   ├── models/        # Data models (tasks, projects, github connections)
+│   ├── services/      # Business logic (tasks, agents, events)
+│   └── ui/           # HTML templates (templ)
+├── web/static/       # Static assets, PWA files
+└── pkg/orion/       # Existing agent brain library
+```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Go (1.25 or later)
-- Node.js (20.x or later)
+- Go 1.25+
+- Git (for worktree functionality)
 
-### Running with Docker Compose
-
-The easiest way to get Counterspell up and running is with Docker Compose.
+### Installation
 
 ```bash
-docker-compose up
+# Clone repository
+git clone https://github.com/revrost/code/counterspell.git
+cd counterspell
+
+# Build
+go build -o counterspell ./cmd/app
+
+# Run
+./counterspell -addr :8710 -db ./data/counterspell.db
 ```
 
-This will start the backend server on port `8080` and the frontend UI on port `5173`.
-
-- **Backend API**: `http://localhost:8080`
-- **Frontend UI**: `http://localhost:5173`
-
-### Development Environment
-
-For development, you can use the provided `dev.sh` script, which uses `kitty` to create a split-pane terminal for the backend and frontend.
+### Docker
 
 ```bash
-./dev.sh
+docker build -t counterspell .
+docker run -p 8710:8710 -v $(pwd)/data:/app/data counterspell
 ```
 
-# Counterspell
+## Usage
 
-## Installation
+### 1. Connect GitHub
+
+Access the app at **http://localhost:8710** and connect your GitHub account or organization. This grants counterspell access to your repositories.
+
+### 2. Select a Project
+
+After connecting, you'll see a list of your available repositories. Select one to start creating tasks.
+
+### 3. Create Tasks
+
+- Click "+ New Task" button
+- Enter a title (e.g., "Fix login bug")
+- Describe the intent for the agent
+
+### 4. Manage Tasks
+
+**Desktop**: Drag tasks between columns:
+- **Backlog** → **In Progress** → Triggers agent execution
+- **Review** → **Done** → Approves and merges changes
+
+**Mobile**: 
+- Tap tabs to switch between status columns
+- Drag tasks within columns to reorganize
+- Moving to "In Progress" triggers agent
+
+## Agent Workflow
+
+1. **Planning**: Agent analyzes the task and creates a plan
+2. **Worktree Creation**: Isolated git worktree is created
+3. **Execution**: Agent writes code in the sandbox
+4. **Review**: Task moves to review status with diffs
+5. **Approval**: Human approves or rejects the changes
+
+## PWA Installation
+
+1. Access the app via HTTPS or localhost
+2. Tap "Share" → "Add to Home Screen" (iOS)
+3. Tap "Install App" (Android)
+4. The app runs in standalone mode (no browser chrome)
+
+## Development
 
 ```bash
-go get github.com/revrost/counterspell
+# Run with live reload
+make dev
+
+# Run tests
+go test ./...
+
+# Generate templates
+templ generate
 ```
 
-## Todo
+## Mobile Testing
 
-- [ ] Protobuf schemas
-- [ ] Agent configuration/blueprint framework
-- [ ] Openrouter integration
-- [ ] Lightweight execution runtime utilize goroutine (cadence/go-workflow)
-- [ ] Create agent, run agent, watch UI
-- [ ] Orchestrator-Executor MVP via ui
-- [ ] Otel integration
-- [ ] Openapi streaming spec
-- [ ] Move sqlite to postgres (later)
+Test on iOS Safari or Chrome DevTools Device Mode:
 
-## Quick Start
+```bash
+# Use ngrok for tunneling
+ngrok http 8710
 
-The simplest way to add Counterspell to your application:
-
-```go
-func main() {
-	// Example 1: Using Echo router
-	err := counterspell.AddToEcho(e,
-		counterspell.WithAuthToken("secret"),
-	)
-	if err != nil {
-		slog.Error("Error adding counterspell middleware", "err", err)
-	}
-}
-
-Go to your app endpoint e.g localhost:8080/counterspell
+# Then access https://<ngrok-id>.ngrok.io from your phone
 ```
 
-## API Endpoints
+## GitHub Integration
 
-All API endpoints require authentication via the `Authorization: Bearer <token>` header or `auth` query parameter.
+counterspell supports two connection types:
 
-## Contributing
+1. **Personal Account**: Connect your personal GitHub repositories
+2. **Organization**: Connect your entire organization (requires admin approval)
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+Both provide read/write access to:
+- Repository code
+- Issues
+- Pull requests
+
+The system creates isolated worktrees for each task, keeping your main branch safe.
 
 ## License
 
-This project is licensed under the [Apache-2.0 License](LICENSE).
+MIT

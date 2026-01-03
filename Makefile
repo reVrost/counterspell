@@ -1,38 +1,108 @@
-.PHONY: dev run test clean generate migrate help
+.PHONY: dev build test clean tidy generate lint docker-build docker-run
+
+# Variables
+PROJECT_NAME := counterspell
+TARGET_MAIN := ./cmd/app
+BINARY_DIR := ./local
+BINARY_PATH := $(BINARY_DIR)/$(PROJECT_NAME)
 
 # Default target
-help: ## Show available commands
-	@echo "Counterspell - Available commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+all: dev
 
-# Development
-dev: generate migrate ## Start development server with hot reloading
-	@echo "🚀 Starting Counterspell in development mode..."
-	COUNTERSPELL_AUTH_TOKEN=dev-token air
+##@ Development
 
-run: generate migrate ## Run the server
-	@echo "🚀 Starting Counterspell server..."
-	COUNTERSPELL_AUTH_TOKEN=dev-token go run ./cmd/server
+dev: generate build
+	@echo "Starting $(PROJECT_NAME) in development mode..."
+	@$(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
 
-# Code generation
-generate: ## Generate sqlc code
-	sqlc generate
+run: build
+	@$(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
 
-# Database
-migrate: ## Run database migrations
-	@mkdir -p bin
-	cd db && goose sqlite3 ../counterspell.db up
+##@ Build
 
-# Testing
-test: generate ## Run all tests
-	go test -v ./...
+build: tidy
+	@echo "Building $(PROJECT_NAME)..."
+	@mkdir -p $(BINARY_DIR)
+	@go build -o $(BINARY_PATH) $(TARGET_MAIN)
+	@echo "Binary built: $(BINARY_PATH)"
 
-build: ## Build the cspell CLI binary
-	go build -o cspell ./cmd/cspell
+build-prod:
+	@echo "Building $(PROJECT_NAME) for production..."
+	@mkdir -p deploy
+	@GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy/$(PROJECT_NAME) $(TARGET_MAIN)
+	@echo "Production binary built: deploy/$(PROJECT_NAME)"
 
-# Cleanup
-clean: ## Clean build artifacts and database
-	rm -rf bin/ cspell counterspell.db coverage.out *.log 
+##@ Testing
 
-buf:
-	npx buf generate
+test:
+	@echo "Running tests..."
+	@go test -v -race ./...
+
+test-cover:
+	@echo "Running tests with coverage..."
+	@go test -v -race -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+
+lint:
+	@echo "Running linter..."
+	@golangci-lint run ./... || echo "Note: golangci-lint not installed, skipping..."
+
+##@ Dependencies
+
+tidy:
+	@echo "Tidying go modules..."
+	@go mod tidy
+	@go mod verify
+
+deps:
+	@echo "Installing dependencies..."
+	@go install github.com/cosmtrek/air@latest
+	@go install github.com/a-h/templ/cmd/templ@latest
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+##@ Code Generation
+
+generate: tidy
+	@echo "Generating code..."
+	@if command -v templ >/dev/null 2>&1; then \
+		templ generate; \
+	else \
+		echo "templ not installed, skipping... (run 'make deps' to install)"; \
+	fi
+
+##@ Docker
+
+docker-build:
+	@echo "Building Docker image..."
+	@docker build -t $(PROJECT_NAME):latest .
+
+docker-run: docker-build
+	@echo "Running Docker container..."
+	@docker run -p 3000:3000 -v $(PWD)/data:/app/data $(PROJECT_NAME):latest
+
+##@ Cleanup
+
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BINARY_DIR)
+	@rm -rf deploy
+	@rm -f coverage.out coverage.html
+
+clean-all: clean
+	@echo "Cleaning all generated files..."
+	@rm -rf data/*.db data/*.db-shm data/*.db-wal
+	@rm -rf worktree-*
+
+##@ Database
+
+migrate-up:
+	@echo "Running database migrations..."
+	@sqlite3 data/$(PROJECT_NAME).db < internal/db/schema.sql
+
+migrate-down:
+	@echo "Dropping database..."
+	@rm -f data/$(PROJECT_NAME).db
+
+##@ Help
+help: ## Display this help screen
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'

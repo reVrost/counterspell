@@ -1,0 +1,207 @@
+package handlers
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/code/counterspell/internal/services"
+)
+
+// Handlers contains all HTTP handlers.
+type Handlers struct {
+	tasks   *services.TaskService
+	events  *services.EventBus
+	agent   *services.AgentRunner
+}
+
+// NewHandlers creates new HTTP handlers.
+func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *services.AgentRunner) *Handlers {
+	return &Handlers{
+		tasks:  tasks,
+		events: events,
+		agent:  agent,
+	}
+}
+
+// RegisterRoutes registers all routes on the router.
+func (h *Handlers) RegisterRoutes(r chi.Router) {
+	r.Get("/", h.HandleBoard)
+	r.Get("/tasks", h.HandleListTasks)
+	r.Post("/tasks", h.HandleCreateTask)
+	r.Post("/tasks/{id}/move", h.HandleMoveTask)
+	r.Get("/tasks/new", h.HandleNewTaskForm)
+	r.Get("/events", h.HandleSSE)
+}
+
+// HandleBoard renders the main kanban board page.
+func (h *Handlers) HandleBoard(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "web/static/index.html")
+}
+
+// HandleListTasks returns tasks for a specific status column.
+func (h *Handlers) HandleListTasks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	statusStr := r.URL.Query().Get("status")
+
+// HandleListTasks returns tasks for a specific status column.
+func (h *Handlers) HandleListTasks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	statusStr := r.URL.Query().Get("status")
+
+	var status *models.TaskStatus
+	if statusStr != "" {
+		s := models.TaskStatus(statusStr)
+		status = &s
+	}
+
+	tasks, err := h.tasks.List(ctx, status)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Render task cards as HTML for HTMX
+	w.Header().Set("Content-Type", "text/html")
+	for _, task := range tasks {
+		fmt.Fprintf(w, `<div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing" data-id="%s">
+			<div class="flex items-start justify-between gap-2">
+				<h3 class="font-medium text-sm text-gray-900 flex-1">%s</h3>
+				<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">%s</span>
+			</div>
+		</div>`, task.ID, task.Title, task.Status)
+	}
+}
+
+// HandleCreateTask creates a new task.
+func (h *Handlers) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	title := r.FormValue("title")
+	intent := r.FormValue("intent")
+
+	if title == "" || intent == "" {
+		http.Error(w, "Title and intent are required", http.StatusBadRequest)
+		return
+	}
+
+	task, err := h.tasks.Create(ctx, title, intent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Publish event
+	h.events.Publish(models.Event{
+		TaskID:      task.ID,
+		Type:        "created",
+		HTMLPayload: fmt.Sprintf("Task created: %s", task.Title),
+	})
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(task)
+}
+
+// HandleMoveTask moves a task to a new status/position.
+func (h *Handlers) HandleMoveTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	status := models.TaskStatus(r.FormValue("status"))
+	positionStr := r.FormValue("position")
+
+	position := 0
+	if positionStr != "" {
+		pos, err := strconv.Atoi(positionStr)
+		if err != nil {
+			http.Error(w, "Invalid position", http.StatusBadRequest)
+			return
+		}
+		position = pos
+	}
+
+	// Update task
+	err := h.tasks.UpdatePositionAndStatus(ctx, taskID, status, position)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// If moving to in_progress, trigger agent
+	if status == models.StatusInProgress {
+		go h.agent.Run(ctx, taskID)
+	}
+
+	// Publish event
+	h.events.Publish(models.Event{
+		TaskID:      taskID,
+		Type:        "moved",
+		HTMLPayload: fmt.Sprintf("Task moved to %s", status),
+	})
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleNewTaskForm renders the new task form.
+func (h *Handlers) HandleNewTaskForm(w http.ResponseWriter, r *http.Request) {
+	// Note: This would use the templ generated code
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Form rendered"})
+}
+
+// HandleSSE handles server-sent events for real-time updates.
+func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Get event channel
+	ch := h.events.Subscribe()
+	defer h.events.Unsubscribe(ch)
+
+	// Send keepalive
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Keep connection alive
+	ctx := r.Context()
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		case event := <-ch:
+			data, err := json.Marshal(event)
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		}
+	}
+}
