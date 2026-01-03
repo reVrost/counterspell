@@ -148,4 +148,14 @@ The system creates isolated worktrees for each task, keeping your main branch sa
 
 ## License
 
-MIT
+FSL-1.1-MIT (Functional Source License with MIT Future Grant)
+
+This software is licensed under the FSL-1.1-MIT license, which permits:
+- Internal use and access
+- Non-commercial education
+- Non-commercial research
+- Professional services with licensed clients
+
+On the second anniversary of release (2027-03-21), the license automatically converts to standard MIT.
+
+See the [LICENSE](LICENSE) file for full terms.
