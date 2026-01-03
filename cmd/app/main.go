@@ -61,7 +61,7 @@ func main() {
 	}
 
 	// Create handlers
-	h := handlers.NewHandlers(taskSvc, eventBus, agentRunner)
+	h := handlers.NewHandlers(taskSvc, eventBus, agentRunner, database)
 
 	// Setup router
 	r := chi.NewRouter()
