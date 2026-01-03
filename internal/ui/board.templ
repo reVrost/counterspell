@@ -1,0 +1,139 @@
+package ui
+
+import "github.com/revrost/code/counterspell/internal/models"
+
+templ TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) {
+	<div
+		class="task-card bg-white rounded-xl shadow-sm border border-gray-200 p-4 cursor-grab active:cursor-grabbing"
+		data-id={ task.ID }
+		data-status={ string(task.Status) }
+	>
+		<!-- Task Header -->
+		<div class="flex items-start justify-between gap-3 mb-2">
+			<h3 class="font-medium text-gray-900 text-sm leading-tight">{ task.Title }</h3>
+			<!-- Status Indicator -->
+			if task.Status == models.StatusTodo {
+				<span class="shrink-0 w-2 h-2 rounded-full bg-yellow-500"></span>
+			} else if task.Status == models.StatusInProgress {
+				<span class="shrink-0 w-2 h-2 rounded-full bg-blue-500"></span>
+			} else if task.Status == models.StatusReview {
+				<span class="shrink-0 w-2 h-2 rounded-full bg-purple-500"></span>
+			} else {
+				<span class="shrink-0 w-2 h-2 rounded-full bg-green-500"></span>
+			}
+		</div>
+
+		<!-- Intent Preview -->
+		<p class="text-xs text-gray-500 line-clamp-2 mb-3">{ task.Intent }</p>
+
+		<!-- Agent Console (visible when in progress/review) -->
+		if task.Status == models.StatusInProgress || task.Status == models.StatusReview {
+			<!-- Spinner for active tasks -->
+			if task.Status == models.StatusInProgress {
+				<div class="flex items-center gap-2 text-xs text-blue-600 mb-2">
+					<div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+					<span>Working...</span>
+				</div>
+			}
+
+			<!-- Log Console -->
+			if len(logs) > 0 {
+				<div class="console-log bg-gray-900 text-gray-100 rounded-lg p-2 max-h-32 overflow-y-auto">
+					for _, log := range logs {
+						<div class="mb-1 last:mb-0">
+							<span class="text-gray-500 mr-1">{ log.CreatedAt.Format("15:04:05") }</span>
+							if log.Level == models.LogSuccess {
+								<span class="text-green-400">[SUCCESS]</span>
+							} else if log.Level == models.LogInfo {
+								<span class="text-blue-400">[INFO]</span>
+							} else if log.Level == models.LogPlan {
+								<span class="text-yellow-400">[PLAN]</span>
+							} else if log.Level == models.LogCode {
+								<span class="text-purple-400">[CODE]</span>
+							} else {
+								<span class="text-red-400">[ERROR]</span>
+							}
+							<span class="ml-1">{ log.Message }</span>
+						</div>
+					}
+				</div>
+			}
+		}
+
+		<!-- Drag Handle (visual only) -->
+		<div class="flex justify-end mt-2">
+			<div class="w-6 h-1 bg-gray-300 rounded-full"></div>
+		</div>
+	</div>
+}
+
+templ Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobile bool) {
+	if isMobile {
+		<!-- Mobile: Show single column based on current tab -->
+		<!-- The actual content is swapped via HTMX based on selected tab -->
+		<div id="mobile-column" class="p-4 space-y-3">
+			for _, task := range tasks {
+				@TaskCard(task, logsByTask[task.ID], true)
+			}
+		</div>
+	} else {
+		<!-- Desktop: Show all columns in grid -->
+		<div class="grid grid-cols-4 gap-4 p-4 h-full">
+			<!-- Todo Column -->
+			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-200">
+					<h2 class="font-semibold text-sm text-gray-700">Todo</h2>
+				</div>
+				<div id="column-todo" class="flex-1 p-3 space-y-3 overflow-y-auto"
+					data-status="todo"
+					hx-trigger="load"
+					hx-get="/tasks?status=todo"
+					hx-swap="innerHTML">
+					<!-- Tasks loaded via HTMX -->
+				</div>
+			</div>
+
+			<!-- In Progress Column -->
+			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-200">
+					<h2 class="font-semibold text-sm text-gray-700">Doing</h2>
+				</div>
+				<div id="column-in_progress" class="flex-1 p-3 space-y-3 overflow-y-auto"
+					data-status="in_progress"
+					hx-trigger="load"
+					hx-get="/tasks?status=in_progress"
+					hx-swap="innerHTML">
+					<!-- Tasks loaded via HTMX -->
+				</div>
+			</div>
+
+			<!-- Review Column -->
+			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-200">
+					<h2 class="font-semibold text-sm text-gray-700">Review</h2>
+				</div>
+				<div id="column-review" class="flex-1 p-3 space-y-3 overflow-y-auto"
+					data-status="review"
+					hx-trigger="load"
+					hx-get="/tasks?status=review"
+					hx-swap="innerHTML">
+					<!-- Tasks loaded via HTMX -->
+				</div>
+			</div>
+
+			<!-- Done Column -->
+			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-200">
+					<h2 class="font-semibold text-sm text-gray-700">Done</h2>
+				</div>
+				<div id="column-done" class="flex-1 p-3 space-y-3 overflow-y-auto"
+					data-status="done"
+					hx-trigger="load"
+					hx-get="/tasks?status=done"
+					hx-swap="innerHTML">
+					<!-- Tasks loaded via HTMX -->
+				</div>
+			</div>
+		</div>
+	}
+}
