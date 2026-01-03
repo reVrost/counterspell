@@ -156,6 +156,6 @@ This software is licensed under the FSL-1.1-MIT license, which permits:
 - Non-commercial research
 - Professional services with licensed clients
 
-On the second anniversary of release (2027-03-21), the license automatically converts to standard MIT.
+On the second anniversary of release (2028-01-05), the license automatically converts to standard MIT.
 
 See the [LICENSE](LICENSE) file for full terms.
