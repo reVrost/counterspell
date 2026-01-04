@@ -204,7 +204,11 @@ func (s *GitHubService) GetProjects(ctx context.Context) ([]models.Project, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to query projects: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Failed to close rows: %v\n", err)
+		}
+	}()
 
 	var projects []models.Project
 	for rows.Next() {
@@ -226,7 +230,11 @@ func (s *GitHubService) GetRecentProjects(ctx context.Context) ([]models.Project
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent projects: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Failed to close rows: %v\n", err)
+		}
+	}()
 
 	var projects []models.Project
 	for rows.Next() {
@@ -270,9 +278,9 @@ func (s *GitHubService) FetchAndSaveRepositories(ctx context.Context, conn *mode
 
 	var url string
 	if conn.Type == "org" {
-		url = fmt.Sprintf("https://api.github.com/orgs/%s/repos", conn.Login)
+		url = "https://api.github.com/orgs/" + conn.Login + "/repos"
 	} else {
-		url = fmt.Sprintf("https://api.github.com/user/repos")
+		url = "https://api.github.com/user/repos"
 	}
 
 	fmt.Printf("Fetching from URL: %s\n", url)

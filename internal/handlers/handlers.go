@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -64,7 +65,7 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 // HandleHome renders home page.
 func (h *Handlers) HandleHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	// Check if GitHub is connected
 	conn, err := h.github.GetActiveConnection(ctx)
 	if err == nil && conn != nil {
@@ -72,10 +73,12 @@ func (h *Handlers) HandleHome(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/projects", http.StatusFound)
 		return
 	}
-	
+
 	// Not connected, show connect page
 	component := ui.HomeLayout("counterspell", ui.GitHubConnectPage())
-	component.Render(r.Context(), w)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleProjects renders the projects page.
@@ -98,7 +101,9 @@ func (h *Handlers) HandleProjects(w http.ResponseWriter, r *http.Request) {
 	}
 
 	component := ui.HomeLayout("counterspell - Projects", ui.ProjectsPage(projects, recentProjects, conn))
-	component.Render(r.Context(), w)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleRefreshProjects fetches repositories from GitHub and returns updated projects page.
@@ -131,7 +136,9 @@ func (h *Handlers) HandleRefreshProjects(w http.ResponseWriter, r *http.Request)
 
 	// Render updated projects section
 	w.Header().Set("Content-Type", "text/html")
-	ui.ProjectsPage(projects, recentProjects, conn).Render(r.Context(), w)
+	if err := ui.ProjectsPage(projects, recentProjects, conn).Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleGitHubAuthorize initiates GitHub OAuth flow.
@@ -255,7 +262,9 @@ func (h *Handlers) HandleKanban(w http.ResponseWriter, r *http.Request) {
 	isMobile := h.isMobile(r)
 	
 	component := ui.HomeLayout("counterspell - Kanban", ui.Board(tasks, logsByTask, isMobile))
-	component.Render(r.Context(), w)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // isMobile checks if request is from mobile device
@@ -286,12 +295,15 @@ func (h *Handlers) HandleListTasks(w http.ResponseWriter, r *http.Request) {
 	// Render task cards as HTML for HTMX
 	w.Header().Set("Content-Type", "text/html")
 	for _, task := range tasks {
-		fmt.Fprintf(w, `<div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing" data-id="%s">
+		if _, err := fmt.Fprintf(w, `<div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing" data-id="%s">
 			<div class="flex items-start justify-between gap-2">
 				<h3 class="font-medium text-sm text-gray-900 flex-1">%s</h3>
 				<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">%s</span>
 			</div>
-		</div>`, task.ID, task.Title, task.Status)
+		</div>`, task.ID, task.Title, task.Status); err != nil {
+			// If writing fails, there's nothing we can do
+			return
+		}
 	}
 }
 
@@ -320,9 +332,11 @@ func (h *Handlers) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
 
 	// Return the new task as HTML
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `<div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100" data-id="%s">
+	if _, err := fmt.Fprintf(w, `<div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100" data-id="%s">
 		<h3 class="font-medium text-sm text-gray-900">%s</h3>
-	</div>`, task.ID, task.Title)
+	</div>`, task.ID, task.Title); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleMoveTask updates a task's status.
@@ -355,7 +369,13 @@ func (h *Handlers) HandleMoveTask(w http.ResponseWriter, r *http.Request) {
 
 	// If moving to in_progress, trigger agent
 	if status == models.StatusInProgress {
-		go h.agent.Run(ctx, taskID)
+		go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := h.agent.Run(ctx, taskID); err != nil {
+			fmt.Printf("Agent run error: %v\n", err)
+		}
+	}()
 	}
 
 	// Return success
@@ -422,7 +442,7 @@ func (h *Handlers) HandleRejectTask(w http.ResponseWriter, r *http.Request) {
 // HandleNewTaskForm renders the new task form modal.
 func (h *Handlers) HandleNewTaskForm(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprint(w, `<div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl" hx-post="/tasks" hx-target="#main" hx-swap="outerHTML">
+	form := `<div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl" hx-post="/tasks" hx-target="#main" hx-swap="outerHTML">
 		<h2 class="text-lg font-semibold mb-4 tracking-tighter">New Task</h2>
 		<form class="space-y-4">
 			<div>
@@ -438,7 +458,10 @@ func (h *Handlers) HandleNewTaskForm(w http.ResponseWriter, r *http.Request) {
 				<button type="button" hx-target="#modal" hx-swap="innerHTML" class="flex-1 bg-gray-100 text-gray-900 py-2 rounded-lg font-medium">Cancel</button>
 			</div>
 		</form>
-	</div>`)
+	</div>`
+	if _, err := fmt.Fprint(w, form); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleSSE streams events for real-time updates.
@@ -469,14 +492,20 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			fmt.Fprintf(w, ": keepalive\n\n")
+			if _, err := fmt.Fprintf(w, ": keepalive\n\n"); err != nil {
+				// Connection might be closed, log and return
+				return
+			}
 			flusher.Flush()
 		case event := <-ch:
 			data, err := json.Marshal(event)
 			if err != nil {
 				continue
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+				// Connection might be closed
+				return
+			}
 			flusher.Flush()
 		}
 	}

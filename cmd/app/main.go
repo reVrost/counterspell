@@ -41,7 +41,9 @@ func main() {
 		logger.Error("Failed to open database", "error", err)
 		os.Exit(1)
 	}
-	defer database.Close()
+	if err := database.Close(); err != nil {
+		logger.Error("Failed to close database", "error", err)
+	}
 
 	// Create services
 	taskSvc := services.NewTaskService(database)
@@ -82,7 +84,7 @@ func main() {
 	// PWA manifest
 	r.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/manifest+json")
-		w.Write([]byte(`{
+		manifest := `{
 			"name": "counterspell",
 			"short_name": "PocketCTO",
 			"description": "Mobile-first AI agent orchestration",
@@ -103,7 +105,10 @@ func main() {
 					"type": "image/png"
 				}
 			]
-		}`))
+		}`
+		if _, err := w.Write([]byte(manifest)); err != nil {
+			logger.Error("Failed to write manifest", "error", err)
+		}
 	})
 
 	// Start server

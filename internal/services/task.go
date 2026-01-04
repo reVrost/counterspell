@@ -83,7 +83,11 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus) ([]mo
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tasks: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Failed to close rows: %v\n", err)
+		}
+	}()
 
 	var tasks []models.Task
 	for rows.Next() {

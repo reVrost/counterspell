@@ -318,18 +318,21 @@ func (Finish) isContentPart() {}
 // ContextKeys defines the keys used for propagating state through context.
 type ContextKeys struct{}
 
+// contextKey is a custom type to avoid key collisions.
+type contextKey string
+
 const (
 	// SessionIDContextKey is the key for the session ID in context.
-	SessionIDContextKey string = "session_id"
+	SessionIDContextKey contextKey = "session_id"
 
 	// MessageIDContextKey is the key for the message ID in context.
-	MessageIDContextKey string = "message_id"
+	MessageIDContextKey contextKey = "message_id"
 
 	// SupportsImagesContextKey is the key for the image support capability in context.
-	SupportsImagesContextKey string = "supports_images"
+	SupportsImagesContextKey contextKey = "supports_images"
 
 	// ModelNameContextKey is the key for the model name in context.
-	ModelNameContextKey string = "model_name"
+	ModelNameContextKey contextKey = "model_name"
 )
 
 // GetSessionID retrieves the session ID from context.
