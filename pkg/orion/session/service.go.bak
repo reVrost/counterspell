@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -182,4 +183,3 @@ func unmarshalTodos(data string) ([]orion.Todo, error) {
 	}
 	return todos, nil
 }
-*/

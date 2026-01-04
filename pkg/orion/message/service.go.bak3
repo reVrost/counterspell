@@ -2,8 +2,10 @@ package message
 
 import (
 	"context"
-	"time"
+	"encoding/json"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/revrost/code/counterspell/pkg/orion"
 	"github.com/google/uuid"
@@ -141,7 +143,6 @@ func (s *Service) DeleteSessionMessages(ctx context.Context, sessionID string) e
 /*
 func marshallParts(parts []orion.ContentPart) ([]byte, error) {
 	wrappedParts := make([]partWrapper, len(parts))
-/*
 	for i, part := range parts {
 		wrappedParts[i] = partWrapper{
 			Type: partTypeOf(part),
@@ -254,19 +255,19 @@ func unmarshalFinish(data json.RawMessage) (orion.ContentPart, error) {
 	return f, nil
 }
 
-*/
-// type partType string
-// 
-// const (
-// 	reasoningType  partType = "reasoning"
-// 	textType       partType = "text"
-// 	toolCallType   partType = "tool_call"
-// 	toolResultType partType = "tool_result"
-// 	finishType     partType = "finish"
-// )
-// 
-// // partWrapper represents a serialized content part.
-// type partWrapper struct {
-// 	Type partType         `json:"type"`
-// 	Data orion.ContentPart `json:"data"`
-// }
+/ partType represents the discriminator for content parts.
+type partType string
+
+const (
+	reasoningType  partType = "reasoning"
+	textType       partType = "text"
+	toolCallType   partType = "tool_call"
+	toolResultType partType = "tool_result"
+	finishType     partType = "finish"
+)
+
+// partWrapper represents a serialized content part.
+type partWrapper struct {
+	Type partType         `json:"type"`
+	Data orion.ContentPart `json:"data"`
+}
