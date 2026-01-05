@@ -31,7 +31,7 @@ func TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) templ.Com
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"task-card bg-white rounded-xl shadow-sm border border-gray-200 p-4 cursor-grab active:cursor-grabbing\" data-id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"task-card bg-gray-900 rounded-xl shadow-sm border border-gray-800 p-4 cursor-grab active:cursor-grabbing\" data-id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -57,14 +57,14 @@ func TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) templ.Com
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><!-- Task Header --><div class=\"flex items-start justify-between gap-3 mb-2\"><h3 class=\"font-medium text-gray-900 text-sm leading-tight\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><!-- Task Header --><div class=\"flex items-start justify-between gap-3 mb-2\"><h3 class=\"font-medium text-white text-sm leading-tight\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(task.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/board.templ`, Line: 13, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/board.templ`, Line: 13, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -95,7 +95,7 @@ func TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) templ.Com
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div><!-- Intent Preview --><p class=\"text-xs text-gray-500 line-clamp-2 mb-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div><!-- Intent Preview --><p class=\"text-xs text-gray-400 line-clamp-2 mb-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -223,7 +223,7 @@ func TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) templ.Com
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<!-- Drag Handle (visual only) --><div class=\"flex justify-end mt-2\"><div class=\"w-6 h-1 bg-gray-300 rounded-full\"></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<!-- Drag Handle (visual only) --><div class=\"flex justify-end mt-2\"><div class=\"w-6 h-1 bg-gray-600 rounded-full\"></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -272,7 +272,7 @@ func Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobil
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<!-- Desktop: Show all columns in grid --> <div class=\"grid grid-cols-4 gap-4 p-4 h-full\"><!-- Todo Column --><div class=\"bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-200\"><h2 class=\"font-semibold text-sm text-gray-700\">Todo</h2></div><div id=\"column-todo\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"todo\" hx-trigger=\"load\" hx-get=\"/tasks?status=todo\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div><!-- In Progress Column --><div class=\"bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-200\"><h2 class=\"font-semibold text-sm text-gray-700\">Doing</h2></div><div id=\"column-in_progress\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"in_progress\" hx-trigger=\"load\" hx-get=\"/tasks?status=in_progress\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div><!-- Review Column --><div class=\"bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-200\"><h2 class=\"font-semibold text-sm text-gray-700\">Review</h2></div><div id=\"column-review\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"review\" hx-trigger=\"load\" hx-get=\"/tasks?status=review\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div><!-- Done Column --><div class=\"bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-200\"><h2 class=\"font-semibold text-sm text-gray-700\">Done</h2></div><div id=\"column-done\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"done\" hx-trigger=\"load\" hx-get=\"/tasks?status=done\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<!-- Desktop: Show all columns in grid --> <div class=\"grid grid-cols-4 gap-4 p-4 h-full\"><!-- Todo Column --><div class=\"bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-800\"><h2 class=\"font-semibold text-sm text-gray-300\">Todo</h2></div><div id=\"column-todo\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"todo\" hx-trigger=\"load\" hx-get=\"/tasks?status=todo\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div><!-- In Progress Column --><div class=\"bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-800\"><h2 class=\"font-semibold text-sm text-gray-300\">Doing</h2></div><div id=\"column-in_progress\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"in_progress\" hx-trigger=\"load\" hx-get=\"/tasks?status=in_progress\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div><!-- Review Column --><div class=\"bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-800\"><h2 class=\"font-semibold text-sm text-gray-300\">Review</h2></div><div id=\"column-review\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"review\" hx-trigger=\"load\" hx-get=\"/tasks?status=review\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div><!-- Done Column --><div class=\"bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden\"><div class=\"p-3 border-b border-gray-800\"><h2 class=\"font-semibold text-sm text-gray-300\">Done</h2></div><div id=\"column-done\" class=\"flex-1 p-3 space-y-3 overflow-y-auto\" data-status=\"done\" hx-trigger=\"load\" hx-get=\"/tasks?status=done\" hx-swap=\"innerHTML\"><!-- Tasks loaded via HTMX --></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -303,12 +303,12 @@ func MobileTaskRow(task models.Task, logs []models.AgentLog) templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"bg-white rounded-xl border border-gray-200 p-4\"><div class=\"flex items-start gap-3\"><!-- Status icon --><div class=\"flex-shrink-0 pt-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"bg-gray-900 rounded-xl border border-gray-800 p-4\"><div class=\"flex items-start gap-3\"><!-- Status icon --><div class=\"flex-shrink-0 pt-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if task.Status == models.StatusTodo {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"w-5 h-5 rounded-full border-2 border-gray-300\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"w-5 h-5 rounded-full border-2 border-gray-600\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -328,20 +328,20 @@ func MobileTaskRow(task models.Task, logs []models.AgentLog) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div><!-- Task content --><div class=\"flex-1 min-w-0\"><h3 class=\"font-semibold text-gray-900 text-sm leading-tight mb-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div><!-- Task content --><div class=\"flex-1 min-w-0\"><h3 class=\"font-semibold text-white text-sm leading-tight mb-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(task.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/board.templ`, Line: 199, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/board.templ`, Line: 199, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</h3><p class=\"text-xs text-gray-500 line-clamp-2 mb-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</h3><p class=\"text-xs text-gray-400 line-clamp-2 mb-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -159,3 +159,66 @@ This software is licensed under the FSL-1.1-MIT license, which permits:
 On the second anniversary of release (2028-01-05), the license automatically converts to standard MIT.
 
 See the [LICENSE](LICENSE) file for full terms.
+
+---
+
+## ☁️ Cloud Deployment
+
+Counterspell is ready to deploy to Fly.io!
+
+### Quick Deploy to Fly.io
+
+```bash
+# Install Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# Login
+flyctl auth login
+
+# Deploy
+flyctl deploy
+```
+
+**App URL:** https://counterspell.fly.dev
+
+**Complete Documentation:**
+- [FLY_SUMMARY.md](FLY_SUMMARY.md) - Quick start guide
+- [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md) - Step-by-step instructions
+- [FLY_CHECKLIST.md](FLY_CHECKLIST.md) - Deployment checklist
+
+**Expected Cost:** ~$5-10/month (or free for first month with new credits)
+
+### Other Hosting Options
+
+- **Render** - Free tier, easy GitHub integration
+- **Oracle Cloud** - Always free tier (2 CPUs, 24GB RAM)
+- **DigitalOcean** - $4/month, simple VPS
+- **EC2 (t3.nano)** - $5/month after AWS free tier
+
+---
+
+## 🔐 Authentication Setup
+
+Counterspell uses Supabase for user authentication.
+
+**Setup Guide:** [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
+
+**Providers:**
+- GitHub OAuth
+- Google OAuth
+- Email magic links
+
+**Required Environment Variables:**
+```bash
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+**Deploy Configuration Files:**
+- `Dockerfile` - Multi-stage Go build
+- `fly.toml` - Fly.io configuration
+- `.flyignore` - Exclude files from deployment
+
+---
+
+**Need help?** See [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md) or visit [Fly.io Docs](https://fly.io/docs)

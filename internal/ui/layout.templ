@@ -2,7 +2,7 @@ package ui
 
 templ Base(title string, content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full bg-gray-50">
+	<html lang="en" class="h-full bg-gray-950">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
@@ -39,7 +39,7 @@ templ Base(title string, content templ.Component) {
 				window.showToast = function(message, type = 'error') {
 					const toast = document.createElement('div');
 					toast.className = `fixed top-4 right-4 z-50 max-w-sm w-full transform transition-all duration-300 translate-x-full ${
-						type === 'error' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+						type === 'error' ? 'bg-red-900/90 border-red-800 text-red-100' : 'bg-green-900/90 border-green-800 text-green-100'
 					} border rounded-lg shadow-lg p-4`;
 					toast.innerHTML = `
 						<div class="flex items-start gap-3">
@@ -48,10 +48,10 @@ templ Base(title string, content templ.Component) {
 								'<svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
 							}
 							<div class="flex-1">
-								<p class="text-sm ${type === 'error' ? 'text-red-900' : 'text-green-900'}">${message}</p>
+								<p class="text-sm ${type === 'error' ? 'text-red-100' : 'text-green-100'}">${message}</p>
 							</div>
 							<button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0">
-								<svg class="w-4 h-4 ${type === 'error' ? 'text-red-600' : 'text-green-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 ${type === 'error' ? 'text-red-300' : 'text-green-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 								</svg>
 							</button>
@@ -99,7 +99,7 @@ templ Base(title string, content templ.Component) {
 				});
 			</script>
 		</head>
-		<body class="h-full flex flex-col text-gray-900 bg-gradient-to-br from-gray-50 to-gray-100 font-sans antialiased">
+		<body class="h-full flex flex-col text-gray-100 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 font-sans antialiased">
 			@content
 		</body>
 	</html>
@@ -108,7 +108,7 @@ templ Base(title string, content templ.Component) {
 // HomeLayout includes mobile bottom menu
 templ HomeLayout(title string, content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full bg-gray-50">
+	<html lang="en" class="h-full bg-gray-950">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
@@ -145,7 +145,7 @@ templ HomeLayout(title string, content templ.Component) {
 				window.showToast = function(message, type = 'error') {
 					const toast = document.createElement('div');
 					toast.className = `fixed top-4 right-4 z-50 max-w-sm w-full transform transition-all duration-300 translate-x-full ${
-						type === 'error' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+						type === 'error' ? 'bg-red-900/90 border-red-800 text-red-100' : 'bg-green-900/90 border-green-800 text-green-100'
 					} border rounded-lg shadow-lg p-4`;
 					toast.innerHTML = `
 						<div class="flex items-start gap-3">
@@ -154,10 +154,10 @@ templ HomeLayout(title string, content templ.Component) {
 								'<svg class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
 							}
 							<div class="flex-1">
-								<p class="text-sm ${type === 'error' ? 'text-red-900' : 'text-green-900'}">${message}</p>
+								<p class="text-sm ${type === 'error' ? 'text-red-100' : 'text-green-100'}">${message}</p>
 							</div>
 							<button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0">
-								<svg class="w-4 h-4 ${type === 'error' ? 'text-red-600' : 'text-green-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 ${type === 'error' ? 'text-red-300' : 'text-green-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 								</svg>
 							</button>
@@ -205,13 +205,13 @@ templ HomeLayout(title string, content templ.Component) {
 				});
 			</script>
 		</head>
-		<body class="h-full flex flex-col text-gray-900 bg-gradient-to-br from-gray-50 to-gray-100 font-sans antialiased">
+		<body class="h-full flex flex-col text-gray-100 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 font-sans antialiased">
 			<!-- Header -->
-			<header class="bg-white border-b border-gray-200 px-6 py-4 fixed top-0 left-0 right-0 z-40">
+			<header class="bg-gray-900 border-b border-gray-800 px-6 py-4 fixed top-0 left-0 right-0 z-40">
 				<div class="max-w-4xl mx-auto flex items-center justify-between">
-					<h1 class="text-xl font-bold text-gray-900 tracking-tighter">counterspell</h1>
+					<h1 class="text-xl font-bold text-white tracking-tighter">counterspell</h1>
 					<div class="flex items-center gap-3">
-						<span class="text-sm text-gray-500 hidden sm:block">Signed in as @user</span>
+						<span class="text-sm text-gray-400 hidden sm:block">Signed in as @user</span>
 						<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500"></div>
 					</div>
 				</div>
@@ -225,9 +225,9 @@ templ HomeLayout(title string, content templ.Component) {
 			</main>
 
 			<!-- Mobile Bottom Menu -->
-			<nav class="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-2 z-40">
+			<nav class="sm:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 px-6 py-2 z-40">
 				<div class="flex items-center justify-around">
-					<a href="/projects" class="flex flex-col items-center gap-1 text-black py-2 px-4 -mx-2">
+					<a href="/projects" class="flex flex-col items-center gap-1 text-white py-2 px-4 -mx-2">
 						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
 						</svg>
@@ -250,7 +250,7 @@ templ HomeLayout(title string, content templ.Component) {
 			</nav>
 
 			<!-- Modal Container -->
-			<div id="modal" class="hidden"></div>
+			<div id="modal"></div>
 		</body>
 	</html>
 }

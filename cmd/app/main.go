@@ -44,6 +44,8 @@ func main() {
 		"github_client_id", getEnvStatus("GITHUB_CLIENT_ID"),
 		"github_client_secret", getEnvStatus("GITHUB_CLIENT_SECRET"),
 		"github_redirect_uri", os.Getenv("GITHUB_REDIRECT_URI"),
+		"supabase_url", getEnvStatus("SUPABASE_URL"),
+		"supabase_anon_key", getEnvStatus("SUPABASE_ANON_KEY"),
 	)
 
 	// Ensure data directory exists
@@ -93,36 +95,12 @@ func main() {
 	h.RegisterRoutes(r)
 
 	// Serve static files
-	r.Handle("/static/*", http.StripPrefix("/static", http.FileServer(http.Dir("web/static"))))
+	r.Handle("/static/*", http.StripPrefix("/static", http.FileServer(http.Dir("static"))))
 
-	// PWA manifest
-	r.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
+	// Serve PWA manifest
+	r.HandleFunc("/static/manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/manifest+json")
-		manifest := `{
-			"name": "counterspell",
-			"short_name": "PocketCTO",
-			"description": "Mobile-first AI agent orchestration",
-			"start_url": "/",
-			"display": "standalone",
-			"background_color": "#000000",
-			"theme_color": "#000000",
-			"orientation": "portrait",
-			"icons": [
-				{
-					"src": "/static/icon-192.png",
-					"sizes": "192x192",
-					"type": "image/png"
-				},
-				{
-					"src": "/static/icon-512.png",
-					"sizes": "512x512",
-					"type": "image/png"
-				}
-			]
-		}`
-		if _, err := w.Write([]byte(manifest)); err != nil {
-			logger.Error("Failed to write manifest", "error", err)
-		}
+		http.ServeFile(w, r, "static/manifest.json")
 	})
 
 	// Start server

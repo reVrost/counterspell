@@ -1,0 +1,37 @@
+# Fly.io configuration for Counterspell
+app = "counterspell"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ENV = "production"
+
+[http_service]
+  internal_port = 8710
+  force_https = true
+  auto_stop_machines = false
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "10s"
+  grace_period = "5s"
+  method = "GET"
+  path = "/"
+
+[deploy]
+  strategy = "immediate"
+
+# Create persistent volume for SQLite database
+[[mounts]]
+  source = "counterspell_data"
+  destination = "/app/data"
+
+# VM configuration (smallest size)
+[[vm]]
+  size = "shared-cpu-1x"
+  memory_mb = 256
+  cpus = 1
