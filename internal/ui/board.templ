@@ -4,13 +4,13 @@ import "github.com/revrost/code/counterspell/internal/models"
 
 templ TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) {
 	<div
-		class="task-card bg-white rounded-xl shadow-sm border border-gray-200 p-4 cursor-grab active:cursor-grabbing"
+		class="task-card bg-gray-900 rounded-xl shadow-sm border border-gray-800 p-4 cursor-grab active:cursor-grabbing"
 		data-id={ task.ID }
 		data-status={ string(task.Status) }
 	>
 		<!-- Task Header -->
 		<div class="flex items-start justify-between gap-3 mb-2">
-			<h3 class="font-medium text-gray-900 text-sm leading-tight">{ task.Title }</h3>
+			<h3 class="font-medium text-white text-sm leading-tight">{ task.Title }</h3>
 			<!-- Status Indicator -->
 			if task.Status == models.StatusTodo {
 				<span class="shrink-0 w-2 h-2 rounded-full bg-yellow-500"></span>
@@ -24,7 +24,7 @@ templ TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) {
 		</div>
 
 		<!-- Intent Preview -->
-		<p class="text-xs text-gray-500 line-clamp-2 mb-3">{ task.Intent }</p>
+		<p class="text-xs text-gray-400 line-clamp-2 mb-3">{ task.Intent }</p>
 
 		<!-- Agent Console (visible when in progress/review) -->
 		if task.Status == models.StatusInProgress || task.Status == models.StatusReview {
@@ -76,7 +76,7 @@ templ TaskCard(task models.Task, logs []models.AgentLog, isMobile bool) {
 
 		<!-- Drag Handle (visual only) -->
 		<div class="flex justify-end mt-2">
-			<div class="w-6 h-1 bg-gray-300 rounded-full"></div>
+			<div class="w-6 h-1 bg-gray-600 rounded-full"></div>
 		</div>
 	</div>
 }
@@ -106,9 +106,9 @@ templ Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobi
 		<!-- Desktop: Show all columns in grid -->
 		<div class="grid grid-cols-4 gap-4 p-4 h-full">
 			<!-- Todo Column -->
-			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
-				<div class="p-3 border-b border-gray-200">
-					<h2 class="font-semibold text-sm text-gray-700">Todo</h2>
+			<div class="bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-800">
+					<h2 class="font-semibold text-sm text-gray-300">Todo</h2>
 				</div>
 				<div id="column-todo" class="flex-1 p-3 space-y-3 overflow-y-auto"
 					data-status="todo"
@@ -120,9 +120,9 @@ templ Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobi
 			</div>
 
 			<!-- In Progress Column -->
-			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
-				<div class="p-3 border-b border-gray-200">
-					<h2 class="font-semibold text-sm text-gray-700">Doing</h2>
+			<div class="bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-800">
+					<h2 class="font-semibold text-sm text-gray-300">Doing</h2>
 				</div>
 				<div id="column-in_progress" class="flex-1 p-3 space-y-3 overflow-y-auto"
 					data-status="in_progress"
@@ -134,9 +134,9 @@ templ Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobi
 			</div>
 
 			<!-- Review Column -->
-			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
-				<div class="p-3 border-b border-gray-200">
-					<h2 class="font-semibold text-sm text-gray-700">Review</h2>
+			<div class="bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-800">
+					<h2 class="font-semibold text-sm text-gray-300">Review</h2>
 				</div>
 				<div id="column-review" class="flex-1 p-3 space-y-3 overflow-y-auto"
 					data-status="review"
@@ -148,9 +148,9 @@ templ Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobi
 			</div>
 
 			<!-- Done Column -->
-			<div class="bg-gray-100 rounded-xl flex flex-col h-full overflow-hidden">
-				<div class="p-3 border-b border-gray-200">
-					<h2 class="font-semibold text-sm text-gray-700">Done</h2>
+			<div class="bg-gray-900 rounded-xl flex flex-col h-full overflow-hidden">
+				<div class="p-3 border-b border-gray-800">
+					<h2 class="font-semibold text-sm text-gray-300">Done</h2>
 				</div>
 				<div id="column-done" class="flex-1 p-3 space-y-3 overflow-y-auto"
 					data-status="done"
@@ -166,12 +166,12 @@ templ Board(tasks []models.Task, logsByTask map[string][]models.AgentLog, isMobi
 
 // MobileTaskRow - Top-down task list for mobile (Linear-style)
 templ MobileTaskRow(task models.Task, logs []models.AgentLog) {
-	<div class="bg-white rounded-xl border border-gray-200 p-4">
+	<div class="bg-gray-900 rounded-xl border border-gray-800 p-4">
 		<div class="flex items-start gap-3">
 			<!-- Status icon -->
 			<div class="flex-shrink-0 pt-1">
 				if task.Status == models.StatusTodo {
-					<div class="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+					<div class="w-5 h-5 rounded-full border-2 border-gray-600"></div>
 				} else if task.Status == models.StatusInProgress {
 					<div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
 						<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -196,8 +196,8 @@ templ MobileTaskRow(task models.Task, logs []models.AgentLog) {
 
 			<!-- Task content -->
 			<div class="flex-1 min-w-0">
-				<h3 class="font-semibold text-gray-900 text-sm leading-tight mb-1">{ task.Title }</h3>
-				<p class="text-xs text-gray-500 line-clamp-2 mb-2">{ task.Intent }</p>
+				<h3 class="font-semibold text-white text-sm leading-tight mb-1">{ task.Title }</h3>
+				<p class="text-xs text-gray-400 line-clamp-2 mb-2">{ task.Intent }</p>
 
 				<!-- Agent Console (visible when in progress/review) -->
 				if task.Status == models.StatusInProgress || task.Status == models.StatusReview {

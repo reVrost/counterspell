@@ -29,7 +29,7 @@ func NewTaskForm(projectID string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"{ open: true }\" x-show=\"open\" class=\"fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50\" x-transition.opacity><form hx-post=\"/tasks\" hx-swap=\"outerHTML\" hx-target=\"#modal\" class=\"bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto\" @click.stop><input type=\"hidden\" name=\"repo\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"{ open: true }\" x-show=\"open\" class=\"fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50\" x-transition.opacity><form hx-post=\"/tasks\" hx-swap=\"outerHTML\" hx-target=\"#modal\" class=\"bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto border border-gray-800\" @click.stop><input type=\"hidden\" name=\"repo\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -42,7 +42,7 @@ func NewTaskForm(projectID string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><h2 class=\"text-lg font-semibold mb-4\">New Task</h2><div class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-700 mb-1\">Task Description (Markdown)</label> <textarea id=\"task-markdown\" name=\"content\" required rows=\"8\" placeholder=\"# Add user authentication\n\nThe app needs user authentication with:\n- Email/password login\n- OAuth support (Google, GitHub)\n- Session management\n\nThe authentication should be secure and follow best practices.\" class=\"w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent outline-none resize-none font-mono\"></textarea><p class=\"text-xs text-gray-500 mt-1\">The first heading will be used as the task title</p></div></div><div class=\"flex gap-3 mt-6\"><button type=\"button\" @click=\"open = false\" class=\"flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50\">Cancel</button> <button type=\"submit\" class=\"flex-1 px-4 py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800\">Create Task</button></div></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><h2 class=\"text-lg font-semibold mb-4 text-white\">New Task</h2><div class=\"space-y-4\"><div><label class=\"block text-sm font-medium text-gray-300 mb-1\">Task Description (Markdown)</label> <textarea id=\"task-markdown\" name=\"content\" required rows=\"8\" placeholder=\"# Add user authentication\n\nThe app needs user authentication with:\n- Email/password login\n- OAuth support (Google, GitHub)\n- Session management\n\nThe authentication should be secure and follow best practices.\" class=\"w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white rounded-lg text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none resize-none font-mono\"></textarea><p class=\"text-xs text-gray-400 mt-1\">The first heading will be used as the task title</p></div></div><div class=\"flex gap-3 mt-6\"><button type=\"button\" @click=\"open = false\" class=\"flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800\">Cancel</button> <button type=\"submit\" class=\"flex-1 px-4 py-2.5 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-100\">Create Task</button></div></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -100,33 +100,33 @@ func DiffModal(title, diff string) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50\" onclick=\"document.getElementById('modal').classList.add('hidden')\"><div class=\"bg-white rounded-2xl p-6 w-full max-w-4xl shadow-xl max-h-[90vh] overflow-y-auto\" onclick=\"event.stopPropagation()\"><div class=\"flex items-center justify-between mb-4\"><h2 class=\"text-lg font-semibold\">Review Changes: ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50\" onclick=\"document.getElementById('modal').classList.add('hidden')\"><div class=\"bg-gray-900 rounded-2xl p-6 w-full max-w-4xl shadow-xl max-h-[90vh] overflow-y-auto border border-gray-800\" onclick=\"event.stopPropagation()\"><div class=\"flex items-center justify-between mb-4\"><h2 class=\"text-lg font-semibold text-white\">Review Changes: ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/form.templ`, Line: 61, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/form.templ`, Line: 61, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</h2><button onclick=\"document.getElementById('modal').classList.add('hidden')\" class=\"text-gray-400 hover:text-gray-600\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><pre class=\"bg-gray-900 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto font-mono whitespace-pre-wrap break-words\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</h2><button onclick=\"document.getElementById('modal').classList.add('hidden')\" class=\"text-gray-400 hover:text-gray-200\"><svg class=\"w-6 h-6\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><pre class=\"bg-gray-950 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto font-mono whitespace-pre-wrap break-words border border-gray-800\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(diff)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/form.templ`, Line: 69, Col: 129}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/form.templ`, Line: 69, Col: 152}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</pre><div class=\"flex gap-3 mt-6\"><button onclick=\"document.getElementById('modal').classList.add('hidden')\" class=\"flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50\">Close</button></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</pre><div class=\"flex gap-3 mt-6\"><button onclick=\"document.getElementById('modal').classList.add('hidden')\" class=\"flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800\">Close</button></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

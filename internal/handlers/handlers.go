@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/services"
@@ -25,6 +26,7 @@ type Handlers struct {
 	events       *services.EventBus
 	agent        *services.AgentRunner
 	github       *services.GitHubService
+	auth         *auth.AuthService
 	clientID     string
 	clientSecret string
 	redirectURI  string
@@ -42,11 +44,22 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *
 	fmt.Printf("  Client Secret: %s\n", maskSensitive(clientSecret))
 	fmt.Printf("  Redirect URI: %s\n", redirectURI)
 
+	githubService := services.NewGitHubService(clientID, clientSecret, redirectURI, db)
+
+	// Initialize auth service
+	authService, err := auth.NewAuthServiceFromEnv()
+	if err != nil {
+		fmt.Printf("Warning: Failed to initialize auth service: %v\n", err)
+		fmt.Printf("OAuth will not be available\n")
+		authService = nil
+	}
+
 	return &Handlers{
 		tasks:        tasks,
 		events:       events,
 		agent:        agent,
-		github:       services.NewGitHubService(clientID, clientSecret, redirectURI, db),
+		github:       githubService,
+		auth:         authService,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		redirectURI:  redirectURI,
@@ -66,7 +79,17 @@ func maskSensitive(val string) string {
 
 // RegisterRoutes registers all routes on the router.
 func (h *Handlers) RegisterRoutes(r chi.Router) {
-	r.Get("/", h.HandleHome)
+	// Landing and Auth
+	r.Get("/", h.HandleLanding)
+	r.Get("/auth/login", h.HandleAuth)
+	r.Get("/auth/register", h.HandleRegister)
+	r.Get("/auth/oauth/{provider}", h.HandleOAuth)
+	r.Get("/auth/callback", h.HandleAuthCallback)
+	r.Get("/auth/check", h.HandleAuthCheck)
+	r.Post("/auth/logout", h.HandleLogout)
+
+	// App routes (protected)
+	r.Get("/home", h.HandleHome)
 	r.Get("/projects", h.HandleProjects)
 	r.Post("/projects/refresh", h.HandleRefreshProjects)
 	r.Post("/disconnect", h.HandleDisconnect)

@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o pocket-cto ./cmd/app
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o app ./cmd/app
 
 # Runtime stage
 FROM alpine:latest
@@ -22,17 +22,22 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install git for runtime worktree operations
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates
 
 # Copy binary from builder
-COPY --from=builder /app/pocket-cto .
+COPY --from=builder /app/app .
+
+# Copy static files
+COPY --from=builder /app/static ./static
+
+# Copy schema
 COPY --from=builder /app/internal/db/schema.sql ./internal/db/schema.sql
 
-# Create data directory
+# Create data directory for SQLite database
 RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE 8710
 
 # Run the application
-CMD ["./pocket-cto", "-addr", ":8710", "-db", "./data/pocket-cto.db"]
+CMD ["./app", "-addr", ":8710", "-db", "./data/counterspell.db"]

@@ -1,0 +1,53 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+SUPABASE_SETUP.md
+
+# Environment files
+.env
+.envrc
+.envrc.example
+.env.local
+.env.production
+
+# Fly files (don't upload fly config)
+.fly
+fly.toml
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Development files
+.air.toml
+tmp/
+data/
+*.db
+
+# Test files
+*_test.go
+*.test
+
+# Temporary files
+*.log
+*.tmp
+
+# Build artifacts (we build in Docker)
+bin/
+dist/
+build/
+
+# Node modules (if any frontend)
+node_modules/
+
+# OS files
+Thumbs.db
