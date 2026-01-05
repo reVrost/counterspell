@@ -1,8 +1,8 @@
 package ui
 
 templ NewTaskForm(projectID string) {
-	<div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onclick="document.getElementById('modal').classList.add('hidden')">
-		<form hx-post="/tasks" hx-swap="outerHTML" hx-target="#modal" class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+	<div x-data="{ open: true }" x-show="open" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" x-transition.opacity>
+		<form hx-post="/tasks" hx-swap="outerHTML" hx-target="#modal" class="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto" @click.stop>
 			<input type="hidden" name="repo" value={ projectID } />
 
 			<h2 class="text-lg font-semibold mb-4">New Task</h2>
@@ -24,7 +24,7 @@ The authentication should be secure and follow best practices."
 			</div>
 
 			<div class="flex gap-3 mt-6">
-				<button type="button" onclick="document.getElementById('modal').classList.add('hidden')"
+				<button type="button" @click="open = false"
 					class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
 					Cancel
 				</button>
@@ -39,8 +39,12 @@ The authentication should be secure and follow best practices."
 
 templ TaskCreated(taskID string) {
 	<script>
-		// Close modal
-		document.getElementById('modal').classList.add('hidden');
+		// Hide modal immediately
+		const modal = document.getElementById('modal');
+		if (modal) {
+			modal.classList.add('hidden');
+			modal.innerHTML = '';
+		}
 		// Reload board
 		htmx.trigger('#main', 'load');
 		// Add haptic feedback
