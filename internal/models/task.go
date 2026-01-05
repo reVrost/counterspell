@@ -16,6 +16,7 @@ const (
 // Task represents a work item in the system.
 type Task struct {
 	ID        string     `json:"id"`
+	ProjectID string     `json:"project_id"`
 	Title     string     `json:"title"`
 	Intent    string     `json:"intent"`
 	Status    TaskStatus `json:"status"`

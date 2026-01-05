@@ -19,6 +19,14 @@ import (
 	"github.com/revrost/code/counterspell/internal/services"
 )
 
+// getEnvStatus returns "set" or "not set" for an environment variable
+func getEnvStatus(key string) string {
+	if val := os.Getenv(key); val != "" {
+		return "set"
+	}
+	return "not set"
+}
+
 func main() {
 	// Parse flags
 	addr := flag.String("addr", ":8710", "Server address")
@@ -28,6 +36,15 @@ func main() {
 	// Setup logger
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+
+	// Log environment configuration
+	logger.Info("Configuration",
+		"addr", *addr,
+		"db_path", *dbPath,
+		"github_client_id", getEnvStatus("GITHUB_CLIENT_ID"),
+		"github_client_secret", getEnvStatus("GITHUB_CLIENT_SECRET"),
+		"github_redirect_uri", os.Getenv("GITHUB_REDIRECT_URI"),
+	)
 
 	// Ensure data directory exists
 	if err := os.MkdirAll(filepath.Dir(*dbPath), 0755); err != nil {
@@ -40,9 +57,6 @@ func main() {
 	if err != nil {
 		logger.Error("Failed to open database", "error", err)
 		os.Exit(1)
-	}
-	if err := database.Close(); err != nil {
-		logger.Error("Failed to close database", "error", err)
 	}
 
 	// Create services
@@ -142,6 +156,11 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server shutdown failed", "error", err)
 		os.Exit(1)
+	}
+
+	// Close database
+	if err := database.Close(); err != nil {
+		logger.Error("Failed to close database", "error", err)
 	}
 
 	logger.Info("Server stopped")
