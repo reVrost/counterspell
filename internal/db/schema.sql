@@ -5,12 +5,14 @@ PRAGMA foreign_keys = ON;
 -- 1. Tasks: The core unit of work
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('todo', 'in_progress', 'review', 'human_review', 'done')),
     position INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 -- 2. Agent Logs: "The Matrix" Code Stream

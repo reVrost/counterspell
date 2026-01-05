@@ -23,15 +23,15 @@ func NewTaskService(database *db.DB) *TaskService {
 }
 
 // Create creates a new task.
-func (s *TaskService) Create(ctx context.Context, title, intent string) (*models.Task, error) {
+func (s *TaskService) Create(ctx context.Context, projectID, title, intent string) (*models.Task, error) {
 	id := uuid.New().String()
 	now := time.Now()
 
 	query := `
-		INSERT INTO tasks (id, title, intent, status, position, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO tasks (id, project_id, title, intent, status, position, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := s.db.ExecContext(ctx, query, id, title, intent, models.StatusTodo, 0, now, now)
+	_, err := s.db.ExecContext(ctx, query, id, projectID, title, intent, models.StatusTodo, 0, now, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
@@ -42,12 +42,12 @@ func (s *TaskService) Create(ctx context.Context, title, intent string) (*models
 // Get retrieves a task by ID.
 func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) {
 	query := `
-		SELECT id, title, intent, status, position, created_at, updated_at
+		SELECT id, project_id, title, intent, status, position, created_at, updated_at
 		FROM tasks WHERE id = ?
 	`
 	var task models.Task
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&task.ID, &task.Title, &task.Intent, &task.Status,
+		&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
 		&task.Position, &task.CreatedAt, &task.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -59,25 +59,32 @@ func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) 
 	return &task, nil
 }
 
-// List returns all tasks, optionally filtered by status.
-func (s *TaskService) List(ctx context.Context, status *models.TaskStatus) ([]models.Task, error) {
+// List returns all tasks, optionally filtered by status and/or project.
+func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, projectID *string) ([]models.Task, error) {
 	var query string
 	var args []interface{}
 
+	whereClauses := []string{}
 	if status != nil {
-		query = `
-			SELECT id, title, intent, status, position, created_at, updated_at
-			FROM tasks WHERE status = ?
-			ORDER BY position ASC, created_at DESC
-		`
-		args = []interface{}{*status}
-	} else {
-		query = `
-			SELECT id, title, intent, status, position, created_at, updated_at
-			FROM tasks
-			ORDER BY status ASC, position ASC, created_at DESC
-		`
+		whereClauses = append(whereClauses, "status = ?")
+		args = append(args, *status)
 	}
+	if projectID != nil {
+		whereClauses = append(whereClauses, "project_id = ?")
+		args = append(args, *projectID)
+	}
+
+	whereClause := ""
+	if len(whereClauses) > 0 {
+		whereClause = "WHERE " + joinStrings(whereClauses, " AND ")
+	}
+
+	query = `
+		SELECT id, project_id, title, intent, status, position, created_at, updated_at
+		FROM tasks
+	` + whereClause + `
+		ORDER BY status ASC, position ASC, created_at DESC
+	`
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -93,7 +100,7 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus) ([]mo
 	for rows.Next() {
 		var task models.Task
 		err := rows.Scan(
-			&task.ID, &task.Title, &task.Intent, &task.Status,
+			&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
 			&task.Position, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
@@ -103,6 +110,17 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus) ([]mo
 	}
 
 	return tasks, nil
+}
+
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for _, s := range strs[1:] {
+		result += sep + s
+	}
+	return result
 }
 
 // UpdateStatus updates a task's status.

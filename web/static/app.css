@@ -30,6 +30,23 @@
 		line-height: 1.4;
 		letter-spacing: -0.01em;
 	}
+
+	.hidden {
+		display: none;
+	}
+
+	.animate-spin {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
 }
 
 /* Geist-specific utilities */

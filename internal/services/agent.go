@@ -1,8 +1,11 @@
 package services
 
 import (
+	"bufio"
 	"context"
-	"time"
+	"log/slog"
+	"os/exec"
+	"strings"
 
 	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/models"
@@ -60,23 +63,98 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 		HTMLPayload: `<span class="text-blue-400">[info]</span> Created worktree: ` + worktreePath,
 	})
 
-	time.Sleep(500 * time.Millisecond)
-
-	// Simulate agent thinking
+	// Execute crush command with task's intent
 	r.eventBus.Publish(models.Event{
 		TaskID:      taskID,
 		Type:        "log",
-		HTMLPayload: `<span class="text-purple-400">[code]</span> Writing code...`,
+		HTMLPayload: `<span class="text-purple-400">[code]</span> Starting agent...`,
 	})
 
-	time.Sleep(2 * time.Second)
+	cmd := exec.CommandContext(ctx, "crush", "run", "--yolo", task.Intent)
+	cmd.Dir = worktreePath
 
-	// Simulate code completion
-	r.eventBus.Publish(models.Event{
-		TaskID:      taskID,
-		Type:        "log",
-		HTMLPayload: `<span class="text-green-400">[success]</span> Code written successfully`,
-	})
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		r.eventBus.Publish(models.Event{
+			TaskID:      taskID,
+			Type:        "error",
+			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to create stdout pipe: ` + err.Error(),
+		})
+		return err
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		r.eventBus.Publish(models.Event{
+			TaskID:      taskID,
+			Type:        "error",
+			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to create stderr pipe: ` + err.Error(),
+		})
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		r.eventBus.Publish(models.Event{
+			TaskID:      taskID,
+			Type:        "error",
+			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to start agent: ` + err.Error(),
+		})
+		return err
+	}
+
+	// Stream output in real-time
+	outputScanner := bufio.NewScanner(stdout)
+	errorScanner := bufio.NewScanner(stderr)
+
+	done := make(chan bool, 2)
+
+	go func() {
+		for outputScanner.Scan() {
+			line := outputScanner.Text()
+			r.eventBus.Publish(models.Event{
+				TaskID:      taskID,
+				Type:        "log",
+				HTMLPayload: `<span class="text-gray-300">` + escapeHTML(line) + `</span>`,
+			})
+		}
+		done <- true
+	}()
+
+	go func() {
+		for errorScanner.Scan() {
+			line := errorScanner.Text()
+			if strings.Contains(strings.ToLower(line), "error") {
+				r.eventBus.Publish(models.Event{
+					TaskID:      taskID,
+					Type:        "log",
+					HTMLPayload: `<span class="text-red-400">` + escapeHTML(line) + `</span>`,
+				})
+			} else {
+				r.eventBus.Publish(models.Event{
+					TaskID:      taskID,
+					Type:        "log",
+					HTMLPayload: `<span class="text-yellow-400">` + escapeHTML(line) + `</span>`,
+				})
+			}
+		}
+		done <- true
+	}()
+
+	// Wait for both scanners to finish
+	<-done
+	<-done
+
+	// Wait for command to finish
+	err = cmd.Wait()
+
+	if err != nil {
+		r.eventBus.Publish(models.Event{
+			TaskID:      taskID,
+			Type:        "error",
+			HTMLPayload: `<span class="text-red-400">[error]</span> Agent failed: ` + err.Error(),
+		})
+		return err
+	}
 
 	// Move to review
 	if err := r.taskService.UpdateStatus(ctx, taskID, models.StatusReview); err != nil {
@@ -94,8 +172,20 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 		HTMLPayload: `<span class="text-green-400">✓</span> Moved to review`,
 	})
 
+	slog.Info("Agent completed", "task_id", taskID, "title", task.Title)
+
 	// Cleanup worktree (defer until approved or rejected)
 	// For now, we keep it for review
 
 	return nil
+}
+
+// escapeHTML escapes HTML special characters.
+func escapeHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
 }

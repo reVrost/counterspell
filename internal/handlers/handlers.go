@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/services"
 	"github.com/revrost/code/counterspell/internal/ui"
+	"github.com/revrost/code/counterspell/internal/utils"
 )
 
 // Handlers contains all HTTP handlers.
@@ -33,6 +36,12 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *
 	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
 
+	// Log GitHub configuration (don't log actual secrets)
+	fmt.Printf("GitHub Handler Config:\n")
+	fmt.Printf("  Client ID: %s\n", maskSensitive(clientID))
+	fmt.Printf("  Client Secret: %s\n", maskSensitive(clientSecret))
+	fmt.Printf("  Redirect URI: %s\n", redirectURI)
+
 	return &Handlers{
 		tasks:        tasks,
 		events:       events,
@@ -42,6 +51,17 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *
 		clientSecret: clientSecret,
 		redirectURI:  redirectURI,
 	}
+}
+
+// maskSensitive masks sensitive values for logging
+func maskSensitive(val string) string {
+	if val == "" {
+		return "not set"
+	}
+	if len(val) <= 8 {
+		return "***"
+	}
+	return val[:4] + "..." + val[len(val)-4:]
 }
 
 // RegisterRoutes registers all routes on the router.
@@ -58,6 +78,7 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Post("/tasks/{id}/move", h.HandleMoveTask)
 	r.Post("/tasks/{id}/approve", h.HandleApproveTask)
 	r.Post("/tasks/{id}/reject", h.HandleRejectTask)
+	r.Get("/tasks/{id}/diff", h.HandleTaskDiff)
 	r.Get("/tasks/new", h.HandleNewTaskForm)
 	r.Get("/events", h.HandleSSE)
 }
@@ -90,6 +111,17 @@ func (h *Handlers) HandleProjects(w http.ResponseWriter, r *http.Request) {
 		projects = []models.Project{}
 	}
 
+	// Create a default project if none exist
+	if len(projects) == 0 {
+		fmt.Println("No projects found, creating default project")
+		_ = h.github.SaveProject(ctx, "local", "local-project")
+		// Refresh project list
+		projects, err = h.github.GetProjects(ctx)
+		if err != nil {
+			projects = []models.Project{}
+		}
+	}
+
 	recentProjects, err := h.github.GetRecentProjects(ctx)
 	if err != nil {
 		recentProjects = []models.Project{}
@@ -113,13 +145,13 @@ func (h *Handlers) HandleRefreshProjects(w http.ResponseWriter, r *http.Request)
 	// Get connection
 	conn, err := h.github.GetActiveConnection(ctx)
 	if err != nil {
-		http.Error(w, "No GitHub connection", http.StatusNotFound)
+		sendHTMXError(w, r, http.StatusNotFound, "No GitHub connection")
 		return
 	}
 
 	// Fetch and save repositories
 	if err := h.github.FetchAndSaveRepositories(ctx, conn); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch repositories: %v", err), http.StatusInternalServerError)
+		sendHTMXError(w, r, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch repositories: %v", err))
 		return
 	}
 
@@ -137,7 +169,7 @@ func (h *Handlers) HandleRefreshProjects(w http.ResponseWriter, r *http.Request)
 	// Render updated projects section
 	w.Header().Set("Content-Type", "text/html")
 	if err := ui.ProjectsPage(projects, recentProjects, conn).Render(r.Context(), w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		sendHTMXError(w, r, http.StatusInternalServerError, err.Error())
 	}
 }
 
@@ -171,53 +203,91 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 	code := r.URL.Query().Get("code")
 	connType := r.URL.Query().Get("state")
 
+	fmt.Printf("\n=== GitHub OAuth Callback ===\n")
+	fmt.Printf("Code: %s\n", maskString(code))
+	fmt.Printf("Connection Type: %s\n", connType)
+
 	if code == "" {
 		http.Error(w, "No code provided", http.StatusBadRequest)
 		return
 	}
 
 	// Exchange code for access token
+	fmt.Printf("Exchanging code for token...\n")
 	token, err := h.github.ExchangeCodeForToken(ctx, code)
 	if err != nil {
+		fmt.Printf("ERROR: Failed to exchange token: %v\n", err)
 		http.Error(w, fmt.Sprintf("Failed to exchange token: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("Token received successfully\n")
+	fmt.Printf("Token received successfully (masked: %s)\n", maskString(token))
 
 	// Get user info
+	fmt.Printf("Fetching user info...\n")
 	login, avatarURL, err := h.github.GetUserInfo(ctx, token)
 	if err != nil {
+		fmt.Printf("ERROR: Failed to get user info: %v\n", err)
 		http.Error(w, fmt.Sprintf("Failed to get user info: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("User info: login=%s\n", login)
+	fmt.Printf("User info: login=%s, avatar=%s\n", login, avatarURL)
 
 	// Save connection
+	fmt.Printf("Saving connection to database...\n")
 	err = h.github.SaveConnection(ctx, connType, login, avatarURL, token, "repo,read:user,read:org")
 	if err != nil {
+		fmt.Printf("ERROR: Failed to save connection: %v\n", err)
 		http.Error(w, fmt.Sprintf("Failed to save connection: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("Connection saved\n")
+	fmt.Printf("Connection saved successfully\n")
 
 	// Fetch and save repositories (synchronous for debugging)
 	conn, err := h.github.GetActiveConnection(ctx)
 	if err == nil && conn != nil {
 		fmt.Printf("Fetching repositories for %s (type: %s)\n", conn.Login, conn.Type)
 		if err := h.github.FetchAndSaveRepositories(ctx, conn); err != nil {
-			fmt.Printf("Failed to fetch repositories: %v\n", err)
+			fmt.Printf("ERROR: Failed to fetch repositories: %v\n", err)
 		} else {
 			fmt.Printf("Successfully fetched repositories\n")
 		}
 	} else {
-		fmt.Printf("No active connection found: %v\n", err)
+		fmt.Printf("ERROR: No active connection found: %v\n", err)
 	}
+
+	fmt.Printf("=== End OAuth Callback ===\n\n")
 
 	// Redirect to Projects page
 	http.Redirect(w, r, "/projects", http.StatusTemporaryRedirect)
+}
+
+// maskString masks sensitive strings for logging
+func maskString(s string) string {
+	if s == "" {
+		return "empty"
+	}
+	if len(s) <= 12 {
+		return "***"
+	}
+	return s[:6] + "..." + s[len(s)-6:]
+}
+
+// sendHTMXError sends an error response that triggers HTMX error handling
+func sendHTMXError(w http.ResponseWriter, r *http.Request, status int, message string) {
+	// Check if this is an HTMX request
+	isHTMX := r.Header.Get("HX-Request") == "true"
+
+	if isHTMX {
+		// For HTMX requests, return an error response that will trigger the toast
+		w.Header().Set("HX-Trigger", "htmx:error")
+		http.Error(w, message, status)
+	} else {
+		// For regular requests, just return the error
+		http.Error(w, message, status)
+	}
 }
 
 // HandleDisconnect disconnects GitHub and clears data.
@@ -241,27 +311,47 @@ func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
 // HandleKanban renders the Kanban board.
 func (h *Handlers) HandleKanban(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
-	// Get tasks for all statuses
-	tasks, err := h.tasks.List(ctx, nil)
+
+	// Get project ID from URL parameter
+	repo := r.URL.Query().Get("repo")
+
+	// Get project for the repo
+	projectID := ""
+	if repo != "" {
+		project, err := h.github.GetProjectByRepo(ctx, repo)
+		if err == nil && project != nil {
+			projectID = project.ID
+		}
+	}
+
+	// If no project selected, auto-select the first available project
+	if projectID == "" {
+		projects, err := h.github.GetProjects(ctx)
+		if err == nil && len(projects) > 0 {
+			projectID = projects[0].ID
+		}
+	}
+
+	// Get tasks for all statuses filtered by project
+	tasks, err := h.tasks.List(ctx, nil, &projectID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Group tasks by status
 	tasksByStatus := make(map[string][]models.Task)
 	for _, task := range tasks {
 		tasksByStatus[string(task.Status)] = append(tasksByStatus[string(task.Status)], task)
 	}
-	
+
 	// Mock logs (empty for now)
 	logsByTask := make(map[string][]models.AgentLog)
-	
+
 	// Determine if mobile
 	isMobile := h.isMobile(r)
-	
-	component := ui.HomeLayout("counterspell - Kanban", ui.Board(tasks, logsByTask, isMobile))
+
+	component := ui.HomeLayout("counterspell - Kanban", ui.Board(tasks, logsByTask, isMobile, projectID))
 	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -279,6 +369,7 @@ func (h *Handlers) isMobile(r *http.Request) bool {
 func (h *Handlers) HandleListTasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	statusStr := r.URL.Query().Get("status")
+	repo := r.URL.Query().Get("repo")
 
 	var status *models.TaskStatus
 	if statusStr != "" {
@@ -286,7 +377,16 @@ func (h *Handlers) HandleListTasks(w http.ResponseWriter, r *http.Request) {
 		status = &s
 	}
 
-	tasks, err := h.tasks.List(ctx, status)
+	// Get project ID for the repo
+	projectID := ""
+	if repo != "" {
+		project, err := h.github.GetProjectByRepo(ctx, repo)
+		if err == nil && project != nil {
+			projectID = project.ID
+		}
+	}
+
+	tasks, err := h.tasks.List(ctx, status, &projectID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -312,29 +412,58 @@ func (h *Handlers) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		sendHTMXError(w, r, http.StatusBadRequest, "Invalid form data: "+err.Error())
 		return
 	}
 
-	title := r.FormValue("title")
-	intent := r.FormValue("intent")
+	repo := r.FormValue("repo")
+	content := r.FormValue("content")
 
-	if title == "" || intent == "" {
-		http.Error(w, "Title and intent are required", http.StatusBadRequest)
+	// Debug logging
+	fmt.Printf("HandleCreateTask: repo=%s, content_len=%d\n", repo, len(content))
+
+	if content == "" {
+		sendHTMXError(w, r, http.StatusBadRequest, "Content is required")
 		return
 	}
 
-	task, err := h.tasks.Create(ctx, title, intent)
+	// Extract title from markdown content
+	title := utils.ExtractTitleFromMarkdown(content)
+
+	// Get project ID for the repo
+	projectID := ""
+	if repo != "" {
+		project, err := h.github.GetProjectByRepo(ctx, repo)
+		if err == nil && project != nil {
+			projectID = project.ID
+		}
+	}
+
+	// If still no project ID, try to get first available project
+	if projectID == "" {
+		projects, err := h.github.GetProjects(ctx)
+		if err == nil && len(projects) > 0 {
+			projectID = projects[0].ID
+		}
+	}
+
+	if projectID == "" {
+		sendHTMXError(w, r, http.StatusBadRequest, "No project found. Please create a project first.")
+		return
+	}
+
+	fmt.Printf("Creating task with projectID=%s, title=%s\n", projectID, title)
+
+	task, err := h.tasks.Create(ctx, projectID, title, content)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		sendHTMXError(w, r, http.StatusInternalServerError, "Failed to create task: "+err.Error())
 		return
 	}
 
-	// Return the new task as HTML
+	// Return success with task ID to trigger board reload
 	w.Header().Set("Content-Type", "text/html")
-	if _, err := fmt.Fprintf(w, `<div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100" data-id="%s">
-		<h3 class="font-medium text-sm text-gray-900">%s</h3>
-	</div>`, task.ID, task.Title); err != nil {
+	component := ui.TaskCreated(task.ID)
+	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -345,25 +474,25 @@ func (h *Handlers) HandleMoveTask(w http.ResponseWriter, r *http.Request) {
 
 	taskID := chi.URLParam(r, "id")
 	if taskID == "" {
-		http.Error(w, "Task ID is required", http.StatusBadRequest)
+		sendHTMXError(w, r, http.StatusBadRequest, "Task ID is required")
 		return
 	}
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		sendHTMXError(w, r, http.StatusBadRequest, "Invalid form data")
 		return
 	}
 
 	statusStr := r.FormValue("status")
 	if statusStr == "" {
-		http.Error(w, "Status is required", http.StatusBadRequest)
+		sendHTMXError(w, r, http.StatusBadRequest, "Status is required")
 		return
 	}
 
 	status := models.TaskStatus(statusStr)
 	err := h.tasks.UpdateStatus(ctx, taskID, status)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		sendHTMXError(w, r, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -439,27 +568,60 @@ func (h *Handlers) HandleRejectTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// HandleTaskDiff shows the git diff for a task in review.
+func (h *Handlers) HandleTaskDiff(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	taskID := chi.URLParam(r, "id")
+	if taskID == "" {
+		http.Error(w, "Task ID is required", http.StatusBadRequest)
+		return
+	}
+
+	task, err := h.tasks.Get(ctx, taskID)
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	if task.Status != models.StatusReview {
+		http.Error(w, "Task must be in review status", http.StatusBadRequest)
+		return
+	}
+
+	// Get git diff from worktree
+	worktreePath := filepath.Join("..", "worktree-"+taskID)
+
+	cmd := exec.Command("git", "diff", "main")
+	cmd.Dir = worktreePath
+	output, err := cmd.CombinedOutput()
+
+	var diff string
+	if err != nil && len(output) > 0 {
+		// Could be empty diff (no changes)
+		diff = string(output)
+	} else if err == nil {
+		diff = string(output)
+	}
+
+	if diff == "" {
+		diff = "No changes to display."
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	component := ui.DiffModal(task.Title, diff)
+	if err := component.Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // HandleNewTaskForm renders the new task form modal.
 func (h *Handlers) HandleNewTaskForm(w http.ResponseWriter, r *http.Request) {
+	repo := r.URL.Query().Get("repo")
+
 	w.Header().Set("Content-Type", "text/html")
-	form := `<div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl" hx-post="/tasks" hx-target="#main" hx-swap="outerHTML">
-		<h2 class="text-lg font-semibold mb-4 tracking-tighter">New Task</h2>
-		<form class="space-y-4">
-			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-				<input type="text" name="title" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" placeholder="Fix login bug"/>
-			</div>
-			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-1">Intent</label>
-				<textarea name="intent" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" rows="3" placeholder="User cannot login with email..."></textarea>
-			</div>
-			<div class="flex gap-2">
-				<button type="submit" class="flex-1 bg-black text-white py-2 rounded-lg font-medium active:scale-95 transition-transform">Create Task</button>
-				<button type="button" hx-target="#modal" hx-swap="innerHTML" class="flex-1 bg-gray-100 text-gray-900 py-2 rounded-lg font-medium">Cancel</button>
-			</div>
-		</form>
-	</div>`
-	if _, err := fmt.Fprint(w, form); err != nil {
+	component := ui.NewTaskForm(repo)
+	if err := component.Render(r.Context(), w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

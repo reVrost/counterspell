@@ -26,12 +26,28 @@ type GitHubService struct {
 
 // NewGitHubService creates a new GitHub service.
 func NewGitHubService(clientID, clientSecret, redirectURI string, db *db.DB) *GitHubService {
+	fmt.Printf("GitHub Service initialized:\n")
+	fmt.Printf("  Client ID: %s\n", maskString(clientID))
+	fmt.Printf("  Client Secret: %s\n", maskString(clientSecret))
+	fmt.Printf("  Redirect URI: %s\n", redirectURI)
+
 	return &GitHubService{
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		redirectURI:  redirectURI,
 		db:           db,
 	}
+}
+
+// maskString masks sensitive values for logging
+func maskString(s string) string {
+	if s == "" {
+		return "not set"
+	}
+	if len(s) <= 8 {
+		return "***"
+	}
+	return s[:4] + "..." + s[len(s)-4:]
 }
 
 // ExchangeCodeForToken exchanges the OAuth code for an access token.
@@ -246,6 +262,22 @@ func (s *GitHubService) GetRecentProjects(ctx context.Context) ([]models.Project
 	}
 
 	return projects, nil
+}
+
+// GetProjectByRepo retrieves a project by repository name.
+func (s *GitHubService) GetProjectByRepo(ctx context.Context, repo string) (*models.Project, error) {
+	query := `SELECT id, github_owner, github_repo, created_at FROM projects WHERE github_repo = ? LIMIT 1`
+
+	var p models.Project
+	err := s.db.QueryRowContext(ctx, query, repo).Scan(&p.ID, &p.GitHubOwner, &p.GitHubRepo, &p.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project by repo: %w", err)
+	}
+
+	return &p, nil
 }
 
 // DeleteConnection deletes the active GitHub connection.
