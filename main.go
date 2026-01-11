@@ -919,24 +919,25 @@ const detailTemplate = `
 
         <!-- Default Buttons -->
         <div x-show="!showChat" class="grid grid-cols-4 gap-2 h-12">
-            <!-- Ralph Wiggum Button -->
+            <!-- Retry Button -->
             <button hx-post="/action/retry/{{.Task.ID}}" hx-swap="none"
-                class="col-span-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex flex-col items-center justify-center gap-1 active:scale-95 transition">
-                <i class="fas fa-dice font-sm"></i>
-                <span class="text-[9px] font-bold uppercase">Retry</span>
+                class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all text-gray-400 hover:text-white">
+                <i class="fas fa-undo text-xs mb-0.5"></i>
+                <span class="text-[10px] font-semibold uppercase tracking-wide">Retry</span>
             </button>
             
             <!-- Chat Button -->
             <button @click="showChat = true" 
-                class="col-span-1 bg-gray-800 hover:bg-gray-700 text-blue-400 rounded-lg flex flex-col items-center justify-center gap-1 active:scale-95 transition">
-                <i class="fas fa-comment-alt font-sm"></i>
-                <span class="text-[9px] font-bold uppercase">Refine</span>
+                class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all text-blue-400 hover:text-blue-300">
+                <i class="fas fa-comment text-xs mb-0.5"></i>
+                <span class="text-[10px] font-semibold uppercase tracking-wide">Chat</span>
             </button>
             
             <!-- Merge Button -->
             <button hx-post="/action/merge/{{.Task.ID}}" hx-swap="none"
-                class="col-span-2 bg-white text-black hover:bg-gray-200 rounded-lg flex items-center justify-center gap-2 font-bold text-sm active:scale-95 transition shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                <i class="fas fa-check"></i> Approve & Merge
+                class="col-span-2 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-2 font-bold text-sm active:scale-95 transition-all">
+                <i class="fas fa-code-branch"></i>
+                <span>Merge</span>
             </button>
         </div>
     </div>
