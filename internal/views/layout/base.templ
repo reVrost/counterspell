@@ -1,0 +1,229 @@
+package layout
+
+import (
+	"fmt"
+	"github.com/revrost/code/counterspell/internal/views"
+	"github.com/revrost/code/counterspell/internal/views/components"
+	"github.com/revrost/code/counterspell/internal/models"
+)
+
+// Base is the main shell of the application
+templ Base(title string, projects map[string]views.UIProject, settings models.UserSettings, isAuthenticated bool, content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en" class="dark">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+			<title>Counterspell</title>
+			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+			<script src="https://cdn.tailwindcss.com"></script>
+			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+			<script>
+				tailwind.config = {
+					darkMode: 'class',
+					theme: {
+						fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] },
+						extend: {
+							colors: {
+								gray: { 850: '#1A1D24', 900: '#111318', 950: '#0C0E12' },
+								linear: { border: '#2E323A', text: '#EBEBEB', sub: '#8A8F98' }
+							}
+						}
+					}
+				}
+			</script>
+			<style>
+				body { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; }
+				.hide-scrollbar::-webkit-scrollbar { display: none; }
+				.no-tap-highlight { -webkit-tap-highlight-color: transparent; }
+				
+				/* Slide-over animation */
+				.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+				.slide-enter-start, .slide-leave-end { transform: translateY(100%); }
+				.slide-enter-end, .slide-leave-start { transform: translateY(0); }
+				
+				/* Custom syntax highlight feel */
+				.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }
+				.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }
+				.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }
+			</style>
+		</head>
+		<body x-data={ fmt.Sprintf(`{
+			modalOpen: false,
+			activeTab: 'diff',
+			projectMenuOpen: false,
+			listening: false,
+			toastMsg: '',
+			toastOpen: false,
+			settingsOpen: false,
+			userMenuOpen: false,
+			
+			// Onboarding State
+			showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
+			onboardingStep: 0,
+            isAuthenticated: %t,
+			
+            init() {
+                if (this.showOnboarding && this.isAuthenticated) {
+                    this.runPostAuthSequence();
+                }
+            },
+
+			startOnboarding() {
+				this.onboardingStep = 1;
+				// Real Auth Redirect
+				setTimeout(() => {
+					window.location.href = '/github/authorize?type=user';
+				}, 1000);
+			},
+
+            runPostAuthSequence() {
+                this.onboardingStep = 2; // Syncing
+                setTimeout(() => {
+                    this.onboardingStep = 3; // Ready
+                    setTimeout(() => {
+                        localStorage.setItem('counterspell_v1_onboarded', 'true');
+                        this.showOnboarding = false;
+                        this.showToast('Environment Synced');
+                    }, 800);
+                }, 2000);
+            },
+
+			showToast(msg) {
+				this.toastMsg = msg;
+				this.toastOpen = true;
+				setTimeout(() => this.toastOpen = false, 3000);
+			},
+			simulateVoice() {
+				this.listening = true;
+				setTimeout(() => {
+					this.listening = false;
+					this.$refs.voiceForm.requestSubmit();
+				}, 1200);
+			},
+			closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); }
+		}`, isAuthenticated) }
+		@keydown.escape="closeModal()"
+		@close-modal.window="closeModal()"
+		@toast.window="showToast($event.detail.value)"
+		class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
+
+			<!-- Toast Notification -->
+			<div x-show="toastOpen" 
+				x-transition:enter="transition ease-out duration-300"
+				x-transition:enter-start="translate-y-full opacity-0"
+				x-transition:enter-end="translate-y-0 opacity-100"
+				x-transition:leave="transition ease-in duration-200"
+				x-transition:leave-start="translate-y-0 opacity-100"
+				x-transition:leave-end="translate-y-full opacity-0"
+				class="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 border border-gray-700/50 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-sm font-medium">
+				<i class="fas fa-check-circle text-green-500"></i>
+				<span x-text="toastMsg"></span>
+			</div>
+
+			<!-- Onboarding Overlay -->
+			<div x-show="showOnboarding" 
+				x-transition:leave="transition ease-in duration-500"
+				x-transition:leave-start="opacity-100 translate-y-0"
+				x-transition:leave-end="opacity-0 -translate-y-10"
+				class="fixed inset-0 z-[100] bg-[#0C0E12] flex flex-col items-center justify-center text-center px-6">
+				
+				<!-- Background Effects -->
+				<div class="absolute inset-0 overflow-hidden pointer-events-none">
+					<div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse"></div>
+					<div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animation-delay-2000 animate-pulse"></div>
+				</div>
+
+				<!-- Content -->
+				<div class="relative z-10 max-w-md w-full space-y-8">
+					<div class="space-y-4">
+						<div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6">
+							<i class="fas fa-wave-square text-2xl text-white"></i>
+						</div>
+						<h1 class="text-3xl font-bold text-white tracking-tight">Welcome to Counterspell</h1>
+						<p class="text-gray-400 text-sm leading-relaxed">
+							The AI-native orchestration layer for your engineering team.<br>
+							Connect your identity to begin.
+						</p>
+					</div>
+
+					<!-- Step 0: Initial Action -->
+					<div x-show="onboardingStep === 0" x-transition.opacity>
+						<button @click="startOnboarding()" 
+							class="w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2">
+							<i class="fab fa-github text-lg"></i> Continue with GitHub
+						</button>
+						<p class="mt-4 text-[10px] text-gray-600">By continuing, you agree to the Developer Protocol v2.1</p>
+					</div>
+
+					<!-- Step 1-3: Loading Sequence -->
+					<div x-show="onboardingStep > 0" class="space-y-4" x-cloak>
+						<div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800 text-left space-y-3 font-mono text-xs">
+							
+							<!-- Item 1: Auth -->
+							<div class="flex items-center gap-3">
+								<div class="w-4 h-4 rounded-full flex items-center justify-center"
+									:class="onboardingStep > 1 ? 'bg-green-500/20 text-green-500' : 'bg-purple-500/20 text-purple-400'">
+									<i class="fas" :class="onboardingStep > 1 ? 'fa-check' : 'fa-circle-notch fa-spin'"></i>
+								</div>
+								<span :class="onboardingStep > 1 ? 'text-gray-400' : 'text-gray-200'">Authenticating with GitHub...</span>
+							</div>
+
+							<!-- Item 2: Repos -->
+							<div class="flex items-center gap-3" x-show="onboardingStep >= 2" x-transition.opacity>
+								<div class="w-4 h-4 rounded-full flex items-center justify-center"
+									:class="onboardingStep > 2 ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-400'">
+									<i class="fas" :class="onboardingStep > 2 ? 'fa-check' : 'fa-circle-notch fa-spin'"></i>
+								</div>
+								<span :class="onboardingStep > 2 ? 'text-gray-400' : 'text-gray-200'">Indexing repositories...</span>
+							</div>
+
+							<!-- Item 3: Voice -->
+							<div class="flex items-center gap-3" x-show="onboardingStep >= 3" x-transition.opacity>
+								<div class="w-4 h-4 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center">
+									<i class="fas fa-check"></i>
+								</div>
+								<span class="text-green-400">Environment Ready</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- User Header -->
+			@components.Header(projects)
+
+			<!-- Main Feed -->
+			<main class="flex-1 overflow-y-auto bg-[#0C0E12] relative" 
+				id="feed-container"
+				hx-get="/feed" 
+				hx-trigger="load, closeModal from:body">
+				@content
+			</main>
+
+			<!-- Input Bar -->
+			@components.InputBar()
+
+			<!-- Detail Modal Wrapper -->
+			<div x-show="modalOpen" class="fixed inset-0 z-40 bg-gray-950/40 backdrop-blur-[2px]" x-transition.opacity></div>
+			<div x-show="modalOpen"
+				class="fixed inset-x-0 bottom-0 top-[40px] z-50 bg-[#16191F] rounded-t-[24px] shadow-2xl flex flex-col overflow-hidden border-t border-white/10"
+				x-transition:enter="transition transform duration-300 ease-out"
+				x-transition:enter-start="translate-y-full"
+				x-transition:enter-end="translate-y-0"
+				x-transition:leave="transition transform duration-200 ease-in"
+				x-transition:leave-start="translate-y-0"
+				x-transition:leave-end="translate-y-full">
+				
+				<div class="h-6 w-full flex items-center justify-center shrink-0 cursor-pointer hover:bg-white/5 transition" @click="closeModal()">
+					<div class="w-12 h-1 rounded-full bg-gray-700"></div>
+				</div>
+				<div id="modal-content" class="flex-1 flex flex-col h-full overflow-hidden"></div>
+			</div>
+
+			<!-- Settings Modal -->
+			@components.SettingsModal(settings)
+		</body>
+	</html>
+}

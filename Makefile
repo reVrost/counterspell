@@ -3,8 +3,7 @@
 # Variables
 PROJECT_NAME := counterspell
 TARGET_MAIN := ./cmd/app
-BINARY_DIR := ./local
-BINARY_PATH := $(BINARY_DIR)/$(PROJECT_NAME)
+BINARY_PATH := $(PROJECT_NAME)
 
 # Default target
 all: dev

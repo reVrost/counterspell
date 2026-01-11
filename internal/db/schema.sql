@@ -48,3 +48,13 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id);
 CREATE INDEX IF NOT EXISTS idx_github_connections_type ON github_connections(type);
 CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(github_owner);
+
+-- 5. User Settings (BYOK)
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT PRIMARY KEY DEFAULT 'default',
+    openrouter_key TEXT,
+    zai_key TEXT,
+    anthropic_key TEXT,
+    openai_key TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

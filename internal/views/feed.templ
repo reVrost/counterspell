@@ -1,0 +1,122 @@
+package views
+
+import "fmt"
+
+// Feed renders the main dashboard
+templ Feed(data FeedData) {
+	<div class="px-3 pt-4 pb-24">
+		
+		<!-- NEEDS REVIEW (Target for OOB Swaps) -->
+		<div id="reviews-container">
+			@ReviewsSection(data)
+		</div>
+
+		<!-- IN PROGRESS (Polled separately) -->
+		<div class="mb-6">
+			<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">In Progress</h3>
+			<div class="space-y-2" hx-get="/feed/active" hx-trigger="every 2s" hx-swap="innerHTML">
+				<!-- Initial load -->
+				@ActiveRows(data.Active, data.Projects)
+			</div>
+		</div>
+
+		<!-- DONE HISTORY -->
+		if len(data.Done) > 0 {
+			<div class="pt-4 border-t border-gray-800/50">
+				<h3 class="px-2 text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Completed</h3>
+				<div class="space-y-2 opacity-60 hover:opacity-100 transition">
+					for _, task := range data.Done {
+						@CompletedTaskRow(task, data.Projects[task.ProjectID])
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ActiveRows renders the list of active tasks (polling target)
+templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
+	for _, task := range tasks {
+		<div class="bg-[#13151A] border border-gray-800/50 rounded-xl p-3 opacity-90 transition hover:opacity-100 shadow-sm"
+			@click="modalOpen = true"
+			hx-get={ fmt.Sprintf("/task/%s", task.ID) } hx-target="#modal-content">
+			<div class="flex justify-between items-start mb-2">
+				<div class="flex items-center gap-2">
+					<span class={ fmt.Sprintf("%s opacity-70 w-5 h-5 rounded flex items-center justify-center text-[10px]", projects[task.ProjectID].Color) }>
+						<i class={ fmt.Sprintf("fas %s", projects[task.ProjectID].Icon) }></i>
+					</span>
+					<span class="text-xs text-gray-500">{ projects[task.ProjectID].Name }</span>
+				</div>
+				<span class="text-[10px] text-purple-400 flex items-center gap-1">
+					<i class="fas fa-circle-notch fa-spin"></i> { fmt.Sprintf("%d%%", task.Progress) }
+				</span>
+			</div>
+			<p class="text-sm text-gray-400 leading-tight">{ task.Description }</p>
+			
+			if task.Progress < 100 {
+				<div class="mt-2 w-full bg-gray-800 h-0.5 rounded-full overflow-hidden">
+					<div class="bg-purple-600 h-full transition-all duration-300" style={ fmt.Sprintf("width: %d%%", task.Progress) }></div>
+				</div>
+			}
+		</div>
+	}
+	if len(tasks) == 0 {
+		<div class="px-2 text-xs text-gray-600 italic">No active agents running...</div>
+	}
+}
+
+// ReviewsSection renders the Needs Review section (OOB target)
+templ ReviewsSection(data FeedData) {
+	if len(data.Reviews) > 0 {
+		<div class="mb-6">
+			<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Needs Review</h3>
+			<div class="space-y-2">
+				for _, task := range data.Reviews {
+					@ReviewTaskRow(task, data.Projects[task.ProjectID])
+				}
+			</div>
+		</div>
+	}
+}
+
+templ ReviewTaskRow(task *UITask, project UIProject) {
+	<div class="bg-[#13151A] border border-gray-800 rounded-xl p-3 active:bg-gray-800 transition shadow-sm relative group"
+			@click="modalOpen = true"
+			hx-get={ fmt.Sprintf("/task/%s", task.ID) } hx-target="#modal-content">
+		
+		<div class="flex justify-between items-start mb-1">
+			<div class="flex items-center gap-2">
+				<span class={ fmt.Sprintf("%s bg-gray-800/50 border border-gray-700/50 w-5 h-5 rounded flex items-center justify-center text-[10px]", project.Color) }>
+					<i class={ fmt.Sprintf("fas %s", project.Icon) }></i>
+				</span>
+				<span class="text-xs font-medium text-gray-400">{ project.Name }</span>
+			</div>
+			<span class="text-[10px] text-orange-400 bg-orange-400/10 px-1.5 py-0.5 rounded font-medium border border-orange-400/20">Review</span>
+		</div>
+		
+		<p class="text-sm text-gray-200 font-medium leading-tight mb-2 pr-4">{ task.Description }</p>
+		<div class="flex items-center gap-3 text-[11px] text-gray-600 font-mono">
+			<span><i class="fas fa-robot mr-1"></i>{ task.AgentName }</span>
+		</div>
+		<div class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-700">
+			<i class="fas fa-chevron-right text-xs"></i>
+		</div>
+	</div>
+}
+
+templ CompletedTaskRow(task *UITask, project UIProject) {
+	<div class="bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition"
+			@click="modalOpen = true"
+			hx-get={ fmt.Sprintf("/task/%s", task.ID) } hx-target="#modal-content">
+		<div class="flex items-center gap-3">
+			<div class="w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]">
+				<i class="fas fa-check"></i>
+			</div>
+			<div>
+					<div class="text-xs text-gray-400 line-through decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition">{ task.Description }</div>
+					<div class="text-[10px] text-gray-600">{ project.Name }</div>
+			</div>
+		</div>
+		<i class="fas fa-chevron-right text-[10px] text-gray-700 opacity-0 group-hover:opacity-100 transition"></i>
+	</div>
+}
