@@ -1,0 +1,95 @@
+package components
+
+templ InputBar() {
+	<!-- Docked Input Bar -->
+	<div class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-2xl">
+		<form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" 
+			class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200"
+			x-data="{ 
+				text: '', 
+				showFileMenu: false,
+				files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
+				resize() {
+					this.$refs.input.style.height = 'auto'; 
+					let newHeight = this.$refs.input.scrollHeight;
+					if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
+					this.$refs.input.style.height = newHeight + 'px';
+				},
+				checkMention(e) {
+					if (this.text.match(/@[^ ]*$/)) {
+						this.showFileMenu = true;
+					} else {
+						this.showFileMenu = false;
+					}
+					if (e.key === 'Escape') this.showFileMenu = false;
+				},
+				insertFile(f) {
+					this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
+					this.showFileMenu = false;
+					this.$nextTick(() => { this.$refs.input.focus(); });
+				}
+			}">
+			
+			<!-- Attachment -->
+			<button type="button" class="text-gray-400 hover:text-white transition p-2 mb-0.5">
+				<i class="fas fa-paperclip text-lg"></i>
+			</button>
+
+			<!-- Expanding Textarea Container -->
+			<div class="flex-1 mx-2 relative min-w-0">
+				
+				<!-- File Menu Popover -->
+				<div x-show="showFileMenu" x-cloak
+					x-transition.opacity.duration.100ms
+					class="absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50">
+					<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800">Files</div>
+					<template x-for="file in files">
+						<div @click="insertFile(file)" class="px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition">
+							<span class="text-purple-400 opacity-60 mr-1">#</span> <span x-text="file"></span>
+						</div>
+					</template>
+				</div>
+
+				<textarea x-model="text" x-ref="input" name="voice_input" 
+					@input="resize()" @keyup="checkMention($event)"
+					rows="1"
+					placeholder="What do you want to know?" 
+					class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1"></textarea>
+			</div>
+
+			<!-- Model Selector Trigger -->
+			<div x-data="{ modelOpen: false }" class="relative mb-0.5">
+				<button type="button" @click="modelOpen = !modelOpen" class="text-gray-400 hover:text-white transition p-2 mr-1">
+					<i class="fas fa-bolt text-lg"></i>
+				</button>
+				
+				<!-- Model Popover -->
+				<div x-show="modelOpen" @click.outside="modelOpen = false" x-cloak
+					x-transition.scale.origin.bottom.right
+					class="absolute bottom-12 right-0 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 mb-2">
+					<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider">Select Model</div>
+					<div class="px-2 pb-1 space-y-0.5">
+						<div class="flex items-center justify-between px-2 py-1.5 bg-purple-500/10 text-purple-400 rounded cursor-pointer">
+							<span class="text-xs font-medium">Claude 3.5 Sonnet</span>
+							<i class="fas fa-check text-[10px]"></i>
+						</div>
+						<div class="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 text-gray-400 rounded cursor-pointer transition">
+							<span class="text-xs font-medium">GPT-4o</span>
+						</div>
+						<div class="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 text-gray-400 rounded cursor-pointer transition">
+							<span class="text-xs font-medium">DeepSeek V3</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Submit Button (Mic/Send) -->
+			<button type="button" @click="text.length > 0 ? $refs.voiceForm.requestSubmit() : simulateVoice()"
+				:class="listening ? 'bg-purple-500 scale-105' : 'bg-white scale-100'"
+				class="w-10 h-10 rounded-full flex items-center justify-center text-black text-lg transition-all duration-300 shadow-lg shrink-0 mb-0.5 relative z-10">
+				<i class="fas" 
+				   :class="text.length > 0 ? 'fa-arrow-up text-sm' : (listening ? 'fa-wave-square animate-pulse text-white text-sm' : 'fa-microphone')"></i>
+			</button>
+		</form>
+	</div>
+}
