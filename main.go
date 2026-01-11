@@ -275,7 +275,7 @@ func handleActionRetry(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	go startAgentWork(id)
-	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Task restarting..."}`)
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Task restarting..."}`)
 	handleFeed(w, r)
 }
 
@@ -291,7 +291,7 @@ func handleActionChat(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	go startAgentWork(id)
-	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Feedback sent to agent"}`)
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Feedback sent to agent"}`)
 	handleFeed(w, r)
 }
 
@@ -303,7 +303,7 @@ func handleActionMerge(w http.ResponseWriter, r *http.Request) {
 	t.Logs = append(t.Logs, LogEntry{time.Now(), "Merged to main", "success"})
 	mu.Unlock()
 
-	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Changes merged successfully"}`)
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Changes merged successfully"}`)
 	handleFeed(w, r)
 }
 
@@ -313,7 +313,7 @@ func handleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	delete(tasks, id)
 	mu.Unlock()
 
-	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Task discarded"}`)
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Task discarded"}`)
 	handleFeed(w, r)
 }
 
@@ -484,6 +484,7 @@ const shellTemplate = `
     closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); }
 }"
 @keydown.escape="closeModal()"
+@close-modal.window="closeModal()"
 @toast.window="showToast($event.detail.value)"
 class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
 
@@ -676,19 +677,61 @@ class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
     <!-- Docked Input Bar -->
     <div class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-2xl">
         <form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" 
-              class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-center shadow-2xl relative backdrop-blur-md">
+              class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200"
+              x-data="{ 
+                text: '', 
+                showFileMenu: false,
+                files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
+                resize() {
+                    this.$refs.input.style.height = 'auto'; 
+                    let newHeight = this.$refs.input.scrollHeight;
+                    if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
+                    this.$refs.input.style.height = newHeight + 'px';
+                },
+                checkMention(e) {
+                    if (this.text.match(/@[^ ]*$/)) {
+                        this.showFileMenu = true;
+                    } else {
+                        this.showFileMenu = false;
+                    }
+                    if (e.key === 'Escape') this.showFileMenu = false;
+                },
+                insertFile(f) {
+                    this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
+                    this.showFileMenu = false;
+                    this.$nextTick(() => { this.$refs.input.focus(); });
+                }
+            }">
             
             <!-- Attachment -->
-            <button type="button" class="text-gray-400 hover:text-white transition p-2">
+            <button type="button" class="text-gray-400 hover:text-white transition p-2 mb-0.5">
                 <i class="fas fa-paperclip text-lg"></i>
             </button>
 
-            <!-- Text Input -->
-            <input type="text" name="voice_input" placeholder="What do you want to know?" 
-                   class="bg-transparent border-none focus:ring-0 text-white text-base placeholder-gray-500 w-full mx-2 font-medium focus:outline-none">
+            <!-- Expanding Textarea Container -->
+            <div class="flex-1 mx-2 relative min-w-0">
+                
+                <!-- File Menu Popover -->
+                <div x-show="showFileMenu" x-cloak
+                     x-transition.opacity.duration.100ms
+                     class="absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50">
+                     <div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800">Files</div>
+                     <template x-for="file in files">
+                        <div @click="insertFile(file)" class="px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition">
+                            <span class="text-purple-400 opacity-60 mr-1">#</span> <span x-text="file"></span>
+                        </div>
+                     </template>
+                </div>
+
+                <textarea x-model="text" x-ref="input" name="voice_input" 
+                       @input="resize()" @keyup="checkMention($event)"
+                       rows="1"
+                       placeholder="What do you want to know?" 
+                       class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1"></textarea>
+            </div>
 
             <!-- Model Selector Trigger -->
-            <div x-data="{ modelOpen: false }" class="relative">
+            <div x-data="{ modelOpen: false }" class="relative mb-0.5">
                 <button type="button" @click="modelOpen = !modelOpen" class="text-gray-400 hover:text-white transition p-2 mr-1">
                     <i class="fas fa-bolt text-lg"></i>
                 </button>
@@ -713,11 +756,12 @@ class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
                 </div>
             </div>
 
-            <!-- Mic Button -->
-            <button type="button" @click="simulateVoice()"
+            <!-- Submit Button (Mic/Send) -->
+            <button type="button" @click="text.length > 0 ? $refs.voiceForm.requestSubmit() : simulateVoice()"
                 :class="listening ? 'bg-purple-500 scale-105' : 'bg-white scale-100'"
-                class="w-10 h-10 rounded-full flex items-center justify-center text-black text-lg transition-all duration-300 shadow-lg shrink-0">
-                <i class="fas" :class="listening ? 'fa-wave-square animate-pulse text-white text-sm' : 'fa-microphone-lines'"></i>
+                class="w-10 h-10 rounded-full flex items-center justify-center text-black text-lg transition-all duration-300 shadow-lg shrink-0 mb-0.5 relative z-10">
+                <i class="fas" 
+                   :class="text.length > 0 ? 'fa-arrow-up text-sm' : (listening ? 'fa-wave-square animate-pulse text-white text-sm' : 'fa-microphone')"></i>
             </button>
         </form>
     </div>
@@ -1043,14 +1087,75 @@ const detailTemplate = `
     <!-- Bottom Actions Toolbar (Sticky) -->
     <div class="shrink-0 p-4 border-t border-white/5 bg-[#16191F] pb-8">
 
-        <!-- Chat Input Mode -->
-        <div x-show="showChat" x-transition.origin.bottom class="mb-2">
-            <form hx-post="/action/chat/{{.Task.ID}}" hx-swap="none" @submit="showChat = false">
-                <textarea name="message" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-500 mb-2 font-mono h-24" placeholder="Give feedback to the agent..."></textarea>
-                <div class="flex justify-between">
-                     <button type="button" @click="showChat = false" class="text-xs text-gray-500 px-2">Cancel</button>
-                     <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">Send Feedback</button>
+        <!-- Chat Input Mode (Capsule Style) -->
+        <div x-show="showChat" x-transition.origin.bottom class="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#16191F] via-[#16191F] to-transparent z-20 pb-8 flex justify-center">
+            <form hx-post="/action/chat/{{.Task.ID}}" hx-swap="none" @submit="showChat = false"
+                  class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl"
+                  x-data="{ 
+                    text: '', 
+                    showFileMenu: false,
+                    files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
+                    resize() {
+                        this.$refs.input.style.height = 'auto'; 
+                        let newHeight = this.$refs.input.scrollHeight;
+                        if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
+                        this.$refs.input.style.height = newHeight + 'px';
+                    },
+                    checkMention(e) {
+                        if (this.text.match(/@[^ ]*$/)) {
+                            this.showFileMenu = true;
+                        } else {
+                            this.showFileMenu = false;
+                        }
+                        if (e.key === 'Escape') this.showFileMenu = false;
+                    },
+                    insertFile(f) {
+                        this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
+                        this.showFileMenu = false;
+                        this.$nextTick(() => { this.$refs.input.focus(); });
+                    }
+                }">
+                
+                <!-- Cancel (X) -->
+                <button type="button" @click="showChat = false" class="text-gray-500 hover:text-white transition p-2 mb-0.5">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+
+                <!-- Attachment -->
+                <button type="button" class="text-gray-400 hover:text-white transition p-2 mb-0.5">
+                    <i class="fas fa-paperclip text-lg"></i>
+                </button>
+
+                <!-- Expanding Textarea -->
+                <div class="flex-1 mx-2 relative min-w-0">
+                    <!-- File Menu Popover -->
+                    <div x-show="showFileMenu" x-cloak
+                         x-transition.opacity.duration.100ms
+                         class="absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50">
+                         <div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800">Files</div>
+                         <template x-for="file in files">
+                            <div @click="insertFile(file)" class="px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition">
+                                <span class="text-purple-400 opacity-60 mr-1">#</span> <span x-text="file"></span>
+                            </div>
+                         </template>
+                    </div>
+
+                    <textarea name="message" x-model="text" x-ref="input"
+                           @input="resize()" @keyup="checkMention($event)"
+                           rows="1" placeholder="Refine code instructions..."
+                           class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1"></textarea>
                 </div>
+
+                <!-- Model Selector (Visual) -->
+                <button type="button" class="text-gray-400 hover:text-white transition p-2 mr-1 mb-0.5">
+                    <i class="fas fa-bolt text-lg"></i>
+                </button>
+
+                <!-- Submit Button -->
+                <button type="submit" 
+                    class="bg-white text-black hover:bg-gray-200 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mb-0.5 shadow-lg transition-transform active:scale-95 relative z-10">
+                    <i class="fas fa-arrow-up text-sm"></i>
+                </button>
             </form>
         </div>
 
@@ -1066,7 +1171,7 @@ const detailTemplate = `
             <!-- Chat Button -->
             <button @click="showChat = true"
                 class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all text-purple-400 hover:text-purple-300">
-                <i class="fas fa-sparkles text-xs mb-0.5"></i>
+                <i class="fas fa-comment-dots text-xs mb-0.5"></i>
                 <span class="text-[10px] font-semibold uppercase tracking-wide">Chat</span>
             </button>
 
