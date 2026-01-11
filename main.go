@@ -444,6 +444,7 @@ const shellTemplate = `
     activeTab: 'diff',
     projectMenuOpen: false,
     listening: false,
+    settingsOpen: false,
     toastMsg: '',
     toastOpen: false,
 
@@ -596,7 +597,7 @@ class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
                   </div>
 
                   <div class="px-2">
-                     <div class="px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2">
+                     <div @click="userMenuOpen = false; settingsOpen = true" class="px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2 transition-colors">
                          <i class="fas fa-cog w-4"></i> Settings
                      </div>
                   </div>
@@ -672,16 +673,120 @@ class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
           hx-trigger="load, closeModal from:body">
     </main>
 
-    <!-- Floating Mic -->
-    <div class="fixed bottom-6 right-6 z-10">
-        <form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML">
-            <input type="hidden" name="voice_input" value="Refactor the payment gateway wrapper">
+    <!-- Docked Input Bar -->
+    <div class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-2xl">
+        <form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" 
+              class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-center shadow-2xl relative backdrop-blur-md">
+            
+            <!-- Attachment -->
+            <button type="button" class="text-gray-400 hover:text-white transition p-2">
+                <i class="fas fa-paperclip text-lg"></i>
+            </button>
+
+            <!-- Text Input -->
+            <input type="text" name="voice_input" placeholder="What do you want to know?" 
+                   class="bg-transparent border-none focus:ring-0 text-white text-base placeholder-gray-500 w-full mx-2 font-medium focus:outline-none">
+
+            <!-- Model Selector Trigger -->
+            <div x-data="{ modelOpen: false }" class="relative">
+                <button type="button" @click="modelOpen = !modelOpen" class="text-gray-400 hover:text-white transition p-2 mr-1">
+                    <i class="fas fa-bolt text-lg"></i>
+                </button>
+                
+                <!-- Model Popover -->
+                <div x-show="modelOpen" @click.outside="modelOpen = false" x-cloak
+                     x-transition.scale.origin.bottom.right
+                     class="absolute bottom-12 right-0 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 mb-2">
+                     <div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider">Select Model</div>
+                     <div class="px-2 pb-1 space-y-0.5">
+                        <div class="flex items-center justify-between px-2 py-1.5 bg-purple-500/10 text-purple-400 rounded cursor-pointer">
+                            <span class="text-xs font-medium">Claude 3.5 Sonnet</span>
+                            <i class="fas fa-check text-[10px]"></i>
+                        </div>
+                        <div class="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 text-gray-400 rounded cursor-pointer transition">
+                            <span class="text-xs font-medium">GPT-4o</span>
+                        </div>
+                        <div class="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 text-gray-400 rounded cursor-pointer transition">
+                            <span class="text-xs font-medium">DeepSeek V3</span>
+                        </div>
+                     </div>
+                </div>
+            </div>
+
+            <!-- Mic Button -->
             <button type="button" @click="simulateVoice()"
-                :class="listening ? 'w-16 h-16 bg-purple-500 scale-110' : 'w-14 h-14 bg-white scale-100'"
-                class="rounded-full shadow-[0_0_40px_rgba(168,85,247,0.3)] flex items-center justify-center text-black text-xl transition-all duration-300 active:scale-95">
-                <i class="fas" :class="listening ? 'fa-wave-square animate-pulse text-white' : 'fa-microphone'"></i>
+                :class="listening ? 'bg-purple-500 scale-105' : 'bg-white scale-100'"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-black text-lg transition-all duration-300 shadow-lg shrink-0">
+                <i class="fas" :class="listening ? 'fa-wave-square animate-pulse text-white text-sm' : 'fa-microphone-lines'"></i>
             </button>
         </form>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-show="settingsOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" x-cloak
+         x-transition.opacity>
+         <div @click.outside="settingsOpen = false" 
+              class="bg-[#16191F] border border-gray-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+              
+              <div class="px-6 py-4 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-[#16191F] z-10">
+                  <h2 class="text-lg font-bold text-white">Settings</h2>
+                  <button @click="settingsOpen = false" class="text-gray-500 hover:text-white transition"><i class="fas fa-times"></i></button>
+              </div>
+
+              <div class="p-6 space-y-8">
+                  <!-- API Keys -->
+                  <div>
+                      <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <i class="fas fa-key"></i> BYOK (Bring Your Own Keys)
+                      </h3>
+                      <div class="space-y-4">
+                          <div x-data="{ key: localStorage.getItem('key_openrouter') || '' }">
+                              <label class="block text-xs font-medium text-gray-400 mb-1.5">OpenRouter API Key</label>
+                              <div class="relative">
+                                  <input type="password" x-model="key" @input="localStorage.setItem('key_openrouter', key)" 
+                                         class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none font-mono placeholder-gray-700" 
+                                         placeholder="sk-or-...">
+                                  <div class="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-xs" x-show="key.length > 10"><i class="fas fa-check-circle"></i></div>
+                              </div>
+                          </div>
+                          <div x-data="{ key: localStorage.getItem('key_zai') || '' }">
+                              <label class="block text-xs font-medium text-gray-400 mb-1.5">Z.ai API Key</label>
+                              <input type="password" x-model="key" @input="localStorage.setItem('key_zai', key)" 
+                                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none font-mono placeholder-gray-700" 
+                                     placeholder="zai-...">
+                          </div>
+                          <div x-data="{ key: localStorage.getItem('key_anthropic') || '' }">
+                              <label class="block text-xs font-medium text-gray-400 mb-1.5">Anthropic API Key</label>
+                              <input type="password" x-model="key" @input="localStorage.setItem('key_anthropic', key)" 
+                                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none font-mono placeholder-gray-700" 
+                                     placeholder="sk-ant-...">
+                          </div>
+                          <div x-data="{ key: localStorage.getItem('key_openai') || '' }">
+                              <label class="block text-xs font-medium text-gray-400 mb-1.5">OpenAI API Key</label>
+                              <input type="password" x-model="key" @input="localStorage.setItem('key_openai', key)" 
+                                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none font-mono placeholder-gray-700" 
+                                     placeholder="sk-...">
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- Sponsor -->
+                  <div class="bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-xl p-5 text-center">
+                      <div class="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 border border-gray-700 shadow-xl">
+                          <i class="fas fa-heart text-pink-500 animate-pulse"></i>
+                      </div>
+                      <h3 class="text-sm font-bold text-white mb-1">Support Open Source</h3>
+                      <p class="text-xs text-gray-400 mb-4 leading-relaxed">Conductor is free and open source. Your sponsorship helps keep the lights on and the agents coding.</p>
+                      <button class="bg-white text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 transition active:scale-95">
+                          <i class="fas fa-gift mr-1"></i> Sponsor Project
+                      </button>
+                  </div>
+                  
+                  <div class="text-center">
+                      <p class="text-[10px] text-gray-600 font-mono">Conductor v2.1 (Build 8492)</p>
+                  </div>
+              </div>
+         </div>
     </div>
 
     <!-- Detail Modal -->
