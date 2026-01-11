@@ -58,6 +58,16 @@ var (
 		"core": {ID: "core", Name: "acme/core-platform", Icon: "fa-server", Color: "text-blue-400"},
 		"web":  {ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"},
 		"ios":  {ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"},
+		// Scalability Mock Data
+		"android": {ID: "android", Name: "acme/android-app", Icon: "fa-android", Color: "text-green-500"},
+		"api":     {ID: "api", Name: "acme/public-api", Icon: "fa-network-wired", Color: "text-yellow-400"},
+		"docs":    {ID: "docs", Name: "acme/documentation", Icon: "fa-book", Color: "text-gray-400"},
+		"infra":   {ID: "infra", Name: "acme/infrastructure", Icon: "fa-network-wired", Color: "text-red-400"},
+		"utils":   {ID: "utils", Name: "acme/go-utils", Icon: "fa-toolbox", Color: "text-blue-300"},
+		"design":  {ID: "design", Name: "acme/design-system", Icon: "fa-paint-brush", Color: "text-pink-400"},
+		"auth":    {ID: "auth", Name: "acme/auth-service", Icon: "fa-lock", Color: "text-yellow-600"},
+		"cli":     {ID: "cli", Name: "acme/cli-tool", Icon: "fa-terminal", Color: "text-gray-200"},
+		"billing": {ID: "billing", Name: "acme/billing-engine", Icon: "fa-credit-card", Color: "text-green-300"},
 	}
 
 	tasks  = make(map[int]*Task)
@@ -120,8 +130,11 @@ func initStore() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+	mu.Lock()
+	data := struct{ Projects map[string]Project }{Projects: projects}
+	mu.Unlock()
 	tmpl := template.Must(template.New("index").Parse(shellTemplate))
-	tmpl.Execute(w, nil)
+	tmpl.Execute(w, data)
 }
 
 func handleFeed(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +178,9 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 		Filter:  projectFilter,
 	}
 
-	tmpl := template.Must(template.New("feed").Funcs(funcMap).Parse(feedTemplate))
+	tmpl := template.New("feed").Funcs(funcMap)
+	template.Must(tmpl.Parse(feedTemplate))
+	template.Must(tmpl.New("activeRows").Parse(activeRowsTemplate))
 	tmpl.Execute(w, data)
 }
 
@@ -235,7 +250,7 @@ func handleActionRetry(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 	
 	go startAgentWork(id)
-	w.Header().Set("HX-Trigger", "closeModal")
+	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Task restarting..."}`)
 	handleFeed(w, r)
 }
 
@@ -251,7 +266,7 @@ func handleActionChat(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	go startAgentWork(id)
-	w.Header().Set("HX-Trigger", "closeModal")
+	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Feedback sent to agent"}`)
 	handleFeed(w, r)
 }
 
@@ -263,7 +278,7 @@ func handleActionMerge(w http.ResponseWriter, r *http.Request) {
 	t.Logs = append(t.Logs, LogEntry{time.Now(), "Merged to main", "success"})
 	mu.Unlock()
 	
-	w.Header().Set("HX-Trigger", "closeModal")
+	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Changes merged successfully"}`)
 	handleFeed(w, r)
 }
 
@@ -273,7 +288,7 @@ func handleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	delete(tasks, id)
 	mu.Unlock()
 	
-	w.Header().Set("HX-Trigger", "closeModal")
+	w.Header().Set("HX-Trigger", `{"closeModal": true, "toast": "Task discarded"}`)
 	handleFeed(w, r)
 }
 
@@ -403,17 +418,129 @@ const shellTemplate = `
     activeTab: 'diff',
     projectMenuOpen: false,
     listening: false,
+    toastMsg: '',
+    toastOpen: false,
+    
+    // Onboarding State
+    showOnboarding: !localStorage.getItem('conductor_v2_onboarded'),
+    onboardingStep: 0, // 0: idle, 1: connecting, 2: syncing, 3: done
+    
+    startOnboarding() {
+        this.onboardingStep = 1;
+        // Simulate Auth
+        setTimeout(() => {
+            this.onboardingStep = 2;
+            // Simulate Repo Sync
+            setTimeout(() => {
+                this.onboardingStep = 3;
+                // Reveal App
+                setTimeout(() => {
+                    localStorage.setItem('conductor_v2_onboarded', 'true');
+                    this.showOnboarding = false;
+                }, 800);
+            }, 1200);
+        }, 1500);
+    },
+
+    showToast(msg) {
+        this.toastMsg = msg;
+        this.toastOpen = true;
+        setTimeout(() => this.toastOpen = false, 3000);
+    },
     simulateVoice() {
         this.listening = true;
         setTimeout(() => {
             this.listening = false;
-            document.querySelector('form button[type=\'button\']').closest('form').requestSubmit();
+            this.$refs.voiceForm.requestSubmit();
         }, 1200);
     },
     closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); }
 }"
 @keydown.escape="closeModal()"
-class="h-screen flex flex-col overflow-hidden no-tap-highlight">
+@toast.window="showToast($event.detail.value)"
+class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]">
+
+    <!-- Onboarding Overlay -->
+    <div x-show="showOnboarding" 
+         x-transition:leave="transition ease-in duration-500"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-10"
+         class="fixed inset-0 z-[100] bg-[#0C0E12] flex flex-col items-center justify-center text-center px-6">
+         
+         <!-- Background Effects -->
+         <div class="absolute inset-0 overflow-hidden pointer-events-none">
+             <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse"></div>
+             <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animation-delay-2000 animate-pulse"></div>
+         </div>
+
+         <!-- Content -->
+         <div class="relative z-10 max-w-md w-full space-y-8">
+             <div class="space-y-4">
+                 <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6">
+                    <i class="fas fa-wave-square text-2xl text-white"></i>
+                 </div>
+                 <h1 class="text-3xl font-bold text-white tracking-tight">Welcome to Conductor</h1>
+                 <p class="text-gray-400 text-sm leading-relaxed">
+                     The AI-native orchestration layer for your engineering team.<br>
+                     Connect your identity to begin.
+                 </p>
+             </div>
+
+             <!-- Step 0: Initial Action -->
+             <div x-show="onboardingStep === 0" x-transition.opacity>
+                 <button @click="startOnboarding()" 
+                     class="w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2">
+                     <i class="fab fa-github text-lg"></i> Continue with GitHub
+                 </button>
+                 <p class="mt-4 text-[10px] text-gray-600">By continuing, you agree to the Developer Protocol v2.1</p>
+             </div>
+
+             <!-- Step 1-3: Loading Sequence -->
+             <div x-show="onboardingStep > 0" class="space-y-4" x-cloak>
+                 <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800 text-left space-y-3 font-mono text-xs">
+                     
+                     <!-- Item 1: Auth -->
+                     <div class="flex items-center gap-3">
+                         <div class="w-4 h-4 rounded-full flex items-center justify-center"
+                              :class="onboardingStep > 1 ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-400'">
+                             <i class="fas" :class="onboardingStep > 1 ? 'fa-check' : 'fa-circle-notch fa-spin'"></i>
+                         </div>
+                         <span :class="onboardingStep > 1 ? 'text-gray-400' : 'text-gray-200'">Authenticating with GitHub...</span>
+                     </div>
+
+                     <!-- Item 2: Repos -->
+                     <div class="flex items-center gap-3" x-show="onboardingStep >= 2" x-transition.opacity>
+                         <div class="w-4 h-4 rounded-full flex items-center justify-center"
+                              :class="onboardingStep > 2 ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-400'">
+                             <i class="fas" :class="onboardingStep > 2 ? 'fa-check' : 'fa-circle-notch fa-spin'"></i>
+                         </div>
+                         <span :class="onboardingStep > 2 ? 'text-gray-400' : 'text-gray-200'">Indexing 62 repositories...</span>
+                     </div>
+
+                     <!-- Item 3: Voice -->
+                     <div class="flex items-center gap-3" x-show="onboardingStep >= 3" x-transition.opacity>
+                         <div class="w-4 h-4 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center">
+                             <i class="fas fa-check"></i>
+                         </div>
+                         <span class="text-green-400">Environment Ready</span>
+                     </div>
+                 </div>
+             </div>
+         </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div x-show="toastOpen" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="translate-y-full opacity-0"
+         x-transition:enter-end="translate-y-0 opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="translate-y-0 opacity-100"
+         x-transition:leave-end="translate-y-full opacity-0"
+         class="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 border border-gray-700/50 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-sm font-medium">
+         <i class="fas fa-check-circle text-green-500"></i>
+         <span x-text="toastMsg"></span>
+    </div>
 
     <!-- Header -->
     <header class="h-14 border-b border-linear-border bg-gray-900/80 backdrop-blur-md flex items-center justify-between px-4 z-20 shrink-0">
@@ -424,19 +551,92 @@ class="h-screen flex flex-col overflow-hidden no-tap-highlight">
              <span class="font-semibold text-sm tracking-tight text-gray-200">All Projects</span>
              <i class="fas fa-chevron-down text-[10px] text-gray-600"></i>
         </div>
-        <div class="flex items-center gap-3">
-             <div class="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></div>
-             <div class="w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px]">BOB</div>
+        <div class="relative" x-data="{ userMenuOpen: false }">
+             <div @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition p-1">
+                  <div class="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></div>
+                  <div class="w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300">BOB</div>
+             </div>
+             
+             <div x-show="userMenuOpen" @click.outside="userMenuOpen = false" x-cloak
+                  x-transition.scale.origin.top.right.duration.200ms
+                  class="absolute top-10 right-0 z-50 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 transform">
+                  
+                  <div class="px-4 py-3 border-b border-gray-800 mb-1">
+                     <p class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Current User</p>
+                     <div class="flex items-center gap-2 mt-1">
+                         <div class="w-4 h-4 rounded-full bg-gray-700 flex items-center justify-center text-[8px]">BOB</div>
+                         <p class="text-xs font-medium text-gray-200">Bob Engineer</p>
+                     </div>
+                  </div>
+
+                  <div class="px-2">
+                     <div class="px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2">
+                         <i class="fas fa-cog w-4"></i> Settings
+                     </div>
+                  </div>
+
+                  <div class="h-px bg-gray-800 my-1 mx-2"></div>
+
+                  <div class="px-2 pb-1">
+                      <div @click="localStorage.removeItem('conductor_v2_onboarded'); window.location.reload()" 
+                           class="px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors">
+                           <i class="fas fa-sign-out-alt w-4"></i> Sign Out
+                      </div>
+                  </div>
+             </div>
         </div>
     </header>
 
     <!-- Project Filter Menu -->
     <div x-show="projectMenuOpen" @click.outside="projectMenuOpen = false"
-         x-transition.opacity.duration.200ms
-         class="absolute top-16 left-4 z-30 w-48 bg-gray-900 border border-linear-border rounded-xl shadow-2xl overflow-hidden py-1">
-         <div hx-get="/feed" hx-target="#feed-container" @click="projectMenuOpen = false" class="px-4 py-3 hover:bg-white/5 cursor-pointer text-sm font-medium border-b border-gray-800">All Projects</div>
-         <div hx-get="/feed?project=core" hx-target="#feed-container" @click="projectMenuOpen = false" class="px-4 py-2 hover:bg-white/5 cursor-pointer text-sm text-gray-400 hover:text-white flex items-center gap-2"><i class="fas fa-server text-blue-400 w-4"></i> Core</div>
-         <div hx-get="/feed?project=web" hx-target="#feed-container" @click="projectMenuOpen = false" class="px-4 py-2 hover:bg-white/5 cursor-pointer text-sm text-gray-400 hover:text-white flex items-center gap-2"><i class="fas fa-columns text-purple-400 w-4"></i> Web</div>
+         x-data="{ search: '' }"
+         x-transition.opacity.duration.150ms
+         class="absolute top-16 left-4 z-30 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col">
+         
+         <!-- Sticky Search Header -->
+         <div class="p-3 border-b border-gray-700 bg-[#16191F]">
+            <div class="relative">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                <input x-model="search" type="text" placeholder="Filter repositories..." 
+                       class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600">
+            </div>
+         </div>
+
+         <!-- Scrollable List -->
+         <div class="max-h-[320px] overflow-y-auto py-1">
+             <div hx-get="/feed" hx-target="#feed-container" 
+                  @click="projectMenuOpen = false" 
+                  class="px-4 py-2 hover:bg-white/5 cursor-pointer text-sm font-bold text-white border-b border-gray-800/50 mb-1"
+                  x-show="'all projects'.includes(search.toLowerCase())">
+                  All Projects
+             </div>
+
+             {{ range .Projects }}
+             <div hx-get="/feed?project={{.ID}}" hx-target="#feed-container" 
+                  @click="projectMenuOpen = false" 
+                  class="px-4 py-2 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition"
+                  x-show="'{{.Name}}'.toLowerCase().includes(search.toLowerCase())">
+                  <div class="w-6 h-6 rounded bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0">
+                    <i class="fas {{.Icon}} {{.Color}} text-[10px]"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                      <div class="text-sm text-gray-400 group-hover:text-white truncate transition">{{.Name}}</div>
+                  </div>
+             </div>
+             {{ end }}
+
+             <!-- Empty State -->
+             <div x-show="$el.parentElement.querySelectorAll('div[hx-get]:not([style*=\'display: none\'])').length === 0" 
+                  class="px-4 py-8 text-center text-gray-600 text-xs">
+                  No projects found.
+             </div>
+         </div>
+         
+         <!-- Footer -->
+         <div class="px-3 py-2 bg-gray-900/50 border-t border-gray-800 text-[10px] text-gray-500 flex justify-between">
+            <span>{{ len .Projects }} Repositories</span>
+            <span class="hover:text-blue-400 cursor-pointer"><i class="fas fa-plus"></i> New</span>
+         </div>
     </div>
 
     <!-- Main Feed -->
@@ -448,7 +648,7 @@ class="h-screen flex flex-col overflow-hidden no-tap-highlight">
 
     <!-- Floating Mic -->
     <div class="fixed bottom-6 right-6 z-10">
-        <form hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML">
+        <form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML">
             <input type="hidden" name="voice_input" value="Refactor the payment gateway wrapper">
             <button type="button" @click="simulateVoice()"
                 :class="listening ? 'w-16 h-16 bg-red-500 scale-110' : 'w-14 h-14 bg-white scale-100'"
@@ -528,19 +728,22 @@ const feedTemplate = `
     {{ if .Done }}
     <div class="pt-4 border-t border-gray-800/50">
         <h3 class="px-2 text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Completed</h3>
-        <div class="space-y-2 opacity-60">
+        <div class="space-y-2 opacity-60 hover:opacity-100 transition">
             {{ range .Done }}
             {{ $p := getProject .ProjectID }}
-            <div class="bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group">
+            <div class="bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition"
+                 @click="modalOpen = true"
+                 hx-get="/task/{{.ID}}" hx-target="#modal-content">
                 <div class="flex items-center gap-3">
                     <div class="w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]">
                         <i class="fas fa-check"></i>
                     </div>
                     <div>
-                         <div class="text-xs text-gray-400 line-through decoration-gray-600">{{.Description}}</div>
+                         <div class="text-xs text-gray-400 line-through decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition">{{.Description}}</div>
                          <div class="text-[10px] text-gray-600">{{$p.Name}}</div>
                     </div>
                 </div>
+                <i class="fas fa-chevron-right text-[10px] text-gray-700 opacity-0 group-hover:opacity-100 transition"></i>
             </div>
             {{ end }}
         </div>
@@ -640,15 +843,46 @@ const detailTemplate = `
         </div>
 
         <!-- Tab 2: PREVIEW -->
-        <div x-show="activeTab === 'preview'" class="p-4 flex items-center justify-center h-full pb-32">
-            {{ if .Task.PreviewURL }}
-                <img src="{{.Task.PreviewURL}}" class="rounded-lg border border-gray-700 shadow-2xl max-w-full">
-            {{ else }}
-                <div class="text-center text-gray-600">
-                    <i class="fas fa-eye-slash text-4xl mb-3 opacity-50"></i>
-                    <p class="text-xs">No visual preview available.</p>
+        <div x-show="activeTab === 'preview'" class="p-4 flex flex-col h-full pb-32" 
+             x-data="{ booting: true, url: '' }"
+             x-init="setTimeout(() => { booting = false; url = 'https://agent-' + Math.floor(Math.random()*1000) + '.ngrok.io' }, 1500)">
+            
+            <div x-show="booting" class="flex-1 flex flex-col items-center justify-center space-y-4 text-gray-500">
+                <div class="relative">
+                    <div class="w-12 h-12 rounded-full border-2 border-gray-700 border-t-blue-500 animate-spin"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i class="fas fa-terminal text-[10px]"></i>
+                    </div>
                 </div>
-            {{ end }}
+                <p class="text-xs font-mono animate-pulse">Starting dev server...</p>
+            </div>
+
+            <div x-show="!booting" class="flex flex-col h-full bg-white rounded overflow-hidden">
+                <!-- Mock Browser Chrome -->
+                <div class="bg-gray-100 border-b border-gray-300 px-3 py-2 flex items-center gap-2 shrink-0">
+                    <div class="flex gap-1.5">
+                        <div class="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+                        <div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
+                        <div class="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+                    </div>
+                    <div class="ml-2 flex-1 bg-white border border-gray-300 rounded px-2 py-0.5 text-[10px] text-gray-500 font-mono flex items-center gap-1">
+                        <i class="fas fa-lock text-[8px]"></i>
+                        <span x-text="url"></span>
+                    </div>
+                </div>
+                <!-- Mock Content -->
+                <div class="flex-1 flex items-center justify-center bg-gray-50 relative overflow-hidden">
+                     {{ if .Task.PreviewURL }}
+                        <img src="{{.Task.PreviewURL}}" class="w-full h-full object-cover opacity-90 hover:opacity-100 transition">
+                     {{ else }}
+                        <div class="text-center">
+                            <h1 class="text-2xl font-bold text-gray-900 mb-2">Conductor Interface</h1>
+                            <p class="text-gray-500 text-sm">Preview build successful.</p>
+                            <button class="mt-4 px-4 py-2 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Action</button>
+                        </div>
+                     {{ end }}
+                </div>
+            </div>
         </div>
 
         <!-- Tab 3: ACTIVITY -->
