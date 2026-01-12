@@ -29,7 +29,7 @@ func getEnvStatus(key string) string {
 func main() {
 	// Parse flags
 	addr := flag.String("addr", ":8710", "Server address")
-	dbPath := flag.String("db", "./data/pocket-cto.db", "Database path")
+	dbPath := flag.String("db", "./data/counterspell.db", "Database path")
 	flag.Parse()
 
 	// Setup logger
@@ -74,7 +74,11 @@ func main() {
 	dataDir := filepath.Dir(*dbPath)
 
 	// Create handlers
-	h := handlers.NewHandlers(taskSvc, eventBus, database, dataDir)
+	h, err := handlers.NewHandlers(taskSvc, eventBus, database, dataDir)
+	if err != nil {
+		logger.Error("Failed to create handlers", "error", err)
+		os.Exit(1)
+	}
 
 	// Setup router
 	r := chi.NewRouter()
@@ -135,6 +139,9 @@ func main() {
 	if err := database.Close(); err != nil {
 		logger.Error("Failed to close database", "error", err)
 	}
+
+	// Shutdown orchestrator worker pool
+	h.Shutdown()
 
 	logger.Info("Server stopped")
 }

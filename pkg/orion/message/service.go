@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/revrost/code/counterspell/pkg/orion"
-	"github.com/google/uuid"
+	"github.com/lithammer/shortuuid/v4"
 )
 
 // Service provides in-memory message storage.
@@ -41,7 +41,7 @@ func (s *Service) Create(ctx context.Context, sessionID string, params orion.Cre
 		))
 	}
 
-	id := uuid.New().String()
+	id := shortuuid.New()
 	msg := orion.NewMessage(sessionID, params.Role)
 	msg.ID = id
 	msg.Parts = params.Parts

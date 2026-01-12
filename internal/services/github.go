@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/models"
 )
@@ -155,7 +155,7 @@ func (s *GitHubService) GetUserInfo(ctx context.Context, token string) (login, a
 // SaveConnection saves a GitHub connection to the database.
 func (s *GitHubService) SaveConnection(ctx context.Context, connType, login, avatarURL, token, scope string) error {
 	conn := models.GitHubConnection{
-		ID:        uuid.New().String(),
+		ID:        shortuuid.New(),
 		Type:      connType,
 		Login:     login,
 		AvatarURL: avatarURL,
@@ -195,7 +195,7 @@ func (s *GitHubService) GetActiveConnection(ctx context.Context) (*models.GitHub
 // SaveProject saves a project to the database.
 func (s *GitHubService) SaveProject(ctx context.Context, owner, repo string) error {
 	project := models.Project{
-		ID:          uuid.New().String(),
+		ID:          shortuuid.New(),
 		GitHubOwner: owner,
 		GitHubRepo:  repo,
 		CreatedAt:   time.Now().Unix(),

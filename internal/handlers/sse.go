@@ -96,7 +96,7 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 					Description: t.Title,
 					AgentName:   "Agent",
 					Status:      string(t.Status),
-					Progress:    int(time.Now().Unix() % 100),
+					Progress:    50, // Stable value to prevent constant morph diffs
 				})
 			}
 		}
@@ -110,7 +110,7 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 				Description: "Fix crash on startup",
 				AgentName:   "Agent-101",
 				Status:      "in_progress",
-				Progress:    int(time.Now().Unix() % 100),
+				Progress:    50, // Stable value to prevent constant morph diffs
 			})
 		}
 
@@ -128,7 +128,8 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	sendActiveUpdate()
 
 	// Create ticker for periodic updates (fallback)
-	ticker := time.NewTicker(1 * time.Second)
+	// Memory leak was caused by Progress changing every second, not the ticker itself
+	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	// Stream updates

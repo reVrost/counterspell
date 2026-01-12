@@ -43,6 +43,7 @@ type Runner struct {
 	workDir      string
 	callback     StreamCallback
 	systemPrompt string
+	finalMessage string
 }
 
 // NewRunner creates a new agent runner.
@@ -53,6 +54,11 @@ func NewRunner(apiKey, workDir string, callback StreamCallback) *Runner {
 		callback:     callback,
 		systemPrompt: fmt.Sprintf("You are a coding assistant. Work directory: %s. Be concise. Make changes directly.", workDir),
 	}
+}
+
+// GetFinalMessage returns the accumulated final message from the agent.
+func (r *Runner) GetFinalMessage() string {
+	return r.finalMessage
 }
 
 // Run executes the agent loop for a given task.
@@ -89,6 +95,7 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 		for _, block := range resp.Content {
 			if block.Type == "text" && block.Text != "" {
 				r.emit(StreamEvent{Type: EventText, Content: block.Text})
+				r.finalMessage += block.Text
 			}
 
 			if block.Type == "tool_use" {

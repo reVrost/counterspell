@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/revrost/code/counterspell/pkg/orion"
-	"github.com/google/uuid"
+	"github.com/lithammer/shortuuid/v4"
 )
 
 // Service provides in-memory session storage.
@@ -34,7 +34,7 @@ func (s *Service) Create(ctx context.Context, title string) (orion.Session, erro
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	id := uuid.New().String()
+	id := shortuuid.New()
 	session := orion.NewSession(title)
 	session.ID = id
 
