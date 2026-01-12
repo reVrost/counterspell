@@ -43,22 +43,27 @@ func (m *RepoManager) EnsureRepo(owner, repo, token string) (string, error) {
 	defer m.mu.Unlock()
 
 	repoPath := m.repoPath(owner, repo)
+	slog.Info("[GIT] EnsureRepo called", "owner", owner, "repo", repo, "repo_path", repoPath)
 
 	// Check if repo already exists
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-		slog.Info("Repo exists, fetching latest", "owner", owner, "repo", repo)
+		slog.Info("[GIT] Repo exists, fetching latest", "owner", owner, "repo", repo)
 		if err := m.fetchLatest(repoPath); err != nil {
+			slog.Error("[GIT] Failed to fetch", "error", err)
 			return "", fmt.Errorf("failed to fetch: %w", err)
 		}
+		slog.Info("[GIT] Repo fetched successfully", "path", repoPath)
 		return repoPath, nil
 	}
 
 	// Clone the repo
-	slog.Info("Cloning repo", "owner", owner, "repo", repo)
+	slog.Info("[GIT] Cloning repo", "owner", owner, "repo", repo, "dest", repoPath)
 	if err := m.cloneRepo(owner, repo, token, repoPath); err != nil {
+		slog.Error("[GIT] Failed to clone", "error", err)
 		return "", fmt.Errorf("failed to clone: %w", err)
 	}
 
+	slog.Info("[GIT] Repo cloned successfully", "path", repoPath)
 	return repoPath, nil
 }
 
@@ -126,9 +131,11 @@ func (m *RepoManager) CreateWorktree(owner, repo, taskID, branchName string) (st
 	repoPath := m.repoPath(owner, repo)
 	worktreePath := m.worktreePath(taskID)
 
+	slog.Info("[GIT] Creating worktree", "task_id", taskID, "repo_path", repoPath, "worktree_path", worktreePath, "branch", branchName)
+
 	// Check if worktree already exists
 	if _, err := os.Stat(worktreePath); err == nil {
-		slog.Info("Worktree already exists", "path", worktreePath)
+		slog.Info("[GIT] Worktree already exists", "path", worktreePath)
 		return worktreePath, nil
 	}
 
@@ -137,21 +144,25 @@ func (m *RepoManager) CreateWorktree(owner, repo, taskID, branchName string) (st
 		return "", fmt.Errorf("failed to create worktrees dir: %w", err)
 	}
 
+	slog.Info("[GIT] Executing: git worktree add -b", "branch", branchName, "path", worktreePath, "dir", repoPath)
+
 	// Create new branch and worktree
 	cmd := exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		slog.Warn("[GIT] First attempt failed, trying without -b", "error", err, "output", string(output))
 		// Branch might already exist, try without -b
 		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
 		cmd.Dir = repoPath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
+			slog.Error("[GIT] Worktree creation failed", "error", err, "output", string(output))
 			return "", fmt.Errorf("git worktree add failed: %w\nOutput: %s", err, string(output))
 		}
 	}
 
-	slog.Info("Created worktree", "task_id", taskID, "path", worktreePath, "branch", branchName)
+	slog.Info("[GIT] Created worktree successfully", "task_id", taskID, "path", worktreePath, "branch", branchName)
 	return worktreePath, nil
 }
 
@@ -175,12 +186,17 @@ func (m *RepoManager) CleanupWorktree(owner, repo, taskID string) error {
 func (m *RepoManager) CommitAndPush(taskID, message string) error {
 	worktreePath := m.worktreePath(taskID)
 
+	slog.Info("[GIT] CommitAndPush called", "task_id", taskID, "worktree_path", worktreePath)
+
 	// Stage all changes
 	cmd := exec.Command("git", "add", "-A")
 	cmd.Dir = worktreePath
+	slog.Info("[GIT] Executing: git add -A", "dir", worktreePath)
 	if output, err := cmd.CombinedOutput(); err != nil {
+		slog.Error("[GIT] git add failed", "error", err, "output", string(output))
 		return fmt.Errorf("git add failed: %w\nOutput: %s", err, string(output))
 	}
+	slog.Info("[GIT] git add successful")
 
 	// Check if there are changes to commit
 	cmd = exec.Command("git", "diff", "--cached", "--quiet")
@@ -193,18 +209,23 @@ func (m *RepoManager) CommitAndPush(taskID, message string) error {
 	// Commit
 	cmd = exec.Command("git", "commit", "-m", message)
 	cmd.Dir = worktreePath
+	slog.Info("[GIT] Executing: git commit", "dir", worktreePath)
 	if output, err := cmd.CombinedOutput(); err != nil {
+		slog.Error("[GIT] git commit failed", "error", err, "output", string(output))
 		return fmt.Errorf("git commit failed: %w\nOutput: %s", err, string(output))
 	}
+	slog.Info("[GIT] git commit successful")
 
 	// Push
 	cmd = exec.Command("git", "push", "-u", "origin", "HEAD")
 	cmd.Dir = worktreePath
+	slog.Info("[GIT] Executing: git push -u origin HEAD", "dir", worktreePath)
 	if output, err := cmd.CombinedOutput(); err != nil {
+		slog.Error("[GIT] git push failed", "error", err, "output", string(output))
 		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
 	}
 
-	slog.Info("Committed and pushed", "task_id", taskID)
+	slog.Info("[GIT] Committed and pushed successfully", "task_id", taskID)
 	return nil
 }
 
@@ -226,12 +247,16 @@ func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
 func (m *RepoManager) GetDiff(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
 
+	slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
+
 	cmd := exec.Command("git", "diff", "HEAD")
 	cmd.Dir = worktreePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		slog.Error("[GIT] GetDiff failed", "error", err, "output", string(output))
 		return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
 	}
 
+	slog.Info("[GIT] GetDiff successful", "task_id", taskID, "diff_size", len(output))
 	return string(output), nil
 }

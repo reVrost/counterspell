@@ -86,11 +86,13 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 		default:
 		}
 
+		r.emit(StreamEvent{Type: EventPlan, Content: "Calling LLM API..."})
 		resp, err := r.callAPI(messages, tools)
 		if err != nil {
 			r.emit(StreamEvent{Type: EventError, Content: err.Error()})
 			return err
 		}
+		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Received response with %d content blocks", len(resp.Content))})
 
 		toolResults := []ContentBlock{}
 
@@ -133,9 +135,11 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 		messages = append(messages, Message{Role: "assistant", Content: resp.Content})
 
 		if len(toolResults) == 0 {
+			r.emit(StreamEvent{Type: EventPlan, Content: "No more tools to run, completing task"})
 			break
 		}
 
+		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Running %d tool result(s) through agent loop", len(toolResults))})
 		messages = append(messages, Message{Role: "user", Content: toolResults})
 	}
 
