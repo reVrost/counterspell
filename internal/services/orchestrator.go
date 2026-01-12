@@ -57,6 +57,7 @@ func NewOrchestrator(
 	settings *SettingsService,
 	dataDir string,
 ) (*Orchestrator, error) {
+	slog.Info("[ORCHESTRATOR] Creating new orchestrator", "data_dir", dataDir)
 	// Create worker pool with 5 workers
 	pool, err := ants.NewPool(5, ants.WithPreAlloc(false))
 	if err != nil {
@@ -75,16 +76,21 @@ func NewOrchestrator(
 		running:     make(map[string]context.CancelFunc),
 	}
 
+	slog.Info("[ORCHESTRATOR] Worker pool created", "workers", 5, "prealloc", false)
+
 	// Start result processor goroutine
 	go orch.processResults()
 
+	slog.Info("[ORCHESTRATOR] Orchestrator initialized")
 	return orch, nil
 }
 
 // Shutdown gracefully shuts down the orchestrator.
 func (o *Orchestrator) Shutdown() {
+	slog.Info("[ORCHESTRATOR] Shutting down")
 	o.workerPool.Release()
 	close(o.resultCh)
+	slog.Info("[ORCHESTRATOR] Shutdown complete")
 }
 
 // StartTask creates a task and begins execution.
@@ -124,7 +130,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
-	slog.Info("Task created successfully", "task_id", task.ID, "project_id", projectID, "owner", owner, "repo", repo)
+	slog.Info("Task created successfully", "task_id", task.ID, "project_id", projectID, "owner", owner, "repo", repo, "model_id", modelID)
 
 	// Emit task_created event to trigger feed refresh
 	o.events.Publish(models.Event{
@@ -132,29 +138,39 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 		Type:   "task_created",
 	})
 
+	slog.Info("Submitting task to worker pool", "task_id", task.ID, "intent", intent)
+
 	// Submit job to worker pool
 	job := &TaskJob{
 		TaskID:    task.ID,
 		ProjectID: projectID,
 		Intent:    intent,
+		ModelID:   modelID,
 		Owner:     owner,
 		Repo:      repo,
 		Token:     conn.Token,
 		ResultCh:  o.resultCh,
 	}
 
+	slog.Info("[ORCHESTRATOR] Worker pool state before submit", "task_id", task.ID, "running_workers", o.workerPool.Running(), "waiting_tasks", o.workerPool.Waiting())
+
 	if err := o.workerPool.Submit(func() {
+		slog.Info("[AGENT LOOP] Worker started for task", "task_id", job.TaskID)
 		o.executeTask(job)
 	}); err != nil {
+		slog.Error("Failed to submit task to worker pool", "task_id", task.ID, "error", err)
 		return nil, fmt.Errorf("failed to submit task: %w", err)
 	}
 
+	slog.Info("Task submitted to worker pool successfully", "task_id", task.ID, "running_workers", o.workerPool.Running(), "waiting_tasks", o.workerPool.Waiting())
 	return task, nil
 }
 
 // executeTask runs the agent loop for a task in a worker.
 func (o *Orchestrator) executeTask(job *TaskJob) {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	slog.Info("[AGENT LOOP] executeTask started", "task_id", job.TaskID, "owner", job.Owner, "repo", job.Repo, "model_id", job.ModelID)
 
 	o.mu.Lock()
 	o.running[job.TaskID] = cancel
@@ -164,10 +180,13 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		o.mu.Lock()
 		delete(o.running, job.TaskID)
 		o.mu.Unlock()
+		slog.Info("[AGENT LOOP] executeTask finished", "task_id", job.TaskID)
 	}()
 
 	// Update status to in_progress
+	slog.Info("[AGENT LOOP] Updating task status to in_progress", "task_id", job.TaskID)
 	if err := o.tasks.UpdateStatus(ctx, job.TaskID, models.StatusInProgress); err != nil {
+		slog.Error("[AGENT LOOP] Failed to update task status", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to update status")
 		job.ResultCh <- TaskResult{
 			TaskID: job.TaskID,
@@ -181,8 +200,10 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	o.emit(job.TaskID, "info", fmt.Sprintf("Preparing %s/%s...", job.Owner, job.Repo))
 
 	// Clone/fetch repo
+	slog.Info("[AGENT LOOP] Ensuring repo exists", "task_id", job.TaskID, "owner", job.Owner, "repo", job.Repo)
 	repoPath, err := o.repos.EnsureRepo(job.Owner, job.Repo, job.Token)
 	if err != nil {
+		slog.Error("[AGENT LOOP] Failed to prepare repo", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to prepare repo: "+err.Error())
 		job.ResultCh <- TaskResult{
 			TaskID: job.TaskID,
@@ -191,13 +212,16 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		}
 		return
 	}
+	slog.Info("[AGENT LOOP] Repo ready", "task_id", job.TaskID, "repo_path", repoPath)
 
 	o.emit(job.TaskID, "info", "Creating isolated workspace...")
 
 	// Create worktree
 	branchName := fmt.Sprintf("agent/task-%s", job.TaskID[:8])
+	slog.Info("[AGENT LOOP] Creating worktree", "task_id", job.TaskID, "branch", branchName)
 	worktreePath, err := o.repos.CreateWorktree(job.Owner, job.Repo, job.TaskID, branchName)
 	if err != nil {
+		slog.Error("[AGENT LOOP] Failed to create worktree", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to create worktree: "+err.Error())
 		job.ResultCh <- TaskResult{
 			TaskID: job.TaskID,
@@ -206,12 +230,15 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		}
 		return
 	}
+	slog.Info("[AGENT LOOP] Worktree created successfully", "task_id", job.TaskID, "worktree_path", worktreePath)
 
 	o.emit(job.TaskID, "success", fmt.Sprintf("Workspace ready: %s", branchName))
 
 	// Get API key and create provider
+	slog.Info("[AGENT LOOP] Getting settings", "task_id", job.TaskID)
 	settings, err := o.settings.GetSettings(ctx)
 	if err != nil {
+		slog.Error("[AGENT LOOP] Failed to get settings", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to get settings")
 		job.ResultCh <- TaskResult{
 			TaskID: job.TaskID,
@@ -223,6 +250,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 
 	// Parse model_id to get provider and model name
 	providerPrefix, modelName := llm.ParseModelID(job.ModelID)
+	slog.Info("[AGENT LOOP] Parsed model ID", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
 
 	var provider llm.Provider
 	switch providerPrefix {
@@ -283,15 +311,22 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		provider.SetModel(modelName)
 	}
 
-	o.emit(job.TaskID, "plan", fmt.Sprintf("Starting agent with model: %s...", provider.Model()))
+	finalModel := provider.Model()
+	slog.Info("[AGENT LOOP] Provider configured", "task_id", job.TaskID, "final_model", finalModel)
+
+	o.emit(job.TaskID, "plan", fmt.Sprintf("Starting agent with model: %s...", finalModel))
 
 	// Create agent runner with streaming callback
+	slog.Info("[AGENT LOOP] Creating agent runner", "task_id", job.TaskID, "worktree", worktreePath, "intent", job.Intent, "provider", providerPrefix, "model", finalModel)
 	runner := agent.NewRunner(provider, worktreePath, func(event agent.StreamEvent) {
+		slog.Debug("[AGENT LOOP] Agent event", "task_id", job.TaskID, "event_type", event.Type)
 		o.handleAgentEvent(job.TaskID, event)
 	})
 
 	// Run the agent
+	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID)
 	if err := runner.Run(ctx, job.Intent); err != nil {
+		slog.Error("[AGENT LOOP] Agent execution failed", "task_id", job.TaskID, "error", err)
 		if ctx.Err() != nil {
 			o.emit(job.TaskID, "info", "Task cancelled")
 		} else {
@@ -304,6 +339,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		}
 		return
 	}
+	slog.Info("[AGENT LOOP] Agent execution completed successfully", "task_id", job.TaskID)
 
 	// Commit and push changes
 	o.emit(job.TaskID, "info", "Committing changes...")
@@ -339,7 +375,9 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 // processResults processes task results from the channel.
 // This runs in a single goroutine to ensure SQLite concurrency safety.
 func (o *Orchestrator) processResults() {
+	slog.Info("[ORCHESTRATOR] processResults goroutine started")
 	for result := range o.resultCh {
+		slog.Info("[ORCHESTRATOR] Received result from worker", "task_id", result.TaskID, "success", result.Success)
 		ctx := context.Background()
 
 		// Update task with result
@@ -358,7 +396,9 @@ func (o *Orchestrator) processResults() {
 		} else {
 			o.emitError(result.TaskID, result.Error)
 		}
+		slog.Info("[ORCHESTRATOR] Result processed", "task_id", result.TaskID)
 	}
+	slog.Info("[ORCHESTRATOR] processResults goroutine ended")
 }
 
 // handleAgentEvent converts agent events to UI events.
