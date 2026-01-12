@@ -3,7 +3,31 @@ package components
 import (
 	"github.com/revrost/code/counterspell/internal/views"
 	"fmt"
+	"strings"
 )
+
+// Available models - must match llm.Models
+var uiModels = []struct {
+	ID   string
+	Name string
+}{
+	{"o#anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"},
+	{"o#anthropic/claude-opus-4.5", "Claude Opus 4.5"},
+	{"o#google/gemini-3-pro-preview", "Gemini 3 Pro Preview"},
+	{"o#google/gemini-3-flash-preview", "Gemini 3 Flash Preview"},
+	{"o#openai/gpt-5.2", "GPT 5.2"},
+	{"o#openai/gpt-5.1-codex-max", "GPT 5.1 Codex Max"},
+	{"zai#glm-4.7", "GLM 4.7"},
+}
+
+// getModelsJSON returns JSON array of models for JavaScript
+func getModelsJSON() string {
+	var parts []string
+	for _, m := range uiModels {
+		parts = append(parts, fmt.Sprintf(`{"id":"%s","name":"%s"}`, m.ID, m.Name))
+	}
+	return `[` + strings.Join(parts, ",") + `]`
+}
 
 templ InputBar(projects map[string]views.UIProject) {
 	<!-- Docked Input Bar -->
@@ -11,33 +35,46 @@ templ InputBar(projects map[string]views.UIProject) {
 		<form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) { text = ''; $refs.input.style.height = 'auto'; }"
 			@submit="if(!activeProjectId) { $event.preventDefault(); showToast('Select a project first'); }"
 			class="bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10"
-			x-data="{ 
-				text: '', 
-				showFileMenu: false,
-				files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
-				resize() {
-					this.$refs.input.style.height = 'auto'; 
-					let newHeight = this.$refs.input.scrollHeight;
-					if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
-					this.$refs.input.style.height = newHeight + 'px';
-				},
-				checkMention(e) {
-					if (this.text.match(/@[^ ]*$/)) {
-						this.showFileMenu = true;
-					} else {
+			x-data={
+				fmt.Sprintf(`{
+					text: '',
+					showFileMenu: false,
+					activeModelId: localStorage.getItem('counterspell_model') || '%s',
+					files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
+					resize() {
+						this.$refs.input.style.height = 'auto';
+						let newHeight = this.$refs.input.scrollHeight;
+						if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
+						this.$refs.input.style.height = newHeight + 'px';
+					},
+					checkMention(e) {
+						if (this.text.match(/@[^ ]*$/)) {
+							this.showFileMenu = true;
+						} else {
+							this.showFileMenu = false;
+						}
+						if (e.key === 'Escape') this.showFileMenu = false;
+					},
+					insertFile(f) {
+						this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
 						this.showFileMenu = false;
+						this.$nextTick(() => { this.$refs.input.focus(); });
+					},
+					setModel(modelId) {
+						this.activeModelId = modelId;
+						localStorage.setItem('counterspell_model', modelId);
+					},
+					get modelName() {
+						const models = %s;
+						const model = models.find(m => m.id === this.activeModelId);
+						return model ? model.name.split(' ')[1] : this.activeModelId.split('#')[1];
 					}
-					if (e.key === 'Escape') this.showFileMenu = false;
-				},
-				insertFile(f) {
-					this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
-					this.showFileMenu = false;
-					this.$nextTick(() => { this.$refs.input.focus(); });
-				}
-			}">
-			
-			<!-- Hidden project_id field -->
+				}`, uiModels[0].ID, getModelsJSON())
+			}>
+
+			<!-- Hidden fields -->
 			<input type="hidden" name="project_id" :value="activeProjectId" />
+			<input type="hidden" name="model_id" :value="activeModelId" />
 			
 			<!-- Input Area -->
 			<div class="relative px-4 pt-4 pb-2">
@@ -125,27 +162,25 @@ templ InputBar(projects map[string]views.UIProject) {
 
 					<!-- Model Selector Trigger -->
 					<div x-data="{ modelOpen: false }" class="relative">
-						<button type="button" @click="modelOpen = !modelOpen" 
+						<button type="button" @click="modelOpen = !modelOpen"
 							class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200">
 							<i class="fas fa-bolt text-sm"></i>
 						</button>
-						
+
 						<!-- Model Popover -->
 						<div x-show="modelOpen" @click.outside="modelOpen = false" x-cloak
 							x-transition.scale.origin.bottom.right
 							class="absolute bottom-full right-0 mb-3 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1">
 							<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-900/50 border-b border-gray-800 mb-1">Select Model</div>
 							<div class="p-1 space-y-0.5">
-								<div class="flex items-center justify-between px-3 py-2 bg-blue-500/10 text-blue-400 rounded-lg cursor-pointer border border-blue-500/20">
-									<span class="text-xs font-medium">Claude 3.5 Sonnet</span>
-									<div class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-								</div>
-								<div class="flex items-center justify-between px-3 py-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-lg cursor-pointer transition">
-									<span class="text-xs font-medium">GPT-4o</span>
-								</div>
-								<div class="flex items-center justify-between px-3 py-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-lg cursor-pointer transition">
-									<span class="text-xs font-medium">DeepSeek V3</span>
-								</div>
+								for _, m := range uiModels {
+									<div @click={ fmt.Sprintf("setModel('%s')", m.ID) }
+										class={ fmt.Sprintf("flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition border border-transparent %s", fmt.Sprintf("activeModelId === '%s' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'", m.ID)) }>
+										<span class="text-xs font-medium">{ m.Name }</span>
+										<div x-show={ fmt.Sprintf("activeModelId === '%s'", m.ID) }
+											class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
+									</div>
+								}
 							</div>
 						</div>
 					</div>

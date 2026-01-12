@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/revrost/code/counterspell/internal/llm"
 )
 
 // Event types for streaming
@@ -39,7 +41,7 @@ type StreamCallback func(event StreamEvent)
 
 // Runner executes agent tasks with streaming output.
 type Runner struct {
-	apiKey       string
+	provider     llm.Provider
 	workDir      string
 	callback     StreamCallback
 	systemPrompt string
@@ -47,9 +49,9 @@ type Runner struct {
 }
 
 // NewRunner creates a new agent runner.
-func NewRunner(apiKey, workDir string, callback StreamCallback) *Runner {
+func NewRunner(provider llm.Provider, workDir string, callback StreamCallback) *Runner {
 	return &Runner{
-		apiKey:       apiKey,
+		provider:     provider,
 		workDir:      workDir,
 		callback:     callback,
 		systemPrompt: fmt.Sprintf("You are a coding assistant. Work directory: %s. Be concise. Make changes directly.", workDir),
@@ -149,7 +151,7 @@ func (r *Runner) emit(event StreamEvent) {
 
 func (r *Runner) callAPI(messages []Message, tools map[string]Tool) (*APIResponse, error) {
 	req := APIRequest{
-		Model:     model,
+		Model:     r.provider.Model(),
 		MaxTokens: maxToken,
 		System:    r.systemPrompt,
 		Messages:  messages,
@@ -161,14 +163,26 @@ func (r *Runner) callAPI(messages []Message, tools map[string]Tool) (*APIRespons
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
+	httpReq, err := http.NewRequest("POST", r.provider.APIURL(), bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", r.apiKey)
-	httpReq.Header.Set("anthropic-version", apiVer)
+
+	// Set API key based on provider type
+	providerType := detectProviderType(r.provider.APIURL())
+
+	switch providerType {
+	case "anthropic":
+		httpReq.Header.Set("x-api-key", r.provider.APIKey())
+		httpReq.Header.Set("anthropic-version", r.provider.APIVersion())
+	case "openrouter":
+		httpReq.Header.Set("Authorization", "Bearer "+r.provider.APIKey())
+		httpReq.Header.Set("HTTP-Referer", "https://counterspell.dev")
+	case "zai":
+		httpReq.Header.Set("Authorization", "Bearer "+r.provider.APIKey())
+	}
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(httpReq)
@@ -191,6 +205,19 @@ func (r *Runner) callAPI(messages []Message, tools map[string]Tool) (*APIRespons
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 	return &apiResp, nil
+}
+
+func detectProviderType(apiURL string) string {
+	if strings.Contains(apiURL, "anthropic") {
+		return "anthropic"
+	}
+	if strings.Contains(apiURL, "openrouter") {
+		return "openrouter"
+	}
+	if strings.Contains(apiURL, "z.ai") {
+		return "zai"
+	}
+	return ""
 }
 
 func (r *Runner) runTool(name string, args map[string]any, tools map[string]Tool) string {

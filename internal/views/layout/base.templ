@@ -1,11 +1,21 @@
 package layout
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/views/components"
 	"github.com/revrost/code/counterspell/internal/models"
 )
+
+func projectIDsJSON(projects map[string]views.UIProject) string {
+	ids := make([]string, 0, len(projects))
+	for id := range projects {
+		ids = append(ids, id)
+	}
+	b, _ := json.Marshal(ids)
+	return string(b)
+}
 
 // Base is the main shell of the application
 templ Base(title string, projects map[string]views.UIProject, settings models.UserSettings, isAuthenticated bool, content templ.Component) {
@@ -15,6 +25,9 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 			<title>Counterspell</title>
+			<link rel="manifest" href="/static/manifest.json"/>
+			<link rel="icon" type="image/png" href="/static/favicon.png" sizes="32x32"/>
+			<link rel="apple-touch-icon" href="/static/apple-touch-icon.png"/>
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 			<script src="https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js" integrity="sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8" crossorigin="anonymous"></script>
@@ -62,6 +75,8 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			toastOpen: false,
 			settingsOpen: false,
 			userMenuOpen: false,
+			deferredPrompt: null,
+			canInstallPWA: false,
 
 			// Active project for input
 			activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
@@ -77,6 +92,7 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
                     this.runPostAuthSequence();
                 }
                 this.connectSSE();
+                this.setupPWAInstall();
             },
 
 			setActiveProject(id, name) {
@@ -122,11 +138,6 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
                 this.onboardingStep = 2; // Syncing
                 setTimeout(() => {
                     this.onboardingStep = 3; // Ready
-                    setTimeout(() => {
-                        localStorage.setItem('counterspell_v1_onboarded', 'true');
-                        this.showOnboarding = false;
-                        this.showToast('Environment Synced');
-                    }, 800);
                 }, 2000);
             },
 
@@ -142,7 +153,33 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 					this.$refs.voiceForm.requestSubmit();
 				}, 1200);
 			},
-			closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); }
+			closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); },
+
+			setupPWAInstall() {
+				window.addEventListener('beforeinstallprompt', (e) => {
+					e.preventDefault();
+					this.deferredPrompt = e;
+					this.canInstallPWA = true;
+				});
+
+				window.addEventListener('appinstalled', () => {
+					this.deferredPrompt = null;
+					this.canInstallPWA = false;
+					this.showToast('App installed successfully!');
+				});
+			},
+
+			installPWA() {
+				if (!this.deferredPrompt) return;
+				this.deferredPrompt.prompt();
+				this.deferredPrompt.userChoice.then((choiceResult) => {
+					if (choiceResult.outcome === 'accepted') {
+						this.showToast('Installing app...');
+					}
+					this.deferredPrompt = null;
+					this.canInstallPWA = false;
+				});
+			}
 		}`, isAuthenticated) }
 			@keydown.escape="closeModal()"
 			@close-modal.window="closeModal()"
@@ -231,6 +268,34 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 							</div>
 						</div>
 					</div>
+
+					<!-- Step 3: PWA Install (shown after ready) -->
+					<div x-show="onboardingStep === 3" class="space-y-4" x-cloak x-transition.opacity>
+						<!-- PWA Install Button -->
+						<div x-show="canInstallPWA" class="space-y-3">
+							<button
+								@click="installPWA()"
+								class="group w-full relative bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold h-14 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-3 overflow-hidden"
+							>
+								<div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+								<div class="relative flex items-center gap-3">
+									<div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+										<i class="fas fa-download text-lg"></i>
+									</div>
+									<span>Install Counterspell</span>
+								</div>
+							</button>
+							<p class="text-center text-xs text-gray-500">Add to home screen for the best experience</p>
+						</div>
+
+						<!-- Skip Install Button -->
+						<button
+							@click="localStorage.setItem('counterspell_v1_onboarded', 'true'); showOnboarding = false"
+							class="w-full bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 font-medium h-12 rounded-xl transition-all duration-300 text-sm"
+						>
+							Continue to Dashboard
+						</button>
+					</div>
 				</div>
 			</div>
 			<!-- User Header -->
@@ -265,6 +330,26 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			</div>
 			<!-- Settings Modal -->
 			@components.SettingsModal(settings)
+			<!-- Validate stored project ID against current projects -->
+			<script id="valid-project-ids" type="application/json">
+				{ templ.JSONString(projectIDsJSON(projects)) }
+			</script>
+			<script>
+				(function() {
+					try {
+						const validIds = new Set(JSON.parse(document.getElementById('valid-project-ids').textContent));
+						const storedId = localStorage.getItem('counterspell_active_project_id');
+						if (storedId && !validIds.has(storedId)) {
+							console.log('Clearing stale project ID:', storedId);
+							localStorage.removeItem('counterspell_active_project_id');
+							localStorage.removeItem('counterspell_active_project_name');
+							window.location.reload();
+						}
+					} catch (e) {
+						console.error('Failed to validate project IDs:', e);
+					}
+				})();
+			</script>
 		</body>
 	</html>
 }

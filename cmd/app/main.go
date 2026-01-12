@@ -102,6 +102,13 @@ func main() {
 		http.ServeFile(w, r, "static/manifest.json")
 	})
 
+	// Serve service worker
+	r.HandleFunc("/static/sw.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Service-Worker-Allowed", "/")
+		http.ServeFile(w, r, "static/sw.js")
+	})
+
 	// Start server
 	server := &http.Server{
 		Addr:         *addr,

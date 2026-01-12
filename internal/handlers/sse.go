@@ -76,47 +76,44 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	ch := h.events.Subscribe()
 	defer h.events.Unsubscribe(ch)
 
-	// Helper to render and send active tasks
+	// Helper to render and send active tasks and reviews
 	sendActiveUpdate := func() {
-		// Get real projects, fall back to mock if none
+		// Get real projects
 		internalProjects, _ := h.github.GetProjects(ctx)
 		projects := make(map[string]views.UIProject)
 		for _, p := range internalProjects {
 			projects[p.ID] = toUIProject(p)
 		}
 
-		// Get active tasks from DB
+		// Get tasks from DB and categorize
 		dbTasks, _ := h.tasks.List(ctx, nil, nil)
 		var active []*views.UITask
+		var reviews []*views.UITask
 		for _, t := range dbTasks {
+			uiTask := &views.UITask{
+				ID:          t.ID,
+				ProjectID:   t.ProjectID,
+				Description: t.Title,
+				AgentName:   "Agent",
+				Status:      string(t.Status),
+				Progress:    50,
+			}
 			if t.Status == "in_progress" {
-				active = append(active, &views.UITask{
-					ID:          t.ID,
-					ProjectID:   t.ProjectID,
-					Description: t.Title,
-					AgentName:   "Agent",
-					Status:      string(t.Status),
-					Progress:    50, // Stable value to prevent constant morph diffs
-				})
+				active = append(active, uiTask)
+			} else if t.Status == "review" || t.Status == "human_review" {
+				uiTask.Progress = 100
+				reviews = append(reviews, uiTask)
 			}
 		}
 
-		// Add mock data if no real tasks (for demo purposes)
-		if len(active) == 0 {
-			projects["ios"] = views.UIProject{ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"}
-			active = append(active, &views.UITask{
-				ID:          "3",
-				ProjectID:   "ios",
-				Description: "Fix crash on startup",
-				AgentName:   "Agent-101",
-				Status:      "in_progress",
-				Progress:    50, // Stable value to prevent constant morph diffs
-			})
-		}
-
-		// Render to buffer
+		// Render active rows to buffer
 		var buf bytes.Buffer
 		views.ActiveRows(active, projects).Render(ctx, &buf)
+
+		// Add OOB swap for reviews section
+		buf.WriteString(`<div id="reviews-container" hx-swap-oob="true">`)
+		views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, &buf)
+		buf.WriteString(`</div>`)
 
 		// SSE requires single-line data, escape newlines
 		html := strings.ReplaceAll(buf.String(), "\n", "")
