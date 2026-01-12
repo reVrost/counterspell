@@ -122,6 +122,12 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	if err != nil {
 		return nil, fmt.Errorf("no GitHub connection: %w", err)
 	}
+	tokenLen := len(conn.Token)
+	slog.Info("GitHub token retrieved", "token_length", tokenLen, "has_token", tokenLen > 0)
+	if tokenLen == 0 {
+		slog.Error("GitHub token is empty - need to configure in settings")
+		return nil, fmt.Errorf("GitHub token is not configured. Please add a GitHub connection in Settings.")
+	}
 
 	// Create task in DB (after validating project exists)
 	task, err := o.tasks.Create(ctx, projectID, intent, intent)
