@@ -15,11 +15,12 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 			<title>Counterspell</title>
-			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+			<script src="https://unpkg.com/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
+			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
-			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"/>
 			<script>
 				tailwind.config = {
 					darkMode: 'class',
@@ -54,11 +55,16 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			modalOpen: false,
 			activeTab: 'diff',
 			projectMenuOpen: false,
+			inputProjectMenuOpen: false,
 			listening: false,
 			toastMsg: '',
 			toastOpen: false,
 			settingsOpen: false,
 			userMenuOpen: false,
+			
+			// Active project for input
+			activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
+			activeProjectName: localStorage.getItem('counterspell_active_project_name') || '',
 			
 			// Onboarding State
 			showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
@@ -71,14 +77,26 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
                 }
                 this.connectSSE();
             },
+			
+			setActiveProject(id, name) {
+				this.activeProjectId = id;
+				this.activeProjectName = name;
+				localStorage.setItem('counterspell_active_project_id', id);
+				localStorage.setItem('counterspell_active_project_name', name);
+				this.inputProjectMenuOpen = false;
+				this.projectMenuOpen = false;
+			},
 
             connectSSE() {
                 const eventSource = new EventSource('/events');
                 eventSource.addEventListener('task', (e) => {
                     const data = JSON.parse(e.data);
                     this.showToast(data.html_payload ? 'Task updated' : 'Event received');
-                    // Refresh feed when task updates
-                    htmx.trigger('#feed-container', 'load');
+                    // Active tasks now update via htmx SSE extension
+                    // Only refresh reviews section on task completion
+                    if (data.type === 'status_change') {
+                        htmx.trigger('#reviews-container', 'refresh');
+                    }
                 });
                 eventSource.onerror = () => {
                     setTimeout(() => this.connectSSE(), 5000);
@@ -218,7 +236,7 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			</main>
 
 			<!-- Input Bar -->
-			@components.InputBar()
+			@components.InputBar(projects)
 
 			<!-- Detail Modal Wrapper -->
 			<div x-show="modalOpen" class="fixed inset-0 z-40 bg-gray-950/40 backdrop-blur-[2px]" x-transition.opacity></div>

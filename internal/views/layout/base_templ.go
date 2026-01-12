@@ -37,7 +37,7 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"dark\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover\"><title>Counterspell</title><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><script src=\"https://cdn.tailwindcss.com\"></script><link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css\"><script>\n\t\t\t\ttailwind.config = {\n\t\t\t\t\tdarkMode: 'class',\n\t\t\t\t\ttheme: {\n\t\t\t\t\t\tfontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] },\n\t\t\t\t\t\textend: {\n\t\t\t\t\t\t\tcolors: {\n\t\t\t\t\t\t\t\tgray: { 850: '#1A1D24', 900: '#111318', 950: '#0C0E12' },\n\t\t\t\t\t\t\t\tlinear: { border: '#2E323A', text: '#EBEBEB', sub: '#8A8F98' }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script><style>\n\t\t\t\tbody { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; }\n\t\t\t\t.hide-scrollbar::-webkit-scrollbar { display: none; }\n\t\t\t\t.no-tap-highlight { -webkit-tap-highlight-color: transparent; }\n\t\t\t\t\n\t\t\t\t/* Slide-over animation */\n\t\t\t\t.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }\n\t\t\t\t.slide-enter-start, .slide-leave-end { transform: translateY(100%); }\n\t\t\t\t.slide-enter-end, .slide-leave-start { transform: translateY(0); }\n\t\t\t\t\n\t\t\t\t/* Custom syntax highlight feel */\n\t\t\t\t.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }\n\t\t\t\t.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }\n\t\t\t\t.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }\n\t\t\t</style></head><body x-data=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"dark\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover\"><title>Counterspell</title><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script src=\"https://unpkg.com/idiomorph@0.3.0/dist/idiomorph-ext.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js\"></script><script src=\"https://cdn.tailwindcss.com\"></script><link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css\"><script>\n\t\t\t\ttailwind.config = {\n\t\t\t\t\tdarkMode: 'class',\n\t\t\t\t\ttheme: {\n\t\t\t\t\t\tfontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] },\n\t\t\t\t\t\textend: {\n\t\t\t\t\t\t\tcolors: {\n\t\t\t\t\t\t\t\tgray: { 850: '#1A1D24', 900: '#111318', 950: '#0C0E12' },\n\t\t\t\t\t\t\t\tlinear: { border: '#2E323A', text: '#EBEBEB', sub: '#8A8F98' }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script><style>\n\t\t\t\tbody { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; }\n\t\t\t\t.hide-scrollbar::-webkit-scrollbar { display: none; }\n\t\t\t\t.no-tap-highlight { -webkit-tap-highlight-color: transparent; }\n\t\t\t\t\n\t\t\t\t/* Slide-over animation */\n\t\t\t\t.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }\n\t\t\t\t.slide-enter-start, .slide-leave-end { transform: translateY(100%); }\n\t\t\t\t.slide-enter-end, .slide-leave-start { transform: translateY(0); }\n\t\t\t\t\n\t\t\t\t/* Custom syntax highlight feel */\n\t\t\t\t.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }\n\t\t\t\t.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }\n\t\t\t\t.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }\n\t\t\t</style></head><body x-data=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -46,11 +46,16 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 			modalOpen: false,
 			activeTab: 'diff',
 			projectMenuOpen: false,
+			inputProjectMenuOpen: false,
 			listening: false,
 			toastMsg: '',
 			toastOpen: false,
 			settingsOpen: false,
 			userMenuOpen: false,
+			
+			// Active project for input
+			activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
+			activeProjectName: localStorage.getItem('counterspell_active_project_name') || '',
 			
 			// Onboarding State
 			showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
@@ -63,14 +68,26 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
                 }
                 this.connectSSE();
             },
+			
+			setActiveProject(id, name) {
+				this.activeProjectId = id;
+				this.activeProjectName = name;
+				localStorage.setItem('counterspell_active_project_id', id);
+				localStorage.setItem('counterspell_active_project_name', name);
+				this.inputProjectMenuOpen = false;
+				this.projectMenuOpen = false;
+			},
 
             connectSSE() {
                 const eventSource = new EventSource('/events');
                 eventSource.addEventListener('task', (e) => {
                     const data = JSON.parse(e.data);
                     this.showToast(data.html_payload ? 'Task updated' : 'Event received');
-                    // Refresh feed when task updates
-                    htmx.trigger('#feed-container', 'load');
+                    // Active tasks now update via htmx SSE extension
+                    // Only refresh reviews section on task completion
+                    if (data.type === 'status_change') {
+                        htmx.trigger('#reviews-container', 'refresh');
+                    }
                 });
                 eventSource.onerror = () => {
                     setTimeout(() => this.connectSSE(), 5000);
@@ -112,7 +129,7 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 			closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); }
 		}`, isAuthenticated))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout/base.templ`, Line: 121, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout/base.templ`, Line: 139, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -138,7 +155,7 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = components.InputBar().Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = components.InputBar(projects).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
