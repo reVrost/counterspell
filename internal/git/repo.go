@@ -47,8 +47,8 @@ func (m *RepoManager) EnsureRepo(owner, repo, token string) (string, error) {
 
 	// Check if repo already exists
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-		slog.Info("[GIT] Repo exists, fetching latest", "owner", owner, "repo", repo)
-		if err := m.fetchLatest(repoPath); err != nil {
+		slog.Info("[GIT] Repo exists, fetching latest", "owner", owner, "repo", repo, "token_provided", token != "")
+		if err := m.fetchLatest(repoPath, token, owner, repo); err != nil {
 			slog.Error("[GIT] Failed to fetch", "error", err)
 			return "", fmt.Errorf("failed to fetch: %w", err)
 		}
@@ -78,30 +78,53 @@ func (m *RepoManager) cloneRepo(owner, repo, token, destPath string) error {
 	var cloneURL string
 	if token != "" {
 		cloneURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, owner, repo)
+		slog.Info("[GIT] Using authenticated clone URL", "token_length", len(token))
 	} else {
 		cloneURL = fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
+		slog.Warn("[GIT] No token provided, cloning without auth")
 	}
+
+	slog.Info("[GIT] Cloning repo", "owner", owner, "repo", repo, "dest", destPath)
 
 	// Clone with depth 1 for speed, but we need full history for worktrees
 	// So we do a regular clone
 	cmd := exec.Command("git", "clone", cloneURL, destPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		slog.Error("[GIT] Clone command failed", "error", err, "output", string(output))
 		return fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
 	}
 
-	slog.Info("Cloned repo", "path", destPath)
+	slog.Info("[GIT] Cloned repo successfully", "path", destPath)
 	return nil
 }
 
 // fetchLatest fetches the latest changes from origin.
-func (m *RepoManager) fetchLatest(repoPath string) error {
+func (m *RepoManager) fetchLatest(repoPath, token, owner, repo string) error {
+	slog.Info("[GIT] Fetching latest changes", "path", repoPath, "has_token", token != "")
+
+	// Update remote URL with current token if provided
+	if token != "" {
+		newURL := fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, owner, repo)
+		slog.Info("[GIT] Updating remote URL with token", "token_length", len(token))
+		cmd := exec.Command("git", "remote", "set-url", "origin", newURL)
+		cmd.Dir = repoPath
+		if output, err := cmd.CombinedOutput(); err != nil {
+			slog.Error("[GIT] Failed to update remote URL", "error", err, "output", string(output))
+			return fmt.Errorf("failed to update remote URL: %w\nOutput: %s", err, string(output))
+		}
+		slog.Info("[GIT] Remote URL updated successfully")
+	}
+
 	cmd := exec.Command("git", "fetch", "origin")
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		slog.Error("[GIT] git fetch failed", "error", err, "output", string(output))
 		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
 	}
+
+	slog.Info("[GIT] Fetch successful, resetting to origin/main")
 
 	// Reset main to origin/main
 	cmd = exec.Command("git", "checkout", "main")
@@ -113,15 +136,17 @@ func (m *RepoManager) fetchLatest(repoPath string) error {
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		// Try master branch
+		slog.Info("[GIT] Trying master branch instead", "path", repoPath)
 		cmd = exec.Command("git", "reset", "--hard", "origin/master")
 		cmd.Dir = repoPath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
+			slog.Error("[GIT] git reset failed", "error", err, "output", string(output))
 			return fmt.Errorf("git reset failed: %w\nOutput: %s", err, string(output))
 		}
 	}
 
-	slog.Info("Fetched latest", "path", repoPath)
+	slog.Info("[GIT] Fetched and reset successfully", "path", repoPath)
 	return nil
 }
 
