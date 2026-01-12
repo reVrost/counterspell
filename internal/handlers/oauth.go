@@ -62,7 +62,7 @@ func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	h.github.DeleteConnection(ctx)
 	h.github.DeleteAllProjects(ctx)
-	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/", http.StatusSeeOther) // 303 converts POST to GET
 }
 
 // Legacy/Stub Handlers

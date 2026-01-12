@@ -16,6 +16,7 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 			<title>Counterspell</title>
 			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
@@ -68,6 +69,20 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
                 if (this.showOnboarding && this.isAuthenticated) {
                     this.runPostAuthSequence();
                 }
+                this.connectSSE();
+            },
+
+            connectSSE() {
+                const eventSource = new EventSource('/events');
+                eventSource.addEventListener('task', (e) => {
+                    const data = JSON.parse(e.data);
+                    this.showToast(data.html_payload ? 'Task updated' : 'Event received');
+                    // Refresh feed when task updates
+                    htmx.trigger('#feed-container', 'load');
+                });
+                eventSource.onerror = () => {
+                    setTimeout(() => this.connectSSE(), 5000);
+                };
             },
 
 			startOnboarding() {

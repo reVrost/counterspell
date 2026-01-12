@@ -1,4 +1,4 @@
-.PHONY: dev build test clean tidy generate lint docker-build docker-run
+.PHONY: dev build test clean tidy generate lint docker-build docker-run run
 
 # Variables
 PROJECT_NAME := counterspell
@@ -12,7 +12,7 @@ all: dev
 
 dev: generate build
 	@echo "Starting $(PROJECT_NAME) in development mode..."
-	@direnv exec $(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
+	./counterspell -addr :8710 -db ./data/$(PROJECT_NAME).db
 
 air:
 	@echo "Starting air with direnv..."
@@ -22,18 +22,14 @@ run: build
 	@echo "Starting $(PROJECT_NAME)..."
 	@direnv exec $(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
 
-run: build
-	@$(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
-
 ##@ Build
 
-build: tidy
+build:
 	@echo "Building $(PROJECT_NAME)..."
-	@mkdir -p $(BINARY_DIR)
 	@go build -o $(BINARY_PATH) $(TARGET_MAIN)
 	@echo "Binary built: $(BINARY_PATH)"
 
-build-prod:
+build-prod: tidy
 	@echo "Building $(PROJECT_NAME) for production..."
 	@mkdir -p deploy
 	@GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy/$(PROJECT_NAME) $(TARGET_MAIN)
@@ -57,7 +53,6 @@ lint:
 ##@ Dependencies
 
 tidy:
-	@echo "Tidying go modules..."
 	@go mod tidy
 	@go mod verify
 
@@ -69,13 +64,14 @@ deps:
 
 ##@ Code Generation
 
-generate: tidy
+generate:
 	@echo "Generating code..."
 	@if command -v templ >/dev/null 2>&1; then \
 		templ generate; \
 	else \
 		echo "templ not installed, skipping... (run 'make deps' to install)"; \
 	fi
+	go generate ./...
 
 ##@ Docker
 
@@ -89,13 +85,8 @@ docker-run: docker-build
 
 ##@ Cleanup
 
-clean:
-	@echo "Cleaning build artifacts..."
-	@rm -rf $(BINARY_DIR)
-	@rm -rf deploy
-	@rm -f coverage.out coverage.html
 
-clean-all: clean
+clean-all:
 	@echo "Cleaning all generated files..."
 	@rm -rf data/*.db data/*.db-shm data/*.db-wal
 	@rm -rf worktree-*

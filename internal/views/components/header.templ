@@ -42,10 +42,12 @@ templ Header(projects map[string]views.UIProject) {
 				<div class="h-px bg-gray-800 my-1 mx-2"></div>
 
 				<div class="px-2 pb-1">
-					<div @click="localStorage.removeItem('conductor_v2_onboarded'); window.location.reload()" 
-						class="px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors">
-						<i class="fas fa-sign-out-alt w-4"></i> Sign Out
-					</div>
+					<form method="POST" action="/disconnect" class="contents">
+						<button type="submit" @click="localStorage.removeItem('counterspell_v1_onboarded')" 
+							class="w-full px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left">
+							<i class="fas fa-sign-out-alt w-4"></i> Sign Out
+						</button>
+					</form>
 				</div>
 			</div>
 		</div>

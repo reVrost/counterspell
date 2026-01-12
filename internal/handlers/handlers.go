@@ -15,7 +15,7 @@ import (
 type Handlers struct {
 	tasks        *services.TaskService
 	events       *services.EventBus
-	agent        *services.AgentRunner
+	orchestrator *services.Orchestrator
 	github       *services.GitHubService
 	auth         *auth.AuthService
 	settings     *services.SettingsService
@@ -25,12 +25,16 @@ type Handlers struct {
 }
 
 // NewHandlers creates new HTTP handlers.
-func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *services.AgentRunner, db *db.DB) *Handlers {
+func NewHandlers(tasks *services.TaskService, events *services.EventBus, database *db.DB, dataDir string) *Handlers {
 	clientID := os.Getenv("GITHUB_CLIENT_ID")
 	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
 
-	githubService := services.NewGitHubService(clientID, clientSecret, redirectURI, db)
+	githubService := services.NewGitHubService(clientID, clientSecret, redirectURI, database)
+	settingsService := services.NewSettingsService(database)
+
+	// Create orchestrator
+	orchestrator := services.NewOrchestrator(tasks, githubService, events, settingsService, dataDir)
 
 	// Initialize auth service
 	authService, err := auth.NewAuthServiceFromEnv()
@@ -39,12 +43,10 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *
 		authService = nil
 	}
 
-	settingsService := services.NewSettingsService(db)
-
 	return &Handlers{
 		tasks:        tasks,
 		events:       events,
-		agent:        agent,
+		orchestrator: orchestrator,
 		github:       githubService,
 		auth:         authService,
 		settings:     settingsService,
@@ -57,7 +59,7 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, agent *
 // RegisterRoutes registers all routes on the router.
 func (h *Handlers) RegisterRoutes(r chi.Router) {
 	// Landing and Auth
-	r.Get("/", h.HandleFeed) // New Home is Feed
+	r.Get("/", h.HandleFeed)
 	r.Get("/auth/login", h.HandleAuth)
 	r.Get("/auth/register", h.HandleRegister)
 	r.Get("/auth/oauth/{provider}", h.HandleOAuth)
@@ -65,11 +67,15 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Get("/auth/check", h.HandleAuthCheck)
 	r.Post("/auth/logout", h.HandleLogout)
 
-	// New UI Routes
+	// Feed Routes
 	r.Get("/feed", h.HandleFeed)
 	r.Get("/feed/active", h.HandleFeedActive)
+	r.Get("/feed/active/stream", h.HandleFeedActiveSSE)
 	r.Get("/task/{id}", h.HandleTaskDetailUI)
-	
+
+	// SSE for streaming
+	r.Get("/events", h.HandleSSE)
+
 	// Actions
 	r.Post("/add-task", h.HandleAddTask)
 	r.Post("/action/retry/{id}", h.HandleActionRetry)
@@ -78,24 +84,19 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Post("/action/chat/{id}", h.HandleActionChat)
 	r.Post("/settings", h.HandleSaveSettings)
 
-	// Keep GitHub OAuth routes
+	// GitHub OAuth routes
 	r.Get("/github/authorize", h.HandleGitHubAuthorize)
 	r.Get("/github/callback", h.HandleGitHubCallback)
 	r.Post("/disconnect", h.HandleDisconnect)
-	
+
 	// Legacy routes redirects
-	r.Get("/home", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusFound) })
-	r.Get("/projects", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusFound) })
-	r.Get("/board", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusFound) })
+	r.Get("/home", redirectTo("/"))
+	r.Get("/projects", redirectTo("/"))
+	r.Get("/board", redirectTo("/"))
 }
 
-// maskSensitive masks sensitive values for logging
-func maskSensitive(val string) string {
-	if val == "" {
-		return "not set"
+func redirectTo(path string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, path, http.StatusFound)
 	}
-	if len(val) <= 8 {
-		return "***"
-	}
-	return val[:4] + "..." + val[len(val)-4:]
 }
