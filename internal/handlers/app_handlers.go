@@ -3,9 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
-	"maps"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/revrost/code/counterspell/internal/models"
@@ -81,33 +79,7 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Add mock data if no real tasks (for demo purposes)
-	if len(data.Reviews) == 0 && len(data.Active) == 0 && len(data.Done) == 0 {
-		projects["web"] = views.UIProject{ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"}
-		projects["ios"] = views.UIProject{ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"}
-		data.Projects = projects
 
-		data.Reviews = []*views.UITask{
-			{
-				ID:          "2",
-				ProjectID:   "web",
-				Description: "Add Dark Mode to Dashboard",
-				AgentName:   "Agent-042",
-				Status:      "review",
-				Progress:    100,
-			},
-		}
-		data.Active = []*views.UITask{
-			{
-				ID:          "3",
-				ProjectID:   "ios",
-				Description: "Fix crash on startup",
-				AgentName:   "Agent-101",
-				Status:      "in_progress",
-				Progress:    50,
-			},
-		}
-	}
 
 	// If this is an HTMX request, render only the feed component (partial)
 	// Otherwise, render the full page layout
@@ -132,47 +104,42 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 
 // HandleFeedActive returns the active rows partial
 func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
-	// Mock logic: randomly increment progress of active tasks
-	// In real app, we fetch from DB
-	mockActive := []*views.UITask{
-		{
-			ID:          "3",
-			ProjectID:   "ios",
-			Description: "Fix crash on startup",
-			AgentName:   "Agent-101",
-			Status:      "in_progress",
-			Progress:    int(time.Now().Unix() % 100), // Random progress
-		},
+	ctx := r.Context()
+
+	// Get real projects
+	internalProjects, _ := h.github.GetProjects(ctx)
+	projects := make(map[string]views.UIProject)
+	for _, p := range internalProjects {
+		projects[p.ID] = toUIProject(p)
 	}
 
-	// Mock Projects map
-	projects := map[string]views.UIProject{
-		"ios": {ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"},
+	// Get active tasks from DB
+	dbTasks, _ := h.tasks.List(ctx, nil, nil)
+	var active []*views.UITask
+	var reviews []*views.UITask
+	for _, t := range dbTasks {
+		uiTask := &views.UITask{
+			ID:          t.ID,
+			ProjectID:   t.ProjectID,
+			Description: t.Title,
+			AgentName:   "Agent",
+			Status:      string(t.Status),
+			Progress:    50,
+		}
+		if t.Status == "in_progress" {
+			active = append(active, uiTask)
+		} else if t.Status == "review" || t.Status == "human_review" {
+			uiTask.Progress = 100
+			reviews = append(reviews, uiTask)
+		}
 	}
-
-	// Also Update Reviews via OOB
-	mockReviews := []*views.UITask{
-		{
-			ID:          "2",
-			ProjectID:   "web",
-			Description: "Add Dark Mode to Dashboard",
-			AgentName:   "Agent-042",
-			Status:      "review",
-			Progress:    100,
-		},
-	}
-	reviewsProjects := map[string]views.UIProject{
-		"web": {ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"},
-	}
-	// Merge maps
-	maps.Copy(projects, reviewsProjects)
 
 	// Render Active Rows
-	views.ActiveRows(mockActive, projects).Render(r.Context(), w)
+	views.ActiveRows(active, projects).Render(ctx, w)
 
 	// Render Reviews OOB
-	w.Write([]byte(`<div id="reviews-container">`))
-	views.ReviewsSection(views.FeedData{Reviews: mockReviews, Projects: projects}).Render(r.Context(), w)
+	w.Write([]byte(`<div id="reviews-container" hx-swap-oob="true">`))
+	views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, w)
 	w.Write([]byte(`</div>`))
 }
 
@@ -261,6 +228,7 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 
 	intent := r.FormValue("voice_input")
 	projectID := r.FormValue("project_id")
+	modelID := r.FormValue("model_id")
 
 	if intent == "" {
 		h.HandleFeed(w, r)
@@ -274,7 +242,7 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start task execution
-	_, err := h.orchestrator.StartTask(ctx, projectID, intent)
+	_, err := h.orchestrator.StartTask(ctx, projectID, intent, modelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		w.Header().Set("HX-Trigger", `{"toast": "Failed to start task", "taskCreated": "false"}`)

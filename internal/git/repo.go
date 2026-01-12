@@ -18,7 +18,12 @@ type RepoManager struct {
 // NewRepoManager creates a new repo manager.
 // dataDir is the base directory for storing repos (e.g., "./data")
 func NewRepoManager(dataDir string) *RepoManager {
-	return &RepoManager{dataDir: dataDir}
+	// Convert to absolute path to ensure worktrees are created at correct level
+	absDir, err := filepath.Abs(dataDir)
+	if err != nil {
+		absDir = dataDir // fallback if conversion fails
+	}
+	return &RepoManager{dataDir: absDir}
 }
 
 // repoPath returns the local path for a given owner/repo.

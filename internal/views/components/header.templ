@@ -37,6 +37,9 @@ templ Header(projects map[string]views.UIProject) {
 					<div @click="userMenuOpen = false; settingsOpen = true" class="px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2 transition-colors">
 						<i class="fas fa-cog w-4"></i> Settings
 					</div>
+					<div x-show="deferredPrompt" @click="userMenuOpen = false; installApp()" class="px-2 py-1.5 hover:bg-purple-500/10 rounded cursor-pointer text-xs text-purple-400 hover:text-purple-300 flex items-center gap-2 transition-colors">
+						<i class="fas fa-download w-4"></i> Install App
+					</div>
 				</div>
 
 				<div class="h-px bg-gray-800 my-1 mx-2"></div>

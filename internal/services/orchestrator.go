@@ -9,6 +9,7 @@ import (
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/revrost/code/counterspell/internal/git"
+	"github.com/revrost/code/counterspell/internal/llm"
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/pkg/agent"
 )
@@ -26,11 +27,12 @@ type TaskResult struct {
 type TaskJob struct {
 	TaskID    string
 	ProjectID string
-	Intent    string
+	Intent     string
+	ModelID    string
 	Owner     string
-	Repo      string
-	Token     string
-	ResultCh  chan<- TaskResult
+	Repo       string
+	Token      string
+	ResultCh   chan<- TaskResult
 }
 
 // Orchestrator manages task execution with agents.
@@ -86,7 +88,7 @@ func (o *Orchestrator) Shutdown() {
 }
 
 // StartTask creates a task and begins execution.
-func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent string) (*models.Task, error) {
+func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID string) (*models.Task, error) {
 	// First, verify project exists
 	projects, err := o.github.GetProjects(ctx)
 	if err != nil {
@@ -123,6 +125,12 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent string) 
 	}
 
 	slog.Info("Task created successfully", "task_id", task.ID, "project_id", projectID, "owner", owner, "repo", repo)
+
+	// Emit task_created event to trigger feed refresh
+	o.events.Publish(models.Event{
+		TaskID: task.ID,
+		Type:   "task_created",
+	})
 
 	// Submit job to worker pool
 	job := &TaskJob{
@@ -201,22 +209,84 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 
 	o.emit(job.TaskID, "success", fmt.Sprintf("Workspace ready: %s", branchName))
 
-	// Get API key
+	// Get API key and create provider
 	settings, err := o.settings.GetSettings(ctx)
-	if err != nil || settings.AnthropicKey == "" {
-		o.emitError(job.TaskID, "No Anthropic API key configured. Add it in Settings.")
+	if err != nil {
+		o.emitError(job.TaskID, "Failed to get settings")
 		job.ResultCh <- TaskResult{
 			TaskID: job.TaskID,
 			Success: false,
-			Error:   "No Anthropic API key configured",
+			Error:   "Failed to get settings",
 		}
 		return
 	}
 
-	o.emit(job.TaskID, "plan", "Starting agent...")
+	// Parse model_id to get provider and model name
+	providerPrefix, modelName := llm.ParseModelID(job.ModelID)
+
+	var provider llm.Provider
+	switch providerPrefix {
+	case "openrouter", "o":
+		if settings.OpenRouterKey == "" {
+			o.emitError(job.TaskID, "OpenRouter API key not configured")
+			job.ResultCh <- TaskResult{
+				TaskID: job.TaskID,
+				Success: false,
+				Error:   "OpenRouter API key not configured",
+			}
+			return
+		}
+		provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
+	case "zai", "z":
+		if settings.ZaiKey == "" {
+			o.emitError(job.TaskID, "Z.ai API key not configured")
+			job.ResultCh <- TaskResult{
+				TaskID: job.TaskID,
+				Success: false,
+				Error:   "Z.ai API key not configured",
+			}
+			return
+		}
+		provider = llm.NewZaiProvider(settings.ZaiKey)
+	case "anthropic":
+		if settings.AnthropicKey == "" {
+			o.emitError(job.TaskID, "Anthropic API key not configured")
+			job.ResultCh <- TaskResult{
+				TaskID: job.TaskID,
+				Success: false,
+				Error:   "Anthropic API key not configured",
+			}
+			return
+		}
+		provider = llm.NewAnthropicProvider(settings.AnthropicKey)
+	default:
+		// Try auto-detect based on available keys
+		if settings.OpenRouterKey != "" {
+			provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
+		} else if settings.ZaiKey != "" {
+			provider = llm.NewZaiProvider(settings.ZaiKey)
+		} else if settings.AnthropicKey != "" {
+			provider = llm.NewAnthropicProvider(settings.AnthropicKey)
+		} else {
+			o.emitError(job.TaskID, "No API key configured. Add OpenRouter, Z.ai, or Anthropic key in Settings.")
+			job.ResultCh <- TaskResult{
+				TaskID: job.TaskID,
+				Success: false,
+				Error:   "No API key configured",
+			}
+			return
+		}
+	}
+
+	// Set model name on provider
+	if modelName != "" {
+		provider.SetModel(modelName)
+	}
+
+	o.emit(job.TaskID, "plan", fmt.Sprintf("Starting agent with model: %s...", provider.Model()))
 
 	// Create agent runner with streaming callback
-	runner := agent.NewRunner(settings.AnthropicKey, worktreePath, func(event agent.StreamEvent) {
+	runner := agent.NewRunner(provider, worktreePath, func(event agent.StreamEvent) {
 		o.handleAgentEvent(job.TaskID, event)
 	})
 
