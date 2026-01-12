@@ -8,7 +8,7 @@ import (
 templ InputBar(projects map[string]views.UIProject) {
 	<!-- Docked Input Bar -->
 	<div class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-3xl">
-		<form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" 
+		<form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) { text = ''; $refs.input.style.height = 'auto'; }"
 			@submit="if(!activeProjectId) { $event.preventDefault(); showToast('Select a project first'); }"
 			class="bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10"
 			x-data="{ 

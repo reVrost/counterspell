@@ -37,86 +37,65 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50">
 				<button @click="activeTab = 'diff'"
 					:class="activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
-					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Code</button>
-				<button @click="activeTab = 'preview'"
-					:class="activeTab === 'preview' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
-					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Preview</button>
+					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Diff</button>
+				<button @click="activeTab = 'agent'"
+					:class="activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
+					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Agent</button>
 				<button @click="activeTab = 'activity'"
 					:class="activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
 					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Log</button>
 			</div>
 		</div>
 
-		<!-- Main Content Area -->
+	<!-- Main Content Area -->
 		<div class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full">
 
 			<!-- Tab 1: DIFF -->
 			<div x-show="activeTab === 'diff'" class="p-0 min-h-full pb-32">
-				if task.Status == "working" {
+				if task.Status == "in_progress" {
 					<div class="flex flex-col items-center justify-center h-64 text-gray-500 space-y-4">
 						<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
 						<p class="text-xs font-mono">Generating changes...</p>
 					</div>
 				} else {
 					<div class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between">
-						<span class="text-xs text-gray-400 font-mono">pkg/server.go</span>
-						<span class="text-[10px] text-green-500 font-mono">+12 / -2</span>
+						<span class="text-xs text-gray-400 font-mono">changes</span>
+						<span class="text-[10px] text-green-500 font-mono">git diff</span>
 					</div>
 					<div class="p-4 font-mono text-xs leading-6 text-gray-300 whitespace-pre overflow-x-auto">
-						for _, line := range strings.Split(task.MockDiff, "\n") {
-							if strings.HasPrefix(line, "+") {
-								<div class="diff-add">{ line }</div>
-							} else if strings.HasPrefix(line, "-") {
-								<div class="diff-del">{ line }</div>
-							} else {
-								<div>{ line }</div>
+						if task.GitDiff != "" {
+							for _, line := range strings.Split(task.GitDiff, "\n") {
+								if strings.HasPrefix(line, "+") {
+									<div class="diff-add">{ line }</div>
+								} else if strings.HasPrefix(line, "-") {
+									<div class="diff-del">{ line }</div>
+								} else {
+									<div>{ line }</div>
+								}
 							}
+						} else {
+							<div class="text-gray-500 italic">No changes made</div>
 						}
 					</div>
 				}
 			</div>
 
-			<!-- Tab 2: PREVIEW -->
-			<div x-show="activeTab === 'preview'" class="p-4 flex flex-col h-full pb-32"
-				x-data="{ booting: true, url: '' }"
-				x-init="setTimeout(() => { booting = false; url = 'https://agent-' + Math.floor(Math.random()*1000) + '.ngrok.io' }, 1500)">
-
-				<div x-show="booting" class="flex-1 flex flex-col items-center justify-center space-y-4 text-gray-500">
-					<div class="relative">
-						<div class="w-12 h-12 rounded-full border-2 border-gray-700 border-t-purple-500 animate-spin"></div>
-						<div class="absolute inset-0 flex items-center justify-center">
-							<i class="fas fa-terminal text-[10px]"></i>
-						</div>
+			<!-- Tab 2: AGENT OUTPUT -->
+			<div x-show="activeTab === 'agent'" class="p-5 pb-32">
+				if task.Status == "in_progress" {
+					<div class="flex flex-col items-center justify-center h-64 text-gray-500 space-y-4">
+						<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
+						<p class="text-xs font-mono">Agent is working...</p>
 					</div>
-					<p class="text-xs font-mono animate-pulse">Starting dev server...</p>
-				</div>
-
-				<div x-show="!booting" class="flex flex-col h-full bg-white rounded overflow-hidden">
-					<!-- Mock Browser Chrome -->
-					<div class="bg-gray-100 border-b border-gray-300 px-3 py-2 flex items-center gap-2 shrink-0">
-						<div class="flex gap-1.5">
-							<div class="w-2.5 h-2.5 rounded-full bg-red-400"></div>
-							<div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
-							<div class="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+				} else {
+					if task.AgentOutput != "" {
+						<div class="prose prose-invert prose-sm max-w-none">
+							<div class="text-gray-300 whitespace-pre-wrap leading-relaxed">{ task.AgentOutput }</div>
 						</div>
-						<div class="ml-2 flex-1 bg-white border border-gray-300 rounded px-2 py-0.5 text-[10px] text-gray-500 font-mono flex items-center gap-1">
-							<i class="fas fa-lock text-[8px]"></i>
-							<span x-text="url"></span>
-						</div>
-					</div>
-					<!-- Mock Content -->
-					<div class="flex-1 flex items-center justify-center bg-gray-50 relative overflow-hidden">
-						if task.PreviewURL != "" {
-							<img src={ task.PreviewURL } class="w-full h-full object-cover opacity-90 hover:opacity-100 transition"/>
-						} else {
-							<div class="text-center">
-								<h1 class="text-2xl font-bold text-gray-900 mb-2">Conductor Interface</h1>
-								<p class="text-gray-500 text-sm">Preview build successful.</p>
-								<button class="mt-4 px-4 py-2 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Action</button>
-							</div>
-						}
-					</div>
-				</div>
+					} else {
+						<div class="text-gray-500 italic">No agent output</div>
+					}
+				}
 			</div>
 
 			<!-- Tab 3: ACTIVITY -->

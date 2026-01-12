@@ -216,3 +216,17 @@ func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
 
 	return string(output), nil
 }
+
+// GetDiff returns the git diff for a task's worktree.
+func (m *RepoManager) GetDiff(taskID string) (string, error) {
+	worktreePath := m.worktreePath(taskID)
+
+	cmd := exec.Command("git", "diff", "HEAD")
+	cmd.Dir = worktreePath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return string(output), nil
+}

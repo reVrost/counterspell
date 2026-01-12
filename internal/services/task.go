@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/models"
 )
@@ -24,7 +24,7 @@ func NewTaskService(database *db.DB) *TaskService {
 
 // Create creates a new task.
 func (s *TaskService) Create(ctx context.Context, projectID, title, intent string) (*models.Task, error) {
-	id := uuid.New().String()
+	id := shortuuid.New()
 	now := time.Now()
 
 	query := `
@@ -42,19 +42,26 @@ func (s *TaskService) Create(ctx context.Context, projectID, title, intent strin
 // Get retrieves a task by ID.
 func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) {
 	query := `
-		SELECT id, project_id, title, intent, status, position, created_at, updated_at
+		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, created_at, updated_at
 		FROM tasks WHERE id = ?
 	`
+	var agentOutput, gitDiff sql.NullString
 	var task models.Task
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
-		&task.Position, &task.CreatedAt, &task.UpdatedAt,
+		&task.Position, &agentOutput, &gitDiff, &task.CreatedAt, &task.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("task not found")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task: %w", err)
+	}
+	if agentOutput.Valid {
+		task.AgentOutput = agentOutput.String
+	}
+	if gitDiff.Valid {
+		task.GitDiff = gitDiff.String
 	}
 	return &task, nil
 }
@@ -80,7 +87,7 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 	}
 
 	query = `
-		SELECT id, project_id, title, intent, status, position, created_at, updated_at
+		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, created_at, updated_at
 		FROM tasks
 	` + whereClause + `
 		ORDER BY status ASC, position ASC, created_at DESC
@@ -99,12 +106,19 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 	var tasks []models.Task
 	for rows.Next() {
 		var task models.Task
+		var agentOutput, gitDiff sql.NullString
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
-			&task.Position, &task.CreatedAt, &task.UpdatedAt,
+			&task.Position, &agentOutput, &gitDiff, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan task: %w", err)
+		}
+		if agentOutput.Valid {
+			task.AgentOutput = agentOutput.String
+		}
+		if gitDiff.Valid {
+			task.GitDiff = gitDiff.String
 		}
 		tasks = append(tasks, task)
 	}
@@ -168,6 +182,19 @@ func (s *TaskService) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
+	}
+	return nil
+}
+
+// UpdateWithResult updates a task's status, agent output, and git diff.
+func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status models.TaskStatus, agentOutput, gitDiff string) error {
+	query := `
+		UPDATE tasks SET status = ?, agent_output = ?, git_diff = ?, updated_at = ?
+		WHERE id = ?
+	`
+	_, err := s.db.ExecContext(ctx, query, status, agentOutput, gitDiff, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to update task result: %w", err)
 	}
 	return nil
 }

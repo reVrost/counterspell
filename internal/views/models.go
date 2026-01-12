@@ -21,7 +21,8 @@ type UITask struct {
 	Progress    int
 	Status      string // Mapped from state
 	Summary     string
-	MockDiff    string
+	AgentOutput  string // Final message from agent
+	GitDiff     string // Git diff of changes
 	Logs        []UILogEntry
 	CreatedAt   time.Time
 	PreviewURL  string

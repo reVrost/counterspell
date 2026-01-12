@@ -12,7 +12,7 @@ templ Feed(data FeedData) {
 		<!-- IN PROGRESS (SSE streaming) -->
 		<div class="mb-6">
 			<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">In Progress</h3>
-			<div class="space-y-2" hx-ext="sse" sse-connect="/feed/active/stream" sse-swap="active-update" hx-swap="morph:innerHTML">
+			<div class="space-y-2" hx-ext="sse" sse-connect="/feed/active/stream" sse-swap="active-update" hx-swap="innerHTML">
 				<!-- Initial content, replaced by SSE updates -->
 				@ActiveRows(data.Active, data.Projects)
 			</div>

@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"time"
 
@@ -18,17 +19,17 @@ func toUIProject(p models.Project) views.UIProject {
 	// Generate a deterministic color/icon based on ID or Name
 	colors := []string{"text-blue-400", "text-purple-400", "text-green-400", "text-yellow-400", "text-pink-400"}
 	icons := []string{"fa-server", "fa-columns", "fa-mobile-alt", "fa-database", "fa-globe"}
-	
+
 	idx := 0
 	for i, c := range p.ID {
 		idx += int(c) * (i + 1)
 	}
-	
+
 	return views.UIProject{
 		ID:    p.ID,
 		Name:  fmt.Sprintf("%s/%s", p.GitHubOwner, p.GitHubRepo),
-		Icon:  icons[idx % len(icons)],
-		Color: colors[idx % len(colors)],
+		Icon:  icons[idx%len(icons)],
+		Color: colors[idx%len(colors)],
 	}
 }
 
@@ -45,7 +46,7 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to get projects", "error", err)
 	}
 	slog.Info("Loaded projects", "count", len(internalProjects))
-	
+
 	projects := make(map[string]views.UIProject)
 	for _, p := range internalProjects {
 		projects[p.ID] = toUIProject(p)
@@ -143,7 +144,7 @@ func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
 			Progress:    int(time.Now().Unix() % 100), // Random progress
 		},
 	}
-	
+
 	// Mock Projects map
 	projects := map[string]views.UIProject{
 		"ios": {ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"},
@@ -164,11 +165,11 @@ func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
 		"web": {ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"},
 	}
 	// Merge maps
-	for k, v := range reviewsProjects { projects[k] = v }
+	maps.Copy(projects, reviewsProjects)
 
 	// Render Active Rows
 	views.ActiveRows(mockActive, projects).Render(r.Context(), w)
-	
+
 	// Render Reviews OOB
 	w.Write([]byte(`<div id="reviews-container">`))
 	views.ReviewsSection(views.FeedData{Reviews: mockReviews, Projects: projects}).Render(r.Context(), w)
@@ -178,28 +179,51 @@ func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
 // HandleTaskDetail renders the task detail modal content
 func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	
-	// Mock Task
-	task := &views.UITask{
-		ID:          id,
-		ProjectID:   "web",
-		Description: "Add Dark Mode to Dashboard",
-		AgentName:   "Agent-042",
-		Status:      "review",
-		Progress:    100,
-		MockDiff:    "file: src/App.css\n@@ -10,2 +10,3 @@\n :root {\n-  --bg: #fff;\n+  --bg: #111;\n+  --text: #eee;\n }",
-		PreviewURL:  "https://cdn.dribbble.com/users/1615584/screenshots/15710288/media/7845f7478d59d56223253b8b603d1544.jpg?resize=400x300&vertical=center",
-		Logs: []views.UILogEntry{
-			{Type: "info", Message: "Task started"},
-			{Type: "agent", Message: "Analyzing CSS files..."},
-			{Type: "code", Message: "Generated dark mode variables"},
-			{Type: "success", Message: "Tests passed"},
-		},
-	}
-	
-	project := views.UIProject{ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"}
+	ctx := r.Context()
 
-	components.TaskDetail(task, project).Render(r.Context(), w)
+	// Get real task from database
+	dbTask, err := h.tasks.Get(ctx, id)
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	// Get the project from the projects map
+	projects, err := h.github.GetProjects(ctx)
+	if err != nil {
+		slog.Error("Failed to get projects", "error", err)
+		http.Error(w, "Failed to load project", http.StatusInternalServerError)
+		return
+	}
+
+	var project views.UIProject
+	for _, p := range projects {
+		if p.ID == dbTask.ProjectID {
+			project = toUIProject(p)
+			break
+		}
+	}
+
+	// If project not found, use default values
+	if project.ID == "" {
+		project = views.UIProject{ID: dbTask.ProjectID, Name: dbTask.ProjectID, Icon: "fa-folder", Color: "text-gray-400"}
+	}
+
+	// Create UI task from DB task
+	task := &views.UITask{
+		ID:          dbTask.ID,
+		ProjectID:   dbTask.ProjectID,
+		Description: dbTask.Title,
+		AgentName:   "Agent",
+		Status:      string(dbTask.Status),
+		Progress:    100,
+		AgentOutput:  dbTask.AgentOutput,
+		GitDiff:     dbTask.GitDiff,
+		PreviewURL:  "",
+		Logs:        []views.UILogEntry{},
+	}
+
+	components.TaskDetail(task, project).Render(ctx, w)
 }
 
 // HandleActionRetry mocks retry action
@@ -237,14 +261,14 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 
 	intent := r.FormValue("voice_input")
 	projectID := r.FormValue("project_id")
-	
+
 	if intent == "" {
 		h.HandleFeed(w, r)
 		return
 	}
 
 	if projectID == "" {
-		w.Header().Set("HX-Trigger", `{"toast": "Select a project first"}`)
+		w.Header().Set("HX-Trigger", `{"toast": "Select a project first", "taskCreated": "false"}`)
 		h.HandleFeed(w, r)
 		return
 	}
@@ -252,12 +276,13 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	// Start task execution
 	_, err := h.orchestrator.StartTask(ctx, projectID, intent)
 	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Failed to start task"}`)
+		slog.Error("Failed to start task", "error", err)
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to start task", "taskCreated": "false"}`)
 		h.HandleFeed(w, r)
 		return
 	}
 
-	w.Header().Set("HX-Trigger", `{"toast": "Task started"}`)
+	w.Header().Set("HX-Trigger", `{"toast": "Task started", "taskCreated": "true"}`)
 	h.HandleFeed(w, r)
 }
 
@@ -270,7 +295,7 @@ func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := &models.UserSettings{
-		UserID:       "default",
+		UserID:        "default",
 		OpenRouterKey: r.FormValue("openrouter_key"),
 		ZaiKey:        r.FormValue("zai_key"),
 		AnthropicKey:  r.FormValue("anthropic_key"),

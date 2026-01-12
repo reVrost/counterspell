@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 
@@ -25,7 +24,7 @@ type Handlers struct {
 }
 
 // NewHandlers creates new HTTP handlers.
-func NewHandlers(tasks *services.TaskService, events *services.EventBus, database *db.DB, dataDir string) *Handlers {
+func NewHandlers(tasks *services.TaskService, events *services.EventBus, database *db.DB, dataDir string) (*Handlers, error) {
 	clientID := os.Getenv("GITHUB_CLIENT_ID")
 	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
@@ -34,26 +33,30 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, databas
 	settingsService := services.NewSettingsService(database)
 
 	// Create orchestrator
-	orchestrator := services.NewOrchestrator(tasks, githubService, events, settingsService, dataDir)
+	orchestrator, err := services.NewOrchestrator(tasks, githubService, events, settingsService, dataDir)
+	if err != nil {
+		return nil, err
+	}
 
 	// Initialize auth service
-	authService, err := auth.NewAuthServiceFromEnv()
-	if err != nil {
-		fmt.Printf("Warning: Failed to initialize auth service: %v\n", err)
-		authService = nil
-	}
+	// authService, err := auth.NewAuthServiceFromEnv()
+	// if err != nil {
+	// 	fmt.Printf("Warning: Failed to initialize auth service: %v\n", err)
+	// 	authService = nil
+	// }
 
 	return &Handlers{
 		tasks:        tasks,
 		events:       events,
 		orchestrator: orchestrator,
 		github:       githubService,
-		auth:         authService,
+		// Disable for now
+		auth:         nil,
 		settings:     settingsService,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		redirectURI:  redirectURI,
-	}
+	}, nil
 }
 
 // RegisterRoutes registers all routes on the router.
@@ -98,5 +101,12 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 func redirectTo(path string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, path, http.StatusFound)
+	}
+}
+
+// Shutdown gracefully shuts down the handlers.
+func (h *Handlers) Shutdown() {
+	if h.orchestrator != nil {
+		h.orchestrator.Shutdown()
 	}
 }
