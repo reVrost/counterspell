@@ -8,7 +8,12 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func InputBar() templ.Component {
+import (
+	"fmt"
+	"github.com/revrost/code/counterspell/internal/views"
+)
+
+func InputBar(projects map[string]views.UIProject) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +34,110 @@ func InputBar() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Docked Input Bar --><div class=\"fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-2xl\"><form x-ref=\"voiceForm\" hx-post=\"/add-task\" hx-target=\"#feed-container\" hx-swap=\"innerHTML\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200\" x-data=\"{ \n\t\t\t\ttext: '', \n\t\t\t\tshowFileMenu: false,\n\t\t\t\tfiles: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],\n\t\t\t\tresize() {\n\t\t\t\t\tthis.$refs.input.style.height = 'auto'; \n\t\t\t\t\tlet newHeight = this.$refs.input.scrollHeight;\n\t\t\t\t\tif(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;\n\t\t\t\t\tthis.$refs.input.style.height = newHeight + 'px';\n\t\t\t\t},\n\t\t\t\tcheckMention(e) {\n\t\t\t\t\tif (this.text.match(/@[^ ]*$/)) {\n\t\t\t\t\t\tthis.showFileMenu = true;\n\t\t\t\t\t} else {\n\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t}\n\t\t\t\t\tif (e.key === 'Escape') this.showFileMenu = false;\n\t\t\t\t},\n\t\t\t\tinsertFile(f) {\n\t\t\t\t\tthis.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';\n\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\tthis.$nextTick(() => { this.$refs.input.focus(); });\n\t\t\t\t}\n\t\t\t}\"><!-- Attachment --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-paperclip text-lg\"></i></button><!-- Expanding Textarea Container --><div class=\"flex-1 mx-2 relative min-w-0\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea x-model=\"text\" x-ref=\"input\" name=\"voice_input\" @input=\"resize()\" @keyup=\"checkMention($event)\" rows=\"1\" placeholder=\"What do you want to know?\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1\"></textarea></div><!-- Model Selector Trigger --><div x-data=\"{ modelOpen: false }\" class=\"relative mb-0.5\"><button type=\"button\" @click=\"modelOpen = !modelOpen\" class=\"text-gray-400 hover:text-white transition p-2 mr-1\"><i class=\"fas fa-bolt text-lg\"></i></button><!-- Model Popover --><div x-show=\"modelOpen\" @click.outside=\"modelOpen = false\" x-cloak x-transition.scale.origin.bottom.right class=\"absolute bottom-12 right-0 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 mb-2\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider\">Select Model</div><div class=\"px-2 pb-1 space-y-0.5\"><div class=\"flex items-center justify-between px-2 py-1.5 bg-purple-500/10 text-purple-400 rounded cursor-pointer\"><span class=\"text-xs font-medium\">Claude 3.5 Sonnet</span> <i class=\"fas fa-check text-[10px]\"></i></div><div class=\"flex items-center justify-between px-2 py-1.5 hover:bg-white/5 text-gray-400 rounded cursor-pointer transition\"><span class=\"text-xs font-medium\">GPT-4o</span></div><div class=\"flex items-center justify-between px-2 py-1.5 hover:bg-white/5 text-gray-400 rounded cursor-pointer transition\"><span class=\"text-xs font-medium\">DeepSeek V3</span></div></div></div></div><!-- Submit Button (Mic/Send) --><button type=\"button\" @click=\"text.length > 0 ? $refs.voiceForm.requestSubmit() : simulateVoice()\" :class=\"listening ? 'bg-purple-500 scale-105' : 'bg-white scale-100'\" class=\"w-10 h-10 rounded-full flex items-center justify-center text-black text-lg transition-all duration-300 shadow-lg shrink-0 mb-0.5 relative z-10\"><i class=\"fas\" :class=\"text.length > 0 ? 'fa-arrow-up text-sm' : (listening ? 'fa-wave-square animate-pulse text-white text-sm' : 'fa-microphone')\"></i></button></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Docked Input Bar --><div class=\"fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-3xl\"><form x-ref=\"voiceForm\" hx-post=\"/add-task\" hx-target=\"#feed-container\" hx-swap=\"innerHTML\" @submit=\"if(!activeProjectId) { $event.preventDefault(); showToast('Select a project first'); }\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10\" x-data=\"{ \n\t\t\t\ttext: '', \n\t\t\t\tshowFileMenu: false,\n\t\t\t\tfiles: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],\n\t\t\t\tresize() {\n\t\t\t\t\tthis.$refs.input.style.height = 'auto'; \n\t\t\t\t\tlet newHeight = this.$refs.input.scrollHeight;\n\t\t\t\t\tif(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;\n\t\t\t\t\tthis.$refs.input.style.height = newHeight + 'px';\n\t\t\t\t},\n\t\t\t\tcheckMention(e) {\n\t\t\t\t\tif (this.text.match(/@[^ ]*$/)) {\n\t\t\t\t\t\tthis.showFileMenu = true;\n\t\t\t\t\t} else {\n\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t}\n\t\t\t\t\tif (e.key === 'Escape') this.showFileMenu = false;\n\t\t\t\t},\n\t\t\t\tinsertFile(f) {\n\t\t\t\t\tthis.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';\n\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\tthis.$nextTick(() => { this.$refs.input.focus(); });\n\t\t\t\t}\n\t\t\t}\"><!-- Hidden project_id field --><input type=\"hidden\" name=\"project_id\" :value=\"activeProjectId\"><!-- Input Area --><div class=\"relative px-4 pt-4 pb-2\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea x-model=\"text\" x-ref=\"input\" name=\"voice_input\" @input=\"resize()\" @keyup=\"checkMention($event)\" rows=\"1\" placeholder=\"What do you want to build?\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]\"></textarea></div><!-- Toolbar --><div class=\"flex items-center justify-between px-2 pb-2 mt-1\"><!-- Left: Project Selector --><div class=\"relative\"><button type=\"button\" @click=\"inputProjectMenuOpen = !inputProjectMenuOpen\" class=\"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border border-transparent hover:border-gray-700\" :class=\"activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'\"><div class=\"flex items-center justify-center w-4 h-4 rounded-full\" :class=\"activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'\"><i class=\"fas fa-folder text-[9px]\" :class=\"activeProjectId ? 'text-blue-400' : 'text-gray-400'\"></i></div><span x-text=\"activeProjectName ? activeProjectName.split('/').pop() : 'Select project'\" class=\"max-w-[120px] truncate\"></span> <i class=\"fas fa-chevron-down text-[8px] opacity-50 ml-0.5\"></i></button><!-- Project Dropdown --><div x-show=\"inputProjectMenuOpen\" @click.outside=\"inputProjectMenuOpen = false\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-3 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col\" x-data=\"{ search: '' }\"><div class=\"p-3 border-b border-gray-800 bg-[#16191F]/50 backdrop-blur-sm sticky top-0\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Search projects...\" class=\"w-full bg-gray-900/50 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600 transition-colors\"></div></div><div class=\"max-h-[240px] overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-700\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, p := range projects {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div @click=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("setActiveProject('%s', '%s')", p.ID, p.Name))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 95, Col: 79}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" class=\"px-3 py-2.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition border-l-2 border-transparent hover:border-blue-500\" x-show=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 97, Col: 90}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"><div class=\"w-6 h-6 rounded-md bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0 group-hover:border-gray-600 transition-colors\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var4 = []any{fmt.Sprintf("fas %s %s text-[10px]", p.Icon, p.Color)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<i class=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var4).String())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 1, Col: 0}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"></i></div><div class=\"flex-1 min-w-0 flex flex-col gap-0.5\"><span class=\"text-xs font-medium text-gray-300 group-hover:text-white truncate\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 102, Col: 98}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span> <span class=\"text-[10px] text-gray-500 truncate\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 103, Col: 65}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</span></div><i class=\"fas fa-check text-blue-500 text-xs\" x-show=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("activeProjectId === '%s'", p.ID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 105, Col: 109}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"></i></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if len(projects) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"px-4 py-8 text-center flex flex-col items-center gap-2 text-gray-500\"><i class=\"fas fa-folder-open text-2xl opacity-50\"></i> <span class=\"text-xs\">No projects found.</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></div></div><!-- Right Actions --><div class=\"flex items-center gap-1\"><!-- Attachment Button (Restored) --><button type=\"button\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-paperclip text-sm\"></i></button><!-- Model Selector Trigger --><div x-data=\"{ modelOpen: false }\" class=\"relative\"><button type=\"button\" @click=\"modelOpen = !modelOpen\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-bolt text-sm\"></i></button><!-- Model Popover --><div x-show=\"modelOpen\" @click.outside=\"modelOpen = false\" x-cloak x-transition.scale.origin.bottom.right class=\"absolute bottom-full right-0 mb-3 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-900/50 border-b border-gray-800 mb-1\">Select Model</div><div class=\"p-1 space-y-0.5\"><div class=\"flex items-center justify-between px-3 py-2 bg-blue-500/10 text-blue-400 rounded-lg cursor-pointer border border-blue-500/20\"><span class=\"text-xs font-medium\">Claude 3.5 Sonnet</span><div class=\"w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]\"></div></div><div class=\"flex items-center justify-between px-3 py-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-lg cursor-pointer transition\"><span class=\"text-xs font-medium\">GPT-4o</span></div><div class=\"flex items-center justify-between px-3 py-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-lg cursor-pointer transition\"><span class=\"text-xs font-medium\">DeepSeek V3</span></div></div></div></div><!-- Divider --><div class=\"w-px h-4 bg-gray-700 mx-1\"></div><!-- Submit Button --><button type=\"button\" @click=\"text.length > 0 ? $refs.voiceForm.requestSubmit() : simulateVoice()\" :class=\"listening ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300')\" class=\"w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-300 hover:scale-105 active:scale-95 ml-1\"><i class=\"fas\" :class=\"text.length > 0 ? 'fa-arrow-up' : (listening ? 'fa-stop animate-pulse' : 'fa-microphone')\"></i></button></div></div></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

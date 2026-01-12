@@ -236,24 +236,21 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	intent := r.FormValue("voice_input")
+	projectID := r.FormValue("project_id")
+	
 	if intent == "" {
 		h.HandleFeed(w, r)
 		return
 	}
 
-	// Get first project as default (for MVP)
-	projects, err := h.github.GetProjects(ctx)
-	if err != nil || len(projects) == 0 {
-		w.Header().Set("HX-Trigger", `{"toast": "No projects connected. Connect GitHub first."}`)
+	if projectID == "" {
+		w.Header().Set("HX-Trigger", `{"toast": "Select a project first"}`)
 		h.HandleFeed(w, r)
 		return
 	}
 
-	// Use first project for MVP
-	projectID := projects[0].ID
-
 	// Start task execution
-	_, err = h.orchestrator.StartTask(ctx, projectID, intent)
+	_, err := h.orchestrator.StartTask(ctx, projectID, intent)
 	if err != nil {
 		w.Header().Set("HX-Trigger", `{"toast": "Failed to start task"}`)
 		h.HandleFeed(w, r)
