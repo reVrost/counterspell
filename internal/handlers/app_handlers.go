@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -39,58 +40,71 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 	settings, _ := h.settings.GetSettings(ctx)
 
 	// Get projects
-	internalProjects, _ := h.github.GetProjects(ctx)
+	internalProjects, err := h.github.GetProjects(ctx)
+	if err != nil {
+		slog.Error("Failed to get projects", "error", err)
+	}
+	slog.Info("Loaded projects", "count", len(internalProjects))
+	
 	projects := make(map[string]views.UIProject)
 	for _, p := range internalProjects {
 		projects[p.ID] = toUIProject(p)
 	}
 
-	// Add mock projects if none
-	if len(projects) == 0 {
-		projects["core"] = views.UIProject{ID: "core", Name: "acme/core-platform", Icon: "fa-server", Color: "text-blue-400"}
-		projects["web"] = views.UIProject{ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"}
-		projects["ios"] = views.UIProject{ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"}
-	}
-
-	// Mock Tasks for UI
-	tasks := []*views.UITask{
-		{
-			ID:          "1",
-			ProjectID:   "core",
-			Description: "Refactor auth middleware to support OIDC",
-			AgentName:   "Agent-007",
-			Status:      "done",
-			Progress:    100,
-		},
-		{
-			ID:          "2",
-			ProjectID:   "web",
-			Description: "Add Dark Mode to Dashboard",
-			AgentName:   "Agent-042",
-			Status:      "review",
-			Progress:    100,
-		},
-		{
-			ID:          "3",
-			ProjectID:   "ios",
-			Description: "Fix crash on startup",
-			AgentName:   "Agent-101",
-			Status:      "in_progress",
-			Progress:    45,
-		},
-	}
+	// Load real tasks from DB
+	dbTasks, _ := h.tasks.List(ctx, nil, nil)
 
 	data := views.FeedData{
 		Projects: projects,
 	}
 
-	for _, t := range tasks {
-		if t.Status == "review" {
-			data.Reviews = append(data.Reviews, t)
-		} else if t.Status == "in_progress" || t.Status == "todo" {
-			data.Active = append(data.Active, t)
-		} else if t.Status == "done" {
-			data.Done = append(data.Done, t)
+	for _, t := range dbTasks {
+		uiTask := &views.UITask{
+			ID:          t.ID,
+			ProjectID:   t.ProjectID,
+			Description: t.Title,
+			AgentName:   "Agent",
+			Status:      string(t.Status),
+			Progress:    50, // TODO: track real progress
+		}
+
+		switch t.Status {
+		case "review", "human_review":
+			uiTask.Progress = 100
+			data.Reviews = append(data.Reviews, uiTask)
+		case "in_progress":
+			data.Active = append(data.Active, uiTask)
+		case "done":
+			uiTask.Progress = 100
+			data.Done = append(data.Done, uiTask)
+		}
+	}
+
+	// Add mock data if no real tasks (for demo purposes)
+	if len(data.Reviews) == 0 && len(data.Active) == 0 && len(data.Done) == 0 {
+		projects["web"] = views.UIProject{ID: "web", Name: "acme/web-dashboard", Icon: "fa-columns", Color: "text-purple-400"}
+		projects["ios"] = views.UIProject{ID: "ios", Name: "acme/ios-app", Icon: "fa-mobile-alt", Color: "text-green-400"}
+		data.Projects = projects
+
+		data.Reviews = []*views.UITask{
+			{
+				ID:          "2",
+				ProjectID:   "web",
+				Description: "Add Dark Mode to Dashboard",
+				AgentName:   "Agent-042",
+				Status:      "review",
+				Progress:    100,
+			},
+		}
+		data.Active = []*views.UITask{
+			{
+				ID:          "3",
+				ProjectID:   "ios",
+				Description: "Fix crash on startup",
+				AgentName:   "Agent-101",
+				Status:      "in_progress",
+				Progress:    50,
+			},
 		}
 	}
 
@@ -103,12 +117,10 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check authentication
+	// Check authentication via GitHub connection
 	isAuthenticated := false
-	if h.auth != nil {
-		if _, err := h.auth.GetSession(r); err == nil {
-			isAuthenticated = true
-		}
+	if conn, err := h.github.GetActiveConnection(ctx); err == nil && conn != nil {
+		isAuthenticated = true
 	}
 
 	component := layout.Base("Counterspell", projects, *settings, isAuthenticated, views.Feed(data))
@@ -214,8 +226,41 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 	h.HandleFeed(w, r)
 }
 
-// HandleAddTask mocks adding a task
+// HandleAddTask creates a new task and starts execution.
 func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	intent := r.FormValue("voice_input")
+	if intent == "" {
+		h.HandleFeed(w, r)
+		return
+	}
+
+	// Get first project as default (for MVP)
+	projects, err := h.github.GetProjects(ctx)
+	if err != nil || len(projects) == 0 {
+		w.Header().Set("HX-Trigger", `{"toast": "No projects connected. Connect GitHub first."}`)
+		h.HandleFeed(w, r)
+		return
+	}
+
+	// Use first project for MVP
+	projectID := projects[0].ID
+
+	// Start task execution
+	_, err = h.orchestrator.StartTask(ctx, projectID, intent)
+	if err != nil {
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to start task"}`)
+		h.HandleFeed(w, r)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"toast": "Task started"}`)
 	h.HandleFeed(w, r)
 }
 

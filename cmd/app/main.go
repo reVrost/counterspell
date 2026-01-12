@@ -14,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/handlers"
 	"github.com/revrost/code/counterspell/internal/services"
 )
@@ -65,21 +64,17 @@ func main() {
 	taskSvc := services.NewTaskService(database)
 	eventBus := services.NewEventBus()
 
-	// Create git worktree manager
-	repoPath, _ := os.Getwd()
-	worktreeMgr := git.NewWorktreeManager(repoPath)
-
-	// Create agent runner
-	agentRunner := services.NewAgentRunner(taskSvc, eventBus, worktreeMgr)
-
 	// Reset stuck tasks on startup
 	ctx := context.Background()
 	if err := taskSvc.ResetInProgress(ctx); err != nil {
 		logger.Error("Failed to reset in-progress tasks", "error", err)
 	}
 
+	// Data directory for repos and worktrees
+	dataDir := filepath.Dir(*dbPath)
+
 	// Create handlers
-	h := handlers.NewHandlers(taskSvc, eventBus, agentRunner, database)
+	h := handlers.NewHandlers(taskSvc, eventBus, database, dataDir)
 
 	// Setup router
 	r := chi.NewRouter()
