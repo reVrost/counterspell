@@ -253,6 +253,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		}
 		return
 	}
+	slog.Info("[AGENT LOOP] Got settings", "task_id", job.TaskID,
+		"openrouter_key_len", len(settings.OpenRouterKey),
+		"zai_key_len", len(settings.ZaiKey),
+		"anthropic_key_len", len(settings.AnthropicKey),
+		"openai_key_len", len(settings.OpenAIKey))
 
 	// Parse model_id to get provider and model name
 	providerPrefix, modelName := llm.ParseModelID(job.ModelID)
@@ -273,6 +278,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
 	case "zai", "z":
 		if settings.ZaiKey == "" {
+			slog.Error("[AGENT LOOP] Z.ai API key not configured", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
 			o.emitError(job.TaskID, "Z.ai API key not configured")
 			job.ResultCh <- TaskResult{
 				TaskID: job.TaskID,
@@ -281,6 +287,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 			}
 			return
 		}
+		slog.Info("[AGENT LOOP] Creating Z.ai provider", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
 		provider = llm.NewZaiProvider(settings.ZaiKey)
 	case "anthropic":
 		if settings.AnthropicKey == "" {

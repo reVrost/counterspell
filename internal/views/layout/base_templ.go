@@ -183,7 +183,7 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<!-- Main Feed --><main class=\"flex-1 overflow-y-auto bg-[#0C0E12] relative\" id=\"feed-container\" hx-get=\"/feed\" hx-trigger=\"load, closeModal from:body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<!-- Main Feed --><main class=\"flex-1 overflow-y-auto bg-[#0C0E12] relative\" id=\"feed-container\" hx-get=\"/feed\" hx-trigger=\"load, close-modal from:body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

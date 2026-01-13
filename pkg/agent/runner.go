@@ -154,6 +154,18 @@ func (r *Runner) emit(event StreamEvent) {
 }
 
 func (r *Runner) callAPI(messages []Message, tools map[string]Tool) (*APIResponse, error) {
+	// Determine protocol
+	switch r.provider.Type() {
+	case "anthropic":
+		return r.callAPIAnthropic(messages, tools)
+	case "openai":
+		return r.callAPIOpenAI(messages, tools)
+	default:
+		return nil, fmt.Errorf("unknown provider type: %s", r.provider.Type())
+	}
+}
+
+func (r *Runner) callAPIAnthropic(messages []Message, tools map[string]Tool) (*APIResponse, error) {
 	req := APIRequest{
 		Model:     r.provider.Model(),
 		MaxTokens: maxToken,
@@ -184,8 +196,6 @@ func (r *Runner) callAPI(messages []Message, tools map[string]Tool) (*APIRespons
 	case "openrouter":
 		httpReq.Header.Set("Authorization", "Bearer "+r.provider.APIKey())
 		httpReq.Header.Set("HTTP-Referer", "https://counterspell.dev")
-	case "zai":
-		httpReq.Header.Set("Authorization", "Bearer "+r.provider.APIKey())
 	}
 
 	client := &http.Client{Timeout: 120 * time.Second}
@@ -218,10 +228,224 @@ func detectProviderType(apiURL string) string {
 	if strings.Contains(apiURL, "openrouter") {
 		return "openrouter"
 	}
+	// Z.ai is handled by Type() check now, but keep for fallback
 	if strings.Contains(apiURL, "z.ai") {
 		return "zai"
 	}
 	return ""
+}
+
+// OpenAIRequest represents a request to OpenAI API
+type OpenAIRequest struct {
+	Model      string          `json:"model"`
+	Messages   []OpenAIMessage `json:"messages"`
+	Tools      []OpenAIToolDef `json:"tools,omitempty"`
+	ToolChoice string          `json:"tool_choice,omitempty"`
+}
+
+type OpenAIMessage struct {
+	Role       string           `json:"role"`
+	Content    any              `json:"content"` // string or []OpenAIContent
+	ToolCalls  []OpenAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+}
+
+type OpenAIContent struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+}
+
+type OpenAIToolDef struct {
+	Type     string      `json:"type"`
+	Function FunctionDef `json:"function"`
+}
+
+type FunctionDef struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Parameters  InputSchema `json:"parameters"`
+}
+
+type OpenAIToolCall struct {
+	ID       string       `json:"id"`
+	Type     string       `json:"type"`
+	Function FunctionCall `json:"function"`
+}
+
+type FunctionCall struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+// OpenAIResponse represents response from OpenAI API
+type OpenAIResponse struct {
+	Choices []struct {
+		Message OpenAIMessage `json:"message"`
+	} `json:"choices"`
+}
+
+func (r *Runner) callAPIOpenAI(messages []Message, tools map[string]Tool) (*APIResponse, error) {
+	// Convert messages to OpenAI format
+	openAIMessages := []OpenAIMessage{}
+
+	// Add system prompt as first message
+	openAIMessages = append(openAIMessages, OpenAIMessage{
+		Role:    "system",
+		Content: r.systemPrompt,
+	})
+
+	for _, msg := range messages {
+		// Handle User messages
+		if msg.Role == "user" {
+			// Check if it's a tool result
+			isToolResult := false
+			for _, block := range msg.Content {
+				if block.Type == "tool_result" {
+					isToolResult = true
+					openAIMessages = append(openAIMessages, OpenAIMessage{
+						Role:       "tool",
+						ToolCallID: block.ToolUseID,
+						Content:    block.Content,
+					})
+				}
+			}
+
+			// Normal user text message
+			if !isToolResult {
+				var contentBuilder strings.Builder
+				for _, block := range msg.Content {
+					if block.Type == "text" {
+						contentBuilder.WriteString(block.Text)
+					}
+				}
+				openAIMessages = append(openAIMessages, OpenAIMessage{
+					Role:    "user",
+					Content: contentBuilder.String(),
+				})
+			}
+		}
+
+		// Handle Assistant messages
+		if msg.Role == "assistant" {
+			oaMsg := OpenAIMessage{
+				Role: "assistant",
+			}
+
+			var contentBuilder strings.Builder
+			for _, block := range msg.Content {
+				if block.Type == "text" {
+					contentBuilder.WriteString(block.Text)
+				}
+				if block.Type == "tool_use" {
+					argsJSON, _ := json.Marshal(block.Input)
+					oaMsg.ToolCalls = append(oaMsg.ToolCalls, OpenAIToolCall{
+						ID:   block.ID,
+						Type: "function",
+						Function: FunctionCall{
+							Name:      block.Name,
+							Arguments: string(argsJSON),
+						},
+					})
+				}
+			}
+			oaMsg.Content = contentBuilder.String()
+			openAIMessages = append(openAIMessages, oaMsg)
+		}
+	}
+
+	// Prepare tools
+	openAITools := []OpenAIToolDef{}
+	for name, tool := range tools {
+		openAITools = append(openAITools, OpenAIToolDef{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        name,
+				Description: tool.Description,
+				Parameters:  makeSchema(map[string]Tool{name: tool})[0].InputSchema,
+			},
+		})
+	}
+
+	req := OpenAIRequest{
+		Model:    r.provider.Model(),
+		Messages: openAIMessages,
+		Tools:    openAITools,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("POST", r.provider.APIURL(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	// OpenAI standard auth - always set for openai type providers
+	apiKey := r.provider.APIKey()
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+	fmt.Printf("[DEBUG] callAPIOpenAI: url=%s model=%s apiKeyLen=%d\n", r.provider.APIURL(), r.provider.Model(), len(apiKey))
+
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	fmt.Printf("[DEBUG] callAPIOpenAI response: status=%d bodyLen=%d\n", resp.StatusCode, len(respBody))
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var oaResp OpenAIResponse
+	if err := json.Unmarshal(respBody, &oaResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	// Convert back to APIResponse (Anthropic format used internally)
+	apiResp := APIResponse{
+		Content: []ContentBlock{},
+	}
+
+	if len(oaResp.Choices) > 0 {
+		choice := oaResp.Choices[0]
+
+		// Add text content
+		if contentStr, ok := choice.Message.Content.(string); ok && contentStr != "" {
+			apiResp.Content = append(apiResp.Content, ContentBlock{
+				Type: "text",
+				Text: contentStr,
+			})
+		}
+
+		// Add tool calls
+		for _, toolCall := range choice.Message.ToolCalls {
+			var input map[string]any
+			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+				continue
+			}
+
+			apiResp.Content = append(apiResp.Content, ContentBlock{
+				Type:  "tool_use",
+				ID:    toolCall.ID,
+				Name:  toolCall.Function.Name,
+				Input: input,
+			})
+		}
+	}
+
+	return &apiResp, nil
 }
 
 func (r *Runner) runTool(name string, args map[string]any, tools map[string]Tool) string {

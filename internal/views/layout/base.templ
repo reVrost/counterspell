@@ -305,7 +305,7 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				class="flex-1 overflow-y-auto bg-[#0C0E12] relative"
 				id="feed-container"
 				hx-get="/feed"
-				hx-trigger="load, closeModal from:body"
+				hx-trigger="load, close-modal from:body"
 			>
 				@content
 			</main>

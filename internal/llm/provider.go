@@ -16,6 +16,9 @@ type Provider interface {
 
 	// SetModel sets the model to use.
 	SetModel(model string)
+
+	// Type returns the provider type (anthropic or openai).
+	Type() string
 }
 
 // AnthropicProvider implements Anthropic API.
@@ -29,6 +32,10 @@ func NewAnthropicProvider(apiKey string) *AnthropicProvider {
 		apiKey: apiKey,
 		model:  "claude-opus-4-5",
 	}
+}
+
+func (p *AnthropicProvider) Type() string {
+	return "anthropic"
 }
 
 func (p *AnthropicProvider) APIURL() string {
@@ -64,8 +71,12 @@ func NewOpenRouterProvider(apiKey string) *OpenRouterProvider {
 	}
 }
 
+func (p *OpenRouterProvider) Type() string {
+	return "anthropic"
+}
+
 func (p *OpenRouterProvider) APIURL() string {
-	return "https://openrouter.ai/api/v1/chat/completions"
+	return "https://openrouter.ai/api/v1/messages"
 }
 
 func (p *OpenRouterProvider) APIVersion() string {
@@ -97,8 +108,12 @@ func NewZaiProvider(apiKey string) *ZaiProvider {
 	}
 }
 
+func (p *ZaiProvider) Type() string {
+	return "openai"
+}
+
 func (p *ZaiProvider) APIURL() string {
-	return "https://api.z.ai/api/coding/paas/v4"
+	return "https://api.z.ai/api/coding/paas/v4/chat/completions"
 }
 
 func (p *ZaiProvider) APIVersion() string {
@@ -116,4 +131,3 @@ func (p *ZaiProvider) Model() string {
 func (p *ZaiProvider) SetModel(model string) {
 	p.model = model
 }
-
