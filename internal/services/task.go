@@ -42,14 +42,14 @@ func (s *TaskService) Create(ctx context.Context, projectID, title, intent strin
 // Get retrieves a task by ID.
 func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) {
 	query := `
-		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, created_at, updated_at
+		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, message_history, created_at, updated_at
 		FROM tasks WHERE id = ?
 	`
-	var agentOutput, gitDiff sql.NullString
+	var agentOutput, gitDiff, messageHistory sql.NullString
 	var task models.Task
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
-		&task.Position, &agentOutput, &gitDiff, &task.CreatedAt, &task.UpdatedAt,
+		&task.Position, &agentOutput, &gitDiff, &messageHistory, &task.CreatedAt, &task.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("task not found")
@@ -62,6 +62,9 @@ func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) 
 	}
 	if gitDiff.Valid {
 		task.GitDiff = gitDiff.String
+	}
+	if messageHistory.Valid {
+		task.MessageHistory = messageHistory.String
 	}
 	return &task, nil
 }
@@ -87,7 +90,7 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 	}
 
 	query = `
-		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, created_at, updated_at
+		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, message_history, created_at, updated_at
 		FROM tasks
 	` + whereClause + `
 		ORDER BY status ASC, position ASC, created_at DESC
@@ -106,10 +109,10 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 	var tasks []models.Task
 	for rows.Next() {
 		var task models.Task
-		var agentOutput, gitDiff sql.NullString
+		var agentOutput, gitDiff, messageHistory sql.NullString
 		err := rows.Scan(
 			&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
-			&task.Position, &agentOutput, &gitDiff, &task.CreatedAt, &task.UpdatedAt,
+			&task.Position, &agentOutput, &gitDiff, &messageHistory, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan task: %w", err)
@@ -119,6 +122,9 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 		}
 		if gitDiff.Valid {
 			task.GitDiff = gitDiff.String
+		}
+		if messageHistory.Valid {
+			task.MessageHistory = messageHistory.String
 		}
 		tasks = append(tasks, task)
 	}
@@ -186,33 +192,50 @@ func (s *TaskService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// UpdateWithResult updates a task's status, agent output, and git diff.
-func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status models.TaskStatus, agentOutput, gitDiff string) error {
+// UpdateWithResult updates a task's status, agent output, git diff, and message history.
+func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status models.TaskStatus, agentOutput, gitDiff, messageHistory string) error {
 	query := `
-		UPDATE tasks SET status = ?, agent_output = ?, git_diff = ?, updated_at = ?
+		UPDATE tasks SET status = ?, agent_output = ?, git_diff = ?, message_history = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := s.db.ExecContext(ctx, query, status, agentOutput, gitDiff, time.Now(), id)
+	_, err := s.db.ExecContext(ctx, query, status, agentOutput, gitDiff, messageHistory, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update task result: %w", err)
 	}
 	return nil
 }
 
-// ResetInProgress resets all tasks stuck in in_progress back to todo.
+// ResetInProgress resets tasks stuck in in_progress back to appropriate status.
 // This is called on server startup for recovery.
+// - Tasks with agent_output go to review (they completed but server restarted)
+// - Tasks without output go to todo (they were interrupted)
 func (s *TaskService) ResetInProgress(ctx context.Context) error {
+	// Tasks that have output should go to review, not todo
 	query := `
 		UPDATE tasks SET status = ?, updated_at = ?
-		WHERE status = ?
+		WHERE status = ? AND (agent_output IS NOT NULL AND agent_output != '')
 	`
-	result, err := s.db.ExecContext(ctx, query, models.StatusTodo, time.Now(), models.StatusInProgress)
+	result, err := s.db.ExecContext(ctx, query, models.StatusReview, time.Now(), models.StatusInProgress)
 	if err != nil {
-		return fmt.Errorf("failed to reset in-progress tasks: %w", err)
+		return fmt.Errorf("failed to reset completed in-progress tasks: %w", err)
 	}
 	rows, _ := result.RowsAffected()
 	if rows > 0 {
-		slog.Info("Reset stuck tasks", "count", rows)
+		slog.Info("Reset completed tasks to review", "count", rows)
+	}
+
+	// Tasks without output should go back to todo
+	query = `
+		UPDATE tasks SET status = ?, updated_at = ?
+		WHERE status = ? AND (agent_output IS NULL OR agent_output = '')
+	`
+	result, err = s.db.ExecContext(ctx, query, models.StatusTodo, time.Now(), models.StatusInProgress)
+	if err != nil {
+		return fmt.Errorf("failed to reset stuck in-progress tasks: %w", err)
+	}
+	rows, _ = result.RowsAffected()
+	if rows > 0 {
+		slog.Info("Reset stuck tasks to todo", "count", rows)
 	}
 	return nil
 }

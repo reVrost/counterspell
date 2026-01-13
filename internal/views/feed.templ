@@ -17,6 +17,17 @@ templ Feed(data FeedData) {
 				@ActiveRows(data.Active, data.Projects)
 			</div>
 		</div>
+		<!-- TODO / QUEUED -->
+		if len(data.Todo) > 0 {
+			<div class="mb-6">
+				<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Queued</h3>
+				<div class="space-y-2">
+					for _, task := range data.Todo {
+						@TodoTaskRow(task, data.Projects[task.ProjectID])
+					}
+				</div>
+			</div>
+		}
 		<!-- DONE HISTORY -->
 		if len(data.Done) > 0 {
 			<div class="pt-4 border-t border-gray-800/50">
@@ -100,6 +111,32 @@ templ ReviewTaskRow(task *UITask, project UIProject) {
 		</div>
 		<div class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-700">
 			<i class="fas fa-chevron-right text-xs"></i>
+		</div>
+	</div>
+}
+
+templ TodoTaskRow(task *UITask, project UIProject) {
+	<div
+		class="bg-[#13151A] border border-gray-800/50 rounded-xl p-3 transition hover:bg-gray-800/30 shadow-sm relative group cursor-pointer"
+		@click="modalOpen = true"
+		hx-get={ fmt.Sprintf("/task/%s", task.ID) }
+		hx-target="#modal-content"
+	>
+		<div class="flex justify-between items-start mb-1">
+			<div class="flex items-center gap-2">
+				<span class={ fmt.Sprintf("%s bg-gray-800/50 border border-gray-700/50 w-5 h-5 rounded flex items-center justify-center text-[10px]", project.Color) }>
+					<i class={ fmt.Sprintf("fas %s", project.Icon) }></i>
+				</span>
+				<span class="text-xs font-medium text-gray-400">{ project.Name }</span>
+			</div>
+			<span class="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded font-medium border border-gray-700/50">Queued</span>
+		</div>
+		<p class="text-sm text-gray-300 leading-tight mb-2 pr-4">{ task.Description }</p>
+		<div class="flex items-center gap-3 text-[11px] text-gray-600">
+			<span><i class="fas fa-clock mr-1"></i>Waiting</span>
+		</div>
+		<div class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-700 opacity-0 group-hover:opacity-100 transition">
+			<i class="fas fa-play text-xs"></i>
 		</div>
 	</div>
 }

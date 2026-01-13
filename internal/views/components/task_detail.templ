@@ -72,52 +72,61 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 	<!-- Main Content Area -->
 		<div class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full">
 
-			<!-- Tab 1: DIFF -->
+			<!-- Tab 1: DIFF (SSE streaming) -->
 			<div x-show="activeTab === 'diff'" class="p-0 min-h-full pb-32">
-				if task.Status == "in_progress" {
-					<div class="flex flex-col items-center justify-center h-64 text-gray-500 space-y-4">
-						<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
-						<p class="text-xs font-mono">Generating changes...</p>
-					</div>
-				} else {
-					<div class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between">
-						<span class="text-xs text-gray-400 font-mono">changes</span>
-						<span class="text-[10px] text-green-500 font-mono">git diff</span>
-					</div>
-					<div class="p-4 font-mono text-xs leading-6 text-gray-300 whitespace-pre overflow-x-auto">
-						if task.GitDiff != "" {
-							for _, line := range strings.Split(task.GitDiff, "\n") {
-								if strings.HasPrefix(line, "+") {
-									<div class="diff-add">{ line }</div>
-								} else if strings.HasPrefix(line, "-") {
-									<div class="diff-del">{ line }</div>
-								} else {
-									<div>{ line }</div>
-								}
+				<div class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between">
+					<span class="text-xs text-gray-400 font-mono">changes</span>
+					<span class="text-[10px] text-green-500 font-mono">git diff</span>
+				</div>
+				<div 
+					class="p-4 font-mono text-xs leading-6 text-gray-300 whitespace-pre overflow-x-auto"
+					hx-ext="sse"
+					sse-connect={ fmt.Sprintf("/task/%s/diff/stream", task.ID) }
+					sse-swap="diff"
+					hx-swap="innerHTML"
+				>
+					if task.Status == "in_progress" {
+						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
+							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
+							<p class="text-xs font-mono">Generating changes...</p>
+						</div>
+					} else if task.GitDiff != "" {
+						for _, line := range strings.Split(task.GitDiff, "\n") {
+							if strings.HasPrefix(line, "+") {
+								<div class="diff-add">{ line }</div>
+							} else if strings.HasPrefix(line, "-") {
+								<div class="diff-del">{ line }</div>
+							} else {
+								<div>{ line }</div>
 							}
-						} else {
-							<div class="text-gray-500 italic">No changes made</div>
 						}
-					</div>
-				}
+					} else {
+						<div class="text-gray-500 italic">No changes made</div>
+					}
+				</div>
 			</div>
 
-			<!-- Tab 2: AGENT OUTPUT -->
+			<!-- Tab 2: AGENT OUTPUT (SSE streaming with JetBrains Mono) -->
 			<div x-show="activeTab === 'agent'" class="p-5 pb-32">
-				if task.Status == "in_progress" {
-					<div class="flex flex-col items-center justify-center h-64 text-gray-500 space-y-4">
-						<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
-						<p class="text-xs font-mono">Agent is working...</p>
-					</div>
-				} else {
-					if task.AgentOutput != "" {
-						<div class="prose prose-invert prose-sm max-w-none">
-							<div class="text-gray-300 whitespace-pre-wrap leading-relaxed">{ task.AgentOutput }</div>
+				<div
+					hx-ext="sse"
+					sse-connect={ fmt.Sprintf("/task/%s/agent/stream", task.ID) }
+					sse-swap="agent"
+					hx-swap="innerHTML"
+				>
+					if task.Status == "in_progress" {
+						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
+							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
+							<p class="text-xs font-mono">Agent is working...</p>
+						</div>
+					} else if task.AgentOutput != "" {
+						<div class="prose prose-invert prose-xs max-w-none">
+							<div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-xs">{ task.AgentOutput }</div>
 						</div>
 					} else {
-						<div class="text-gray-500 italic">No agent output</div>
+						<div class="text-gray-500 italic text-xs">No agent output</div>
 					}
-				}
+				</div>
 			</div>
 
 			<!-- Tab 3: ACTIVITY -->

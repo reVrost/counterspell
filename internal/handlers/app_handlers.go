@@ -68,6 +68,9 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch t.Status {
+		case "todo":
+			uiTask.Progress = 0
+			data.Todo = append(data.Todo, uiTask)
 		case "review", "human_review":
 			uiTask.Progress = 100
 			data.Reviews = append(data.Reviews, uiTask)
@@ -241,9 +244,36 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	h.HandleFeed(w, r)
 }
 
-// HandleActionChat mocks chat/refine action
+// HandleActionChat continues a task with a follow-up message.
 func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Feedback sent"}`)
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	if err := r.ParseForm(); err != nil {
+		w.Header().Set("HX-Trigger", `{"toast": "Invalid request"}`)
+		h.HandleFeed(w, r)
+		return
+	}
+
+	message := r.FormValue("message")
+	if message == "" {
+		w.Header().Set("HX-Trigger", `{"toast": "Message required"}`)
+		h.HandleFeed(w, r)
+		return
+	}
+
+	// Get default model from settings or use a default
+	modelID := "o#anthropic/claude-sonnet-4" // Default model
+
+	// Continue the task with the follow-up message
+	if err := h.orchestrator.ContinueTask(ctx, taskID, message, modelID); err != nil {
+		slog.Error("Failed to continue task", "task_id", taskID, "error", err)
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to continue task"}`)
+		h.HandleFeed(w, r)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Continuing task..."}`)
 	h.HandleFeed(w, r)
 }
 

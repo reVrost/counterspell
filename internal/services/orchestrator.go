@@ -16,23 +16,26 @@ import (
 
 // TaskResult represents the result of a completed task.
 type TaskResult struct {
-	TaskID      string
-	Success     bool
-	AgentOutput string
-	GitDiff     string
-	Error       string
+	TaskID         string
+	Success        bool
+	AgentOutput    string
+	GitDiff        string
+	MessageHistory string
+	Error          string
 }
 
 // TaskJob represents a job submitted to the worker pool.
 type TaskJob struct {
-	TaskID    string
-	ProjectID string
-	Intent     string
-	ModelID    string
-	Owner     string
-	Repo       string
-	Token      string
-	ResultCh   chan<- TaskResult
+	TaskID         string
+	ProjectID      string
+	Intent         string
+	ModelID        string
+	Owner          string
+	Repo           string
+	Token          string
+	MessageHistory string // For continuations
+	IsContinuation bool
+	ResultCh       chan<- TaskResult
 }
 
 // Orchestrator manages task execution with agents.
@@ -327,28 +330,47 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	finalModel := provider.Model()
 	slog.Info("[AGENT LOOP] Provider configured", "task_id", job.TaskID, "final_model", finalModel)
 
-	o.emit(job.TaskID, "plan", fmt.Sprintf("Starting agent with model: %s...", finalModel))
+	if job.IsContinuation {
+		o.emit(job.TaskID, "plan", fmt.Sprintf("Continuing with model: %s...", finalModel))
+	} else {
+		o.emit(job.TaskID, "plan", fmt.Sprintf("Starting agent with model: %s...", finalModel))
+	}
 
 	// Create agent runner with streaming callback
-	slog.Info("[AGENT LOOP] Creating agent runner", "task_id", job.TaskID, "worktree", worktreePath, "intent", job.Intent, "provider", providerPrefix, "model", finalModel)
+	slog.Info("[AGENT LOOP] Creating agent runner", "task_id", job.TaskID, "worktree", worktreePath, "intent", job.Intent, "provider", providerPrefix, "model", finalModel, "is_continuation", job.IsContinuation)
 	runner := agent.NewRunner(provider, worktreePath, func(event agent.StreamEvent) {
 		slog.Debug("[AGENT LOOP] Agent event", "task_id", job.TaskID, "event_type", event.Type)
 		o.handleAgentEvent(job.TaskID, event)
 	})
 
-	// Run the agent
-	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID)
-	if err := runner.Run(ctx, job.Intent); err != nil {
-		slog.Error("[AGENT LOOP] Agent execution failed", "task_id", job.TaskID, "error", err)
+	// Load message history for continuations
+	if job.IsContinuation && job.MessageHistory != "" {
+		if err := runner.SetMessageHistory(job.MessageHistory); err != nil {
+			slog.Warn("[AGENT LOOP] Failed to load message history", "task_id", job.TaskID, "error", err)
+		} else {
+			slog.Info("[AGENT LOOP] Loaded message history", "task_id", job.TaskID)
+		}
+	}
+
+	// Run the agent (Run for new tasks, Continue for continuations)
+	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation)
+	var runErr error
+	if job.IsContinuation {
+		runErr = runner.Continue(ctx, job.Intent)
+	} else {
+		runErr = runner.Run(ctx, job.Intent)
+	}
+	if runErr != nil {
+		slog.Error("[AGENT LOOP] Agent execution failed", "task_id", job.TaskID, "error", runErr)
 		if ctx.Err() != nil {
 			o.emit(job.TaskID, "info", "Task cancelled")
 		} else {
-			o.emitError(job.TaskID, "Agent failed: "+err.Error())
+			o.emitError(job.TaskID, "Agent failed: "+runErr.Error())
 		}
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
 			Success: false,
-			Error:   "Agent failed: " + err.Error(),
+			Error:   "Agent failed: " + runErr.Error(),
 		}
 		return
 	}
@@ -371,15 +393,17 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		gitDiff = ""
 	}
 
-	// Get final agent output
+	// Get final agent output and message history
 	agentOutput := runner.GetFinalMessage()
+	messageHistory := runner.GetMessageHistory()
 
 	// Send result to channel for processing
 	job.ResultCh <- TaskResult{
-		TaskID:      job.TaskID,
-		Success:     true,
-		AgentOutput: agentOutput,
-		GitDiff:     gitDiff,
+		TaskID:         job.TaskID,
+		Success:        true,
+		AgentOutput:    agentOutput,
+		GitDiff:        gitDiff,
+		MessageHistory: messageHistory,
 	}
 
 	slog.Info("Task completed", "task_id", job.TaskID, "repo", fmt.Sprintf("%s/%s", job.Owner, job.Repo), "path", repoPath)
@@ -399,7 +423,7 @@ func (o *Orchestrator) processResults() {
 			status = models.StatusReview // Keep review status so user can see the error
 		}
 
-		if err := o.tasks.UpdateWithResult(ctx, result.TaskID, status, result.AgentOutput, result.GitDiff); err != nil {
+		if err := o.tasks.UpdateWithResult(ctx, result.TaskID, status, result.AgentOutput, result.GitDiff, result.MessageHistory); err != nil {
 			slog.Error("Failed to update task with result", "task_id", result.TaskID, "error", err)
 			continue
 		}
@@ -409,6 +433,13 @@ func (o *Orchestrator) processResults() {
 		} else {
 			o.emitError(result.TaskID, result.Error)
 		}
+
+		// Emit status_change event to trigger SSE updates for diff/agent tabs
+		o.events.Publish(models.Event{
+			TaskID: result.TaskID,
+			Type:   "status_change",
+		})
+
 		slog.Info("[ORCHESTRATOR] Result processed", "task_id", result.TaskID)
 	}
 	slog.Info("[ORCHESTRATOR] processResults goroutine ended")
@@ -430,6 +461,76 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 	case agent.EventDone:
 		o.emit(taskID, "success", event.Content)
 	}
+}
+
+// ContinueTask continues an existing task with a follow-up message.
+func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage, modelID string) error {
+	// Get existing task
+	task, err := o.tasks.Get(ctx, taskID)
+	if err != nil {
+		return fmt.Errorf("task not found: %w", err)
+	}
+
+	// Get project info
+	projects, err := o.github.GetProjects(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	var owner, repo string
+	for _, p := range projects {
+		if p.ID == task.ProjectID {
+			owner = p.GitHubOwner
+			repo = p.GitHubRepo
+			break
+		}
+	}
+
+	if owner == "" {
+		return fmt.Errorf("project not found for task")
+	}
+
+	// Get GitHub token
+	conn, err := o.github.GetActiveConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("no GitHub connection: %w", err)
+	}
+
+	// Update task status back to in_progress
+	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusInProgress); err != nil {
+		return fmt.Errorf("failed to update task status: %w", err)
+	}
+
+	// Emit task_created event to trigger feed refresh
+	o.events.Publish(models.Event{
+		TaskID: taskID,
+		Type:   "task_created",
+	})
+
+	slog.Info("Continuing task", "task_id", taskID, "follow_up", followUpMessage)
+
+	// Submit job to worker pool
+	job := &TaskJob{
+		TaskID:         taskID,
+		ProjectID:      task.ProjectID,
+		Intent:         followUpMessage,
+		ModelID:        modelID,
+		Owner:          owner,
+		Repo:           repo,
+		Token:          conn.Token,
+		MessageHistory: task.MessageHistory,
+		IsContinuation: true,
+		ResultCh:       o.resultCh,
+	}
+
+	if err := o.workerPool.Submit(func() {
+		slog.Info("[AGENT LOOP] Worker started for continuation", "task_id", job.TaskID)
+		o.executeTask(job)
+	}); err != nil {
+		return fmt.Errorf("failed to submit continuation: %w", err)
+	}
+
+	return nil
 }
 
 // CancelTask cancels a running task.
