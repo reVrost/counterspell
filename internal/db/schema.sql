@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     position INTEGER DEFAULT 0,
     agent_output TEXT,
     git_diff TEXT,
+    message_history TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

@@ -15,16 +15,17 @@ const (
 
 // Task represents a work item in the system.
 type Task struct {
-	ID          string     `json:"id"`
-	ProjectID   string     `json:"project_id"`
-	Title       string     `json:"title"`
-	Intent      string     `json:"intent"`
-	Status      TaskStatus `json:"status"`
-	Position    int        `json:"position"`
-	AgentOutput string     `json:"agent_output,omitempty"`
-	GitDiff     string     `json:"git_diff,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID             string     `json:"id"`
+	ProjectID      string     `json:"project_id"`
+	Title          string     `json:"title"`
+	Intent         string     `json:"intent"`
+	Status         TaskStatus `json:"status"`
+	Position       int        `json:"position"`
+	AgentOutput    string     `json:"agent_output,omitempty"`
+	GitDiff        string     `json:"git_diff,omitempty"`
+	MessageHistory string     `json:"message_history,omitempty"` // JSON serialized agent message history
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // LogLevel represents the severity level of an agent log entry.

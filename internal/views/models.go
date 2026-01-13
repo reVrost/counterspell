@@ -36,6 +36,7 @@ type UILogEntry struct {
 
 // FeedData is the data for the feed page
 type FeedData struct {
+	Todo     []*UITask
 	Reviews  []*UITask
 	Active   []*UITask
 	Done     []*UITask

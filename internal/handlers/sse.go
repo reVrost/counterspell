@@ -221,13 +221,30 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 	ch := h.events.Subscribe()
 	defer h.events.Unsubscribe(ch)
 
-	// Check if task already has diff and send it
-	task, err := h.tasks.Get(ctx, taskID)
-	if err == nil && task.GitDiff != "" {
-		diffHTML := renderDiffHTML(task.GitDiff)
-		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(diffHTML, "\n", ""))
+	// Helper to send current diff state
+	sendDiff := func() {
+		task, err := h.tasks.Get(ctx, taskID)
+		if err != nil {
+			return
+		}
+		var html string
+		if task.Status == "in_progress" {
+			html = `<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4"><i class="fas fa-cog fa-spin text-3xl opacity-50"></i><p class="text-xs font-mono">Generating changes...</p></div>`
+		} else if task.GitDiff != "" {
+			html = renderDiffHTML(task.GitDiff)
+		} else {
+			html = `<div class="text-gray-500 italic">No changes made</div>`
+		}
+		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
+
+	// Send initial state
+	sendDiff()
+
+	// Periodic ticker as fallback
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
 
 	// Stream diff updates
 	for {
@@ -238,21 +255,14 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-
 			// Only forward events for this task
 			if event.TaskID != taskID {
 				continue
 			}
-
-			// On status change or diff update, fetch latest diff
-			if event.Type == "status_change" || event.Type == "diff_update" {
-				task, err := h.tasks.Get(ctx, taskID)
-				if err == nil && task.GitDiff != "" {
-					diffHTML := renderDiffHTML(task.GitDiff)
-					fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(diffHTML, "\n", ""))
-					flusher.Flush()
-				}
-			}
+			// On any task event, refresh diff
+			sendDiff()
+		case <-ticker.C:
+			sendDiff()
 		}
 	}
 }
@@ -278,13 +288,30 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 	ch := h.events.Subscribe()
 	defer h.events.Unsubscribe(ch)
 
-	// Check if task already has agent output and send it
-	task, err := h.tasks.Get(ctx, taskID)
-	if err == nil && task.AgentOutput != "" {
-		agentHTML := renderAgentHTML(task.AgentOutput)
-		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(agentHTML, "\n", ""))
+	// Helper to send current agent state
+	sendAgent := func() {
+		task, err := h.tasks.Get(ctx, taskID)
+		if err != nil {
+			return
+		}
+		var html string
+		if task.Status == "in_progress" {
+			html = `<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4"><i class="fas fa-cog fa-spin text-3xl opacity-50"></i><p class="text-xs font-mono">Agent is working...</p></div>`
+		} else if task.AgentOutput != "" {
+			html = renderAgentHTML(task.AgentOutput)
+		} else {
+			html = `<div class="text-gray-500 italic">No agent output</div>`
+		}
+		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
+
+	// Send initial state
+	sendAgent()
+
+	// Periodic ticker as fallback
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
 
 	// Stream agent updates
 	for {
@@ -295,21 +322,14 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-
 			// Only forward events for this task
 			if event.TaskID != taskID {
 				continue
 			}
-
-			// On status change or agent update, fetch latest output
-			if event.Type == "status_change" || event.Type == "agent_update" {
-				task, err := h.tasks.Get(ctx, taskID)
-				if err == nil && task.AgentOutput != "" {
-					agentHTML := renderAgentHTML(task.AgentOutput)
-					fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(agentHTML, "\n", ""))
-					flusher.Flush()
-				}
-			}
+			// On any task event, refresh agent output
+			sendAgent()
+		case <-ticker.C:
+			sendAgent()
 		}
 	}
 }
@@ -337,10 +357,10 @@ func renderDiffHTML(diff string) string {
 // renderAgentHTML converts agent output text to styled HTML
 func renderAgentHTML(output string) string {
 	if output == "" {
-		return `<div class="text-gray-500 italic">No agent output</div>`
+		return `<div class="text-gray-500 italic text-xs">No agent output</div>`
 	}
 	escaped := escapeHTML(output)
-	return fmt.Sprintf(`<div class="prose prose-invert prose-sm max-w-none"><div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono">%s</div></div>`, escaped)
+	return fmt.Sprintf(`<div class="prose prose-invert prose-xs max-w-none"><div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-xs">%s</div></div>`, escaped)
 }
 
 // escapeHTML escapes HTML special characters

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -41,11 +42,12 @@ type StreamCallback func(event StreamEvent)
 
 // Runner executes agent tasks with streaming output.
 type Runner struct {
-	provider     llm.Provider
-	workDir      string
-	callback     StreamCallback
-	systemPrompt string
-	finalMessage string
+	provider       llm.Provider
+	workDir        string
+	callback       StreamCallback
+	systemPrompt   string
+	finalMessage   string
+	messageHistory []Message
 }
 
 // NewRunner creates a new agent runner.
@@ -63,18 +65,54 @@ func (r *Runner) GetFinalMessage() string {
 	return r.finalMessage
 }
 
+// GetMessageHistory returns the message history as JSON string.
+func (r *Runner) GetMessageHistory() string {
+	data, err := json.Marshal(r.messageHistory)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// SetMessageHistory sets the initial message history from JSON string.
+func (r *Runner) SetMessageHistory(historyJSON string) error {
+	if historyJSON == "" {
+		return nil
+	}
+	return json.Unmarshal([]byte(historyJSON), &r.messageHistory)
+}
+
 // Run executes the agent loop for a given task.
 func (r *Runner) Run(ctx context.Context, task string) error {
-	tools := r.makeTools()
-	messages := []Message{}
+	return r.runWithMessage(ctx, task, false)
+}
 
-	r.emit(StreamEvent{Type: EventPlan, Content: "Analyzing task: " + task})
+// Continue resumes the agent loop with a new follow-up message.
+func (r *Runner) Continue(ctx context.Context, followUpMessage string) error {
+	return r.runWithMessage(ctx, followUpMessage, true)
+}
+
+// runWithMessage is the core loop that handles both new runs and continuations.
+func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isContinuation bool) error {
+	tools := r.makeTools()
+	
+	// Use existing message history or start fresh
+	messages := r.messageHistory
+	if messages == nil {
+		messages = []Message{}
+	}
+
+	if isContinuation {
+		r.emit(StreamEvent{Type: EventPlan, Content: "Continuing with: " + userMessage})
+	} else {
+		r.emit(StreamEvent{Type: EventPlan, Content: "Analyzing task: " + userMessage})
+	}
 
 	// Add user message
 	messages = append(messages, Message{
 		Role: "user",
 		Content: []ContentBlock{
-			{Type: "text", Text: task},
+			{Type: "text", Text: userMessage},
 		},
 	})
 
@@ -82,6 +120,7 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 	for {
 		select {
 		case <-ctx.Done():
+			r.messageHistory = messages
 			return ctx.Err()
 		default:
 		}
@@ -89,10 +128,18 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 		r.emit(StreamEvent{Type: EventPlan, Content: "Calling LLM API..."})
 		resp, err := r.callAPI(messages, tools)
 		if err != nil {
+			r.messageHistory = messages
 			r.emit(StreamEvent{Type: EventError, Content: err.Error()})
 			return err
 		}
 		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Received response with %d content blocks", len(resp.Content))})
+
+		// Log the raw response for debugging
+		respJSON, _ := json.MarshalIndent(resp, "", "  ")
+		fmt.Printf("\n=== LLM API RESPONSE ===\n%s\n=== END RESPONSE ===\n\n", string(respJSON))
+		for i, block := range resp.Content {
+			fmt.Printf("Block %d: type=%s, has_text=%v, has_name=%v, id=%s\n", i, block.Type, block.Text != "", block.Name != "", block.ID)
+		}
 
 		toolResults := []ContentBlock{}
 
@@ -143,6 +190,9 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 		messages = append(messages, Message{Role: "user", Content: toolResults})
 	}
 
+	// Store message history for future continuations
+	r.messageHistory = messages
+
 	r.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
 	return nil
 }
@@ -178,6 +228,19 @@ func (r *Runner) callAPIAnthropic(messages []Message, tools map[string]Tool) (*A
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
+
+	// Log the full request for debugging
+	prettyBody, _ := json.MarshalIndent(req, "", "  ")
+	slog.Info("[LLM REQUEST] Sending to API",
+		"url", r.provider.APIURL(),
+		"model", r.provider.Model(),
+		"message_count", len(messages),
+		"tool_count", len(tools),
+	)
+	slog.Debug("[LLM REQUEST] Full payload", "body", string(prettyBody))
+	// Also log to stdout for immediate visibility
+	fmt.Printf("\n=== LLM API REQUEST ===\nURL: %s\nModel: %s\nMessages: %d\nTools: %d\n", r.provider.APIURL(), r.provider.Model(), len(messages), len(tools))
+	fmt.Printf("Full Request Body:\n%s\n=== END REQUEST ===\n\n", string(prettyBody))
 
 	httpReq, err := http.NewRequest("POST", r.provider.APIURL(), bytes.NewReader(body))
 	if err != nil {

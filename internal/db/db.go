@@ -117,6 +117,26 @@ func runMigrations(db *sql.DB) error {
 		}
 	}
 
+	// Migration 2: Add message_history column to tasks table
+	var hasMessageHistory bool
+	err = db.QueryRow(`
+		SELECT COUNT(*) > 0
+		FROM pragma_table_info('tasks')
+		WHERE name = 'message_history'
+	`).Scan(&hasMessageHistory)
+
+	if err != nil {
+		return fmt.Errorf("failed to check message_history column: %w", err)
+	}
+
+	if !hasMessageHistory {
+		slog.Info("Adding message_history column to tasks table")
+		_, err = db.Exec(`ALTER TABLE tasks ADD COLUMN message_history TEXT`)
+		if err != nil {
+			return fmt.Errorf("failed to add message_history column: %w", err)
+		}
+	}
+
 	return nil
 }
 
