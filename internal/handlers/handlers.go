@@ -78,6 +78,7 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 
 	// SSE for streaming
 	r.Get("/events", h.HandleSSE)
+	r.Get("/task/{id}/logs/stream", h.HandleTaskLogsSSE)
 
 	// Actions
 	r.Post("/add-task", h.HandleAddTask)

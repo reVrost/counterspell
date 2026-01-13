@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/revrost/code/counterspell/internal/views"
 )
 
@@ -145,4 +146,209 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 			sendActiveUpdate()
 		}
 	}
+}
+
+// HandleTaskLogsSSE streams log updates for a specific task.
+func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Subscribe to events
+	ch := h.events.Subscribe()
+	defer h.events.Unsubscribe(ch)
+
+	// Send initial ping
+	fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
+	flusher.Flush()
+
+	// Stream only logs for this task
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+
+			// Only forward events for this task
+			if event.TaskID != taskID {
+				continue
+			}
+
+			// Send log event as HTML for htmx SSE
+			if event.Type == "log" {
+				// The HTMLPayload already has formatted content like: <span class="text-yellow-400">[plan]</span> message
+				// Wrap it in log entry structure and send
+				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
+				logHTML := fmt.Sprintf(`<div class="ml-4 relative"><div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div><p class="text-xs text-gray-400">%s</p></div>`, htmlData)
+				fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
+				flusher.Flush()
+			}
+		}
+	}
+}
+
+// HandleTaskDiffSSE streams git diff updates for a specific task.
+func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Subscribe to events
+	ch := h.events.Subscribe()
+	defer h.events.Unsubscribe(ch)
+
+	// Check if task already has diff and send it
+	task, err := h.tasks.Get(ctx, taskID)
+	if err == nil && task.GitDiff != "" {
+		diffHTML := renderDiffHTML(task.GitDiff)
+		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(diffHTML, "\n", ""))
+		flusher.Flush()
+	}
+
+	// Stream diff updates
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+
+			// Only forward events for this task
+			if event.TaskID != taskID {
+				continue
+			}
+
+			// On status change or diff update, fetch latest diff
+			if event.Type == "status_change" || event.Type == "diff_update" {
+				task, err := h.tasks.Get(ctx, taskID)
+				if err == nil && task.GitDiff != "" {
+					diffHTML := renderDiffHTML(task.GitDiff)
+					fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(diffHTML, "\n", ""))
+					flusher.Flush()
+				}
+			}
+		}
+	}
+}
+
+// HandleTaskAgentSSE streams agent output updates for a specific task.
+func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Subscribe to events
+	ch := h.events.Subscribe()
+	defer h.events.Unsubscribe(ch)
+
+	// Check if task already has agent output and send it
+	task, err := h.tasks.Get(ctx, taskID)
+	if err == nil && task.AgentOutput != "" {
+		agentHTML := renderAgentHTML(task.AgentOutput)
+		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(agentHTML, "\n", ""))
+		flusher.Flush()
+	}
+
+	// Stream agent updates
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+
+			// Only forward events for this task
+			if event.TaskID != taskID {
+				continue
+			}
+
+			// On status change or agent update, fetch latest output
+			if event.Type == "status_change" || event.Type == "agent_update" {
+				task, err := h.tasks.Get(ctx, taskID)
+				if err == nil && task.AgentOutput != "" {
+					agentHTML := renderAgentHTML(task.AgentOutput)
+					fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(agentHTML, "\n", ""))
+					flusher.Flush()
+				}
+			}
+		}
+	}
+}
+
+// renderDiffHTML converts git diff text to styled HTML
+func renderDiffHTML(diff string) string {
+	if diff == "" {
+		return `<div class="text-gray-500 italic">No changes made</div>`
+	}
+
+	var buf strings.Builder
+	for _, line := range strings.Split(diff, "\n") {
+		escapedLine := escapeHTML(line)
+		if strings.HasPrefix(line, "+") {
+			buf.WriteString(fmt.Sprintf(`<div class="diff-add">%s</div>`, escapedLine))
+		} else if strings.HasPrefix(line, "-") {
+			buf.WriteString(fmt.Sprintf(`<div class="diff-del">%s</div>`, escapedLine))
+		} else {
+			buf.WriteString(fmt.Sprintf(`<div>%s</div>`, escapedLine))
+		}
+	}
+	return buf.String()
+}
+
+// renderAgentHTML converts agent output text to styled HTML
+func renderAgentHTML(output string) string {
+	if output == "" {
+		return `<div class="text-gray-500 italic">No agent output</div>`
+	}
+	escaped := escapeHTML(output)
+	return fmt.Sprintf(`<div class="prose prose-invert prose-sm max-w-none"><div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono">%s</div></div>`, escaped)
+}
+
+// escapeHTML escapes HTML special characters
+func escapeHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
 }
