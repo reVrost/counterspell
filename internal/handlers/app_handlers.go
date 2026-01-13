@@ -205,8 +205,16 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 	h.HandleFeed(w, r)
 }
 
-// HandleActionDiscard mocks discard action
+// HandleActionDiscard deletes a task
 func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+
+	if err := h.tasks.Delete(ctx, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Task discarded"}`)
 	h.HandleFeed(w, r)
 }
