@@ -176,6 +176,22 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 		project = views.UIProject{ID: dbTask.ProjectID, Name: dbTask.ProjectID, Icon: "fa-folder", Color: "text-gray-400"}
 	}
 
+	// Load logs from DB
+	dbLogs, err := h.tasks.GetLogs(ctx, id)
+	if err != nil {
+		slog.Error("Failed to get logs", "error", err)
+	}
+
+	// Convert to UI logs
+	var uiLogs []views.UILogEntry
+	for _, log := range dbLogs {
+		uiLogs = append(uiLogs, views.UILogEntry{
+			Timestamp: log.CreatedAt,
+			Message:   log.Message,
+			Type:      string(log.Level),
+		})
+	}
+
 	// Create UI task from DB task
 	task := &views.UITask{
 		ID:          dbTask.ID,
@@ -184,10 +200,10 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 		AgentName:   "Agent",
 		Status:      string(dbTask.Status),
 		Progress:    100,
-		AgentOutput:  dbTask.AgentOutput,
+		AgentOutput: dbTask.AgentOutput,
 		GitDiff:     dbTask.GitDiff,
 		PreviewURL:  "",
-		Logs:        []views.UILogEntry{},
+		Logs:        uiLogs,
 	}
 
 	components.TaskDetail(task, project).Render(ctx, w)
@@ -205,10 +221,16 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 	h.HandleFeed(w, r)
 }
 
-// HandleActionDiscard deletes a task
+// HandleActionDiscard deletes a task and cleans up its worktree
 func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
+
+	// Clean up worktree first (before DB delete)
+	if err := h.orchestrator.CleanupTask(id); err != nil {
+		slog.Error("Failed to cleanup worktree", "task_id", id, "error", err)
+		// Continue with delete even if cleanup fails
+	}
 
 	if err := h.tasks.Delete(ctx, id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -269,11 +269,13 @@ func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
 }
 
 // GetDiff returns the git diff for a task's worktree.
+// After commit, shows diff between HEAD~1 and HEAD (the committed changes).
 func (m *RepoManager) GetDiff(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
 
 	slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
 
+	// First try uncommitted changes
 	cmd := exec.Command("git", "diff", "HEAD")
 	cmd.Dir = worktreePath
 	output, err := cmd.CombinedOutput()
@@ -282,6 +284,61 @@ func (m *RepoManager) GetDiff(taskID string) (string, error) {
 		return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
 	}
 
+	// If no uncommitted changes, get diff of last commit
+	if len(output) == 0 {
+		slog.Info("[GIT] No uncommitted changes, getting last commit diff", "task_id", taskID)
+		cmd = exec.Command("git", "diff", "HEAD~1", "HEAD")
+		cmd.Dir = worktreePath
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			slog.Warn("[GIT] GetDiff HEAD~1 failed (may be first commit)", "error", err)
+			// Try show for first commit case
+			cmd = exec.Command("git", "show", "--format=", "HEAD")
+			cmd.Dir = worktreePath
+			output, _ = cmd.CombinedOutput()
+		}
+	}
+
 	slog.Info("[GIT] GetDiff successful", "task_id", taskID, "diff_size", len(output))
 	return string(output), nil
+}
+
+// RemoveWorktree removes the worktree for a task.
+func (m *RepoManager) RemoveWorktree(taskID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	worktreePath := m.worktreePath(taskID)
+	slog.Info("[GIT] Removing worktree", "task_id", taskID, "path", worktreePath)
+
+	// Check if worktree exists
+	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+		slog.Info("[GIT] Worktree does not exist, nothing to remove", "task_id", taskID)
+		return nil
+	}
+
+	// Remove the worktree directory first
+	if err := os.RemoveAll(worktreePath); err != nil {
+		slog.Error("[GIT] Failed to remove worktree directory", "error", err)
+		return fmt.Errorf("failed to remove worktree directory: %w", err)
+	}
+
+	// Prune worktrees to clean up git's internal state
+	// Find the parent repo by looking for any repo in the repos directory
+	reposDir := filepath.Join(m.dataDir, "repos")
+	filepath.Walk(reposDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() && info.Name() == ".git" {
+			parentRepo := filepath.Dir(path)
+			cmd := exec.Command("git", "worktree", "prune")
+			cmd.Dir = parentRepo
+			cmd.Run() // Ignore errors
+		}
+		return nil
+	})
+
+	slog.Info("[GIT] Worktree removed", "task_id", taskID)
+	return nil
 }

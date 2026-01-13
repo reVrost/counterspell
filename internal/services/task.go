@@ -216,3 +216,33 @@ func (s *TaskService) ResetInProgress(ctx context.Context) error {
 	}
 	return nil
 }
+
+// AddLog adds a log entry for a task.
+func (s *TaskService) AddLog(ctx context.Context, taskID, level, message string) error {
+	query := `INSERT INTO agent_logs (task_id, level, message) VALUES (?, ?, ?)`
+	_, err := s.db.ExecContext(ctx, query, taskID, level, message)
+	if err != nil {
+		return fmt.Errorf("failed to add log: %w", err)
+	}
+	return nil
+}
+
+// GetLogs retrieves logs for a task.
+func (s *TaskService) GetLogs(ctx context.Context, taskID string) ([]*models.AgentLog, error) {
+	query := `SELECT id, task_id, level, message, created_at FROM agent_logs WHERE task_id = ? ORDER BY id ASC`
+	rows, err := s.db.QueryContext(ctx, query, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []*models.AgentLog
+	for rows.Next() {
+		var log models.AgentLog
+		if err := rows.Scan(&log.ID, &log.TaskID, &log.Level, &log.Message, &log.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan log: %w", err)
+		}
+		logs = append(logs, &log)
+	}
+	return logs, nil
+}

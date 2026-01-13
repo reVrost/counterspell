@@ -443,8 +443,19 @@ func (o *Orchestrator) CancelTask(taskID string) {
 	}
 }
 
-// emit sends an event to the UI.
+// CleanupTask removes the worktree for a task.
+func (o *Orchestrator) CleanupTask(taskID string) error {
+	return o.repos.RemoveWorktree(taskID)
+}
+
+// emit sends an event to the UI and stores it in DB.
 func (o *Orchestrator) emit(taskID, level, message string) {
+	// Store log in DB for persistence
+	ctx := context.Background()
+	if err := o.tasks.AddLog(ctx, taskID, level, message); err != nil {
+		slog.Error("Failed to store log", "task_id", taskID, "error", err)
+	}
+
 	colorClass := "text-gray-400"
 	switch level {
 	case "plan":
