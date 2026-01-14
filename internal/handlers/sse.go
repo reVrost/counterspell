@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/views"
+	"github.com/revrost/code/counterspell/internal/views/components"
 )
 
 // HandleSSE handles Server-Sent Events for real-time updates.
@@ -125,10 +128,9 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	// Send initial state
 	sendActiveUpdate()
 
-	// Create ticker for periodic updates (fallback)
-	// Memory leak was caused by Progress changing every second, not the ticker itself
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
+	// Keepalive ticker - prevents proxy timeouts (ngrok, cloudflare, etc.)
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
 
 	// Stream updates
 	for {
@@ -141,9 +143,10 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 			}
 			// Task event received, send update
 			sendActiveUpdate()
-		case <-ticker.C:
-			// Periodic refresh as fallback
-			sendActiveUpdate()
+		case <-keepalive.C:
+			// SSE comment to keep connection alive
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
 		}
 	}
 }
@@ -172,6 +175,10 @@ func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
 	flusher.Flush()
 
+	// Keepalive ticker
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
+
 	// Stream only logs for this task
 	for {
 		select {
@@ -196,6 +203,9 @@ func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
 				flusher.Flush()
 			}
+		case <-keepalive.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
 		}
 	}
 }
@@ -242,9 +252,9 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 	// Send initial state
 	sendDiff()
 
-	// Periodic ticker as fallback
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
+	// Keepalive ticker
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
 
 	// Stream diff updates
 	for {
@@ -261,8 +271,9 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 			}
 			// On any task event, refresh diff
 			sendDiff()
-		case <-ticker.C:
-			sendDiff()
+		case <-keepalive.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
 		}
 	}
 }
@@ -288,30 +299,30 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 	ch := h.events.Subscribe()
 	defer h.events.Unsubscribe(ch)
 
-	// Helper to send current agent state
-	sendAgent := func() {
+	// Helper to send current agent state from DB (used for initial load)
+	sendAgentFromDB := func() {
 		task, err := h.tasks.Get(ctx, taskID)
 		if err != nil {
 			return
 		}
-		var html string
-		if task.Status == "in_progress" {
-			html = `<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4"><i class="fas fa-cog fa-spin text-3xl opacity-50"></i><p class="text-xs font-mono">Agent is working...</p></div>`
-		} else if task.AgentOutput != "" {
-			html = renderAgentHTML(task.AgentOutput)
-		} else {
-			html = `<div class="text-gray-500 italic">No agent output</div>`
-		}
+		html := renderAgentConversation(ctx, task)
+		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		flusher.Flush()
+	}
+
+	// Helper to render and send agent state from JSON message history
+	sendAgentFromJSON := func(messageHistoryJSON string, isInProgress bool) {
+		html := renderAgentConversationFromJSON(ctx, messageHistoryJSON, isInProgress)
 		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
 	// Send initial state
-	sendAgent()
+	sendAgentFromDB()
 
-	// Periodic ticker as fallback
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
+	// Keepalive ticker
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
 
 	// Stream agent updates
 	for {
@@ -326,10 +337,16 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 			if event.TaskID != taskID {
 				continue
 			}
-			// On any task event, refresh agent output
-			sendAgent()
-		case <-ticker.C:
-			sendAgent()
+			// Handle live agent updates (message history JSON in HTMLPayload)
+			if event.Type == "agent_update" {
+				sendAgentFromJSON(event.HTMLPayload, true)
+			} else if event.Type == "status_change" {
+				// Task completed, reload from DB to get final state
+				sendAgentFromDB()
+			}
+		case <-keepalive.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
 		}
 	}
 }
@@ -371,4 +388,160 @@ func escapeHTML(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&#39;")
 	return s
+}
+
+// renderAgentConversation renders the full conversation history using templ components
+func renderAgentConversation(ctx context.Context, task *models.Task) string {
+	// Parse message history
+	var uiMessages []views.UIMessage
+	if task.MessageHistory != "" {
+		var rawMessages []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type      string         `json:"type"`
+				Text      string         `json:"text,omitempty"`
+				Name      string         `json:"name,omitempty"`
+				Input     map[string]any `json:"input,omitempty"`
+				ID        string         `json:"id,omitempty"`
+				ToolUseID string         `json:"tool_use_id,omitempty"`
+				Content   string         `json:"content,omitempty"`
+			} `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(task.MessageHistory), &rawMessages); err == nil {
+			for _, msg := range rawMessages {
+				uiMsg := views.UIMessage{Role: msg.Role}
+				for _, block := range msg.Content {
+					uiContent := views.UIContent{Type: block.Type}
+					switch block.Type {
+					case "text":
+						uiContent.Text = block.Text
+					case "tool_use":
+						uiContent.ToolName = block.Name
+						uiContent.ToolID = block.ID
+						if inputBytes, err := json.Marshal(block.Input); err == nil {
+							uiContent.ToolInput = string(inputBytes)
+						}
+					case "tool_result":
+						uiContent.ToolID = block.ToolUseID
+						uiContent.Text = block.Content
+					}
+					uiMsg.Content = append(uiMsg.Content, uiContent)
+				}
+				uiMessages = append(uiMessages, uiMsg)
+			}
+		}
+	}
+
+	var buf bytes.Buffer
+
+	// Render messages if we have them
+	if len(uiMessages) > 0 {
+		buf.WriteString(`<div class="space-y-0">`)
+		for _, msg := range uiMessages {
+			components.MessageBubble(msg).Render(ctx, &buf)
+		}
+		buf.WriteString(`</div>`)
+	}
+
+	// If in progress, show compact loading
+	if task.Status == models.StatusInProgress {
+		buf.WriteString(`<div class="flex items-center gap-3 px-4 py-3">`)
+		buf.WriteString(`<div class="relative">`)
+		buf.WriteString(`<div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">`)
+		buf.WriteString(`<i class="fas fa-robot text-sm text-blue-400 pulse-glow"></i>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`<div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">`)
+		buf.WriteString(`<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full"></div>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`<div>`)
+		buf.WriteString(`<p class="text-xs font-medium shimmer">Agent is thinking...</p>`)
+		buf.WriteString(`<p class="text-[10px] text-gray-600">Analyzing code</p>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`</div>`)
+	} else if len(uiMessages) == 0 {
+		// No messages and not in progress - fallback to raw output or empty
+		if task.AgentOutput != "" {
+			return renderAgentHTML(task.AgentOutput)
+		}
+		return `<div class="p-5 text-gray-500 italic text-xs">No agent output</div>`
+	}
+
+	return buf.String()
+}
+
+// renderAgentConversationFromJSON renders conversation from JSON message history (for live streaming)
+func renderAgentConversationFromJSON(ctx context.Context, messageHistoryJSON string, isInProgress bool) string {
+	// Parse message history
+	var uiMessages []views.UIMessage
+	if messageHistoryJSON != "" {
+		var rawMessages []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type      string         `json:"type"`
+				Text      string         `json:"text,omitempty"`
+				Name      string         `json:"name,omitempty"`
+				Input     map[string]any `json:"input,omitempty"`
+				ID        string         `json:"id,omitempty"`
+				ToolUseID string         `json:"tool_use_id,omitempty"`
+				Content   string         `json:"content,omitempty"`
+			} `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(messageHistoryJSON), &rawMessages); err == nil {
+			for _, msg := range rawMessages {
+				uiMsg := views.UIMessage{Role: msg.Role}
+				for _, block := range msg.Content {
+					uiContent := views.UIContent{Type: block.Type}
+					switch block.Type {
+					case "text":
+						uiContent.Text = block.Text
+					case "tool_use":
+						uiContent.ToolName = block.Name
+						uiContent.ToolID = block.ID
+						if inputBytes, err := json.Marshal(block.Input); err == nil {
+							uiContent.ToolInput = string(inputBytes)
+						}
+					case "tool_result":
+						uiContent.ToolID = block.ToolUseID
+						uiContent.Text = block.Content
+					}
+					uiMsg.Content = append(uiMsg.Content, uiContent)
+				}
+				uiMessages = append(uiMessages, uiMsg)
+			}
+		}
+	}
+
+	var buf bytes.Buffer
+
+	// Render messages if we have them
+	if len(uiMessages) > 0 {
+		buf.WriteString(`<div class="space-y-0">`)
+		for _, msg := range uiMessages {
+			components.MessageBubble(msg).Render(ctx, &buf)
+		}
+		buf.WriteString(`</div>`)
+	}
+
+	// If in progress, show compact loading
+	if isInProgress {
+		buf.WriteString(`<div class="flex items-center gap-3 px-4 py-3">`)
+		buf.WriteString(`<div class="relative">`)
+		buf.WriteString(`<div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">`)
+		buf.WriteString(`<i class="fas fa-robot text-sm text-blue-400 pulse-glow"></i>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`<div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">`)
+		buf.WriteString(`<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full"></div>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`<div>`)
+		buf.WriteString(`<p class="text-xs font-medium shimmer">Agent is thinking...</p>`)
+		buf.WriteString(`<p class="text-[10px] text-gray-600">Analyzing code</p>`)
+		buf.WriteString(`</div>`)
+		buf.WriteString(`</div>`)
+	} else if len(uiMessages) == 0 {
+		return `<div class="p-5 text-gray-500 italic text-xs">No agent output</div>`
+	}
+
+	return buf.String()
 }

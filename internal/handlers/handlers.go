@@ -86,8 +86,12 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Post("/add-task", h.HandleAddTask)
 	r.Post("/action/retry/{id}", h.HandleActionRetry)
 	r.Post("/action/merge/{id}", h.HandleActionMerge)
+	r.Post("/action/pr/{id}", h.HandleActionPR)
 	r.Post("/action/discard/{id}", h.HandleActionDiscard)
 	r.Post("/action/chat/{id}", h.HandleActionChat)
+	r.Post("/action/resolve-conflict/{id}", h.HandleResolveConflict)
+	r.Post("/action/abort-merge/{id}", h.HandleAbortMerge)
+	r.Post("/action/complete-merge/{id}", h.HandleCompleteMerge)
 	r.Post("/settings", h.HandleSaveSettings)
 
 	// GitHub OAuth routes

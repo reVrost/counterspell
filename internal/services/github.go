@@ -177,6 +177,7 @@ func (s *GitHubService) SaveConnection(ctx context.Context, connType, login, ava
 
 // GetActiveConnection retrieves the active GitHub connection.
 func (s *GitHubService) GetActiveConnection(ctx context.Context) (*models.GitHubConnection, error) {
+	fmt.Println("[GITHUB] GetActiveConnection: querying database")
 	var conn models.GitHubConnection
 
 	query := `SELECT id, type, login, avatar_url, token, scope, created_at
@@ -186,9 +187,11 @@ func (s *GitHubService) GetActiveConnection(ctx context.Context) (*models.GitHub
 
 	err := s.db.QueryRowContext(ctx, query).Scan(&conn.ID, &conn.Type, &conn.Login, &conn.AvatarURL, &conn.Token, &conn.Scope, &conn.CreatedAt)
 	if err != nil {
+		fmt.Printf("[GITHUB] GetActiveConnection: no connection found, error=%v\n", err)
 		return nil, err
 	}
 
+	fmt.Printf("[GITHUB] GetActiveConnection: found connection login=%s type=%s\n", conn.Login, conn.Type)
 	return &conn, nil
 }
 
@@ -214,10 +217,12 @@ func (s *GitHubService) SaveProject(ctx context.Context, owner, repo string) err
 
 // GetProjects retrieves all projects.
 func (s *GitHubService) GetProjects(ctx context.Context) ([]models.Project, error) {
+	fmt.Println("[GITHUB] GetProjects: querying database")
 	query := `SELECT id, github_owner, github_repo, created_at FROM projects ORDER BY created_at DESC`
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
+		fmt.Printf("[GITHUB] GetProjects: query error=%v\n", err)
 		return nil, fmt.Errorf("failed to query projects: %w", err)
 	}
 	defer func() {
@@ -230,11 +235,13 @@ func (s *GitHubService) GetProjects(ctx context.Context) ([]models.Project, erro
 	for rows.Next() {
 		var p models.Project
 		if err := rows.Scan(&p.ID, &p.GitHubOwner, &p.GitHubRepo, &p.CreatedAt); err != nil {
+			fmt.Printf("[GITHUB] GetProjects: scan error=%v\n", err)
 			return nil, fmt.Errorf("failed to scan project: %w", err)
 		}
 		projects = append(projects, p)
 	}
 
+	fmt.Printf("[GITHUB] GetProjects: returning %d projects\n", len(projects))
 	return projects, nil
 }
 
@@ -282,28 +289,36 @@ func (s *GitHubService) GetProjectByRepo(ctx context.Context, repo string) (*mod
 
 // DeleteConnection deletes the active GitHub connection.
 func (s *GitHubService) DeleteConnection(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM github_connections`)
+	fmt.Println("[GITHUB] DeleteConnection: starting")
+	result, err := s.db.ExecContext(ctx, `DELETE FROM github_connections`)
 	if err != nil {
+		fmt.Printf("[GITHUB] DeleteConnection: error=%v\n", err)
 		return fmt.Errorf("failed to delete connection: %w", err)
 	}
+	rows, _ := result.RowsAffected()
+	fmt.Printf("[GITHUB] DeleteConnection: success, rows_affected=%d\n", rows)
 	return nil
 }
 
 // DeleteAllProjects deletes all projects.
 func (s *GitHubService) DeleteAllProjects(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM projects`)
+	fmt.Println("[GITHUB] DeleteAllProjects: starting")
+	result, err := s.db.ExecContext(ctx, `DELETE FROM projects`)
 	if err != nil {
+		fmt.Printf("[GITHUB] DeleteAllProjects: error=%v\n", err)
 		return fmt.Errorf("failed to delete projects: %w", err)
 	}
+	rows, _ := result.RowsAffected()
+	fmt.Printf("[GITHUB] DeleteAllProjects: success, rows_affected=%d\n", rows)
 	return nil
 }
 
 // FetchAndSaveRepositories fetches repositories from GitHub and saves them to database.
 func (s *GitHubService) FetchAndSaveRepositories(ctx context.Context, conn *models.GitHubConnection) error {
 	type repoResponse struct {
-		Name         string `json:"name"`
-		FullName     string `json:"full_name"`
-		Owner        struct {
+		Name     string `json:"name"`
+		FullName string `json:"full_name"`
+		Owner    struct {
 			Login string `json:"login"`
 		} `json:"owner"`
 	}
@@ -401,4 +416,63 @@ func (s *GitHubService) FetchAndSaveRepositories(ctx context.Context, conn *mode
 
 	fmt.Printf("Total repositories saved: %d\n", repoCount)
 	return nil
+}
+
+// CreatePullRequest creates a GitHub PR for the given branch.
+// Returns the PR URL on success.
+func (s *GitHubService) CreatePullRequest(ctx context.Context, owner, repo, branch, title, body string) (string, error) {
+	conn, err := s.GetActiveConnection(ctx)
+	if err != nil {
+		return "", fmt.Errorf("no GitHub connection: %w", err)
+	}
+
+	// Create PR via GitHub API
+	prData := map[string]string{
+		"title": title,
+		"body":  body,
+		"head":  branch,
+		"base":  "main",
+	}
+
+	jsonData, err := json.Marshal(prData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal PR data: %w", err)
+	}
+
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+conn.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to create PR: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusCreated {
+		// Check if PR already exists
+		if resp.StatusCode == 422 && strings.Contains(string(respBody), "A pull request already exists") {
+			return "", fmt.Errorf("PR already exists for this branch")
+		}
+		return "", fmt.Errorf("GitHub API failed (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var prResponse struct {
+		HTMLURL string `json:"html_url"`
+		Number  int    `json:"number"`
+	}
+	if err := json.Unmarshal(respBody, &prResponse); err != nil {
+		return "", fmt.Errorf("failed to parse PR response: %w", err)
+	}
+
+	return prResponse.HTMLURL, nil
 }

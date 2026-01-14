@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/views/components"
@@ -34,16 +36,20 @@ func toUIProject(p models.Project) views.UIProject {
 // HandleFeed renders the main feed page
 func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	slog.Info("[FEED] HandleFeed called", "method", r.Method, "url", r.URL.String(), "hx_request", r.Header.Get("HX-Request"))
 
 	// Get Settings
-	settings, _ := h.settings.GetSettings(ctx)
+	settings, err := h.settings.GetSettings(ctx)
+	if err != nil {
+		slog.Error("[FEED] Failed to get settings", "error", err)
+	}
 
 	// Get projects
 	internalProjects, err := h.github.GetProjects(ctx)
 	if err != nil {
-		slog.Error("Failed to get projects", "error", err)
+		slog.Error("[FEED] Failed to get projects", "error", err)
 	}
-	slog.Info("Loaded projects", "count", len(internalProjects))
+	slog.Info("[FEED] Loaded projects", "count", len(internalProjects))
 
 	projects := make(map[string]views.UIProject)
 	for _, p := range internalProjects {
@@ -95,12 +101,18 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 
 	// Check authentication via GitHub connection
 	isAuthenticated := false
-	if conn, err := h.github.GetActiveConnection(ctx); err == nil && conn != nil {
+	conn, connErr := h.github.GetActiveConnection(ctx)
+	if connErr == nil && conn != nil {
 		isAuthenticated = true
+		slog.Info("[FEED] User is authenticated", "login", conn.Login, "type", conn.Type)
+	} else {
+		slog.Info("[FEED] User is NOT authenticated", "error", connErr)
 	}
 
+	slog.Info("[FEED] Rendering page", "isAuthenticated", isAuthenticated, "projectCount", len(projects))
 	component := layout.Base("Counterspell", projects, *settings, isAuthenticated, views.Feed(data))
 	if err := component.Render(ctx, w); err != nil {
+		slog.Error("[FEED] Failed to render", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -195,6 +207,46 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Parse message history
+	var uiMessages []views.UIMessage
+	if dbTask.MessageHistory != "" {
+		var rawMessages []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type      string         `json:"type"`
+				Text      string         `json:"text,omitempty"`
+				Name      string         `json:"name,omitempty"`
+				Input     map[string]any `json:"input,omitempty"`
+				ID        string         `json:"id,omitempty"`
+				ToolUseID string         `json:"tool_use_id,omitempty"`
+				Content   string         `json:"content,omitempty"`
+			} `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(dbTask.MessageHistory), &rawMessages); err == nil {
+			for _, msg := range rawMessages {
+				uiMsg := views.UIMessage{Role: msg.Role}
+				for _, block := range msg.Content {
+					uiContent := views.UIContent{Type: block.Type}
+					switch block.Type {
+					case "text":
+						uiContent.Text = block.Text
+					case "tool_use":
+						uiContent.ToolName = block.Name
+						uiContent.ToolID = block.ID
+						if inputBytes, err := json.Marshal(block.Input); err == nil {
+							uiContent.ToolInput = string(inputBytes)
+						}
+					case "tool_result":
+						uiContent.ToolID = block.ToolUseID
+						uiContent.Text = block.Content
+					}
+					uiMsg.Content = append(uiMsg.Content, uiContent)
+				}
+				uiMessages = append(uiMessages, uiMsg)
+			}
+		}
+	}
+
 	// Create UI task from DB task
 	task := &views.UITask{
 		ID:          dbTask.ID,
@@ -207,6 +259,7 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 		GitDiff:     dbTask.GitDiff,
 		PreviewURL:  "",
 		Logs:        uiLogs,
+		Messages:    uiMessages,
 	}
 
 	components.TaskDetail(task, project).Render(ctx, w)
@@ -218,9 +271,142 @@ func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
 	h.HandleFeed(w, r)
 }
 
-// HandleActionMerge mocks merge action
+// HandleActionMerge merges a task's branch to main and pushes
 func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merged successfully"}`)
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	err := h.orchestrator.MergeTask(ctx, taskID)
+	if err != nil {
+		// Check if it's a merge conflict
+		if conflictErr, ok := err.(*git.ErrMergeConflict); ok {
+			slog.Info("Merge conflict detected, showing conflict UI", "task_id", taskID, "files", conflictErr.ConflictedFiles)
+
+			// Get conflict details
+			conflicts, err := h.orchestrator.GetConflictDetails(ctx, taskID, conflictErr.ConflictedFiles)
+			if err != nil {
+				slog.Error("Failed to get conflict details", "error", err)
+				w.Header().Set("HX-Trigger", `{"toast": "Failed to load conflict details"}`)
+				h.HandleFeed(w, r)
+				return
+			}
+
+			// Convert to component type
+			uiConflicts := make([]components.ConflictFile, len(conflicts))
+			for i, c := range conflicts {
+				uiConflicts[i] = components.ConflictFile{
+					Path:   c.Path,
+					Ours:   c.Ours,
+					Theirs: c.Theirs,
+				}
+			}
+
+			// Render conflict view
+			components.ConflictView(taskID, uiConflicts).Render(ctx, w)
+			return
+		}
+
+		slog.Error("Failed to merge task", "task_id", taskID, "error", err)
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Merge failed: %s"}`, err.Error()))
+		h.HandleFeed(w, r)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merged to main and pushed!"}`)
+	h.HandleFeed(w, r)
+}
+
+// HandleResolveConflict resolves a single file conflict
+func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	if err := r.ParseForm(); err != nil {
+		w.Header().Set("HX-Trigger", `{"toast": "Invalid request"}`)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	filePath := r.FormValue("file")
+	choice := r.FormValue("choice")
+
+	// Get conflict details to get the content
+	conflicts, err := h.orchestrator.GetConflictDetails(ctx, taskID, []string{filePath})
+	if err != nil || len(conflicts) == 0 {
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to get conflict"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var resolution string
+	switch choice {
+	case "ours":
+		resolution = conflicts[0].Ours
+	case "theirs":
+		resolution = conflicts[0].Theirs
+	default:
+		w.Header().Set("HX-Trigger", `{"toast": "Invalid choice"}`)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := h.orchestrator.ResolveConflict(ctx, taskID, filePath, resolution); err != nil {
+		slog.Error("Failed to resolve conflict", "error", err)
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to resolve conflict"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Resolved %s"}`, filePath))
+	w.WriteHeader(http.StatusOK)
+}
+
+// HandleAbortMerge aborts the current merge
+func (h *Handlers) HandleAbortMerge(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	if err := h.orchestrator.AbortMerge(ctx, taskID); err != nil {
+		slog.Error("Failed to abort merge", "error", err)
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to abort merge"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merge aborted"}`)
+	h.HandleFeed(w, r)
+}
+
+// HandleCompleteMerge completes the merge after conflicts are resolved
+func (h *Handlers) HandleCompleteMerge(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	if err := h.orchestrator.CompleteMergeResolution(ctx, taskID); err != nil {
+		slog.Error("Failed to complete merge", "error", err)
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Merge failed: %s"}`, err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merged to main!"}`)
+	h.HandleFeed(w, r)
+}
+
+// HandleActionPR creates a GitHub Pull Request for the task
+func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	prURL, err := h.orchestrator.CreatePR(ctx, taskID)
+	if err != nil {
+		slog.Error("Failed to create PR", "task_id", taskID, "error", err)
+		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Failed to create PR: %s"}`, err.Error()))
+		h.HandleFeed(w, r)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", fmt.Sprintf(`{"close-modal": true, "toast": "PR created!", "open-url": "%s"}`, prURL))
 	h.HandleFeed(w, r)
 }
 
@@ -273,8 +459,9 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Continuing task..."}`)
-	h.HandleFeed(w, r)
+	// Just send toast - SSE will stream updates to agent tab
+	w.Header().Set("HX-Trigger", `{"toast": "Continuing task..."}`)
+	w.WriteHeader(http.StatusOK)
 }
 
 // HandleAddTask creates a new task and starts execution.

@@ -6,6 +6,42 @@ import (
 	"github.com/revrost/code/counterspell/internal/views"
 )
 
+// toolIcon returns an appropriate FA icon for a tool name
+func toolIcon(name string) string {
+	switch {
+	case strings.Contains(name, "edit"), strings.Contains(name, "write"):
+		return "fa-pen"
+	case strings.Contains(name, "read"), strings.Contains(name, "view"):
+		return "fa-eye"
+	case strings.Contains(name, "bash"), strings.Contains(name, "exec"):
+		return "fa-terminal"
+	case strings.Contains(name, "search"), strings.Contains(name, "grep"), strings.Contains(name, "glob"):
+		return "fa-search"
+	case strings.Contains(name, "list"), strings.Contains(name, "ls"):
+		return "fa-folder-open"
+	default:
+		return "fa-cog"
+	}
+}
+
+// truncateResult limits tool result length for display
+func truncateResult(s string) string {
+	if len(s) > 2000 {
+		return s[:2000] + "\n... (truncated)"
+	}
+	return s
+}
+
+// hasTextContent checks if a message has any non-empty text content
+func hasTextContent(msg views.UIMessage) bool {
+	for _, c := range msg.Content {
+		if c.Type == "text" && c.Text != "" {
+			return true
+		}
+	}
+	return false
+}
+
 templ LogEntry(log views.UILogEntry) {
 	<div class="ml-4 relative">
 		<div class={ "absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117]", 
@@ -28,8 +64,83 @@ templ LogEntry(log views.UILogEntry) {
 	</div>
 }
 
+// MessageBubble renders a single message in the conversation
+templ MessageBubble(msg views.UIMessage) {
+	if msg.Role == "user" && hasTextContent(msg) {
+		<!-- User message (only if has text) -->
+		<div class="px-4 py-2 border-b border-gray-800/50">
+			<div class="flex gap-2">
+				<div class="w-4 h-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+					<i class="fas fa-user text-[7px] text-blue-400"></i>
+				</div>
+				<div class="flex-1 min-w-0 -mt-px">
+					for _, content := range msg.Content {
+						if content.Type == "text" && content.Text != "" {
+							<div class="text-xs text-gray-200 whitespace-pre-wrap leading-normal">{ content.Text }</div>
+						}
+					}
+				</div>
+			</div>
+		</div>
+	} else if msg.Role == "assistant" {
+		<!-- Assistant message -->
+		<div class="px-4 py-2 bg-[#0D1117] border-b border-gray-800/50">
+			<div class="flex gap-2">
+				<div class="w-4 h-4 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+					<i class="fas fa-robot text-[7px] text-purple-400"></i>
+				</div>
+				<div class="flex-1 min-w-0 space-y-1 -mt-px">
+					for _, content := range msg.Content {
+						if content.Type == "text" && content.Text != "" {
+							<div class="text-xs text-gray-300 whitespace-pre-wrap leading-normal">{ content.Text }</div>
+						} else if content.Type == "tool_use" {
+							@ToolCallBlock(content)
+						} else if content.Type == "tool_result" {
+							@ToolResultBlock(content)
+						}
+					}
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// ToolCallBlock renders a tool call in a sleek collapsible style (like Claude Code)
+templ ToolCallBlock(content views.UIContent) {
+	<div class="my-1" x-data="{ expanded: false }">
+		<button @click="expanded = !expanded" 
+			class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-gray-300 transition group">
+			<div class="w-4 h-4 rounded bg-gray-800 border border-gray-700 flex items-center justify-center group-hover:border-gray-600 transition">
+				<i class={ fmt.Sprintf("fas %s text-[8px] text-gray-500 group-hover:text-gray-400", toolIcon(content.ToolName)) }></i>
+			</div>
+			<span class="font-mono">{ content.ToolName }</span>
+			<i class="fas fa-chevron-right text-[7px] transition-transform" :class="expanded ? 'rotate-90' : ''"></i>
+		</button>
+		<div x-show="expanded" x-collapse class="mt-1 ml-5">
+			<pre class="text-[9px] text-gray-500 bg-gray-900/50 rounded p-1.5 overflow-x-auto border border-gray-800">{ content.ToolInput }</pre>
+		</div>
+	</div>
+}
+
+// ToolResultBlock renders a tool result
+templ ToolResultBlock(content views.UIContent) {
+	if content.Text != "" {
+		<div class="my-1 ml-5" x-data="{ expanded: false }">
+			<button @click="expanded = !expanded" 
+				class="flex items-center gap-1.5 text-[10px] text-gray-600 hover:text-gray-400 transition">
+				<i class="fas fa-check-circle text-green-600 text-[8px]"></i>
+				<span class="font-mono">result</span>
+				<i class="fas fa-chevron-right text-[7px] transition-transform" :class="expanded ? 'rotate-90' : ''"></i>
+			</button>
+			<div x-show="expanded" x-collapse class="mt-1">
+				<pre class="text-[9px] text-gray-500 bg-gray-900/50 rounded p-1.5 overflow-x-auto border border-gray-800 max-h-32 overflow-y-auto">{ truncateResult(content.Text) }</pre>
+			</div>
+		</div>
+	}
+}
+
 templ TaskDetail(task *views.UITask, project views.UIProject) {
-	<div class="flex flex-col h-full" x-data="{ showChat: false, activeTab: 'diff' }">
+	<div class="flex flex-col h-full" x-data="{ showChat: false, activeTab: 'agent' }">
 		<!-- Modal Header -->
 		<div class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#16191F]">
 			<div class="flex items-center gap-3">
@@ -57,12 +168,12 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 		<!-- Tabs Container -->
 		<div class="flex items-center justify-center p-2 bg-[#16191F] shrink-0 border-b border-white/5">
 			<div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50">
-				<button @click="activeTab = 'diff'"
-					:class="activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
-					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Diff</button>
 				<button @click="activeTab = 'agent'"
 					:class="activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
 					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Agent</button>
+				<button @click="activeTab = 'diff'"
+					:class="activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
+					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Diff</button>
 				<button @click="activeTab = 'activity'"
 					:class="activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
 					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all">Log</button>
@@ -70,9 +181,12 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 		</div>
 
 	<!-- Main Content Area -->
-		<div class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full">
+		<div class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full" id="content-scroll" 
+			x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+			@sse:agent.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+			@sse:log.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)">
 
-			<!-- Tab 1: DIFF (SSE streaming) -->
+			<!-- Tab 2: DIFF (SSE streaming) -->
 			<div x-show="activeTab === 'diff'" class="p-0 min-h-full pb-32">
 				<div class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between">
 					<span class="text-xs text-gray-400 font-mono">changes</span>
@@ -106,8 +220,8 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				</div>
 			</div>
 
-			<!-- Tab 2: AGENT OUTPUT (SSE streaming with JetBrains Mono) -->
-			<div x-show="activeTab === 'agent'" class="p-5 pb-32">
+			<!-- Tab 1: AGENT CONVERSATION -->
+			<div x-show="activeTab === 'agent'" class="pb-32">
 				<div
 					hx-ext="sse"
 					sse-connect={ fmt.Sprintf("/task/%s/agent/stream", task.ID) }
@@ -115,16 +229,41 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					hx-swap="innerHTML"
 				>
 					if task.Status == "in_progress" {
-						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
-							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
-							<p class="text-xs font-mono">Agent is working...</p>
+						<!-- Show existing messages if any, plus loading -->
+						if len(task.Messages) > 0 {
+							<div class="space-y-0">
+								for _, msg := range task.Messages {
+									@MessageBubble(msg)
+								}
+							</div>
+						}
+						<div class="flex items-center gap-3 px-4 py-3">
+							<div class="relative">
+								<div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+									<i class="fas fa-robot text-sm text-blue-400 pulse-glow"></i>
+								</div>
+								<div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
+									<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full"></div>
+								</div>
+							</div>
+							<div>
+								<p class="text-xs font-medium shimmer">Agent is thinking...</p>
+								<p class="text-[10px] text-gray-600">Analyzing code</p>
+							</div>
+						</div>
+					} else if len(task.Messages) > 0 {
+						<div class="space-y-0">
+							for _, msg := range task.Messages {
+								@MessageBubble(msg)
+							}
 						</div>
 					} else if task.AgentOutput != "" {
-						<div class="prose prose-invert prose-xs max-w-none">
+						<!-- Fallback to raw output if no parsed messages -->
+						<div class="p-5">
 							<div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-xs">{ task.AgentOutput }</div>
 						</div>
 					} else {
-						<div class="text-gray-500 italic text-xs">No agent output</div>
+						<div class="p-5 text-gray-500 italic text-xs">No agent output</div>
 					}
 				</div>
 			</div>
@@ -153,7 +292,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 
 			<!-- Chat Input Mode (Capsule Style) -->
 			<div x-show="showChat" x-transition.origin.bottom class="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#16191F] via-[#16191F] to-transparent z-20 pb-8 flex justify-center">
-				<form hx-post={ fmt.Sprintf("/action/chat/%s", task.ID) } hx-swap="none" @submit="showChat = false"
+				<form hx-post={ fmt.Sprintf("/action/chat/%s", task.ID) } hx-swap="none" @htmx:after-request="showChat = false"
 					  class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl"
 					  x-data="{ 
 						text: '', 
@@ -206,6 +345,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 
 						<textarea name="message" x-model="text" x-ref="input"
 							   @input="resize()" @keyup="checkMention($event)"
+							   @keydown.enter.prevent="if (!$event.shiftKey) $el.form.requestSubmit()"
 							   rows="1" placeholder="Refine code instructions..."
 							   class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1"></textarea>
 					</div>
@@ -227,23 +367,37 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<div x-show="!showChat" class="grid grid-cols-4 gap-2 h-12">
 				<!-- Retry Button -->
 				<button hx-post={ fmt.Sprintf("/action/retry/%s", task.ID) } hx-swap="none"
-					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all text-gray-400 hover:text-white">
-					<i class="fas fa-undo text-xs mb-0.5"></i>
+					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white">
+					<i class="fas fa-undo text-[10px]"></i>
 					<span class="text-[10px] font-semibold uppercase tracking-wide">Retry</span>
 				</button>
 
 				<!-- Chat Button -->
 				<button @click="showChat = true" 
-					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all text-purple-400 hover:text-purple-300">
-					<i class="fas fa-comment-dots text-xs mb-0.5"></i>
+					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white">
+					<i class="fas fa-comment-dots text-[10px]"></i>
 					<span class="text-[10px] font-semibold uppercase tracking-wide">Chat</span>
 				</button>
 
-				<!-- Merge Button -->
+				<!-- PR Button -->
+				<button hx-post={ fmt.Sprintf("/action/pr/%s", task.ID) } hx-swap="none"
+					hx-indicator="#pr-spinner"
+					hx-disabled-elt="this"
+					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+					<i class="fab fa-github text-[10px] htmx-request:hidden"></i>
+					<i id="pr-spinner" class="fas fa-spinner fa-spin htmx-indicator text-[10px]"></i>
+					<span class="text-[10px] font-semibold uppercase tracking-wide">PR</span>
+				</button>
+
+				<!-- Merge to Main Button -->
 				<button hx-post={ fmt.Sprintf("/action/merge/%s", task.ID) } hx-swap="none"
-					class="col-span-2 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-2 font-bold text-sm active:scale-95 transition-all">
-					<i class="fas fa-code-branch"></i>
-					<span>Merge</span>
+					hx-indicator="#merge-spinner"
+					hx-disabled-elt="this"
+					class="col-span-1 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+					<i class="fas fa-code-merge text-[10px] htmx-request:hidden"></i>
+					<i id="merge-spinner" class="fas fa-spinner fa-spin htmx-indicator text-[10px]"></i>
+					<span class="text-[10px] font-semibold uppercase tracking-wide htmx-request:hidden">main</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wide hidden htmx-request:inline">...</span>
 				</button>
 			</div>
 		</div>

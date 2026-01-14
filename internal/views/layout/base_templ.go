@@ -9,20 +9,16 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/views/components"
 )
 
-func projectIDsJSON(projects map[string]views.UIProject) string {
-	ids := make([]string, 0, len(projects))
-	for id := range projects {
-		ids = append(ids, id)
+func boolStr(b bool) string {
+	if b {
+		return "true"
 	}
-	b, _ := json.Marshal(ids)
-	return string(b)
+	return "false"
 }
 
 // Base is the main shell of the application
@@ -47,135 +43,20 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"dark\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover\"><title>Counterspell</title><link rel=\"manifest\" href=\"/static/manifest.json\"><link rel=\"icon\" type=\"image/png\" href=\"/static/favicon.png\" sizes=\"32x32\"><link rel=\"apple-touch-icon\" href=\"/static/apple-touch-icon.png\"><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script src=\"https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js\" integrity=\"sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8\" crossorigin=\"anonymous\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js\"></script><script src=\"https://cdn.tailwindcss.com\"></script><link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css\"><script>\n\t\t\t\ttailwind.config = {\n\t\t\t\t\tdarkMode: 'class',\n\t\t\t\t\ttheme: {\n\t\t\t\t\t\tfontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] },\n\t\t\t\t\t\textend: {\n\t\t\t\t\t\t\tcolors: {\n\t\t\t\t\t\t\t\tgray: { 850: '#1A1D24', 900: '#111318', 950: '#0C0E12' },\n\t\t\t\t\t\t\t\tlinear: { border: '#2E323A', text: '#EBEBEB', sub: '#8A8F98' }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script><style>\n\t\t\t\tbody { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; }\n\t\t\t\t.hide-scrollbar::-webkit-scrollbar { display: none; }\n\t\t\t\t.no-tap-highlight { -webkit-tap-highlight-color: transparent; }\n\n\t\t\t\t/* Slide-over animation */\n\t\t\t\t.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }\n\t\t\t\t.slide-enter-start, .slide-leave-end { transform: translateY(100%); }\n\t\t\t\t.slide-enter-end, .slide-leave-start { transform: translateY(0); }\n\n\t\t\t\t/* Custom syntax highlight feel */\n\t\t\t\t.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }\n\t\t\t\t.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }\n\t\t\t\t.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }\n\t\t\t</style></head><body x-data=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"dark\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover\"><title>Counterspell</title><link rel=\"manifest\" href=\"/static/manifest.json\"><link rel=\"icon\" type=\"image/png\" href=\"/static/favicon.png\" sizes=\"32x32\"><link rel=\"apple-touch-icon\" href=\"/static/apple-touch-icon.png\"><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script src=\"https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js\" integrity=\"sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8\" crossorigin=\"anonymous\"></script><script src=\"https://cdn.tailwindcss.com\"></script><link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css\"><script>\n\t\t\t\ttailwind.config = {\n\t\t\t\t\tdarkMode: 'class',\n\t\t\t\t\ttheme: {\n\t\t\t\t\t\tfontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], mono: ['JetBrains Mono', 'Menlo', 'monospace'] },\n\t\t\t\t\t\textend: {\n\t\t\t\t\t\t\tcolors: {\n\t\t\t\t\t\t\t\tgray: { 850: '#1A1D24', 900: '#111318', 950: '#0C0E12' },\n\t\t\t\t\t\t\t\tlinear: { border: '#2E323A', text: '#EBEBEB', sub: '#8A8F98' }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t</script><style>\n\t\t\t\tbody { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; }\n\t\t\t\t.hide-scrollbar::-webkit-scrollbar { display: none; }\n\t\t\t\t.no-tap-highlight { -webkit-tap-highlight-color: transparent; }\n\n\t\t\t\t/* Slide-over animation */\n\t\t\t\t.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }\n\t\t\t\t.slide-enter-start, .slide-leave-end { transform: translateY(100%); }\n\t\t\t\t.slide-enter-end, .slide-leave-start { transform: translateY(0); }\n\n\t\t\t\t/* Custom syntax highlight feel */\n\t\t\t\t.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }\n\t\t\t\t.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }\n\t\t\t\t.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }\n\n\t\t\t\t/* Shimmer loading animation */\n\t\t\t\t.shimmer {\n\t\t\t\t\tbackground-image: linear-gradient(\n\t\t\t\t\t\t90deg,\n\t\t\t\t\t\t#3B82F6 0%,\n\t\t\t\t\t\t#60A5FA 25%,\n\t\t\t\t\t\t#93C5FD 50%,\n\t\t\t\t\t\t#60A5FA 75%,\n\t\t\t\t\t\t#3B82F6 100%\n\t\t\t\t\t);\n\t\t\t\t\tbackground-size: 200% 100%;\n\t\t\t\t\tbackground-clip: text;\n\t\t\t\t\t-webkit-background-clip: text;\n\t\t\t\t\t-webkit-text-fill-color: transparent;\n\t\t\t\t\tanimation: shimmer 1.5s linear infinite;\n\t\t\t\t}\n\n\t\t\t\t@keyframes shimmer {\n\t\t\t\t\t0% { background-position: 200% center; }\n\t\t\t\t\t100% { background-position: -200% center; }\n\t\t\t\t}\n\n\t\t\t\t/* Pulse glow for the icon */\n\t\t\t\t.pulse-glow {\n\t\t\t\t\tanimation: pulseGlow 2s ease-in-out infinite;\n\t\t\t\t}\n\n\t\t\t\t@keyframes pulseGlow {\n\t\t\t\t\t0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 2px #3B82F6); }\n\t\t\t\t\t50% { opacity: 1; filter: drop-shadow(0 0 8px #3B82F6); }\n\t\t\t\t}\n\t\t\t</style><script src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js\" defer></script></head><body x-data=\"{\n\t\t\t\tmodalOpen: false,\n\t\t\t\tactiveTab: 'diff',\n\t\t\t\tprojectMenuOpen: false,\n\t\t\t\tinputProjectMenuOpen: false,\n\t\t\t\tlistening: false,\n\t\t\t\tisRecording: false,\n\t\t\t\taudioLevel: 0,\n\t\t\t\taudioLevels: [0,0,0,0,0,0,0,0,0,0,0,0],\n\t\t\t\trecordedAudio: null,\n\t\t\t\trecordedDuration: 0,\n\t\t\t\tmediaRecorder: null,\n\t\t\t\taudioChunks: [],\n\t\t\t\taudioContext: null,\n\t\t\t\tanalyser: null,\n\t\t\t\tanimationFrame: null,\n\t\t\t\ttoastMsg: '',\n\t\t\t\ttoastOpen: false,\n\t\t\t\tsettingsOpen: false,\n\t\t\t\tuserMenuOpen: false,\n\t\t\t\tdeferredPrompt: null,\n\t\t\t\tcanInstallPWA: false,\n\t\t\t\tactiveProjectId: localStorage.getItem('counterspell_active_project_id') || '',\n\t\t\t\tactiveProjectName: localStorage.getItem('counterspell_active_project_name') || '',\n\t\t\t\tshowOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),\n\t\t\t\tonboardingStep: 0,\n\t\t\t\tisAuthenticated: document.body.dataset.authenticated === 'true',\n\t\t\t\tinit() {\n\t\t\t\t\tconsole.log('[APP] Alpine init, isAuthenticated:', this.isAuthenticated, 'showOnboarding:', this.showOnboarding);\n\t\t\t\t\tif (this.showOnboarding && this.isAuthenticated) {\n\t\t\t\t\t\tthis.runPostAuthSequence();\n\t\t\t\t\t}\n\t\t\t\t\tthis.connectSSE();\n\t\t\t\t\tthis.setupPWAInstall();\n\t\t\t\t},\n\t\t\t\tsetActiveProject(id, name) {\n\t\t\t\t\tconsole.log('[setActiveProject] called with:', id, name);\n\t\t\t\t\tthis.activeProjectId = id;\n\t\t\t\t\tthis.activeProjectName = name;\n\t\t\t\t\tlocalStorage.setItem('counterspell_active_project_id', id);\n\t\t\t\t\tlocalStorage.setItem('counterspell_active_project_name', name);\n\t\t\t\t\tthis.inputProjectMenuOpen = false;\n\t\t\t\t\tthis.projectMenuOpen = false;\n\t\t\t\t},\n\t\t\t\tconnectSSE() {\n\t\t\t\t\tif (this._eventSource) { this._eventSource.close(); }\n\t\t\t\t\tconst eventSource = new EventSource('/events');\n\t\t\t\t\tthis._eventSource = eventSource;\n\t\t\t\t\teventSource.addEventListener('task', (e) => {\n\t\t\t\t\t\tconst data = JSON.parse(e.data);\n\t\t\t\t\t\tthis.showToast(data.html_payload ? 'Task updated' : 'Event received');\n\t\t\t\t\t\tif (data.type === 'status_change') { htmx.trigger('#reviews-container', 'refresh'); }\n\t\t\t\t\t});\n\t\t\t\t\teventSource.onerror = () => { eventSource.close(); setTimeout(() => this.connectSSE(), 5000); };\n\t\t\t\t},\n\t\t\t\tstartOnboarding() {\n\t\t\t\t\tthis.onboardingStep = 1;\n\t\t\t\t\tsetTimeout(() => { window.location.href = '/github/authorize?type=user'; }, 1000);\n\t\t\t\t},\n\t\t\t\trunPostAuthSequence() {\n\t\t\t\t\tthis.onboardingStep = 2;\n\t\t\t\t\tsetTimeout(() => { this.onboardingStep = 3; }, 2000);\n\t\t\t\t},\n\t\t\t\tshowToast(msg) {\n\t\t\t\t\tthis.toastMsg = msg;\n\t\t\t\t\tthis.toastOpen = true;\n\t\t\t\t\tsetTimeout(() => this.toastOpen = false, 3000);\n\t\t\t\t},\n\t\t\t\tsimulateVoice() {\n\t\t\t\t\tthis.listening = true;\n\t\t\t\t\tsetTimeout(() => { this.listening = false; this.$refs.voiceForm.requestSubmit(); }, 1200);\n\t\t\t\t},\n\t\t\t\tasync startVoiceRecording() {\n\t\t\t\t\ttry {\n\t\t\t\t\t\tconst stream = await navigator.mediaDevices.getUserMedia({ audio: true });\n\t\t\t\t\t\tthis.audioContext = new (window.AudioContext || window.webkitAudioContext)();\n\t\t\t\t\t\tconst source = this.audioContext.createMediaStreamSource(stream);\n\t\t\t\t\t\tthis.analyser = this.audioContext.createAnalyser();\n\t\t\t\t\t\tthis.analyser.fftSize = 64;\n\t\t\t\t\t\tsource.connect(this.analyser);\n\t\t\t\t\t\tthis.mediaRecorder = new MediaRecorder(stream);\n\t\t\t\t\t\tthis.audioChunks = [];\n\t\t\t\t\t\tthis.recordedDuration = 0;\n\t\t\t\t\t\tthis.isRecording = true;\n\t\t\t\t\t\tconst startTime = Date.now();\n\t\t\t\t\t\tconst updateLevels = () => {\n\t\t\t\t\t\t\tif (!this.isRecording) return;\n\t\t\t\t\t\t\tconst dataArray = new Uint8Array(this.analyser.frequencyBinCount);\n\t\t\t\t\t\t\tthis.analyser.getByteFrequencyData(dataArray);\n\t\t\t\t\t\t\tconst levels = [];\n\t\t\t\t\t\t\tconst step = Math.floor(dataArray.length / 12);\n\t\t\t\t\t\t\tfor (let i = 0; i < 12; i++) { const val = dataArray[i * step] || 0; levels.push(Math.min(100, (val / 255) * 100)); }\n\t\t\t\t\t\t\tthis.audioLevels = levels;\n\t\t\t\t\t\t\tthis.recordedDuration = Math.floor((Date.now() - startTime) / 1000);\n\t\t\t\t\t\t\tthis.animationFrame = requestAnimationFrame(updateLevels);\n\t\t\t\t\t\t};\n\t\t\t\t\t\tupdateLevels();\n\t\t\t\t\t\tthis.mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) this.audioChunks.push(e.data); };\n\t\t\t\t\t\tthis.mediaRecorder.onstop = () => {\n\t\t\t\t\t\t\tconst blob = new Blob(this.audioChunks, { type: 'audio/webm' });\n\t\t\t\t\t\t\tthis.recordedAudio = { blob: blob, url: URL.createObjectURL(blob), duration: this.recordedDuration };\n\t\t\t\t\t\t\tstream.getTracks().forEach(t => t.stop());\n\t\t\t\t\t\t};\n\t\t\t\t\t\tthis.mediaRecorder.start();\n\t\t\t\t\t} catch (err) { this.showToast('Microphone access denied'); this.isRecording = false; }\n\t\t\t\t},\n\t\t\t\tstopVoiceRecording() {\n\t\t\t\t\tif (!this.isRecording) return;\n\t\t\t\t\tthis.isRecording = false;\n\t\t\t\t\tif (this.animationFrame) cancelAnimationFrame(this.animationFrame);\n\t\t\t\t\tif (this.audioContext) this.audioContext.close();\n\t\t\t\t\tif (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') { this.mediaRecorder.stop(); }\n\t\t\t\t\tthis.audioLevels = [0,0,0,0,0,0,0,0,0,0,0,0];\n\t\t\t\t},\n\t\t\t\tcancelRecording() { this.stopVoiceRecording(); this.recordedAudio = null; },\n\t\t\t\tformatDuration(secs) { const m = Math.floor(secs / 60); const s = secs % 60; return m + ':' + (s < 10 ? '0' : '') + s; },\n\t\t\t\tcloseModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); },\n\t\t\t\tsetupPWAInstall() {\n\t\t\t\t\twindow.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); this.deferredPrompt = e; this.canInstallPWA = true; });\n\t\t\t\t\twindow.addEventListener('appinstalled', () => { this.deferredPrompt = null; this.canInstallPWA = false; this.showToast('App installed successfully!'); });\n\t\t\t\t},\n\t\t\t\tinstallPWA() {\n\t\t\t\t\tif (!this.deferredPrompt) return;\n\t\t\t\t\tthis.deferredPrompt.prompt();\n\t\t\t\t\tthis.deferredPrompt.userChoice.then((choiceResult) => {\n\t\t\t\t\t\tif (choiceResult.outcome === 'accepted') { this.showToast('Installing app...'); }\n\t\t\t\t\t\tthis.deferredPrompt = null;\n\t\t\t\t\t\tthis.canInstallPWA = false;\n\t\t\t\t\t});\n\t\t\t\t}\n\t\t\t}\" data-authenticated=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{
-			modalOpen: false,
-			activeTab: 'diff',
-			projectMenuOpen: false,
-			inputProjectMenuOpen: false,
-			listening: false,
-			toastMsg: '',
-			toastOpen: false,
-			settingsOpen: false,
-			userMenuOpen: false,
-			deferredPrompt: null,
-			canInstallPWA: false,
-
-			// Active project for input
-			activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
-			activeProjectName: localStorage.getItem('counterspell_active_project_name') || '',
-
-			// Onboarding State
-			showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
-			onboardingStep: 0,
-            isAuthenticated: %t,
-
-            init() {
-                if (this.showOnboarding && this.isAuthenticated) {
-                    this.runPostAuthSequence();
-                }
-                this.connectSSE();
-                this.setupPWAInstall();
-            },
-
-			setActiveProject(id, name) {
-				this.activeProjectId = id;
-				this.activeProjectName = name;
-				localStorage.setItem('counterspell_active_project_id', id);
-				localStorage.setItem('counterspell_active_project_name', name);
-				this.inputProjectMenuOpen = false;
-				this.projectMenuOpen = false;
-			},
-
-            connectSSE() {
-                // Close existing connection to prevent memory leaks
-                if (this._eventSource) {
-                    this._eventSource.close();
-                }
-                const eventSource = new EventSource('/events');
-                this._eventSource = eventSource;
-                eventSource.addEventListener('task', (e) => {
-                    const data = JSON.parse(e.data);
-                    this.showToast(data.html_payload ? 'Task updated' : 'Event received');
-                    // Active tasks now update via htmx SSE extension
-                    // Only refresh reviews section on task completion
-                    if (data.type === 'status_change') {
-                        htmx.trigger('#reviews-container', 'refresh');
-                    }
-                });
-                eventSource.onerror = () => {
-                    eventSource.close(); // Close failed connection
-                    setTimeout(() => this.connectSSE(), 5000);
-                };
-            },
-
-			startOnboarding() {
-				this.onboardingStep = 1;
-				// Real Auth Redirect
-				setTimeout(() => {
-					window.location.href = '/github/authorize?type=user';
-				}, 1000);
-			},
-
-            runPostAuthSequence() {
-                this.onboardingStep = 2; // Syncing
-                setTimeout(() => {
-                    this.onboardingStep = 3; // Ready
-                }, 2000);
-            },
-
-			showToast(msg) {
-				this.toastMsg = msg;
-				this.toastOpen = true;
-				setTimeout(() => this.toastOpen = false, 3000);
-			},
-			simulateVoice() {
-				this.listening = true;
-				setTimeout(() => {
-					this.listening = false;
-					this.$refs.voiceForm.requestSubmit();
-				}, 1200);
-			},
-			closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); },
-
-			setupPWAInstall() {
-				window.addEventListener('beforeinstallprompt', (e) => {
-					e.preventDefault();
-					this.deferredPrompt = e;
-					this.canInstallPWA = true;
-				});
-
-				window.addEventListener('appinstalled', () => {
-					this.deferredPrompt = null;
-					this.canInstallPWA = false;
-					this.showToast('App installed successfully!');
-				});
-			},
-
-			installPWA() {
-				if (!this.deferredPrompt) return;
-				this.deferredPrompt.prompt();
-				this.deferredPrompt.userChoice.then((choiceResult) => {
-					if (choiceResult.outcome === 'accepted') {
-						this.showToast('Installing app...');
-					}
-					this.deferredPrompt = null;
-					this.canInstallPWA = false;
-				});
-			}
-		}`, isAuthenticated))
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(boolStr(isAuthenticated))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout/base.templ`, Line: 183, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout/base.templ`, Line: 227, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" @keydown.escape=\"closeModal()\" @close-modal.window=\"closeModal()\" @toast.window=\"showToast($event.detail.value)\" class=\"h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]\"><!-- Toast Notification --><div x-show=\"toastOpen\" x-transition:enter=\"transition ease-out duration-300\" x-transition:enter-start=\"translate-y-full opacity-0\" x-transition:enter-end=\"translate-y-0 opacity-100\" x-transition:leave=\"transition ease-in duration-200\" x-transition:leave-start=\"translate-y-0 opacity-100\" x-transition:leave-end=\"translate-y-full opacity-0\" class=\"fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 border border-gray-700/50 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-sm font-medium\"><i class=\"fas fa-check-circle text-green-500\"></i> <span x-text=\"toastMsg\"></span></div><!-- Onboarding Overlay --><div x-show=\"showOnboarding\" x-transition:leave=\"transition ease-in duration-500\" x-transition:leave-start=\"opacity-100 translate-y-0\" x-transition:leave-end=\"opacity-0 -translate-y-10\" class=\"fixed inset-0 z-[100] bg-[#0C0E12] flex flex-col items-center justify-center text-center px-6\"><!-- Background Effects --><div class=\"absolute inset-0 overflow-hidden pointer-events-none\"><div class=\"absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse\"></div><div class=\"absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animation-delay-2000 animate-pulse\"></div></div><!-- Content --><div class=\"relative z-10 max-w-md w-full space-y-8\"><div class=\"space-y-4\"><div class=\"w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6\"><i class=\"fas fa-wave-square text-2xl text-white\"></i></div><h1 class=\"text-3xl font-bold text-white tracking-tight\">Welcome to Counterspell</h1><p class=\"text-gray-400 text-sm leading-relaxed\">The AI-native orchestration layer for your engineering team.<br>Connect your identity to begin.</p></div><!-- Step 0: Initial Action --><div x-show=\"onboardingStep === 0\" x-transition.opacity><button @click=\"startOnboarding()\" class=\"w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2\"><i class=\"fab fa-github text-lg\"></i> Continue with GitHub</button><p class=\"mt-4 text-[10px] text-gray-600\">By continuing, you agree to the Developer Protocol v2.1</p></div><!-- Step 1-3: Loading Sequence --><div x-show=\"onboardingStep > 0\" class=\"space-y-4\" x-cloak><div class=\"bg-gray-900/50 rounded-xl p-4 border border-gray-800 text-left space-y-3 font-mono text-xs\"><!-- Item 1: Auth --><div class=\"flex items-center gap-3\"><div class=\"w-4 h-4 rounded-full flex items-center justify-center\" :class=\"onboardingStep > 1 ? 'bg-green-500/20 text-green-500' : 'bg-purple-500/20 text-purple-400'\"><i class=\"fas\" :class=\"onboardingStep > 1 ? 'fa-check' : 'fa-circle-notch fa-spin'\"></i></div><span :class=\"onboardingStep > 1 ? 'text-gray-400' : 'text-gray-200'\">Authenticating with GitHub...</span></div><!-- Item 2: Repos --><div class=\"flex items-center gap-3\" x-show=\"onboardingStep >= 2\" x-transition.opacity><div class=\"w-4 h-4 rounded-full flex items-center justify-center\" :class=\"onboardingStep > 2 ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-400'\"><i class=\"fas\" :class=\"onboardingStep > 2 ? 'fa-check' : 'fa-circle-notch fa-spin'\"></i></div><span :class=\"onboardingStep > 2 ? 'text-gray-400' : 'text-gray-200'\">Indexing repositories...</span></div><!-- Item 3: Voice --><div class=\"flex items-center gap-3\" x-show=\"onboardingStep >= 3\" x-transition.opacity><div class=\"w-4 h-4 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center\"><i class=\"fas fa-check\"></i></div><span class=\"text-green-400\">Environment Ready</span></div></div></div><!-- Step 3: PWA Install (shown after ready) --><div x-show=\"onboardingStep === 3\" class=\"space-y-4\" x-cloak x-transition.opacity><!-- PWA Install Button --><div x-show=\"canInstallPWA\" class=\"space-y-3\"><button @click=\"installPWA()\" class=\"group w-full relative bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold h-14 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-3 overflow-hidden\"><div class=\"absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300\"></div><div class=\"relative flex items-center gap-3\"><div class=\"w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm\"><i class=\"fas fa-download text-lg\"></i></div><span>Install Counterspell</span></div></button><p class=\"text-center text-xs text-gray-500\">Add to home screen for the best experience</p></div><!-- Skip Install Button --><button @click=\"localStorage.setItem('counterspell_v1_onboarded', 'true'); showOnboarding = false\" class=\"w-full bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 font-medium h-12 rounded-xl transition-all duration-300 text-sm\">Continue to Dashboard</button></div></div></div><!-- User Header -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" @keydown.escape=\"closeModal()\" @close-modal.window=\"closeModal()\" @toast.window=\"showToast($event.detail.value)\" @open-url.window=\"window.open($event.detail.value, '_blank')\" class=\"h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]\"><!-- Toast Notification --><div x-show=\"toastOpen\" x-transition:enter=\"transition ease-out duration-300\" x-transition:enter-start=\"translate-y-full opacity-0\" x-transition:enter-end=\"translate-y-0 opacity-100\" x-transition:leave=\"transition ease-in duration-200\" x-transition:leave-start=\"translate-y-0 opacity-100\" x-transition:leave-end=\"translate-y-full opacity-0\" class=\"fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 border border-gray-700/50 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-sm font-medium\"><i class=\"fas fa-check-circle text-green-500\"></i> <span x-text=\"toastMsg\"></span></div><!-- Onboarding Overlay --><div x-show=\"showOnboarding\" x-transition:leave=\"transition ease-in duration-500\" x-transition:leave-start=\"opacity-100 translate-y-0\" x-transition:leave-end=\"opacity-0 -translate-y-10\" class=\"fixed inset-0 z-[100] bg-[#0C0E12] flex flex-col items-center justify-center text-center px-6\"><!-- Background Effects --><div class=\"absolute inset-0 overflow-hidden pointer-events-none\"><div class=\"absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse\"></div><div class=\"absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animation-delay-2000 animate-pulse\"></div></div><!-- Content --><div class=\"relative z-10 max-w-md w-full space-y-8\"><div class=\"space-y-4\"><div class=\"w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6\"><i class=\"fas fa-wave-square text-2xl text-white\"></i></div><h1 class=\"text-3xl font-bold text-white tracking-tight\">Welcome to Counterspell</h1><p class=\"text-gray-400 text-sm leading-relaxed\">The AI-native orchestration layer for your engineering team.<br>Connect your identity to begin.</p></div><!-- Step 0: Initial Action --><div x-show=\"onboardingStep === 0\" x-transition.opacity><button @click=\"startOnboarding()\" class=\"w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2\"><i class=\"fab fa-github text-lg\"></i> Continue with GitHub</button><p class=\"mt-4 text-[10px] text-gray-600\">By continuing, you agree to the Developer Protocol v2.1</p></div><!-- Step 1-3: Loading Sequence --><div x-show=\"onboardingStep > 0\" class=\"space-y-4\" x-cloak><div class=\"bg-gray-900/50 rounded-xl p-4 border border-gray-800 text-left space-y-3 font-mono text-xs\"><!-- Item 1: Auth --><div class=\"flex items-center gap-3\"><div class=\"w-4 h-4 rounded-full flex items-center justify-center\" :class=\"onboardingStep > 1 ? 'bg-green-500/20 text-green-500' : 'bg-purple-500/20 text-purple-400'\"><i class=\"fas\" :class=\"onboardingStep > 1 ? 'fa-check' : 'fa-circle-notch fa-spin'\"></i></div><span :class=\"onboardingStep > 1 ? 'text-gray-400' : 'text-gray-200'\">Authenticating with GitHub...</span></div><!-- Item 2: Repos --><div class=\"flex items-center gap-3\" x-show=\"onboardingStep >= 2\" x-transition.opacity><div class=\"w-4 h-4 rounded-full flex items-center justify-center\" :class=\"onboardingStep > 2 ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-400'\"><i class=\"fas\" :class=\"onboardingStep > 2 ? 'fa-check' : 'fa-circle-notch fa-spin'\"></i></div><span :class=\"onboardingStep > 2 ? 'text-gray-400' : 'text-gray-200'\">Indexing repositories...</span></div><!-- Item 3: Voice --><div class=\"flex items-center gap-3\" x-show=\"onboardingStep >= 3\" x-transition.opacity><div class=\"w-4 h-4 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center\"><i class=\"fas fa-check\"></i></div><span class=\"text-green-400\">Environment Ready</span></div></div></div><!-- Step 3: PWA Install (shown after ready) --><div x-show=\"onboardingStep === 3\" class=\"space-y-4\" x-cloak x-transition.opacity><!-- PWA Install Button --><div x-show=\"canInstallPWA\" class=\"space-y-3\"><button @click=\"installPWA()\" class=\"group w-full relative bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold h-14 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-3 overflow-hidden\"><div class=\"absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300\"></div><div class=\"relative flex items-center gap-3\"><div class=\"w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm\"><i class=\"fas fa-download text-lg\"></i></div><span>Install Counterspell</span></div></button><p class=\"text-center text-xs text-gray-500\">Add to home screen for the best experience</p></div><!-- Skip Install Button --><button @click=\"localStorage.setItem('counterspell_v1_onboarded', 'true'); showOnboarding = false\" class=\"w-full bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 font-medium h-12 rounded-xl transition-all duration-300 text-sm\">Continue to Dashboard</button></div></div></div><!-- User Header -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -207,7 +88,7 @@ func Base(title string, projects map[string]views.UIProject, settings models.Use
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!-- Validate stored project ID against current projects --><script id=\"valid-project-ids\" type=\"application/json\">\n\t\t\t\t{ templ.JSONString(projectIDsJSON(projects)) }\n\t\t\t</script><script>\n\t\t\t\t(function() {\n\t\t\t\t\ttry {\n\t\t\t\t\t\tconst validIds = new Set(JSON.parse(document.getElementById('valid-project-ids').textContent));\n\t\t\t\t\t\tconst storedId = localStorage.getItem('counterspell_active_project_id');\n\t\t\t\t\t\tif (storedId && !validIds.has(storedId)) {\n\t\t\t\t\t\t\tconsole.log('Clearing stale project ID:', storedId);\n\t\t\t\t\t\t\tlocalStorage.removeItem('counterspell_active_project_id');\n\t\t\t\t\t\t\tlocalStorage.removeItem('counterspell_active_project_name');\n\t\t\t\t\t\t\twindow.location.reload();\n\t\t\t\t\t\t}\n\t\t\t\t\t} catch (e) {\n\t\t\t\t\t\tconsole.error('Failed to validate project IDs:', e);\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
