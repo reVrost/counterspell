@@ -58,53 +58,54 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Docked Input Bar --><div class=\"fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-3xl\"><form x-ref=\"voiceForm\" hx-post=\"/add-task\" hx-target=\"#feed-container\" hx-swap=\"innerHTML\" hx-on::after-request=\"if(event.detail.successful) { text = ''; $refs.input.style.height = 'auto'; }\" @submit=\"if(!activeProjectId) { $event.preventDefault(); showToast('Select a project first'); }\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10\" x-data=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Docked Input Bar --><div class=\"fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-3xl\"><form x-ref=\"voiceForm\" hx-post=\"/add-task\" hx-target=\"#feed-container\" hx-swap=\"innerHTML\" hx-on::after-request=\"if(event.detail.successful) { text = ''; $refs.input.value = ''; $refs.input.style.height = 'auto'; }\" @submit=\"if(!app.activeProjectId) { $event.preventDefault(); app.showToast('Select a project first'); }\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10\" x-data x-init=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{
-					text: '',
-					showFileMenu: false,
-					activeModelId: localStorage.getItem('counterspell_model') || '%s',
-					files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
-					resize() {
-						this.$refs.input.style.height = 'auto';
-						let newHeight = this.$refs.input.scrollHeight;
-						if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
-						this.$refs.input.style.height = newHeight + 'px';
-					},
-					checkMention(e) {
-						if (this.text.match(/@[^ ]*$/)) {
-							this.showFileMenu = true;
-						} else {
-							this.showFileMenu = false;
-						}
-						if (e.key === 'Escape') this.showFileMenu = false;
-					},
-					insertFile(f) {
-						this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`Object.assign($data, {
+				text: "",
+				showFileMenu: false,
+				activeModelId: localStorage.getItem("counterspell_model") || "%s",
+				files: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
+				get app() { return Alpine.$data(document.body); },
+				resize() {
+					this.$refs.input.style.height = "auto";
+					let newHeight = this.$refs.input.scrollHeight;
+					if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
+					this.$refs.input.style.height = newHeight + "px";
+				},
+				checkMention(e) {
+					if (this.text.match(/@[^ ]*$/)) {
+						this.showFileMenu = true;
+					} else {
 						this.showFileMenu = false;
-						this.$nextTick(() => { this.$refs.input.focus(); });
-					},
-					setModel(modelId) {
-						this.activeModelId = modelId;
-						localStorage.setItem('counterspell_model', modelId);
-					},
-					get modelName() {
-						const models = %s;
-						const model = models.find(m => m.id === this.activeModelId);
-						return model ? model.name.split(' ')[1] : this.activeModelId.split('#')[1];
 					}
-				}`, uiModels[0].ID, getModelsJSON()))
+					if (e.key === "Escape") this.showFileMenu = false;
+				},
+				insertFile(f) {
+					this.text = this.text.replace(/@[^ ]*$/, "") + f + " ";
+					this.showFileMenu = false;
+					this.$nextTick(() => { this.$refs.input.focus(); });
+				},
+				setModel(modelId) {
+					this.activeModelId = modelId;
+					localStorage.setItem("counterspell_model", modelId);
+				},
+				get modelName() {
+					const models = %s;
+					const model = models.find(m => m.id === this.activeModelId);
+					return model ? model.name.split(" ")[1] : this.activeModelId.split("#")[1];
+				}
+			})`, uiModels[0].ID, getModelsJSON()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 72, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 73, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><!-- Hidden fields --><input type=\"hidden\" name=\"project_id\" :value=\"activeProjectId\"> <input type=\"hidden\" name=\"model_id\" :value=\"activeModelId\"><!-- Input Area --><div class=\"relative px-4 pt-4 pb-2\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea x-model=\"text\" x-ref=\"input\" name=\"voice_input\" @input=\"resize()\" @keyup=\"checkMention($event)\" rows=\"1\" placeholder=\"What do you want to build?\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]\"></textarea></div><!-- Toolbar --><div class=\"flex items-center justify-between px-2 pb-2 mt-1\"><!-- Left: Project Selector --><div class=\"relative\"><button type=\"button\" @click=\"inputProjectMenuOpen = !inputProjectMenuOpen\" class=\"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border border-transparent hover:border-gray-700\" :class=\"activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'\"><div class=\"flex items-center justify-center w-4 h-4 rounded-full\" :class=\"activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'\"><i class=\"fas fa-folder text-[9px]\" :class=\"activeProjectId ? 'text-blue-400' : 'text-gray-400'\"></i></div><span x-text=\"activeProjectName ? activeProjectName.split('/').pop() : 'Select project'\" class=\"max-w-[120px] truncate\"></span> <i class=\"fas fa-chevron-down text-[8px] opacity-50 ml-0.5\"></i></button><!-- Project Dropdown --><div x-show=\"inputProjectMenuOpen\" @click.outside=\"inputProjectMenuOpen = false\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-3 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col\" x-data=\"{ search: '' }\"><div class=\"p-3 border-b border-gray-800 bg-[#16191F]/50 backdrop-blur-sm sticky top-0\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Search projects...\" class=\"w-full bg-gray-900/50 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600 transition-colors\"></div></div><div class=\"max-h-[240px] overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-700\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><!-- Hidden fields --><input type=\"hidden\" name=\"project_id\" :value=\"app.activeProjectId\"> <input type=\"hidden\" name=\"model_id\" :value=\"activeModelId\"><!-- Voice Recording Visualization --><div x-show=\"app.isRecording\" x-cloak class=\"absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10\"><!-- Cancel Button --><button type=\"button\" @click=\"app.cancelRecording()\" class=\"w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0\"><i class=\"fas fa-times text-sm\"></i></button><!-- Waveform Bars --><div class=\"flex-1 flex items-center justify-center gap-[3px] h-10 mx-4\"><template x-for=\"(level, i) in app.audioLevels\" :key=\"i\"><div class=\"w-1 bg-red-500 rounded-full transition-all duration-75\" :style=\"`height: ${Math.max(4, level * 0.4)}px; opacity: ${0.4 + (level / 100) * 0.6}`\"></div></template></div><!-- Duration --><div class=\"flex items-center gap-2 shrink-0\"><div class=\"w-2 h-2 rounded-full bg-red-500 animate-pulse\"></div><span class=\"text-sm text-gray-300 font-mono\" x-text=\"app.formatDuration(app.recordedDuration)\"></span></div></div><!-- Recorded Audio Preview --><div x-show=\"app.recordedAudio && !app.isRecording\" x-cloak class=\"absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10\"><!-- Delete Button --><button type=\"button\" @click=\"app.recordedAudio = null\" class=\"w-8 h-8 rounded-full bg-gray-800 hover:bg-red-500/20 flex items-center justify-center text-gray-400 hover:text-red-400 transition shrink-0\"><i class=\"fas fa-trash text-sm\"></i></button><!-- Audio Waveform Display --><div class=\"flex-1 mx-4 flex items-center gap-3\"><button type=\"button\" x-data=\"{ playing: false }\" @click=\"\n\t\t\t\t\t\t\tif (!$refs.audioPlayer) return;\n\t\t\t\t\t\t\tif (playing) { $refs.audioPlayer.pause(); $refs.audioPlayer.currentTime = 0; }\n\t\t\t\t\t\t\telse { $refs.audioPlayer.play(); }\n\t\t\t\t\t\t\tplaying = !playing;\n\t\t\t\t\t\t\" class=\"w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white transition shrink-0\"><i class=\"fas\" :class=\"playing ? 'fa-stop' : 'fa-play'\" style=\"font-size: 10px; margin-left: 1px;\"></i></button> <audio x-ref=\"audioPlayer\" :src=\"app.recordedAudio?.url\" @ended=\"playing = false\" class=\"hidden\"></audio><!-- Static waveform visualization --><div class=\"flex-1 flex items-center gap-[2px] h-8\"><template x-for=\"i in 30\"><div class=\"flex-1 bg-blue-500/60 rounded-full\" :style=\"`height: ${4 + Math.sin(i * 0.5) * 8 + Math.random() * 8}px`\"></div></template></div><span class=\"text-xs text-gray-400 font-mono shrink-0\" x-text=\"app.formatDuration(app.recordedAudio?.duration || 0)\"></span></div><!-- Send Button --><button type=\"button\" @click=\"app.showToast('Voice message ready to send'); app.recordedAudio = null\" class=\"w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white transition shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.4)]\"><i class=\"fas fa-arrow-up text-sm\"></i></button></div><!-- Input Area --><div class=\"relative px-4 pt-4 pb-2\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea x-model=\"text\" x-ref=\"input\" name=\"voice_input\" @input=\"resize()\" @keyup=\"checkMention($event)\" rows=\"1\" placeholder=\"What do you want to build?\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]\"></textarea></div><!-- Toolbar --><div class=\"flex items-center justify-between px-2 pb-2 mt-1\"><!-- Left: Project Selector --><div class=\"relative\"><button type=\"button\" @click=\"app.inputProjectMenuOpen = !app.inputProjectMenuOpen\" class=\"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border border-transparent hover:border-gray-700\" :class=\"app.activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'\"><div class=\"flex items-center justify-center w-4 h-4 rounded-full\" :class=\"app.activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'\"><i class=\"fas fa-folder text-[9px]\" :class=\"app.activeProjectId ? 'text-blue-400' : 'text-gray-400'\"></i></div><span x-text=\"app.activeProjectName ? app.activeProjectName.split('/').pop() : 'Select project'\" class=\"max-w-[120px] truncate\"></span> <i class=\"fas fa-chevron-down text-[8px] opacity-50 ml-0.5\"></i></button><!-- Project Dropdown --><div x-show=\"app.inputProjectMenuOpen\" @click.outside=\"app.inputProjectMenuOpen = false\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-3 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col\" x-data=\"{ search: '', get app() { return Alpine.$data(document.body); } }\"><div class=\"p-3 border-b border-gray-800 bg-[#16191F]/50 backdrop-blur-sm sticky top-0\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Search projects...\" class=\"w-full bg-gray-900/50 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600 transition-colors\"></div></div><div class=\"max-h-[240px] overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-700\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -114,9 +115,9 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("setActiveProject('%s', '%s')", p.ID, p.Name))
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 132, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 198, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -129,7 +130,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 134, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 200, Col: 90}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -164,7 +165,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 139, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 205, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -177,7 +178,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 140, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 206, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -188,9 +189,9 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("activeProjectId === '%s'", p.ID))
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s'", p.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 142, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 208, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -224,7 +225,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("setModel('%s')", m.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 177, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 243, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -250,7 +251,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(m.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 179, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 245, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -263,7 +264,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("activeModelId === '%s'", m.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 180, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/input.templ`, Line: 246, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -274,7 +275,7 @@ func InputBar(projects map[string]views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div></div></div><!-- Divider --><div class=\"w-px h-4 bg-gray-700 mx-1\"></div><!-- Submit Button --><button type=\"button\" @click=\"text.length > 0 ? $refs.voiceForm.requestSubmit() : simulateVoice()\" :class=\"listening ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300')\" class=\"w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-300 hover:scale-105 active:scale-95 ml-1\"><i class=\"fas\" :class=\"text.length > 0 ? 'fa-arrow-up' : (listening ? 'fa-stop animate-pulse' : 'fa-microphone')\"></i></button></div></div></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div></div></div><!-- Divider --><div class=\"w-px h-4 bg-gray-700 mx-1\"></div><!-- Submit/Voice Button --><button type=\"button\" @click=\"if(text.length > 0 && !this._touchSubmitted) { $refs.voiceForm.requestSubmit(); } this._touchSubmitted = false;\" @mousedown=\"if (text.length === 0 && !app.isRecording) app.startVoiceRecording()\" @mouseup=\"if (app.isRecording) app.stopVoiceRecording()\" @mouseleave=\"if (app.isRecording) app.stopVoiceRecording()\" @touchstart=\"if (text.length === 0 && !app.isRecording) { $event.preventDefault(); app.startVoiceRecording(); }\" @touchend=\"if (app.isRecording) { $event.preventDefault(); app.stopVoiceRecording(); } else if (text.length > 0) { this._touchSubmitted = true; $refs.voiceForm.requestSubmit(); }\" @touchcancel=\"if (app.isRecording) app.cancelRecording()\" :class=\"app.isRecording ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-110' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')\" class=\"w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 ml-1 select-none touch-none\"><i class=\"fas\" :class=\"text.length > 0 ? 'fa-arrow-up' : (app.isRecording ? 'fa-microphone animate-pulse' : 'fa-microphone')\"></i></button></div></div></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

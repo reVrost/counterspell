@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/panjf2000/ants/v2"
@@ -460,6 +464,13 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 		o.emitError(taskID, event.Content)
 	case agent.EventDone:
 		o.emit(taskID, "success", event.Content)
+	case agent.EventMessages:
+		// Publish message history for live agent panel updates
+		o.events.Publish(models.Event{
+			TaskID:      taskID,
+			Type:        "agent_update",
+			HTMLPayload: event.Messages, // JSON message history
+		})
 	}
 }
 
@@ -531,6 +542,284 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	}
 
 	return nil
+}
+
+// MergeTask merges a task's branch to main and marks it done.
+// If there's a merge conflict, returns ErrMergeConflict for the handler to show conflict UI.
+func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
+	// Get task to find project info
+	task, err := o.tasks.Get(ctx, taskID)
+	if err != nil {
+		return fmt.Errorf("task not found: %w", err)
+	}
+
+	// Get project info
+	projects, err := o.github.GetProjects(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	var owner, repo string
+	for _, p := range projects {
+		if p.ID == task.ProjectID {
+			owner = p.GitHubOwner
+			repo = p.GitHubRepo
+			break
+		}
+	}
+
+	if owner == "" {
+		return fmt.Errorf("project not found for task")
+	}
+
+	// First, pull main into the worktree to check for conflicts
+	if err := o.repos.PullMainIntoWorktree(owner, repo, taskID); err != nil {
+		// Check if it's a merge conflict - return it for the handler to show UI
+		if conflictErr, ok := err.(*git.ErrMergeConflict); ok {
+			slog.Info("[ORCHESTRATOR] Merge conflict detected",
+				"task_id", taskID, "files", conflictErr.ConflictedFiles)
+			return conflictErr
+		}
+		return fmt.Errorf("failed to pull main: %w", err)
+	}
+
+	// No conflicts - commit the merge and push
+	if err := o.repos.CommitAndPush(taskID, "Merge main into branch"); err != nil {
+		slog.Warn("[ORCHESTRATOR] No changes to commit after merge", "task_id", taskID)
+	}
+
+	// Now merge to main
+	branchName, err := o.repos.MergeToMain(owner, repo, taskID)
+	if err != nil {
+		return fmt.Errorf("failed to merge: %w", err)
+	}
+
+	slog.Info("[ORCHESTRATOR] Merged task to main", "task_id", taskID, "branch", branchName)
+
+	// Update task status to done
+	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusDone); err != nil {
+		return fmt.Errorf("failed to update task status: %w", err)
+	}
+
+	// Clean up the worktree
+	if err := o.repos.RemoveWorktree(taskID); err != nil {
+		slog.Warn("[ORCHESTRATOR] Failed to remove worktree after merge", "task_id", taskID, "error", err)
+	}
+
+	// Emit status change event
+	o.events.Publish(models.Event{
+		TaskID: taskID,
+		Type:   "status_change",
+	})
+
+	return nil
+}
+
+// GetConflictDetails returns the content of conflicted files for UI display.
+func (o *Orchestrator) GetConflictDetails(ctx context.Context, taskID string, files []string) ([]ConflictFile, error) {
+	worktreePath := o.repos.WorktreePath(taskID)
+	result := make([]ConflictFile, 0, len(files))
+
+	for _, file := range files {
+		content, err := os.ReadFile(filepath.Join(worktreePath, file))
+		if err != nil {
+			continue
+		}
+
+		// Parse the conflict markers
+		cf := parseConflictFile(file, string(content))
+		result = append(result, cf)
+	}
+
+	return result, nil
+}
+
+// ConflictFile represents a file with merge conflicts.
+type ConflictFile struct {
+	Path     string
+	Ours     string // Current branch (HEAD)
+	Theirs   string // Incoming (origin/main)
+	Original string // Full content with markers
+}
+
+// parseConflictFile parses conflict markers from file content.
+func parseConflictFile(path, content string) ConflictFile {
+	cf := ConflictFile{
+		Path:     path,
+		Original: content,
+	}
+
+	// Simple parsing - extract ours and theirs sections
+	lines := strings.Split(content, "\n")
+	var ours, theirs []string
+	inOurs, inTheirs := false, false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "<<<<<<<") {
+			inOurs = true
+			continue
+		}
+		if strings.HasPrefix(line, "|||||||") {
+			inOurs = false
+			continue
+		}
+		if line == "=======" {
+			inOurs = false
+			inTheirs = true
+			continue
+		}
+		if strings.HasPrefix(line, ">>>>>>>") {
+			inTheirs = false
+			continue
+		}
+
+		if inOurs {
+			ours = append(ours, line)
+		} else if inTheirs {
+			theirs = append(theirs, line)
+		}
+	}
+
+	cf.Ours = strings.Join(ours, "\n")
+	cf.Theirs = strings.Join(theirs, "\n")
+	return cf
+}
+
+// ResolveConflict resolves a single file conflict with the chosen version.
+func (o *Orchestrator) ResolveConflict(ctx context.Context, taskID, filePath, resolution string) error {
+	worktreePath := o.repos.WorktreePath(taskID)
+	fullPath := filepath.Join(worktreePath, filePath)
+
+	// Write the resolved content
+	if err := os.WriteFile(fullPath, []byte(resolution), 0644); err != nil {
+		return fmt.Errorf("failed to write resolved file: %w", err)
+	}
+
+	// Stage the file
+	cmd := exec.Command("git", "add", filePath)
+	cmd.Dir = worktreePath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stage resolved file: %w\nOutput: %s", err, string(output))
+	}
+
+	slog.Info("[ORCHESTRATOR] Resolved conflict", "task_id", taskID, "file", filePath)
+	return nil
+}
+
+// AbortMerge aborts the current merge operation.
+func (o *Orchestrator) AbortMerge(ctx context.Context, taskID string) error {
+	return o.repos.AbortMerge(taskID)
+}
+
+// CompleteMergeResolution finishes the merge after all conflicts are resolved.
+func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID string) error {
+	// Get task info
+	task, err := o.tasks.Get(ctx, taskID)
+	if err != nil {
+		return fmt.Errorf("task not found: %w", err)
+	}
+
+	// Get project info
+	projects, err := o.github.GetProjects(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	var owner, repo string
+	for _, p := range projects {
+		if p.ID == task.ProjectID {
+			owner = p.GitHubOwner
+			repo = p.GitHubRepo
+			break
+		}
+	}
+
+	// Commit the merge resolution
+	if err := o.repos.CommitMergeResolution(taskID, "Resolve merge conflicts"); err != nil {
+		return fmt.Errorf("failed to commit resolution: %w", err)
+	}
+
+	// Now merge to main
+	branchName, err := o.repos.MergeToMain(owner, repo, taskID)
+	if err != nil {
+		return fmt.Errorf("failed to merge to main: %w", err)
+	}
+
+	slog.Info("[ORCHESTRATOR] Merged task to main after conflict resolution", "task_id", taskID, "branch", branchName)
+
+	// Update task status to done
+	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusDone); err != nil {
+		return fmt.Errorf("failed to update task status: %w", err)
+	}
+
+	// Clean up the worktree
+	if err := o.repos.RemoveWorktree(taskID); err != nil {
+		slog.Warn("[ORCHESTRATOR] Failed to remove worktree", "task_id", taskID, "error", err)
+	}
+
+	// Emit status change event
+	o.events.Publish(models.Event{
+		TaskID: taskID,
+		Type:   "status_change",
+	})
+
+	return nil
+}
+
+// CreatePR creates a GitHub Pull Request for a task and marks it done.
+func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, error) {
+	// Get task info
+	task, err := o.tasks.Get(ctx, taskID)
+	if err != nil {
+		return "", fmt.Errorf("task not found: %w", err)
+	}
+
+	// Get project info
+	projects, err := o.github.GetProjects(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	var owner, repo string
+	for _, p := range projects {
+		if p.ID == task.ProjectID {
+			owner = p.GitHubOwner
+			repo = p.GitHubRepo
+			break
+		}
+	}
+
+	if owner == "" {
+		return "", fmt.Errorf("project not found for task")
+	}
+
+	// Get the branch name from the worktree
+	branchName, err := o.repos.GetCurrentBranch(taskID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get branch name: %w", err)
+	}
+	branchName = strings.TrimSpace(branchName)
+
+	// Create the PR - use Title for both title and body
+	prURL, err := o.github.CreatePullRequest(ctx, owner, repo, branchName, task.Title, task.Intent)
+	if err != nil {
+		return "", fmt.Errorf("failed to create PR: %w", err)
+	}
+
+	slog.Info("[ORCHESTRATOR] Created PR", "task_id", taskID, "pr_url", prURL)
+
+	// Update task status to done
+	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusDone); err != nil {
+		return prURL, fmt.Errorf("PR created but failed to update task status: %w", err)
+	}
+
+	// Emit status change event
+	o.events.Publish(models.Event{
+		TaskID: taskID,
+		Type:   "status_change",
+	})
+
+	return prURL, nil
 }
 
 // CancelTask cancels a running task.

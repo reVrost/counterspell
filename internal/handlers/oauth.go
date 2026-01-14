@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -60,8 +61,21 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	h.github.DeleteConnection(ctx)
-	h.github.DeleteAllProjects(ctx)
+	slog.Info("[DISCONNECT] HandleDisconnect called", "method", r.Method, "url", r.URL.String())
+	
+	if err := h.github.DeleteConnection(ctx); err != nil {
+		slog.Error("[DISCONNECT] Failed to delete connection", "error", err)
+	} else {
+		slog.Info("[DISCONNECT] Successfully deleted connection")
+	}
+	
+	if err := h.github.DeleteAllProjects(ctx); err != nil {
+		slog.Error("[DISCONNECT] Failed to delete projects", "error", err)
+	} else {
+		slog.Info("[DISCONNECT] Successfully deleted projects")
+	}
+	
+	slog.Info("[DISCONNECT] Redirecting to /")
 	http.Redirect(w, r, "/", http.StatusSeeOther) // 303 converts POST to GET
 }
 

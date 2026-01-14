@@ -24,8 +24,24 @@ type UITask struct {
 	AgentOutput  string // Final message from agent
 	GitDiff     string // Git diff of changes
 	Logs        []UILogEntry
+	Messages    []UIMessage // Conversation history
 	CreatedAt   time.Time
 	PreviewURL  string
+}
+
+// UIMessage represents a message in the conversation history
+type UIMessage struct {
+	Role    string        // "user" or "assistant"
+	Content []UIContent   // Content blocks
+}
+
+// UIContent represents a content block in a message
+type UIContent struct {
+	Type      string // "text", "tool_use", "tool_result"
+	Text      string // For text blocks
+	ToolName  string // For tool_use blocks
+	ToolInput string // JSON string of tool input
+	ToolID    string // Tool use ID
 }
 
 type UILogEntry struct {

@@ -32,50 +32,116 @@ func getModelsJSON() string {
 templ InputBar(projects map[string]views.UIProject) {
 	<!-- Docked Input Bar -->
 	<div class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-3xl">
-		<form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) { text = ''; $refs.input.style.height = 'auto'; }"
-			@submit="if(!activeProjectId) { $event.preventDefault(); showToast('Select a project first'); }"
+		<form x-ref="voiceForm" hx-post="/add-task" hx-target="#feed-container" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) { text = ''; $refs.input.value = ''; $refs.input.style.height = 'auto'; }"
+			@submit="if(!app.activeProjectId) { $event.preventDefault(); app.showToast('Select a project first'); }"
 			class="bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10"
-			x-data={
-				fmt.Sprintf(`{
-					text: '',
-					showFileMenu: false,
-					activeModelId: localStorage.getItem('counterspell_model') || '%s',
-					files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
-					resize() {
-						this.$refs.input.style.height = 'auto';
-						let newHeight = this.$refs.input.scrollHeight;
-						if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
-						this.$refs.input.style.height = newHeight + 'px';
-					},
-					checkMention(e) {
-						if (this.text.match(/@[^ ]*$/)) {
-							this.showFileMenu = true;
-						} else {
-							this.showFileMenu = false;
-						}
-						if (e.key === 'Escape') this.showFileMenu = false;
-					},
-					insertFile(f) {
-						this.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';
+			x-data
+			x-init={ fmt.Sprintf(`Object.assign($data, {
+				text: "",
+				showFileMenu: false,
+				activeModelId: localStorage.getItem("counterspell_model") || "%s",
+				files: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
+				get app() { return Alpine.$data(document.body); },
+				resize() {
+					this.$refs.input.style.height = "auto";
+					let newHeight = this.$refs.input.scrollHeight;
+					if(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
+					this.$refs.input.style.height = newHeight + "px";
+				},
+				checkMention(e) {
+					if (this.text.match(/@[^ ]*$/)) {
+						this.showFileMenu = true;
+					} else {
 						this.showFileMenu = false;
-						this.$nextTick(() => { this.$refs.input.focus(); });
-					},
-					setModel(modelId) {
-						this.activeModelId = modelId;
-						localStorage.setItem('counterspell_model', modelId);
-					},
-					get modelName() {
-						const models = %s;
-						const model = models.find(m => m.id === this.activeModelId);
-						return model ? model.name.split(' ')[1] : this.activeModelId.split('#')[1];
 					}
-				}`, uiModels[0].ID, getModelsJSON())
+					if (e.key === "Escape") this.showFileMenu = false;
+				},
+				insertFile(f) {
+					this.text = this.text.replace(/@[^ ]*$/, "") + f + " ";
+					this.showFileMenu = false;
+					this.$nextTick(() => { this.$refs.input.focus(); });
+				},
+				setModel(modelId) {
+					this.activeModelId = modelId;
+					localStorage.setItem("counterspell_model", modelId);
+				},
+				get modelName() {
+					const models = %s;
+					const model = models.find(m => m.id === this.activeModelId);
+					return model ? model.name.split(" ")[1] : this.activeModelId.split("#")[1];
+				}
+			})`, uiModels[0].ID, getModelsJSON())
 			}>
 
 			<!-- Hidden fields -->
-			<input type="hidden" name="project_id" :value="activeProjectId" />
+			<input type="hidden" name="project_id" :value="app.activeProjectId" />
 			<input type="hidden" name="model_id" :value="activeModelId" />
 			
+			<!-- Voice Recording Visualization -->
+			<div x-show="app.isRecording" x-cloak
+				class="absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10">
+				<!-- Cancel Button -->
+				<button type="button" @click="app.cancelRecording()"
+					class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0">
+					<i class="fas fa-times text-sm"></i>
+				</button>
+				
+				<!-- Waveform Bars -->
+				<div class="flex-1 flex items-center justify-center gap-[3px] h-10 mx-4">
+					<template x-for="(level, i) in app.audioLevels" :key="i">
+						<div class="w-1 bg-red-500 rounded-full transition-all duration-75"
+							:style="`height: ${Math.max(4, level * 0.4)}px; opacity: ${0.4 + (level / 100) * 0.6}`"></div>
+					</template>
+				</div>
+				
+				<!-- Duration -->
+				<div class="flex items-center gap-2 shrink-0">
+					<div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+					<span class="text-sm text-gray-300 font-mono" x-text="app.formatDuration(app.recordedDuration)"></span>
+				</div>
+			</div>
+
+			<!-- Recorded Audio Preview -->
+			<div x-show="app.recordedAudio && !app.isRecording" x-cloak
+				class="absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10">
+				<!-- Delete Button -->
+				<button type="button" @click="app.recordedAudio = null"
+					class="w-8 h-8 rounded-full bg-gray-800 hover:bg-red-500/20 flex items-center justify-center text-gray-400 hover:text-red-400 transition shrink-0">
+					<i class="fas fa-trash text-sm"></i>
+				</button>
+				
+				<!-- Audio Waveform Display -->
+				<div class="flex-1 mx-4 flex items-center gap-3">
+					<button type="button" x-data="{ playing: false }" 
+						@click="
+							if (!$refs.audioPlayer) return;
+							if (playing) { $refs.audioPlayer.pause(); $refs.audioPlayer.currentTime = 0; }
+							else { $refs.audioPlayer.play(); }
+							playing = !playing;
+						"
+						class="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white transition shrink-0">
+						<i class="fas" :class="playing ? 'fa-stop' : 'fa-play'" style="font-size: 10px; margin-left: 1px;"></i>
+					</button>
+					<audio x-ref="audioPlayer" :src="app.recordedAudio?.url" @ended="playing = false" class="hidden"></audio>
+					
+					<!-- Static waveform visualization -->
+					<div class="flex-1 flex items-center gap-[2px] h-8">
+						<template x-for="i in 30">
+							<div class="flex-1 bg-blue-500/60 rounded-full" 
+								:style="`height: ${4 + Math.sin(i * 0.5) * 8 + Math.random() * 8}px`"></div>
+						</template>
+					</div>
+					
+					<span class="text-xs text-gray-400 font-mono shrink-0" x-text="app.formatDuration(app.recordedAudio?.duration || 0)"></span>
+				</div>
+				
+				<!-- Send Button -->
+				<button type="button" @click="app.showToast('Voice message ready to send'); app.recordedAudio = null"
+					class="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white transition shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.4)]">
+					<i class="fas fa-arrow-up text-sm"></i>
+				</button>
+			</div>
+
 			<!-- Input Area -->
 			<div class="relative px-4 pt-4 pb-2">
 				<!-- File Menu Popover -->
@@ -102,22 +168,22 @@ templ InputBar(projects map[string]views.UIProject) {
 				
 				<!-- Left: Project Selector -->
 				<div class="relative">
-					<button type="button" @click="inputProjectMenuOpen = !inputProjectMenuOpen"
+					<button type="button" @click="app.inputProjectMenuOpen = !app.inputProjectMenuOpen"
 						class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border border-transparent hover:border-gray-700"
-						:class="activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'">
+						:class="app.activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'">
 						<div class="flex items-center justify-center w-4 h-4 rounded-full" 
-							 :class="activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'">
-							<i class="fas fa-folder text-[9px]" :class="activeProjectId ? 'text-blue-400' : 'text-gray-400'"></i>
+							 :class="app.activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'">
+							<i class="fas fa-folder text-[9px]" :class="app.activeProjectId ? 'text-blue-400' : 'text-gray-400'"></i>
 						</div>
-						<span x-text="activeProjectName ? activeProjectName.split('/').pop() : 'Select project'" class="max-w-[120px] truncate"></span>
+						<span x-text="app.activeProjectName ? app.activeProjectName.split('/').pop() : 'Select project'" class="max-w-[120px] truncate"></span>
 						<i class="fas fa-chevron-down text-[8px] opacity-50 ml-0.5"></i>
 					</button>
 					
 					<!-- Project Dropdown -->
-					<div x-show="inputProjectMenuOpen" @click.outside="inputProjectMenuOpen = false" x-cloak
+					<div x-show="app.inputProjectMenuOpen" @click.outside="app.inputProjectMenuOpen = false" x-cloak
 						x-transition.opacity.duration.100ms
 						class="absolute bottom-full left-0 mb-3 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col"
-						x-data="{ search: '' }">
+						x-data="{ search: '', get app() { return Alpine.$data(document.body); } }">
 						
 						<div class="p-3 border-b border-gray-800 bg-[#16191F]/50 backdrop-blur-sm sticky top-0">
 							<div class="relative">
@@ -129,7 +195,7 @@ templ InputBar(projects map[string]views.UIProject) {
 						
 						<div class="max-h-[240px] overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-700">
 							for _, p := range projects {
-								<div @click={ fmt.Sprintf("setActiveProject('%s', '%s')", p.ID, p.Name) }
+								<div @click={ fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name) }
 									class="px-3 py-2.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition border-l-2 border-transparent hover:border-blue-500"
 									x-show={ fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name) }>
 									<div class="w-6 h-6 rounded-md bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0 group-hover:border-gray-600 transition-colors">
@@ -139,7 +205,7 @@ templ InputBar(projects map[string]views.UIProject) {
 										<span class="text-xs font-medium text-gray-300 group-hover:text-white truncate">{ p.Name }</span>
 										<span class="text-[10px] text-gray-500 truncate">{ p.ID }</span>
 									</div>
-									<i class="fas fa-check text-blue-500 text-xs" x-show={ fmt.Sprintf("activeProjectId === '%s'", p.ID) }></i>
+									<i class="fas fa-check text-blue-500 text-xs" x-show={ fmt.Sprintf("app.activeProjectId === '%s'", p.ID) }></i>
 								</div>
 							}
 							
@@ -188,12 +254,19 @@ templ InputBar(projects map[string]views.UIProject) {
 					<!-- Divider -->
 					<div class="w-px h-4 bg-gray-700 mx-1"></div>
 
-					<!-- Submit Button -->
-					<button type="button" @click="text.length > 0 ? $refs.voiceForm.requestSubmit() : simulateVoice()"
-						:class="listening ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300')"
-						class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-300 hover:scale-105 active:scale-95 ml-1">
+					<!-- Submit/Voice Button -->
+					<button type="button" 
+						@click="if(text.length > 0 && !this._touchSubmitted) { $refs.voiceForm.requestSubmit(); } this._touchSubmitted = false;"
+						@mousedown="if (text.length === 0 && !app.isRecording) app.startVoiceRecording()"
+						@mouseup="if (app.isRecording) app.stopVoiceRecording()"
+						@mouseleave="if (app.isRecording) app.stopVoiceRecording()"
+						@touchstart="if (text.length === 0 && !app.isRecording) { $event.preventDefault(); app.startVoiceRecording(); }"
+						@touchend="if (app.isRecording) { $event.preventDefault(); app.stopVoiceRecording(); } else if (text.length > 0) { this._touchSubmitted = true; $refs.voiceForm.requestSubmit(); }"
+						@touchcancel="if (app.isRecording) app.cancelRecording()"
+						:class="app.isRecording ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-110' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')"
+						class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 ml-1 select-none touch-none">
 						<i class="fas" 
-						   :class="text.length > 0 ? 'fa-arrow-up' : (listening ? 'fa-stop animate-pulse' : 'fa-microphone')"></i>
+						   :class="text.length > 0 ? 'fa-arrow-up' : (app.isRecording ? 'fa-microphone animate-pulse' : 'fa-microphone')"></i>
 					</button>
 				</div>
 			</div>

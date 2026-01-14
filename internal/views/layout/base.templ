@@ -1,20 +1,16 @@
 package layout
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/views/components"
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
-func projectIDsJSON(projects map[string]views.UIProject) string {
-	ids := make([]string, 0, len(projects))
-	for id := range projects {
-		ids = append(ids, id)
+func boolStr(b bool) string {
+	if b {
+		return "true"
 	}
-	b, _ := json.Marshal(ids)
-	return string(b)
+	return "false"
 }
 
 // Base is the main shell of the application
@@ -31,7 +27,6 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
 			<script src="https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js" integrity="sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8" crossorigin="anonymous"></script>
-			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"/>
 			<script>
@@ -62,128 +57,178 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }
 				.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }
 				.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }
+
+				/* Shimmer loading animation */
+				.shimmer {
+					background-image: linear-gradient(
+						90deg,
+						#3B82F6 0%,
+						#60A5FA 25%,
+						#93C5FD 50%,
+						#60A5FA 75%,
+						#3B82F6 100%
+					);
+					background-size: 200% 100%;
+					background-clip: text;
+					-webkit-background-clip: text;
+					-webkit-text-fill-color: transparent;
+					animation: shimmer 1.5s linear infinite;
+				}
+
+				@keyframes shimmer {
+					0% { background-position: 200% center; }
+					100% { background-position: -200% center; }
+				}
+
+				/* Pulse glow for the icon */
+				.pulse-glow {
+					animation: pulseGlow 2s ease-in-out infinite;
+				}
+
+				@keyframes pulseGlow {
+					0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 2px #3B82F6); }
+					50% { opacity: 1; filter: drop-shadow(0 0 8px #3B82F6); }
+				}
 			</style>
+			<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
 		</head>
 		<body
-			x-data={ fmt.Sprintf(`{
-			modalOpen: false,
-			activeTab: 'diff',
-			projectMenuOpen: false,
-			inputProjectMenuOpen: false,
-			listening: false,
-			toastMsg: '',
-			toastOpen: false,
-			settingsOpen: false,
-			userMenuOpen: false,
-			deferredPrompt: null,
-			canInstallPWA: false,
-
-			// Active project for input
-			activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
-			activeProjectName: localStorage.getItem('counterspell_active_project_name') || '',
-
-			// Onboarding State
-			showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
-			onboardingStep: 0,
-            isAuthenticated: %t,
-
-            init() {
-                if (this.showOnboarding && this.isAuthenticated) {
-                    this.runPostAuthSequence();
-                }
-                this.connectSSE();
-                this.setupPWAInstall();
-            },
-
-			setActiveProject(id, name) {
-				this.activeProjectId = id;
-				this.activeProjectName = name;
-				localStorage.setItem('counterspell_active_project_id', id);
-				localStorage.setItem('counterspell_active_project_name', name);
-				this.inputProjectMenuOpen = false;
-				this.projectMenuOpen = false;
-			},
-
-            connectSSE() {
-                // Close existing connection to prevent memory leaks
-                if (this._eventSource) {
-                    this._eventSource.close();
-                }
-                const eventSource = new EventSource('/events');
-                this._eventSource = eventSource;
-                eventSource.addEventListener('task', (e) => {
-                    const data = JSON.parse(e.data);
-                    this.showToast(data.html_payload ? 'Task updated' : 'Event received');
-                    // Active tasks now update via htmx SSE extension
-                    // Only refresh reviews section on task completion
-                    if (data.type === 'status_change') {
-                        htmx.trigger('#reviews-container', 'refresh');
-                    }
-                });
-                eventSource.onerror = () => {
-                    eventSource.close(); // Close failed connection
-                    setTimeout(() => this.connectSSE(), 5000);
-                };
-            },
-
-			startOnboarding() {
-				this.onboardingStep = 1;
-				// Real Auth Redirect
-				setTimeout(() => {
-					window.location.href = '/github/authorize?type=user';
-				}, 1000);
-			},
-
-            runPostAuthSequence() {
-                this.onboardingStep = 2; // Syncing
-                setTimeout(() => {
-                    this.onboardingStep = 3; // Ready
-                }, 2000);
-            },
-
-			showToast(msg) {
-				this.toastMsg = msg;
-				this.toastOpen = true;
-				setTimeout(() => this.toastOpen = false, 3000);
-			},
-			simulateVoice() {
-				this.listening = true;
-				setTimeout(() => {
-					this.listening = false;
-					this.$refs.voiceForm.requestSubmit();
-				}, 1200);
-			},
-			closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); },
-
-			setupPWAInstall() {
-				window.addEventListener('beforeinstallprompt', (e) => {
-					e.preventDefault();
-					this.deferredPrompt = e;
-					this.canInstallPWA = true;
-				});
-
-				window.addEventListener('appinstalled', () => {
-					this.deferredPrompt = null;
-					this.canInstallPWA = false;
-					this.showToast('App installed successfully!');
-				});
-			},
-
-			installPWA() {
-				if (!this.deferredPrompt) return;
-				this.deferredPrompt.prompt();
-				this.deferredPrompt.userChoice.then((choiceResult) => {
-					if (choiceResult.outcome === 'accepted') {
-						this.showToast('Installing app...');
+			x-data="{
+				modalOpen: false,
+				activeTab: 'diff',
+				projectMenuOpen: false,
+				inputProjectMenuOpen: false,
+				listening: false,
+				isRecording: false,
+				audioLevel: 0,
+				audioLevels: [0,0,0,0,0,0,0,0,0,0,0,0],
+				recordedAudio: null,
+				recordedDuration: 0,
+				mediaRecorder: null,
+				audioChunks: [],
+				audioContext: null,
+				analyser: null,
+				animationFrame: null,
+				toastMsg: '',
+				toastOpen: false,
+				settingsOpen: false,
+				userMenuOpen: false,
+				deferredPrompt: null,
+				canInstallPWA: false,
+				activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
+				activeProjectName: localStorage.getItem('counterspell_active_project_name') || '',
+				showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
+				onboardingStep: 0,
+				isAuthenticated: document.body.dataset.authenticated === 'true',
+				init() {
+					console.log('[APP] Alpine init, isAuthenticated:', this.isAuthenticated, 'showOnboarding:', this.showOnboarding);
+					if (this.showOnboarding && this.isAuthenticated) {
+						this.runPostAuthSequence();
 					}
-					this.deferredPrompt = null;
-					this.canInstallPWA = false;
-				});
-			}
-		}`, isAuthenticated) }
+					this.connectSSE();
+					this.setupPWAInstall();
+				},
+				setActiveProject(id, name) {
+					console.log('[setActiveProject] called with:', id, name);
+					this.activeProjectId = id;
+					this.activeProjectName = name;
+					localStorage.setItem('counterspell_active_project_id', id);
+					localStorage.setItem('counterspell_active_project_name', name);
+					this.inputProjectMenuOpen = false;
+					this.projectMenuOpen = false;
+				},
+				connectSSE() {
+					if (this._eventSource) { this._eventSource.close(); }
+					const eventSource = new EventSource('/events');
+					this._eventSource = eventSource;
+					eventSource.addEventListener('task', (e) => {
+						const data = JSON.parse(e.data);
+						this.showToast(data.html_payload ? 'Task updated' : 'Event received');
+						if (data.type === 'status_change') { htmx.trigger('#reviews-container', 'refresh'); }
+					});
+					eventSource.onerror = () => { eventSource.close(); setTimeout(() => this.connectSSE(), 5000); };
+				},
+				startOnboarding() {
+					this.onboardingStep = 1;
+					setTimeout(() => { window.location.href = '/github/authorize?type=user'; }, 1000);
+				},
+				runPostAuthSequence() {
+					this.onboardingStep = 2;
+					setTimeout(() => { this.onboardingStep = 3; }, 2000);
+				},
+				showToast(msg) {
+					this.toastMsg = msg;
+					this.toastOpen = true;
+					setTimeout(() => this.toastOpen = false, 3000);
+				},
+				simulateVoice() {
+					this.listening = true;
+					setTimeout(() => { this.listening = false; this.$refs.voiceForm.requestSubmit(); }, 1200);
+				},
+				async startVoiceRecording() {
+					try {
+						const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+						this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+						const source = this.audioContext.createMediaStreamSource(stream);
+						this.analyser = this.audioContext.createAnalyser();
+						this.analyser.fftSize = 64;
+						source.connect(this.analyser);
+						this.mediaRecorder = new MediaRecorder(stream);
+						this.audioChunks = [];
+						this.recordedDuration = 0;
+						this.isRecording = true;
+						const startTime = Date.now();
+						const updateLevels = () => {
+							if (!this.isRecording) return;
+							const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+							this.analyser.getByteFrequencyData(dataArray);
+							const levels = [];
+							const step = Math.floor(dataArray.length / 12);
+							for (let i = 0; i < 12; i++) { const val = dataArray[i * step] || 0; levels.push(Math.min(100, (val / 255) * 100)); }
+							this.audioLevels = levels;
+							this.recordedDuration = Math.floor((Date.now() - startTime) / 1000);
+							this.animationFrame = requestAnimationFrame(updateLevels);
+						};
+						updateLevels();
+						this.mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) this.audioChunks.push(e.data); };
+						this.mediaRecorder.onstop = () => {
+							const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+							this.recordedAudio = { blob: blob, url: URL.createObjectURL(blob), duration: this.recordedDuration };
+							stream.getTracks().forEach(t => t.stop());
+						};
+						this.mediaRecorder.start();
+					} catch (err) { this.showToast('Microphone access denied'); this.isRecording = false; }
+				},
+				stopVoiceRecording() {
+					if (!this.isRecording) return;
+					this.isRecording = false;
+					if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+					if (this.audioContext) this.audioContext.close();
+					if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') { this.mediaRecorder.stop(); }
+					this.audioLevels = [0,0,0,0,0,0,0,0,0,0,0,0];
+				},
+				cancelRecording() { this.stopVoiceRecording(); this.recordedAudio = null; },
+				formatDuration(secs) { const m = Math.floor(secs / 60); const s = secs % 60; return m + ':' + (s < 10 ? '0' : '') + s; },
+				closeModal() { this.modalOpen = false; setTimeout(() => { document.getElementById('modal-content').innerHTML = ''; }, 300); },
+				setupPWAInstall() {
+					window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); this.deferredPrompt = e; this.canInstallPWA = true; });
+					window.addEventListener('appinstalled', () => { this.deferredPrompt = null; this.canInstallPWA = false; this.showToast('App installed successfully!'); });
+				},
+				installPWA() {
+					if (!this.deferredPrompt) return;
+					this.deferredPrompt.prompt();
+					this.deferredPrompt.userChoice.then((choiceResult) => {
+						if (choiceResult.outcome === 'accepted') { this.showToast('Installing app...'); }
+						this.deferredPrompt = null;
+						this.canInstallPWA = false;
+					});
+				}
+			}"
+			data-authenticated={ boolStr(isAuthenticated) }
 			@keydown.escape="closeModal()"
 			@close-modal.window="closeModal()"
 			@toast.window="showToast($event.detail.value)"
+			@open-url.window="window.open($event.detail.value, '_blank')"
 			class="h-screen flex flex-col overflow-hidden no-tap-highlight bg-[#0C0E12]"
 		>
 			<!-- Toast Notification -->
@@ -330,26 +375,7 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			</div>
 			<!-- Settings Modal -->
 			@components.SettingsModal(settings)
-			<!-- Validate stored project ID against current projects -->
-			<script id="valid-project-ids" type="application/json">
-				{ templ.JSONString(projectIDsJSON(projects)) }
-			</script>
-			<script>
-				(function() {
-					try {
-						const validIds = new Set(JSON.parse(document.getElementById('valid-project-ids').textContent));
-						const storedId = localStorage.getItem('counterspell_active_project_id');
-						if (storedId && !validIds.has(storedId)) {
-							console.log('Clearing stale project ID:', storedId);
-							localStorage.removeItem('counterspell_active_project_id');
-							localStorage.removeItem('counterspell_active_project_name');
-							window.location.reload();
-						}
-					} catch (e) {
-						console.error('Failed to validate project IDs:', e);
-					}
-				})();
-			</script>
+	
 		</body>
 	</html>
 }

@@ -21,20 +21,22 @@ import (
 
 // Event types for streaming
 const (
-	EventPlan   = "plan"
-	EventTool   = "tool"
-	EventResult = "result"
-	EventText   = "text"
-	EventError  = "error"
-	EventDone   = "done"
+	EventPlan     = "plan"
+	EventTool     = "tool"
+	EventResult   = "result"
+	EventText     = "text"
+	EventError    = "error"
+	EventDone     = "done"
+	EventMessages = "messages" // Full message history update
 )
 
 // StreamEvent represents a single event in the agent execution.
 type StreamEvent struct {
-	Type    string `json:"type"`
-	Content string `json:"content"`
-	Tool    string `json:"tool,omitempty"`
-	Args    string `json:"args,omitempty"`
+	Type     string `json:"type"`
+	Content  string `json:"content"`
+	Tool     string `json:"tool,omitempty"`
+	Args     string `json:"args,omitempty"`
+	Messages string `json:"messages,omitempty"` // JSON message history for EventMessages
 }
 
 // StreamCallback is called for each event during agent execution.
@@ -181,6 +183,9 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 
 		messages = append(messages, Message{Role: "assistant", Content: resp.Content})
 
+		// Emit current message state for live UI updates
+		r.emitMessages(messages)
+
 		if len(toolResults) == 0 {
 			r.emit(StreamEvent{Type: EventPlan, Content: "No more tools to run, completing task"})
 			break
@@ -188,6 +193,9 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 
 		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Running %d tool result(s) through agent loop", len(toolResults))})
 		messages = append(messages, Message{Role: "user", Content: toolResults})
+
+		// Emit again after adding tool results
+		r.emitMessages(messages)
 	}
 
 	// Store message history for future continuations
@@ -201,6 +209,17 @@ func (r *Runner) emit(event StreamEvent) {
 	if r.callback != nil {
 		r.callback(event)
 	}
+}
+
+func (r *Runner) emitMessages(messages []Message) {
+	data, err := json.Marshal(messages)
+	if err != nil {
+		return
+	}
+	r.emit(StreamEvent{
+		Type:     EventMessages,
+		Messages: string(data),
+	})
 }
 
 func (r *Runner) callAPI(messages []Message, tools map[string]Tool) (*APIResponse, error) {
