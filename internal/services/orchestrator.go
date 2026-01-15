@@ -472,6 +472,13 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 			Type:        "agent_update",
 			HTMLPayload: event.Messages, // JSON message history
 		})
+	case agent.EventTodo:
+		// Publish todo list for live todo panel updates
+		o.events.Publish(models.Event{
+			TaskID:      taskID,
+			Type:        "todo",
+			HTMLPayload: event.Content, // JSON todo list
+		})
 	}
 }
 

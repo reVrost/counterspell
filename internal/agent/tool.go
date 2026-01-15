@@ -32,6 +32,7 @@ type Tool struct {
 
 // makeSchema converts our Tool definitions to API-compatible ToolDef.
 // This maps our simple "string?" notation to JSON Schema format.
+// For complex schemas (arrays, nested objects), pass a map[string]any directly.
 func makeSchema(tools map[string]Tool) []ToolDef {
 	result := []ToolDef{}
 	for name, tool := range tools {
@@ -40,6 +41,14 @@ func makeSchema(tools map[string]Tool) []ToolDef {
 
 		// Process each parameter in the tool's schema
 		for paramName, paramType := range tool.Schema {
+			// If it's already a map (complex schema), use it directly
+			if schemaMap, ok := paramType.(map[string]any); ok {
+				props[paramName] = schemaMap
+				// Complex schemas are always required unless explicitly marked
+				required = append(required, paramName)
+				continue
+			}
+
 			typeStr, ok := paramType.(string)
 			if !ok {
 				continue
