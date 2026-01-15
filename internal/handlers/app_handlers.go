@@ -542,3 +542,37 @@ func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	// We don't need to re-render settings as they are saved.
 	w.WriteHeader(http.StatusOK)
 }
+
+// HandleTranscribe transcribes uploaded audio to text.
+func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Parse multipart form (max 10MB)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get the audio file
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		http.Error(w, "No audio file provided", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Get content type for format detection
+	contentType := header.Header.Get("Content-Type")
+
+	// Transcribe
+	text, err := h.transcription.TranscribeAudio(ctx, file, contentType)
+	if err != nil {
+		slog.Error("Transcription failed", "error", err)
+		http.Error(w, "Transcription failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return plain text
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(text))
+}

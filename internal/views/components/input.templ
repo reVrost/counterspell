@@ -136,9 +136,10 @@ templ InputBar(projects map[string]views.UIProject) {
 				</div>
 				
 				<!-- Send Button -->
-				<button type="button" @click="app.showToast('Voice message ready to send'); app.recordedAudio = null"
-					class="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white transition shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.4)]">
-					<i class="fas fa-arrow-up text-sm"></i>
+				<button type="button" @click="app.transcribeAndSubmit($refs.voiceForm, $refs.input)"
+					:disabled="app.isTranscribing"
+					class="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:bg-blue-500/50 disabled:cursor-not-allowed flex items-center justify-center text-white transition shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.4)]">
+					<i class="fas text-sm" :class="app.isTranscribing ? 'fa-spinner fa-spin' : 'fa-arrow-up'"></i>
 				</button>
 			</div>
 
