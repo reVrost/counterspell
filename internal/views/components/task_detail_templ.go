@@ -528,36 +528,41 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" hx-swap=\"none\" class=\"text-gray-600 hover:text-red-400 transition\" onclick=\"if(!confirm('Discard task?')) return false;\"><i class=\"fas fa-trash\"></i></button></div><!-- Tabs Container --><div class=\"flex items-center justify-center p-2 bg-[#16191F] shrink-0 border-b border-white/5\"><div class=\"flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50\"><button @click=\"activeTab = 'agent'\" :class=\"activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-1 text-[11px] font-medium rounded-md transition-all\">Agent</button> <button @click=\"activeTab = 'diff'\" :class=\"activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-1 text-[11px] font-medium rounded-md transition-all\">Diff</button> <button @click=\"activeTab = 'activity'\" :class=\"activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-1 text-[11px] font-medium rounded-md transition-all\">Log</button></div></div><!-- Unified SSE Connection (only for in-progress tasks) -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" hx-swap=\"none\" class=\"text-gray-600 hover:text-red-400 transition\" onclick=\"if(!confirm('Discard task?')) return false;\"><i class=\"fas fa-trash\"></i></button></div><!-- Tabs Container --><div class=\"flex items-center justify-between p-2 bg-[#16191F] shrink-0 border-b border-white/5\"><div class=\"w-6\"></div><div class=\"flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50\"><button @click=\"activeTab = 'agent'\" :class=\"activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-1 text-[11px] font-medium rounded-md transition-all\">Agent</button> <button @click=\"activeTab = 'diff'\" :class=\"activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-1 text-[11px] font-medium rounded-md transition-all\">Diff</button> <button @click=\"activeTab = 'activity'\" :class=\"activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-1 text-[11px] font-medium rounded-md transition-all\">Log</button></div><!-- Status Indicator --><div class=\"w-6 flex justify-end pr-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if task.Status == "in_progress" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<div hx-ext=\"sse\" sse-connect=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<div class=\"w-1.5 h-1.5 rounded-full bg-orange-400\" title=\"In Progress\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var29 string
-			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s/stream", task.ID))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 205, Col: 57}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" class=\"hidden\"><!-- Hidden elements that receive SSE updates and swap into visible targets --><div sse-swap=\"agent\" hx-target=\"#agent-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"diff\" hx-target=\"#diff-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"log\" hx-target=\"#log-content\" hx-swap=\"beforeend\"></div><div sse-swap=\"complete\" hx-on::sse-message=\"htmx.trigger(document.body, 'close-modal')\"></div></div>")
+		} else if task.Status == "review" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"w-1.5 h-1.5 rounded-full bg-[#b197fc]\" title=\"Needs Review\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:agent.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:log.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div></div><!-- Unified SSE Connection (always active - handles status changes including chat continuations) --><div hx-ext=\"sse\" sse-connect=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var29 string
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s/stream", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 213, Col: 56}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\" class=\"hidden\" id=\"task-sse-connection\"><!-- Hidden elements that receive SSE updates and swap into visible targets --><div sse-swap=\"agent\" hx-target=\"#agent-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"diff\" hx-target=\"#diff-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"log\" hx-target=\"#log-content\" hx-swap=\"beforeend\"></div><div sse-swap=\"complete\" hx-on::sse-message=\"htmx.trigger(document.body, 'close-modal')\"></div><!-- Reconnect SSE when task restarts (e.g., after chat) --><div sse-swap=\"restart\" hx-on::sse-message=\"setTimeout(() => { htmx.ajax('GET', '/task/' + document.getElementById('task-sse-connection').getAttribute('data-task-id') + '/stream', {source: document.getElementById('task-sse-connection')}); }, 100)\"></div></div><!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:agent.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:log.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if task.Status == "in_progress" {
 			if len(task.Messages) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div class=\"space-y-0\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"space-y-0\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -567,17 +572,17 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, " <div class=\"flex items-center gap-3 px-4 py-3\"><div class=\"relative\"><div class=\"w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center\"><i class=\"fas fa-robot text-sm text-blue-400 pulse-glow\"></i></div><div class=\"absolute inset-0 animate-spin\" style=\"animation-duration: 3s;\"><div class=\"absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full\"></div></div></div><div><p class=\"text-sm font-medium shimmer\">Agent is thinking...</p><p class=\"text-[10px] text-gray-600\">Analyzing code</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, " <div class=\"flex items-center gap-3 px-4 py-3\"><div class=\"relative\"><div class=\"w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center\"><i class=\"fas fa-robot text-sm text-blue-400 pulse-glow\"></i></div><div class=\"absolute inset-0 animate-spin\" style=\"animation-duration: 3s;\"><div class=\"absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full\"></div></div></div><div><p class=\"text-sm font-medium shimmer\">Agent is thinking...</p><p class=\"text-[10px] text-gray-600\">Analyzing code</p></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if len(task.Messages) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<div class=\"space-y-0\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div class=\"space-y-0\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -587,12 +592,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if task.AgentOutput != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div class=\"p-5\"><div class=\"text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<div class=\"p-5\"><div class=\"text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -600,95 +605,95 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<div class=\"p-5 text-gray-500 italic text-sm\">No agent output</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div class=\"p-5 text-gray-500 italic text-sm\">No agent output</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div></div><!-- Tab 2: DIFF --><div x-show=\"activeTab === 'diff'\" class=\"p-0 min-h-full pb-32\"><div class=\"px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between\"><span class=\"text-sm text-gray-400 font-mono\">changes</span> <span class=\"text-[10px] text-green-500 font-mono\">git diff</span></div><div id=\"diff-content\" class=\"p-4 font-mono text-sm leading-6 text-gray-300 whitespace-pre overflow-x-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div></div><!-- Tab 2: DIFF --><div x-show=\"activeTab === 'diff'\" class=\"p-0 min-h-full pb-32\"><div class=\"px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between\"><span class=\"text-sm text-gray-400 font-mono\">changes</span> <span class=\"text-[10px] text-green-500 font-mono\">git diff</span></div><div id=\"diff-content\" class=\"p-4 font-mono text-sm leading-6 text-gray-300 whitespace-pre-wrap break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if task.Status == "in_progress" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<div class=\"flex flex-col items-center justify-center h-48 text-gray-500 space-y-4\"><i class=\"fas fa-cog fa-spin text-3xl opacity-50\"></i><p class=\"text-sm font-mono\">Generating changes...</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"flex flex-col items-center justify-center h-48 text-gray-500 space-y-4\"><i class=\"fas fa-cog fa-spin text-3xl opacity-50\"></i><p class=\"text-sm font-mono\">Generating changes...</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if task.GitDiff != "" {
 			for _, line := range strings.Split(task.GitDiff, "\n") {
 				if strings.HasPrefix(line, "+") {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"diff-add\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<div class=\"diff-add\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var30 string
 					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 281, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 291, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else if strings.HasPrefix(line, "-") {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div class=\"diff-del\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<div class=\"diff-del\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var31 string
 					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 283, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 293, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var32 string
 					templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 285, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 295, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<div class=\"text-gray-500 italic\">No changes made</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<div class=\"text-gray-500 italic\">No changes made</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</div></div><!-- Tab 3: ACTIVITY --><div x-show=\"activeTab === 'activity'\" class=\"p-5 pb-32 space-y-6\"><div id=\"log-content\" class=\"relative border-l border-gray-800 ml-2 space-y-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</div></div><!-- Tab 3: ACTIVITY --><div x-show=\"activeTab === 'activity'\" class=\"p-5 pb-32 space-y-6\"><div id=\"log-content\" class=\"relative border-l border-gray-800 ml-2 space-y-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(task.Logs) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<div class=\"ml-4 text-sm text-gray-500 italic\" id=\"no-activity-msg\">No activity yet</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<div class=\"ml-4 text-sm text-gray-500 italic\" id=\"no-activity-msg\">No activity yet</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -699,59 +704,59 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</div></div></div><!-- Bottom Actions Toolbar (Sticky) --><div class=\"shrink-0 p-4 border-t border-white/5 bg-[#16191F] pb-8\"><!-- Chat Input Mode (Capsule Style) --><div x-show=\"showChat\" x-transition.origin.bottom class=\"absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#16191F] via-[#16191F] to-transparent z-20 pb-8 flex justify-center\"><form hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</div></div></div><!-- Bottom Actions Toolbar (Sticky) --><div class=\"shrink-0 p-4 border-t border-white/5 bg-[#16191F] pb-8\"><!-- Chat Input Mode (Capsule Style) --><div x-show=\"showChat\" x-transition.origin.bottom class=\"absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#16191F] via-[#16191F] to-transparent z-20 pb-8 flex justify-center\"><form hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/chat/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 310, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 320, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" hx-swap=\"none\" @htmx:after-request=\"showChat = false\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl\" x-data=\"{\n\t\t\t\t\t\ttext: '',\n\t\t\t\t\t\tshowFileMenu: false,\n\t\t\t\t\t\tfiles: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],\n\t\t\t\t\t\tresize() {\n\t\t\t\t\t\t\tthis.$refs.input.style.height = 'auto';\n\t\t\t\t\t\t\tlet newHeight = this.$refs.input.scrollHeight;\n\t\t\t\t\t\t\tif(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;\n\t\t\t\t\t\t\tthis.$refs.input.style.height = newHeight + 'px';\n\t\t\t\t\t\t},\n\t\t\t\t\t\tcheckMention(e) {\n\t\t\t\t\t\t\tif (this.text.match(/@[^ ]*$/)) {\n\t\t\t\t\t\t\t\tthis.showFileMenu = true;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (e.key === 'Escape') this.showFileMenu = false;\n\t\t\t\t\t\t},\n\t\t\t\t\t\tinsertFile(f) {\n\t\t\t\t\t\t\tthis.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';\n\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\tthis.$nextTick(() => { this.$refs.input.focus(); });\n\t\t\t\t\t\t}\n\t\t\t\t\t}\"><!-- Cancel (X) --><button type=\"button\" @click=\"showChat = false\" class=\"text-gray-500 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-times text-lg\"></i></button><!-- Attachment --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-paperclip text-lg\"></i></button><!-- Expanding Textarea --><div class=\"flex-1 mx-2 relative min-w-0\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-sm text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea name=\"message\" x-model=\"text\" x-ref=\"input\" @input=\"resize()\" @keyup=\"checkMention($event)\" @keydown.enter.prevent=\"if (!$event.shiftKey) $el.form.requestSubmit()\" rows=\"1\" placeholder=\"Refine code instructions...\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1\"></textarea></div><!-- Model Selector (Visual) --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mr-1 mb-0.5\"><i class=\"fas fa-bolt text-lg\"></i></button><!-- Submit Button --><button type=\"submit\" class=\"bg-white text-black hover:bg-gray-200 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mb-0.5 shadow-lg transition-transform active:scale-95 relative z-10\"><i class=\"fas fa-arrow-up text-sm\"></i></button></form></div><!-- Default Buttons --><div x-show=\"!showChat\" class=\"grid grid-cols-4 gap-2 h-12\"><!-- Retry Button --><button hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" hx-swap=\"none\" @htmx:after-request=\"showChat = false\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl\" x-data=\"{\n\t\t\t\t\t\ttext: '',\n\t\t\t\t\t\tshowFileMenu: false,\n\t\t\t\t\t\tfiles: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],\n\t\t\t\t\t\tresize() {\n\t\t\t\t\t\t\tthis.$refs.input.style.height = 'auto';\n\t\t\t\t\t\t\tlet newHeight = this.$refs.input.scrollHeight;\n\t\t\t\t\t\t\tif(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;\n\t\t\t\t\t\t\tthis.$refs.input.style.height = newHeight + 'px';\n\t\t\t\t\t\t},\n\t\t\t\t\t\tcheckMention(e) {\n\t\t\t\t\t\t\tif (this.text.match(/@[^ ]*$/)) {\n\t\t\t\t\t\t\t\tthis.showFileMenu = true;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (e.key === 'Escape') this.showFileMenu = false;\n\t\t\t\t\t\t},\n\t\t\t\t\t\tinsertFile(f) {\n\t\t\t\t\t\t\tthis.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';\n\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\tthis.$nextTick(() => { this.$refs.input.focus(); });\n\t\t\t\t\t\t}\n\t\t\t\t\t}\"><!-- Cancel (X) --><button type=\"button\" @click=\"showChat = false\" class=\"text-gray-500 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-times text-lg\"></i></button><!-- Attachment --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-paperclip text-lg\"></i></button><!-- Expanding Textarea --><div class=\"flex-1 mx-2 relative min-w-0\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-sm text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea name=\"message\" x-model=\"text\" x-ref=\"input\" @input=\"resize()\" @keyup=\"checkMention($event)\" @keydown.enter.prevent=\"if (!$event.shiftKey) $el.form.requestSubmit()\" rows=\"1\" placeholder=\"Refine code instructions...\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1\"></textarea></div><!-- Model Selector (Visual) --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mr-1 mb-0.5\"><i class=\"fas fa-bolt text-lg\"></i></button><!-- Submit Button --><button type=\"submit\" class=\"bg-white text-black hover:bg-gray-200 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mb-0.5 shadow-lg transition-transform active:scale-95 relative z-10\"><i class=\"fas fa-arrow-up text-sm\"></i></button></form></div><!-- Default Buttons --><div x-show=\"!showChat\" class=\"grid grid-cols-4 gap-2 h-12\"><!-- Retry Button --><button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/retry/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 392, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 402, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" hx-swap=\"none\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white\"><i class=\"fas fa-undo text-[10px]\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide\">Retry</span></button><!-- Chat Button --><button @click=\"showChat = true\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white\"><i class=\"fas fa-comment-dots text-[10px]\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide\">Chat</span></button><!-- PR Button --><button hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" hx-swap=\"none\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white\"><i class=\"fas fa-undo text-[10px]\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide\">Retry</span></button><!-- Chat Button --><button @click=\"showChat = true\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white\"><i class=\"fas fa-comment-dots text-[10px]\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide\">Chat</span></button><!-- PR Button --><button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 409, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 419, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none\"><i class=\"fab fa-github text-[10px] [.htmx-request>&]:hidden\"></i> <i class=\"fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden\">PR</span></button><!-- Merge to Main Button --><button hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none\"><i class=\"fab fa-github text-[10px] [.htmx-request>&]:hidden\"></i> <i class=\"fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden\">PR</span></button><!-- Merge to Main Button --><button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 420, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 430, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none\"><i class=\"fas fa-code-merge text-[10px] [.htmx-request>&]:hidden\"></i> <i class=\"fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden\">main</span></button></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none\"><i class=\"fas fa-code-merge text-[10px] [.htmx-request>&]:hidden\"></i> <i class=\"fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden\">main</span></button></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -154,22 +154,14 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 
 // HandleTaskSSE streams all updates (agent, diff, logs) for a specific task via a single SSE connection.
 // Events: "agent", "diff", "log", "complete"
+// The connection stays alive even for non-in_progress tasks to handle chat continuations.
 func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
 
-	// Check if task exists and is in progress
-	task, err := h.tasks.Get(ctx, taskID)
-	if err != nil {
+	// Check if task exists
+	if _, err := h.tasks.Get(ctx, taskID); err != nil {
 		http.Error(w, "Task not found", http.StatusNotFound)
-		return
-	}
-
-	// If task is already complete, send final state and close
-	if task.Status != models.StatusInProgress {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", task.Status)
 		return
 	}
 
@@ -242,6 +234,12 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 			}
 
 			switch event.Type {
+			case "task_created":
+				// Task restarted (e.g., from chat continuation) - send updated state
+				
+				sendAgent()
+				sendDiff()
+
 			case "agent_update":
 				// Live agent update with message history
 				html := renderAgentConversationFromJSON(ctx, event.HTMLPayload, true)
@@ -256,13 +254,13 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				flusher.Flush()
 
 			case "status_change":
-				// Task status changed - send final state and signal completion
+				// Task status changed - send final state
+				
 				sendAgent()
 				sendDiff()
 				fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", event.HTMLPayload)
 				flusher.Flush()
-				// Close connection after task completes
-				return
+				// Don't close connection - keep alive for potential chat continuations
 			}
 
 		case <-keepalive.C:
