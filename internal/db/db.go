@@ -90,7 +90,7 @@ func runMigrations(db *sql.DB) error {
 
 		// Create a default project if none exists
 		var projectCount int
-		db.QueryRow("SELECT COUNT(*) FROM projects").Scan(&projectCount)
+		_ = db.QueryRow("SELECT COUNT(*) FROM projects").Scan(&projectCount)
 
 		if projectCount == 0 {
 			slog.Info("Creating default project")

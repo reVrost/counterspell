@@ -486,7 +486,7 @@ func (r *Runner) toolGrep(args map[string]any) string {
 	}
 
 	hits := []string{}
-	filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}

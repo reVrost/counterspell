@@ -134,8 +134,7 @@ func (m *RepoManager) fetchLatest(repoPath, token, owner, repo string) error {
 
 	cmd := exec.Command("git", "fetch", "origin")
 	cmd.Dir = repoPath
-	output, err := cmd.CombinedOutput()
-	if err != nil {
+	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Error("[GIT] git fetch failed", "error", err, "output", string(output))
 		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
 	}
@@ -145,18 +144,16 @@ func (m *RepoManager) fetchLatest(repoPath, token, owner, repo string) error {
 	// Reset main to origin/main
 	cmd = exec.Command("git", "checkout", "main")
 	cmd.Dir = repoPath
-	cmd.CombinedOutput() // Ignore error, might be on main already
+	_, _ = cmd.CombinedOutput() // Ignore error, might be on main already
 
 	cmd = exec.Command("git", "reset", "--hard", "origin/main")
 	cmd.Dir = repoPath
-	output, err = cmd.CombinedOutput()
-	if err != nil {
+	if _, err := cmd.CombinedOutput(); err != nil {
 		// Try master branch
 		slog.Info("[GIT] Trying master branch instead", "path", repoPath)
 		cmd = exec.Command("git", "reset", "--hard", "origin/master")
 		cmd.Dir = repoPath
-		output, err = cmd.CombinedOutput()
-		if err != nil {
+		if output, err := cmd.CombinedOutput(); err != nil {
 			slog.Error("[GIT] git reset failed", "error", err, "output", string(output))
 			return fmt.Errorf("git reset failed: %w\nOutput: %s", err, string(output))
 		}
@@ -335,7 +332,7 @@ func (m *RepoManager) PullMainIntoWorktree(owner, repo, taskID string) error {
 	// Also fetch in main repo to keep it updated
 	cmd = exec.Command("git", "fetch", "origin")
 	cmd.Dir = repoPath
-	cmd.Run()
+	_ = cmd.Run()
 
 	// Try to merge origin/main into the worktree
 	cmd = exec.Command("git", "merge", "origin/main", "--no-edit")
@@ -470,7 +467,7 @@ func (m *RepoManager) MergeToMain(owner, repo, taskID string) (string, error) {
 			// Abort the merge in main repo
 			abortCmd := exec.Command("git", "merge", "--abort")
 			abortCmd.Dir = repoPath
-			abortCmd.Run()
+			_ = abortCmd.Run()
 
 			// Get list of conflicted files
 			conflictedFiles := []string{}
@@ -567,7 +564,7 @@ func (m *RepoManager) RemoveWorktree(taskID string) error {
 	// Prune worktrees to clean up git's internal state
 	// Find the parent repo by looking for any repo in the repos directory
 	reposDir := filepath.Join(m.dataDir, "repos")
-	filepath.Walk(reposDir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(reposDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -575,7 +572,7 @@ func (m *RepoManager) RemoveWorktree(taskID string) error {
 			parentRepo := filepath.Dir(path)
 			cmd := exec.Command("git", "worktree", "prune")
 			cmd.Dir = parentRepo
-			cmd.Run() // Ignore errors
+			_ = cmd.Run() // Ignore errors
 		}
 		return nil
 	})

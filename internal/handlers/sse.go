@@ -36,7 +36,7 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	defer h.events.Unsubscribe(ch)
 
 	// Send initial ping
-	fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
+	_, _ = fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
 	flusher.Flush()
 
 	// Stream events
@@ -54,7 +54,7 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			fmt.Fprintf(w, "event: task\ndata: %s\n\n", string(data))
+			_, _ = fmt.Fprintf(w, "event: task\ndata: %s\n\n", string(data))
 			flusher.Flush()
 		}
 	}
@@ -103,9 +103,10 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 				Status:      string(t.Status),
 				Progress:    50,
 			}
-			if t.Status == "in_progress" {
+			switch t.Status {
+			case "in_progress":
 				active = append(active, uiTask)
-			} else if t.Status == "review" || t.Status == "human_review" {
+			case "review", "human_review":
 				uiTask.Progress = 100
 				reviews = append(reviews, uiTask)
 			}
@@ -113,16 +114,16 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 
 		// Render active rows to buffer
 		var buf bytes.Buffer
-		views.ActiveRows(active, projects).Render(ctx, &buf)
+		_ = views.ActiveRows(active, projects).Render(ctx, &buf)
 
 		// Add OOB swap for reviews section
 		buf.WriteString(`<div id="reviews-container" hx-swap-oob="true">`)
-		views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, &buf)
+		_ = views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, &buf)
 		buf.WriteString(`</div>`)
 
 		// SSE requires single-line data, escape newlines
 		html := strings.ReplaceAll(buf.String(), "\n", "")
-		fmt.Fprintf(w, "event: active-update\ndata: %s\n\n", html)
+		_, _ = fmt.Fprintf(w, "event: active-update\ndata: %s\n\n", html)
 		flusher.Flush()
 	}
 
@@ -146,7 +147,7 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 			sendActiveUpdate()
 		case <-keepalive.C:
 			// SSE comment to keep connection alive
-			fmt.Fprintf(w, ": keepalive\n\n")
+			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
 	}
@@ -188,7 +189,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		html := renderAgentConversation(ctx, task)
-		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
@@ -205,7 +206,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 		} else {
 			html = `<div class="text-gray-500 italic">No changes made</div>`
 		}
-		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		_, _ = fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
@@ -243,14 +244,14 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 			case "agent_update":
 				// Live agent update with message history
 				html := renderAgentConversationFromJSON(ctx, event.HTMLPayload, true)
-				fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+				_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 				flusher.Flush()
 
 			case "log":
 				// Log entry
 				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
 				logHTML := fmt.Sprintf(`<div class="ml-4 relative"><div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div><p class="text-xs text-gray-400">%s</p></div>`, htmlData)
-				fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
+				_, _ = fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
 				flusher.Flush()
 
 			case "status_change":
@@ -258,17 +259,20 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				
 				sendAgent()
 				sendDiff()
+				//nolint:errcheck // SSE write may fail if client disconnects
 				fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", event.HTMLPayload)
 				flusher.Flush()
 				// Don't close connection - keep alive for potential chat continuations
 
 			case "todo":
 				// Todo list update - forward JSON directly
+				//nolint:errcheck // SSE write may fail if client disconnects
 				fmt.Fprintf(w, "event: todo\ndata: %s\n\n", strings.ReplaceAll(event.HTMLPayload, "\n", ""))
 				flusher.Flush()
 			}
 
 		case <-keepalive.C:
+			//nolint:errcheck // SSE keepalive may fail if client disconnects
 			fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
@@ -297,6 +301,7 @@ func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
 	defer h.events.Unsubscribe(ch)
 
 	// Send initial ping
+	//nolint:errcheck // SSE write may fail if client disconnects
 	fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
 	flusher.Flush()
 
@@ -325,10 +330,11 @@ func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
 				// Wrap it in log entry structure and send
 				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
 				logHTML := fmt.Sprintf(`<div class="ml-4 relative"><div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div><p class="text-xs text-gray-400">%s</p></div>`, htmlData)
-				fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
+				_, _ = fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
 				flusher.Flush()
 			}
 		case <-keepalive.C:
+			//nolint:errcheck // SSE keepalive may fail if client disconnects
 			fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
@@ -370,7 +376,7 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 		} else {
 			html = `<div class="text-gray-500 italic">No changes made</div>`
 		}
-		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		_, _ = fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
@@ -397,6 +403,7 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 			// On any task event, refresh diff
 			sendDiff()
 		case <-keepalive.C:
+			//nolint:errcheck // SSE keepalive may fail if client disconnects
 			fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
@@ -431,14 +438,14 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		html := renderAgentConversation(ctx, task)
-		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
 	// Helper to render and send agent state from JSON message history
 	sendAgentFromJSON := func(messageHistoryJSON string, isInProgress bool) {
 		html := renderAgentConversationFromJSON(ctx, messageHistoryJSON, isInProgress)
-		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
@@ -463,13 +470,15 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			// Handle live agent updates (message history JSON in HTMLPayload)
-			if event.Type == "agent_update" {
+			switch event.Type {
+			case "agent_update":
 				sendAgentFromJSON(event.HTMLPayload, true)
-			} else if event.Type == "status_change" {
+			case "status_change":
 				// Task completed, reload from DB to get final state
 				sendAgentFromDB()
 			}
 		case <-keepalive.C:
+			//nolint:errcheck // SSE keepalive may fail if client disconnects
 			fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
@@ -594,7 +603,7 @@ func renderAgentConversation(ctx context.Context, task *models.Task) string {
 	if len(uiMessages) > 0 {
 		buf.WriteString(`<div class="space-y-0">`)
 		for _, msg := range uiMessages {
-			components.MessageBubble(msg).Render(ctx, &buf)
+			_ = components.MessageBubble(msg).Render(ctx, &buf)
 		}
 		buf.WriteString(`</div>`)
 	}
@@ -674,7 +683,7 @@ func renderAgentConversationFromJSON(ctx context.Context, messageHistoryJSON str
 	if len(uiMessages) > 0 {
 		buf.WriteString(`<div class="space-y-0">`)
 		for _, msg := range uiMessages {
-			components.MessageBubble(msg).Render(ctx, &buf)
+			_ = components.MessageBubble(msg).Render(ctx, &buf)
 		}
 		buf.WriteString(`</div>`)
 	}

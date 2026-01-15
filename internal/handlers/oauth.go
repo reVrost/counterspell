@@ -53,7 +53,7 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 
 	// Fetch repos in background or sync
 	if conn, err := h.github.GetActiveConnection(ctx); err == nil {
-		h.github.FetchAndSaveRepositories(ctx, conn)
+		_ = h.github.FetchAndSaveRepositories(ctx, conn)
 	}
 
 	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
@@ -99,7 +99,7 @@ func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) HandleAuthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"authenticated": true}`))
+	_, _ = w.Write([]byte(`{"authenticated": true}`))
 }
 
 func (h *Handlers) HandleLogout(w http.ResponseWriter, r *http.Request) {
