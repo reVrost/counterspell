@@ -1,6 +1,9 @@
 package views
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // Feed renders the main dashboard
 templ Feed(data FeedData) {
@@ -47,16 +50,11 @@ templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
 					</span>
 					<span class="text-sm text-gray-500">{ projects[task.ProjectID].Name }</span>
 				</div>
-				<span class="text-sm text-orange-400 flex items-center gap-1">
-					<i class="fas fa-circle-notch fa-spin"></i> { fmt.Sprintf("%d%%", task.Progress) }
+				<span class="text-sm text-orange-400 font-mono">
+					{ fmt.Sprintf("%ds", int(time.Since(task.CreatedAt).Seconds())) }
 				</span>
 			</div>
 			<p class="text-sm text-gray-400 leading-tight line-clamp-2">{ task.Description }</p>
-			if task.Progress < 100 {
-				<div class="mt-2 w-full bg-gray-800 h-0.5 rounded-full overflow-hidden">
-					<div class="bg-orange-500 h-full transition-all duration-300" style={ fmt.Sprintf("width: %d%%", task.Progress) }></div>
-				</div>
-			}
 		</div>
 	}
 	if len(tasks) == 0 {

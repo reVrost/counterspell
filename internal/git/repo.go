@@ -267,6 +267,22 @@ func (m *RepoManager) CommitAndPush(taskID, message string) error {
 	return nil
 }
 
+// PushBranch pushes the current branch to remote without committing.
+func (m *RepoManager) PushBranch(taskID string) error {
+	worktreePath := m.worktreePath(taskID)
+
+	cmd := exec.Command("git", "push", "-u", "origin", "HEAD")
+	cmd.Dir = worktreePath
+	slog.Info("[GIT] Executing: git push -u origin HEAD", "dir", worktreePath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		slog.Error("[GIT] git push failed", "error", err, "output", string(output))
+		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
+	}
+
+	slog.Info("[GIT] Pushed branch successfully", "task_id", taskID)
+	return nil
+}
+
 // GetCurrentBranch returns the current branch name in a worktree.
 func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
