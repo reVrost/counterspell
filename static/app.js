@@ -74,7 +74,6 @@ document.addEventListener('alpine:init', () => {
       this._eventSource = eventSource;
       eventSource.addEventListener('task', (e) => {
         const data = JSON.parse(e.data);
-        this.showToast(data.html_payload ? 'Task updated' : 'Event received');
         if (data.type === 'status_change') {
           htmx.trigger('#reviews-container', 'refresh');
         }
