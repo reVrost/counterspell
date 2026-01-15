@@ -17,6 +17,7 @@ document.addEventListener('alpine:init', () => {
     // Voice Recording State
     listening: false,
     isRecording: false,
+    isTranscribing: false,
     audioLevel: 0,
     audioLevels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     recordedAudio: null,
@@ -182,6 +183,58 @@ document.addEventListener('alpine:init', () => {
     cancelRecording() {
       this.stopVoiceRecording();
       this.recordedAudio = null;
+    },
+
+    // Transcribe and submit voice recording
+    async transcribeAndSubmit(formRef, inputRef) {
+      if (!this.recordedAudio || !this.recordedAudio.blob) {
+        this.showToast('No recording available');
+        return;
+      }
+
+      if (!this.activeProjectId) {
+        this.showToast('Select a project first');
+        return;
+      }
+
+      this.isTranscribing = true;
+      this.showToast('Transcribing...');
+
+      try {
+        const formData = new FormData();
+        formData.append('audio', this.recordedAudio.blob, 'recording.webm');
+
+        const response = await fetch('/transcribe', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Transcription failed');
+        }
+
+        const transcription = await response.text();
+
+        if (!transcription || transcription.trim() === '') {
+          this.showToast('Could not understand audio');
+          this.recordedAudio = null;
+          this.isTranscribing = false;
+          return;
+        }
+
+        // Set the transcribed text in the input and submit
+        inputRef.value = transcription;
+        this.recordedAudio = null;
+        this.isTranscribing = false;
+
+        // Trigger form submission via HTMX
+        formRef.requestSubmit();
+      } catch (err) {
+        console.error('Transcription error:', err);
+        this.showToast('Transcription failed: ' + err.message);
+        this.isTranscribing = false;
+      }
     },
 
     formatDuration(secs) {

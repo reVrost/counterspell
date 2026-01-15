@@ -12,15 +12,16 @@ import (
 
 // Handlers contains all HTTP handlers.
 type Handlers struct {
-	tasks        *services.TaskService
-	events       *services.EventBus
-	orchestrator *services.Orchestrator
-	github       *services.GitHubService
-	auth         *auth.AuthService
-	settings     *services.SettingsService
-	clientID     string
-	clientSecret string
-	redirectURI  string
+	tasks         *services.TaskService
+	events        *services.EventBus
+	orchestrator  *services.Orchestrator
+	github        *services.GitHubService
+	auth          *auth.AuthService
+	settings      *services.SettingsService
+	transcription *services.TranscriptionService
+	clientID      string
+	clientSecret  string
+	redirectURI   string
 }
 
 // NewHandlers creates new HTTP handlers.
@@ -31,6 +32,7 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, databas
 
 	githubService := services.NewGitHubService(clientID, clientSecret, redirectURI, database)
 	settingsService := services.NewSettingsService(database)
+	transcriptionService := services.NewTranscriptionService()
 
 	// Create orchestrator
 	orchestrator, err := services.NewOrchestrator(tasks, githubService, events, settingsService, dataDir)
@@ -46,16 +48,17 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, databas
 	// }
 
 	return &Handlers{
-		tasks:        tasks,
-		events:       events,
-		orchestrator: orchestrator,
-		github:       githubService,
+		tasks:         tasks,
+		events:        events,
+		orchestrator:  orchestrator,
+		github:        githubService,
 		// Disable for now
-		auth:         nil,
-		settings:     settingsService,
-		clientID:     clientID,
-		clientSecret: clientSecret,
-		redirectURI:  redirectURI,
+		auth:          nil,
+		settings:      settingsService,
+		transcription: transcriptionService,
+		clientID:      clientID,
+		clientSecret:  clientSecret,
+		redirectURI:   redirectURI,
 	}, nil
 }
 
@@ -96,6 +99,7 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Post("/action/abort-merge/{id}", h.HandleAbortMerge)
 	r.Post("/action/complete-merge/{id}", h.HandleCompleteMerge)
 	r.Post("/settings", h.HandleSaveSettings)
+	r.Post("/transcribe", h.HandleTranscribe)
 
 	// GitHub OAuth routes
 	r.Get("/github/authorize", h.HandleGitHubAuthorize)
