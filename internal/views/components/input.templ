@@ -124,7 +124,7 @@ templ InputBar(projects map[string]views.UIProject) {
 
 				<textarea x-model="text" x-ref="input" name="voice_input" 
 					@input="resize()" @keyup="checkMention($event)"
-					@keydown.enter.prevent="if(!$event.shiftKey && text.trim().length > 0 && app.activeProjectId) { $refs.voiceForm.requestSubmit(); text = ''; resize(); }"
+					@keydown.enter.prevent="if(!$event.shiftKey && text.trim().length > 0 && app.activeProjectId) { navigator.vibrate && navigator.vibrate(30); $refs.voiceForm.requestSubmit(); text = ''; $refs.input.style.height = 'auto'; }"
 					rows="1"
 					placeholder="What do you want to build?" 
 					class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]"></textarea>
@@ -223,12 +223,12 @@ templ InputBar(projects map[string]views.UIProject) {
 
 					<!-- Submit/Voice Button -->
 					<button type="button" 
-						@click="if(text.length > 0) { $refs.voiceForm.requestSubmit(); }"
+						@click="if(text.length > 0) { navigator.vibrate && navigator.vibrate(30); $refs.voiceForm.requestSubmit(); text = ''; $refs.input.style.height = 'auto'; }"
 						@mousedown="if (text.length === 0 && !app.isRecording) app.startVoiceRecording($refs.input)"
 						@mouseup="if (app.isRecording) app.stopVoiceRecording()"
 						@mouseleave="if (app.isRecording) app.stopVoiceRecording()"
-						@touchstart.prevent="if (text.length === 0 && !app.isRecording) app.startVoiceRecording($refs.input)"
-						@touchend.prevent="if (app.isRecording) { app.stopVoiceRecording(); } else if (text.length > 0) { $refs.voiceForm.requestSubmit(); }"
+						@touchstart.prevent="if (text.length === 0 && !app.isRecording) { navigator.vibrate && navigator.vibrate(50); app.startVoiceRecording($refs.input); }"
+						@touchend.prevent="if (app.isRecording) { navigator.vibrate && navigator.vibrate([30, 50, 30]); app.stopVoiceRecording(); } else if (text.length > 0) { navigator.vibrate && navigator.vibrate(30); $refs.voiceForm.requestSubmit(); text = ''; $refs.input.style.height = 'auto'; }"
 						@touchcancel="if (app.isRecording) app.cancelRecording()"
 						:class="app.isRecording ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-110' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')"
 						class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 ml-1 select-none">

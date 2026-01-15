@@ -32,7 +32,7 @@ func Feed(data FeedData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"px-3 pt-20 pb-24\"><!-- NEEDS REVIEW (Target for OOB Swaps) --><div id=\"reviews-container\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"px-3 pt-20 pb-40\"><!-- NEEDS REVIEW (Target for OOB Swaps) --><div id=\"reviews-container\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -366,33 +366,20 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span></div><span class=\"text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-medium border border-blue-500/20 shrink-0\">Review</span></div><p class=\"text-sm text-gray-200 font-medium leading-tight mb-2 pr-4 line-clamp-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span></div><span class=\"text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-medium border border-blue-500/20 shrink-0\">Review</span></div><p class=\"text-sm text-gray-200 font-medium leading-tight pr-4 line-clamp-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 97, Col: 102}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 97, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</p><div class=\"flex items-center gap-3 text-[11px] text-gray-600 font-mono\"><span><i class=\"fas fa-robot mr-1\"></i>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(task.AgentName)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 99, Col: 58}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</span></div><div class=\"absolute right-3 top-1/2 -translate-y-1/2 text-gray-700\"><i class=\"fas fa-chevron-right text-xs\"></i></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</p><div class=\"absolute right-3 top-1/2 -translate-y-1/2 text-gray-700\"><i class=\"fas fa-chevron-right text-xs\"></i></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -416,51 +403,51 @@ func CompletedTaskRow(task *UITask, project UIProject) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var22 == nil {
-			templ_7745c5c3_Var22 = templ.NopComponent
+		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var21 == nil {
+			templ_7745c5c3_Var21 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var22 string
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 108, Col: 43}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" hx-target=\"#modal-content\"><div class=\"flex items-center gap-3\"><div class=\"w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]\"><i class=\"fas fa-check\"></i></div><div><div class=\"text-sm text-gray-400 decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition line-clamp-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var23 string
-		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 111, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 116, Col: 152}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" hx-target=\"#modal-content\"><div class=\"flex items-center gap-3\"><div class=\"w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]\"><i class=\"fas fa-check\"></i></div><div><div class=\"text-sm text-gray-400 decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition line-clamp-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</div><div class=\"text-[10px] text-gray-600\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 119, Col: 152}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 117, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</div><div class=\"text-[10px] text-gray-600\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 120, Col: 57}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</div></div></div><i class=\"fas fa-chevron-right text-[10px] text-gray-700 opacity-0 group-hover:opacity-100 transition\"></i></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</div></div></div><i class=\"fas fa-chevron-right text-[10px] text-gray-700 opacity-0 group-hover:opacity-100 transition\"></i></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

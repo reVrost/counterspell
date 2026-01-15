@@ -57,10 +57,20 @@ func taskDetailXData(task *views.UITask) string {
 		activeTab: 'agent',
 		messageQueue: [],
 		agentRunning: %s,
+		activeModelId: localStorage.getItem("counterspell_model") || "%s",
+		models: %s,
 		get completedCount() { return this.todos.filter(t => t.status === 'completed').length },
 		get inProgressTask() { 
 			const t = this.todos.find(t => t.status === 'in_progress');
 			return t ? (t.active_form || t.content) : '';
+		},
+		get modelName() {
+			const m = this.models.find(m => m.id === this.activeModelId);
+			return m ? m.name.split(" ")[1] : this.activeModelId.split("#")[1];
+		},
+		setModel(id) {
+			this.activeModelId = id;
+			localStorage.setItem("counterspell_model", id);
 		},
 		handleTodoEvent(data) {
 			try { this.todos = JSON.parse(data); } catch(err) { console.error('Todo parse error:', err); }
@@ -78,10 +88,11 @@ func taskDetailXData(task *views.UITask) string {
 			this.messageQueue = rest;
 			const formData = new FormData();
 			formData.append('message', msg);
+			formData.append('model_id', this.activeModelId);
 			this.agentRunning = true;
 			await fetch('%s', { method: 'POST', body: formData });
 		}
-	}`, agentRunning, chatURL)
+	}`, agentRunning, uiModels[0].ID, getModelsJSON(), chatURL)
 }
 
 templ LogEntry(log views.UILogEntry) {
@@ -528,6 +539,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 						agentRunning = true;
 						const formData = new FormData();
 						formData.append('message', msgText);
+						formData.append('model_id', $root.activeModelId);
 						text = '';
 						showChat = false;
 						fetch($el.getAttribute('hx-post'), { method: 'POST', body: formData });
@@ -621,6 +633,31 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 							>
 								<i class="fas fa-paperclip text-xs"></i>
 							</button>
+							<!-- Model Selector -->
+							<div x-data="{ modelOpen: false }" class="relative">
+								<button type="button" @click="modelOpen = !modelOpen"
+									class="h-7 px-2 rounded-lg flex items-center gap-1.5 text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-colors">
+									<i class="fas fa-bolt text-xs"></i>
+									<span class="text-[10px] font-medium" x-text="modelName"></span>
+								</button>
+								<!-- Model Popover -->
+								<div x-show="modelOpen" @click.outside="modelOpen = false" x-cloak
+									x-transition.scale.origin.bottom.left
+									class="absolute bottom-full left-0 mb-2 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 z-50">
+									<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-900/50 border-b border-gray-800 mb-1">Select Model</div>
+									<div class="p-1 space-y-0.5">
+										<template x-for="m in models" :key="m.id">
+											<div @click="setModel(m.id); modelOpen = false"
+												:class="activeModelId === m.id ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white border-transparent'"
+												class="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition border">
+												<span class="text-xs font-medium" x-text="m.name"></span>
+												<div x-show="activeModelId === m.id"
+													class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
+											</div>
+										</template>
+									</div>
+								</div>
+							</div>
 						</div>
 						<!-- Submit -->
 						<button
