@@ -718,7 +718,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				>
 					<!-- Retry Confirmation -->
 					<template x-if="confirmAction === 'retry'">
-						<div class="space-y-4">
+						<div class="space-y-4" x-init="htmx.process($el)">
 							<div class="flex items-center gap-3">
 								<div class="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
 									<i class="fas fa-arrow-rotate-left text-amber-500"></i>
@@ -734,15 +734,15 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 								<button
 									hx-post={ fmt.Sprintf("/action/retry/%s", task.ID) }
 									hx-swap="none"
-									@click="confirmAction = null"
+									hx-disabled-elt="this"
 									class="flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors"
-								>Retry</button>
+								><span class="htmx-request:hidden">Retry</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
 						</div>
 					</template>
 					<!-- Clear Confirmation -->
 					<template x-if="confirmAction === 'clear'">
-						<div class="space-y-4">
+						<div class="space-y-4" x-init="htmx.process($el)">
 							<div class="flex items-center gap-3">
 								<div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
 									<i class="fas fa-eraser text-red-500"></i>
@@ -758,15 +758,15 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 								<button
 									hx-post={ fmt.Sprintf("/action/clear/%s", task.ID) }
 									hx-swap="none"
-									@click="confirmAction = null"
+									hx-disabled-elt="this"
 									class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
-								>Clear</button>
+								><span class="htmx-request:hidden">Clear</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
 						</div>
 					</template>
 					<!-- PR Confirmation -->
 					<template x-if="confirmAction === 'pr'">
-						<div class="space-y-4">
+						<div class="space-y-4" x-init="htmx.process($el)">
 							<div class="flex items-center gap-3">
 								<div class="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
 									<i class="fab fa-github text-purple-500"></i>
@@ -783,15 +783,14 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									hx-post={ fmt.Sprintf("/action/pr/%s", task.ID) }
 									hx-swap="none"
 									hx-disabled-elt="this"
-									@click="confirmAction = null"
-									class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50"
-								>Create PR</button>
+									class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
+								><span class="htmx-request:hidden">Create PR</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
 						</div>
 					</template>
 					<!-- Merge Confirmation -->
 					<template x-if="confirmAction === 'merge'">
-						<div class="space-y-4">
+						<div class="space-y-4" x-init="htmx.process($el)">
 							<div class="flex items-center gap-3">
 								<div class="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
 									<i class="fas fa-code-merge text-green-500"></i>
@@ -808,9 +807,8 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									hx-post={ fmt.Sprintf("/action/merge/%s", task.ID) }
 									hx-swap="none"
 									hx-disabled-elt="this"
-									@click="confirmAction = null"
-									class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50"
-								>Merge</button>
+									class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
+								><span class="htmx-request:hidden">Merge</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
 						</div>
 					</template>

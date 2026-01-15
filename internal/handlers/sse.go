@@ -188,7 +188,22 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
-		html := renderAgentConversation(ctx, task)
+
+		// For in-progress tasks, check if we have cached live history
+		// This ensures SSE reconnections get the latest state even before DB persistence
+		var html string
+		if task.Status == models.StatusInProgress {
+			if liveHistory := h.events.GetLiveHistory(taskID); liveHistory != "" {
+				// Use cached live history
+				html = renderAgentConversationFromJSON(ctx, liveHistory, true)
+			} else {
+				// Fall back to DB (might be empty for fresh tasks)
+				html = renderAgentConversation(ctx, task)
+			}
+		} else {
+			html = renderAgentConversation(ctx, task)
+		}
+
 		_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}

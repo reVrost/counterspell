@@ -816,6 +816,11 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 	}
 	branchName = strings.TrimSpace(branchName)
 
+	// Push the branch to remote before creating PR
+	if err := o.repos.PushBranch(taskID); err != nil {
+		return "", fmt.Errorf("failed to push branch: %w", err)
+	}
+
 	// Create the PR - use Title for both title and body
 	prURL, err := o.github.CreatePullRequest(ctx, owner, repo, branchName, task.Title, task.Intent)
 	if err != nil {
