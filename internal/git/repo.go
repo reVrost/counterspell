@@ -285,33 +285,25 @@ func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
 }
 
 // GetDiff returns the git diff for a task's worktree.
-// After commit, shows diff between HEAD~1 and HEAD (the committed changes).
+// Shows diff between main branch and HEAD (all changes on the feature branch).
 func (m *RepoManager) GetDiff(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
 
 	slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
 
-	// First try uncommitted changes
-	cmd := exec.Command("git", "diff", "HEAD")
+	// Get diff from main to HEAD (all changes on this branch compared to main)
+	cmd := exec.Command("git", "diff", "origin/main...HEAD")
 	cmd.Dir = worktreePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Error("[GIT] GetDiff failed", "error", err, "output", string(output))
-		return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
-	}
-
-	// If no uncommitted changes, get diff of last commit
-	if len(output) == 0 {
-		slog.Info("[GIT] No uncommitted changes, getting last commit diff", "task_id", taskID)
-		cmd = exec.Command("git", "diff", "HEAD~1", "HEAD")
+		slog.Warn("[GIT] GetDiff origin/main...HEAD failed, trying main...HEAD", "error", err)
+		// Fallback to local main if origin/main doesn't exist
+		cmd = exec.Command("git", "diff", "main...HEAD")
 		cmd.Dir = worktreePath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
-			slog.Warn("[GIT] GetDiff HEAD~1 failed (may be first commit)", "error", err)
-			// Try show for first commit case
-			cmd = exec.Command("git", "show", "--format=", "HEAD")
-			cmd.Dir = worktreePath
-			output, _ = cmd.CombinedOutput()
+			slog.Error("[GIT] GetDiff failed", "error", err, "output", string(output))
+			return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
 		}
 	}
 
