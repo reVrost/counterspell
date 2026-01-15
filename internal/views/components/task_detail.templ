@@ -43,6 +43,33 @@ func hasTextContent(msg views.UIMessage) bool {
 	return false
 }
 
+// taskDetailXData generates the Alpine.js x-data for the task detail component
+func taskDetailXData(task *views.UITask) string {
+	agentRunning := "false"
+	if task.Status == "in_progress" {
+		agentRunning = "true"
+	}
+	chatURL := fmt.Sprintf("/action/chat/%s", task.ID)
+	return fmt.Sprintf(`{
+		showChat: false,
+		activeTab: 'agent',
+		messageQueue: [],
+		agentRunning: %s,
+		queueMessage(msg) {
+			this.messageQueue = [...this.messageQueue, msg];
+		},
+		async processQueue() {
+			if (this.messageQueue.length === 0) return;
+			const [msg, ...rest] = this.messageQueue;
+			this.messageQueue = rest;
+			const formData = new FormData();
+			formData.append('message', msg);
+			this.agentRunning = true;
+			await fetch('%s', { method: 'POST', body: formData });
+		}
+	}`, agentRunning, chatURL)
+}
+
 templ LogEntry(log views.UILogEntry) {
 	<div class="ml-4 relative">
 		<div
@@ -151,7 +178,7 @@ templ ToolResultBlock(content views.UIContent) {
 }
 
 templ TaskDetail(task *views.UITask, project views.UIProject) {
-	<div class="flex flex-col h-full" x-data="{ showChat: false, activeTab: 'agent' }">
+	<div class="flex flex-col h-full" x-data={ taskDetailXData(task) }>
 		<!-- Modal Header -->
 		<div class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#16191F]">
 			<div class="flex items-center gap-3">
@@ -213,6 +240,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			sse-connect={ fmt.Sprintf("/task/%s/stream", task.ID) }
 			class="hidden"
 			id="task-sse-connection"
+			@sse:complete.window="agentRunning = false; $nextTick(() => processQueue())"
 		>
 			<!-- Hidden elements that receive SSE updates and swap into visible targets -->
 			<div sse-swap="agent" hx-target="#agent-content" hx-swap="innerHTML"></div>
@@ -232,7 +260,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 		>
 			<!-- Tab 1: AGENT CONVERSATION -->
 			<div x-show="activeTab === 'agent'" class="pb-32">
-				<div id="agent-content">
+				<div id="agent-content" class="mt-1">
 					if task.Status == "in_progress" {
 						if len(task.Messages) > 0 {
 							<div class="space-y-0">
@@ -250,10 +278,18 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"></div>
 								</div>
 							</div>
-							<div>
+							<div class="flex-1">
 								<p class="text-sm font-medium shimmer">Agent is thinking...</p>
 								<p class="text-[10px] text-gray-600">Analyzing code</p>
 							</div>
+							<button
+								hx-post={ fmt.Sprintf("/action/abort/%s", task.ID) }
+								hx-swap="none"
+								class="w-6 h-6 rounded bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-colors"
+								title="Stop agent"
+							>
+								<i class="fas fa-stop text-[10px]"></i>
+							</button>
 						</div>
 					} else if len(task.Messages) > 0 {
 						<div class="space-y-0">
@@ -310,22 +346,34 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<form
 				hx-post={ fmt.Sprintf("/action/chat/%s", task.ID) }
 				hx-swap="none"
-				@submit="
-					if (text.trim()) {
+				:hx-trigger="agentRunning ? 'never' : 'submit'"
+				@submit.prevent="
+					if (!text.trim()) return;
+					const msgText = text.trim();
+					
+					if (agentRunning) {
+						queueMessage(msgText);
+						text = '';
+					} else {
 						const msgHtml = `<div class='px-4 py-2 border-b border-gray-800/50'>
 							<div class='flex gap-2'>
 								<div class='w-4 h-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0'>
 									<i class='fas fa-user text-[7px] text-blue-400'></i>
 								</div>
 								<div class='flex-1 min-w-0 -mt-px'>
-									<div class='text-sm text-gray-200 whitespace-pre-wrap leading-normal'>${text}</div>
+									<div class='text-sm text-gray-200 whitespace-pre-wrap leading-normal'>${msgText}</div>
 								</div>
 							</div>
 						</div>`;
 						document.getElementById('agent-content').insertAdjacentHTML('beforeend', msgHtml);
+						agentRunning = true;
+						const formData = new FormData();
+						formData.append('message', msgText);
+						text = '';
+						showChat = false;
+						fetch($el.getAttribute('hx-post'), { method: 'POST', body: formData });
 					}
 				"
-				@htmx:after-request="showChat = false; text = ''"
 				class="relative mx-auto max-w-xl"
 				x-data="{
 					text: '',
@@ -422,54 +470,175 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 						</button>
 					</div>
 				</div>
-				<!-- Keyboard hint -->
+				<!-- Keyboard hint / Queue indicator -->
 				<div class="flex justify-center mt-2">
-					<span class="text-[10px] text-gray-600">Press <kbd class="px-1 py-0.5 rounded bg-white/[0.04] text-gray-500 font-mono text-[9px]">Enter</kbd> to send</span>
+					<template x-if="messageQueue.length > 0">
+						<span class="text-[10px] text-purple-400">
+							<i class="fas fa-clock mr-1"></i>
+							<span x-text="messageQueue.length"></span> message<span x-show="messageQueue.length > 1">s</span> queued
+						</span>
+					</template>
+					<template x-if="messageQueue.length === 0 && agentRunning">
+						<span class="text-[10px] text-amber-400">
+							<i class="fas fa-hourglass-half mr-1"></i>
+							Message will be queued (agent is working)
+						</span>
+					</template>
+					<template x-if="messageQueue.length === 0 && !agentRunning">
+						<span class="text-[10px] text-gray-600">Press <kbd class="px-1 py-0.5 rounded bg-white/[0.04] text-gray-500 font-mono text-[9px]">Enter</kbd> to send</span>
+					</template>
 				</div>
 			</form>
 		</div>
 		<!-- Bottom Actions Toolbar (Sticky) -->
-		<div class="shrink-0 p-4 border-t border-white/5 bg-[#16191F] pb-8">
+		<div class="shrink-0 px-4 py-3 border-t border-white/[0.06] bg-[#16191F]/95 backdrop-blur-sm pb-6" x-data="{ confirmAction: null }">
+			<!-- Confirmation Modal (teleported to body to escape overflow:hidden) -->
+			<template x-teleport="body">
+				<div
+					x-show="confirmAction"
+					x-transition:enter="transition ease-out duration-150"
+					x-transition:enter-start="opacity-0"
+					x-transition:enter-end="opacity-100"
+					x-transition:leave="transition ease-in duration-100"
+					x-transition:leave-start="opacity-100"
+					x-transition:leave-end="opacity-0"
+					class="fixed inset-0 z-[200] flex items-start justify-center pt-[25vh] bg-black/60 backdrop-blur-sm"
+					@click.self="confirmAction = null"
+				>
+				<div
+					x-show="confirmAction"
+					x-transition:enter="transition ease-out duration-150"
+					x-transition:enter-start="opacity-0 scale-95"
+					x-transition:enter-end="opacity-100 scale-100"
+					x-transition:leave="transition ease-in duration-100"
+					x-transition:leave-start="opacity-100 scale-100"
+					x-transition:leave-end="opacity-0 scale-95"
+					class="bg-[#161b22] border border-gray-700/50 rounded-xl p-5 w-[320px] shadow-2xl"
+				>
+					<!-- Retry Confirmation -->
+					<template x-if="confirmAction === 'retry'">
+						<div class="space-y-4">
+							<div class="flex items-center gap-3">
+								<div class="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+									<i class="fas fa-arrow-rotate-left text-amber-500"></i>
+								</div>
+								<div>
+									<h3 class="font-semibold text-white">Retry Task</h3>
+									<p class="text-xs text-gray-400">Re-run with the same prompt</p>
+								</div>
+							</div>
+							<p class="text-sm text-gray-300">This will retry the previous prompt and overwrite any existing changes.</p>
+							<div class="flex gap-2 pt-2">
+								<button @click="confirmAction = null" class="flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">Cancel</button>
+								<button
+									hx-post={ fmt.Sprintf("/action/retry/%s", task.ID) }
+									hx-swap="none"
+									@click="confirmAction = null"
+									class="flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors"
+								>Retry</button>
+							</div>
+						</div>
+					</template>
+					<!-- PR Confirmation -->
+					<template x-if="confirmAction === 'pr'">
+						<div class="space-y-4">
+							<div class="flex items-center gap-3">
+								<div class="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+									<i class="fab fa-github text-purple-500"></i>
+								</div>
+								<div>
+									<h3 class="font-semibold text-white">Create Pull Request</h3>
+									<p class="text-xs text-gray-400">Push changes to GitHub</p>
+								</div>
+							</div>
+							<p class="text-sm text-gray-300">This will create a new pull request on GitHub with all the changes from this task.</p>
+							<div class="flex gap-2 pt-2">
+								<button @click="confirmAction = null" class="flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">Cancel</button>
+								<button
+									hx-post={ fmt.Sprintf("/action/pr/%s", task.ID) }
+									hx-swap="none"
+									hx-disabled-elt="this"
+									@click="confirmAction = null"
+									class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50"
+								>Create PR</button>
+							</div>
+						</div>
+					</template>
+					<!-- Merge Confirmation -->
+					<template x-if="confirmAction === 'merge'">
+						<div class="space-y-4">
+							<div class="flex items-center gap-3">
+								<div class="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+									<i class="fas fa-code-merge text-green-500"></i>
+								</div>
+								<div>
+									<h3 class="font-semibold text-white">Merge to Main</h3>
+									<p class="text-xs text-gray-400">Apply changes directly</p>
+								</div>
+							</div>
+							<p class="text-sm text-gray-300">This will merge all changes directly into the main branch without creating a pull request.</p>
+							<div class="flex gap-2 pt-2">
+								<button @click="confirmAction = null" class="flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">Cancel</button>
+								<button
+									hx-post={ fmt.Sprintf("/action/merge/%s", task.ID) }
+									hx-swap="none"
+									hx-disabled-elt="this"
+									@click="confirmAction = null"
+									class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50"
+								>Merge</button>
+							</div>
+						</div>
+					</template>
+				</div>
+				</div>
+			</template>
 			<!-- Default Buttons (always in layout to prevent shift) -->
-			<div :class="showChat ? 'invisible pointer-events-none' : ''" class="grid grid-cols-4 gap-2 h-12">
-				<!-- Retry Button -->
+			<div :class="showChat ? 'invisible pointer-events-none' : ''" class="flex items-center justify-between gap-3">
+				<!-- Left: Secondary actions in a pill group -->
+				<div class="flex items-center bg-[#21262d]/80 rounded-full p-1 border border-white/[0.06]">
+					<!-- Retry -->
+					<button
+						@click="confirmAction = 'retry'"
+						class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90"
+						title="Retry"
+					>
+						<i class="fas fa-arrow-rotate-left text-xs"></i>
+					</button>
+					<!-- Divider -->
+					<div class="w-px h-4 bg-white/[0.08]"></div>
+					<!-- Chat -->
+					<button
+						@click="showChat = true"
+						class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90 relative"
+						title="Continue chat"
+					>
+						<i class="fas fa-message text-xs"></i>
+						<!-- Queue badge -->
+						<span 
+							x-show="messageQueue.length > 0" 
+							x-text="messageQueue.length"
+							x-transition
+							class="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+						></span>
+					</button>
+					<!-- Divider -->
+					<div class="w-px h-4 bg-white/[0.08]"></div>
+					<!-- PR -->
+					<button
+						@click="confirmAction = 'pr'"
+						class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90"
+						title="Create PR"
+					>
+						<i class="fab fa-github text-xs"></i>
+					</button>
+				</div>
+				<!-- Right: Primary action -->
 				<button
-					hx-post={ fmt.Sprintf("/action/retry/%s", task.ID) }
-					hx-swap="none"
-					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white"
+					@click="confirmAction = 'merge'"
+					class="flex-1 max-w-[180px] h-10 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/5"
 				>
-					<i class="fas fa-undo text-[10px]"></i>
-					<span class="text-[10px] font-semibold uppercase tracking-wide">Retry</span>
-				</button>
-				<!-- Chat Button -->
-				<button
-					@click="showChat = true"
-					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white"
-				>
-					<i class="fas fa-comment-dots text-[10px]"></i>
-					<span class="text-[10px] font-semibold uppercase tracking-wide">Chat</span>
-				</button>
-				<!-- PR Button -->
-				<button
-					hx-post={ fmt.Sprintf("/action/pr/%s", task.ID) }
-					hx-swap="none"
-					hx-disabled-elt="this"
-					class="col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none"
-				>
-					<i class="fab fa-github text-[10px] [.htmx-request>&]:hidden"></i>
-					<i class="fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline"></i>
-					<span class="text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden">PR</span>
-				</button>
-				<!-- Merge to Main Button -->
-				<button
-					hx-post={ fmt.Sprintf("/action/merge/%s", task.ID) }
-					hx-swap="none"
-					hx-disabled-elt="this"
-					class="col-span-1 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none"
-				>
-					<i class="fas fa-code-merge text-[10px] [.htmx-request>&]:hidden"></i>
-					<i class="fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline"></i>
-					<span class="text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden">main</span>
+					<i class="fas fa-code-merge text-xs"></i>
+					<span class="text-xs font-semibold">Merge to main</span>
 				</button>
 			</div>
 		</div>
