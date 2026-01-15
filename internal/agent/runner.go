@@ -1,3 +1,4 @@
+// Package agent implements a simple coding agent loop.
 package agent
 
 import (
@@ -26,6 +27,34 @@ const (
 	EventDone     = "done"
 	EventMessages = "messages" // Full message history update
 )
+
+// Message represents a single message in the conversation.
+// The agent appends messages with both text and tool calls.
+type Message struct {
+	Role    string         `json:"role"` // "user" or "assistant"
+	Content []ContentBlock `json:"content"`
+}
+
+// ContentBlock can be one of three types:
+// - text: Assistant response text
+// - tool_use: Assistant requesting to call a tool
+// - tool_result: Result sent back after tool execution (from us to API)
+type ContentBlock struct {
+	// For all blocks
+	Type string `json:"type"`
+
+	// For text blocks
+	Text string `json:"text,omitempty"`
+
+	// For tool_use blocks (assistant calling a tool)
+	Name  string         `json:"name,omitempty"`
+	Input map[string]any `json:"input,omitempty"`
+	ID    string         `json:"id,omitempty"` // Links to tool_result
+
+	// For tool_result blocks (result sent back to assistant)
+	ToolUseID string `json:"tool_use_id,omitempty"` // Links to tool_use ID
+	Content   string `json:"content,omitempty"`     // Tool output
+}
 
 // StreamEvent represents a single event in the agent execution.
 type StreamEvent struct {
@@ -323,14 +352,11 @@ func (r *Runner) toolRead(args map[string]any) string {
 		limit = int(l)
 	}
 
-	end := offset + limit
-	if end > len(lines) {
-		end = len(lines)
-	}
+	end := min(offset+limit, len(lines))
 
 	var sb strings.Builder
 	for i := offset; i < end; i++ {
-		sb.WriteString(fmt.Sprintf("%4d| %s\n", i+1, lines[i]))
+		fmt.Fprintf(&sb, "%4d| %s\n", i+1, lines[i])
 	}
 	return sb.String()
 }
