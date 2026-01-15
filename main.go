@@ -78,7 +78,6 @@ var (
 // --- HANDLERS ---
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 	initStore()
 
 	// Static/HTMX Routes
@@ -134,7 +133,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	data := struct{ Projects map[string]Project }{Projects: projects}
 	mu.Unlock()
 	tmpl := template.Must(template.New("index").Parse(shellTemplate))
-	tmpl.Execute(w, data)
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("template error: %v", err)
+	}
 }
 
 func handleFeed(w http.ResponseWriter, r *http.Request) {
@@ -150,11 +151,12 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if t.State == StateReview {
+		switch t.State {
+		case StateReview:
 			reviewTasks = append(reviewTasks, t)
-		} else if t.State == StateWorking || t.State == StateQueued {
+		case StateWorking, StateQueued:
 			activeTasks = append(activeTasks, t)
-		} else if t.State == StateApproved {
+		case StateApproved:
 			doneTasks = append(doneTasks, t)
 		}
 	}
@@ -184,7 +186,9 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 	template.Must(tmpl.Parse(feedTemplate))
 	template.Must(tmpl.New("activeRows").Parse(activeRowsTemplate))
 	template.Must(tmpl.New("reviewsSection").Parse(reviewsTemplate))
-	tmpl.Execute(w, data)
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("template error: %v", err)
+	}
 }
 
 // Partial endpoint for just the active rows (Fixes recursion bug)
@@ -216,12 +220,19 @@ func handleFeedActive(w http.ResponseWriter, r *http.Request) {
 	template.Must(tmpl.New("reviewsSection").Parse(reviewsTemplate))
 
 	// Execute active rows (main swap)
-	tmpl.Execute(w, activeTasks)
+	if err := tmpl.Execute(w, activeTasks); err != nil {
+		log.Printf("template error: %v", err)
+		return
+	}
 
-	// Execute reviews (OOB swap)
+	// Execute reviews (OOB swap) - writes may fail if client disconnects
+	//nolint:errcheck
 	w.Write([]byte(`<div id="reviews-container" hx-swap-oob="true">`))
 	data := struct{ Reviews []*Task }{Reviews: reviewTasks}
-	tmpl.ExecuteTemplate(w, "reviewsSection", data)
+	if err := tmpl.ExecuteTemplate(w, "reviewsSection", data); err != nil {
+		log.Printf("template error: %v", err)
+	}
+	//nolint:errcheck
 	w.Write([]byte(`</div>`))
 }
 
@@ -243,7 +254,9 @@ func handleTaskDetail(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	tmpl := template.Must(template.New("detail").Funcs(funcMap).Parse(detailTemplate))
-	tmpl.Execute(w, data)
+	if err := tmpl.Execute(w, data); err != nil {
+		log.Printf("template error: %v", err)
+	}
 }
 
 func handleAddTask(w http.ResponseWriter, r *http.Request) {
@@ -384,7 +397,7 @@ func parseID(path string) int {
 	var id int
 	parts := strings.Split(path, "/")
 	if len(parts) > 0 {
-		fmt.Sscanf(parts[len(parts)-1], "%d", &id)
+		_, _ = fmt.Sscanf(parts[len(parts)-1], "%d", &id)
 	}
 	return id
 }

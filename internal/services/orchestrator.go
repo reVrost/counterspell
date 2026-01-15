@@ -122,7 +122,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 
 	if !projectExists {
 		slog.Error("Project ID not found in database", "project_id", projectID, "total_projects", len(projects))
-		return nil, fmt.Errorf("project not found (ID: %s). Please select a valid project.", projectID)
+		return nil, fmt.Errorf("project not found (ID: %s), please select a valid project", projectID)
 	}
 
 	// Get GitHub token
@@ -134,7 +134,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	slog.Info("GitHub token retrieved", "token_length", tokenLen, "has_token", tokenLen > 0)
 	if tokenLen == 0 {
 		slog.Error("GitHub token is empty - need to configure in settings")
-		return nil, fmt.Errorf("GitHub token is not configured. Please add a GitHub connection in Settings.")
+		return nil, fmt.Errorf("GitHub token is not configured, please add a GitHub connection in settings")
 	}
 
 	// Create task in DB (after validating project exists)

@@ -39,9 +39,9 @@ func (r *headingAsBoldRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegis
 
 func (r *headingAsBoldRenderer) renderHeading(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		w.WriteString("<p><strong>")
+		_, _ = w.WriteString("<p><strong>")
 	} else {
-		w.WriteString("</strong></p>\n")
+		_, _ = w.WriteString("</strong></p>\n")
 	}
 	return ast.WalkContinue, nil
 }

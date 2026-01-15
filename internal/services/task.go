@@ -270,7 +270,7 @@ func (s *TaskService) GetLogs(ctx context.Context, taskID string) ([]*models.Age
 	if err != nil {
 		return nil, fmt.Errorf("failed to get logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []*models.AgentLog
 	for rows.Next() {

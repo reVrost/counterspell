@@ -141,20 +141,27 @@ func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
 			Status:      string(t.Status),
 			Progress:    50,
 		}
-		if t.Status == "in_progress" {
+		switch t.Status {
+		case "in_progress":
 			active = append(active, uiTask)
-		} else if t.Status == "review" || t.Status == "human_review" {
+		case "review", "human_review":
 			uiTask.Progress = 100
 			reviews = append(reviews, uiTask)
 		}
 	}
 
 	// Render Active Rows
-	views.ActiveRows(active, projects).Render(ctx, w)
+	if err := views.ActiveRows(active, projects).Render(ctx, w); err != nil {
+		slog.Error("render error", "error", err)
+	}
 
-	// Render Reviews OOB
+	// Render Reviews OOB (writes may fail if client disconnects - expected)
+	//nolint:errcheck
 	w.Write([]byte(`<div id="reviews-container" hx-swap-oob="true">`))
-	views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, w)
+	if err := views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, w); err != nil {
+		slog.Error("render error", "error", err)
+	}
+	//nolint:errcheck
 	w.Write([]byte(`</div>`))
 }
 
@@ -262,7 +269,9 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 		Messages:    uiMessages,
 	}
 
-	components.TaskDetail(task, project).Render(ctx, w)
+	if err := components.TaskDetail(task, project).Render(ctx, w); err != nil {
+		slog.Error("render error", "error", err)
+	}
 }
 
 // HandleActionRetry mocks retry action
@@ -318,7 +327,9 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Render conflict view
-			components.ConflictView(taskID, uiConflicts).Render(ctx, w)
+			if err := components.ConflictView(taskID, uiConflicts).Render(ctx, w); err != nil {
+				slog.Error("render error", "error", err)
+			}
 			return
 		}
 
@@ -559,7 +570,7 @@ func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No audio file provided", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Get content type for format detection
 	contentType := header.Header.Get("Content-Type")
@@ -572,7 +583,8 @@ func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return plain text
+	// Return plain text (write may fail if client disconnects)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	//nolint:errcheck
 	w.Write([]byte(text))
 }
