@@ -578,7 +578,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else if task.Status == "review" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"w-1.5 h-1.5 rounded-full bg-[#b197fc]\" title=\"Needs Review\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"w-1.5 h-1.5 rounded-full bg-blue-400\" title=\"Needs Review\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -730,33 +730,46 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" hx-swap=\"none\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors\">Retry</button></div></div></template><!-- PR Confirmation --><template x-if=\"confirmAction === 'pr'\"><div class=\"space-y-4\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center\"><i class=\"fab fa-github text-purple-500\"></i></div><div><h3 class=\"font-semibold text-white\">Create Pull Request</h3><p class=\"text-xs text-gray-400\">Push changes to GitHub</p></div></div><p class=\"text-sm text-gray-300\">This will create a new pull request on GitHub with all the changes from this task.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" hx-swap=\"none\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors\">Retry</button></div></div></template><!-- Clear Confirmation --><template x-if=\"confirmAction === 'clear'\"><div class=\"space-y-4\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center\"><i class=\"fas fa-eraser text-red-500\"></i></div><div><h3 class=\"font-semibold text-white\">Clear History</h3><p class=\"text-xs text-gray-400\">Reset memory and context</p></div></div><p class=\"text-sm text-gray-300\">This will clear the chat history and agent output. The task will start fresh without any prior context.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
+		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/clear/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 558, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 558, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50\">Create PR</button></div></div></template><!-- Merge Confirmation --><template x-if=\"confirmAction === 'merge'\"><div class=\"space-y-4\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center\"><i class=\"fas fa-code-merge text-green-500\"></i></div><div><h3 class=\"font-semibold text-white\">Merge to Main</h3><p class=\"text-xs text-gray-400\">Apply changes directly</p></div></div><p class=\"text-sm text-gray-300\">This will merge all changes directly into the main branch without creating a pull request.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" hx-swap=\"none\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors\">Clear</button></div></div></template><!-- PR Confirmation --><template x-if=\"confirmAction === 'pr'\"><div class=\"space-y-4\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center\"><i class=\"fab fa-github text-purple-500\"></i></div><div><h3 class=\"font-semibold text-white\">Create Pull Request</h3><p class=\"text-xs text-gray-400\">Push changes to GitHub</p></div></div><p class=\"text-sm text-gray-300\">This will create a new pull request on GitHub with all the changes from this task.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 583, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 582, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50\">Merge</button></div></div></template></div></div></template><!-- Default Buttons (always in layout to prevent shift) --><div :class=\"showChat ? 'invisible pointer-events-none' : ''\" class=\"flex items-center justify-between gap-3\"><!-- Left: Secondary actions in a pill group --><div class=\"flex items-center bg-[#21262d]/80 rounded-full p-1 border border-white/[0.06]\"><!-- Retry --><button @click=\"confirmAction = 'retry'\" class=\"w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90\" title=\"Retry\"><i class=\"fas fa-arrow-rotate-left text-xs\"></i></button><!-- Divider --><div class=\"w-px h-4 bg-white/[0.08]\"></div><!-- Chat --><button @click=\"showChat = true\" class=\"w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90 relative\" title=\"Continue chat\"><i class=\"fas fa-message text-xs\"></i><!-- Queue badge --><span x-show=\"messageQueue.length > 0\" x-text=\"messageQueue.length\" x-transition class=\"absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center\"></span></button><!-- Divider --><div class=\"w-px h-4 bg-white/[0.08]\"></div><!-- PR --><button @click=\"confirmAction = 'pr'\" class=\"w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90\" title=\"Create PR\"><i class=\"fab fa-github text-xs\"></i></button></div><!-- Right: Primary action --><button @click=\"confirmAction = 'merge'\" class=\"flex-1 max-w-[180px] h-10 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/5\"><i class=\"fas fa-code-merge text-xs\"></i> <span class=\"text-xs font-semibold\">Merge to main</span></button></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50\">Create PR</button></div></div></template><!-- Merge Confirmation --><template x-if=\"confirmAction === 'merge'\"><div class=\"space-y-4\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center\"><i class=\"fas fa-code-merge text-green-500\"></i></div><div><h3 class=\"font-semibold text-white\">Merge to Main</h3><p class=\"text-xs text-gray-400\">Apply changes directly</p></div></div><p class=\"text-sm text-gray-300\">This will merge all changes directly into the main branch without creating a pull request.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var36 string
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 607, Col: 59}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors [&.htmx-request]:opacity-50\">Merge</button></div></div></template></div></div></template><!-- Default Buttons (always in layout to prevent shift) --><div :class=\"showChat ? 'invisible pointer-events-none' : ''\" class=\"space-y-3\"><!-- Secondary actions row --><div class=\"flex justify-center gap-1\"><button @click=\"confirmAction = 'retry'\" class=\"px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all\" title=\"Retry\"><i class=\"fas fa-arrow-rotate-left text-[10px]\"></i> <span>Retry</span></button> <span class=\"text-gray-700 self-center\">·</span> <button @click=\"confirmAction = 'clear'\" class=\"px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all\" title=\"Clear history\"><i class=\"fas fa-eraser text-[10px]\"></i> <span>Clear</span></button> <span class=\"text-gray-700 self-center\">·</span> <button @click=\"confirmAction = 'pr'\" class=\"px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all\" title=\"Create PR\"><i class=\"fab fa-github text-[10px]\"></i> <span>Create PR</span></button></div><!-- Main action buttons --><div class=\"flex gap-2.5\"><!-- Chat button --><button @click=\"showChat = true\" class=\"flex-1 h-9 bg-[#21262d] hover:bg-[#2d333b] border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group\"><i class=\"fas fa-message text-xs text-purple-400 group-hover:text-purple-300 transition-colors\"></i> <span class=\"text-xs font-medium\">Chat</span><!-- Queue badge --><span x-show=\"messageQueue.length > 0\" x-text=\"messageQueue.length\" x-transition class=\"absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30\"></span></button><!-- Merge button --><button @click=\"confirmAction = 'merge'\" class=\"flex-1 h-9 bg-white hover:bg-gray-100 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10\"><i class=\"fas fa-code-merge text-xs\"></i> <span class=\"text-xs font-medium\">Merge</span></button></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -835,131 +848,131 @@ func DiffView(diff string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var36 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var36 == nil {
-			templ_7745c5c3_Var36 = templ.NopComponent
+		templ_7745c5c3_Var37 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var37 == nil {
+			templ_7745c5c3_Var37 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, file := range ParseDiff(diff) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<div class=\"diff-file-header\"><i class=\"fas fa-file-code mr-2 text-gray-500\"></i> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<div class=\"diff-file-header\"><i class=\"fas fa-file-code mr-2 text-gray-500\"></i> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var37 string
-			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(file.Name)
+			var templ_7745c5c3_Var38 string
+			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(file.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 707, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 740, Col: 14}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</div><div class=\"diff-file-body\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</div><div class=\"diff-file-body\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, line := range file.Lines {
 				if line.Type == "hunk" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<div class=\"diff-hunk\">")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var38 string
-					templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 712, Col: 42}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</div>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else if line.Type == "add" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div class=\"diff-line diff-add\"><span class=\"diff-line-num\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<div class=\"diff-hunk\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var39 string
-					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(line.LineNum)
+					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 715, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 745, Col: 42}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</span> <span class=\"diff-line-content\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "</div>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else if line.Type == "add" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<div class=\"diff-line diff-add\"><span class=\"diff-line-num\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var40 string
-					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
+					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(line.LineNum)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 716, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 748, Col: 48}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</span></div>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else if line.Type == "del" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<div class=\"diff-line diff-del\"><span class=\"diff-line-num\"></span> <span class=\"diff-line-content\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</span> <span class=\"diff-line-content\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var41 string
 					templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 721, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 749, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</span></div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</span></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<div class=\"diff-line diff-context\"><span class=\"diff-line-num\">")
+				} else if line.Type == "del" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<div class=\"diff-line diff-del\"><span class=\"diff-line-num\"></span> <span class=\"diff-line-content\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var42 string
-					templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(line.LineNum)
+					templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 725, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 754, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</span> <span class=\"diff-line-content\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "</span></div>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<div class=\"diff-line diff-context\"><span class=\"diff-line-num\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var43 string
-					templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
+					templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(line.LineNum)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 726, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 758, Col: 48}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</span></div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</span> <span class=\"diff-line-content\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var44 string
+					templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 759, Col: 52}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</span></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

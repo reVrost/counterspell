@@ -87,6 +87,7 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	// Actions
 	r.Post("/add-task", h.HandleAddTask)
 	r.Post("/action/retry/{id}", h.HandleActionRetry)
+	r.Post("/action/clear/{id}", h.HandleActionClear)
 	r.Post("/action/merge/{id}", h.HandleActionMerge)
 	r.Post("/action/pr/{id}", h.HandleActionPR)
 	r.Post("/action/discard/{id}", h.HandleActionDiscard)

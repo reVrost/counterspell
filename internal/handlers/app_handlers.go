@@ -271,6 +271,22 @@ func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
 	h.HandleFeed(w, r)
 }
 
+// HandleActionClear clears a task's chat history and context
+func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	taskID := chi.URLParam(r, "id")
+
+	if err := h.tasks.ClearHistory(ctx, taskID); err != nil {
+		slog.Error("Failed to clear task history", "error", err, "task_id", taskID)
+		w.Header().Set("HX-Trigger", `{"toast": "Failed to clear history"}`)
+		h.HandleFeed(w, r)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"toast": "Chat history cleared"}`)
+	h.HandleFeed(w, r)
+}
+
 // HandleActionMerge merges a task's branch to main and pushes
 func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

@@ -84,8 +84,8 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				.diff-line-content {
 					flex: 1;
 					padding: 0 12px;
-					white-space: pre;
-					overflow-x: auto;
+					white-space: pre-wrap;
+					word-break: break-all;
 				}
 				.diff-add {
 					background-color: rgba(63, 185, 80, 0.15);
