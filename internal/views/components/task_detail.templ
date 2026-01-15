@@ -513,13 +513,14 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 						queueMessage(msgText);
 						text = '';
 					} else {
+						const escapedText = this.escapeHtml(msgText);
 						const msgHtml = `<div class='px-4 py-2 border-b border-gray-800/50'>
 							<div class='flex gap-2'>
 								<div class='w-4 h-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0'>
 									<i class='fas fa-user text-[7px] text-blue-400'></i>
 								</div>
 								<div class='flex-1 min-w-0 -mt-px'>
-									<div class='text-sm text-gray-200 whitespace-pre-wrap leading-normal'>${msgText}</div>
+									<div class='text-sm text-gray-200 whitespace-pre-wrap leading-normal'>${escapedText}</div>
 								</div>
 							</div>
 						</div>`;
@@ -538,6 +539,11 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					focused: false,
 					showFileMenu: false,
 					files: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],
+					escapeHtml(str) {
+						const div = document.createElement('div');
+						div.textContent = str;
+						return div.innerHTML;
+					},
 					resize() {
 						this.$refs.input.style.height = 'auto';
 						let newHeight = this.$refs.input.scrollHeight;
