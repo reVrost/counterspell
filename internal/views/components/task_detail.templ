@@ -230,7 +230,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				if task.Status == "in_progress" {
 					<div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
 				} else if task.Status == "review" {
-					<div class="w-1.5 h-1.5 rounded-full bg-[#b197fc]" title="Needs Review"></div>
+					<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Needs Review"></div>
 				}
 			</div>
 		</div>
@@ -539,6 +539,30 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 							</div>
 						</div>
 					</template>
+					<!-- Clear Confirmation -->
+					<template x-if="confirmAction === 'clear'">
+						<div class="space-y-4">
+							<div class="flex items-center gap-3">
+								<div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+									<i class="fas fa-eraser text-red-500"></i>
+								</div>
+								<div>
+									<h3 class="font-semibold text-white">Clear History</h3>
+									<p class="text-xs text-gray-400">Reset memory and context</p>
+								</div>
+							</div>
+							<p class="text-sm text-gray-300">This will clear the chat history and agent output. The task will start fresh without any prior context.</p>
+							<div class="flex gap-2 pt-2">
+								<button @click="confirmAction = null" class="flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">Cancel</button>
+								<button
+									hx-post={ fmt.Sprintf("/action/clear/%s", task.ID) }
+									hx-swap="none"
+									@click="confirmAction = null"
+									class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+								>Clear</button>
+							</div>
+						</div>
+					</template>
 					<!-- PR Confirmation -->
 					<template x-if="confirmAction === 'pr'">
 						<div class="space-y-4">
@@ -593,53 +617,62 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				</div>
 			</template>
 			<!-- Default Buttons (always in layout to prevent shift) -->
-			<div :class="showChat ? 'invisible pointer-events-none' : ''" class="flex items-center justify-between gap-3">
-				<!-- Left: Secondary actions in a pill group -->
-				<div class="flex items-center bg-[#21262d]/80 rounded-full p-1 border border-white/[0.06]">
-					<!-- Retry -->
+			<div :class="showChat ? 'invisible pointer-events-none' : ''" class="space-y-3">
+				<!-- Secondary actions row -->
+				<div class="flex justify-center gap-1">
 					<button
 						@click="confirmAction = 'retry'"
-						class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90"
+						class="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all"
 						title="Retry"
 					>
-						<i class="fas fa-arrow-rotate-left text-xs"></i>
+						<i class="fas fa-arrow-rotate-left text-[10px]"></i>
+						<span>Retry</span>
 					</button>
-					<!-- Divider -->
-					<div class="w-px h-4 bg-white/[0.08]"></div>
-					<!-- Chat -->
+					<span class="text-gray-700 self-center">·</span>
+					<button
+						@click="confirmAction = 'clear'"
+						class="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all"
+						title="Clear history"
+					>
+						<i class="fas fa-eraser text-[10px]"></i>
+						<span>Clear</span>
+					</button>
+					<span class="text-gray-700 self-center">·</span>
+					<button
+						@click="confirmAction = 'pr'"
+						class="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all"
+						title="Create PR"
+					>
+						<i class="fab fa-github text-[10px]"></i>
+						<span>Create PR</span>
+					</button>
+				</div>
+				<!-- Main action buttons -->
+				<div class="flex gap-2.5">
+					<!-- Chat button -->
 					<button
 						@click="showChat = true"
-						class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90 relative"
-						title="Continue chat"
+						class="flex-1 h-9 bg-[#21262d] hover:bg-[#2d333b] border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group"
 					>
-						<i class="fas fa-message text-xs"></i>
+						<i class="fas fa-message text-xs text-purple-400 group-hover:text-purple-300 transition-colors"></i>
+						<span class="text-xs font-medium">Chat</span>
 						<!-- Queue badge -->
 						<span 
 							x-show="messageQueue.length > 0" 
 							x-text="messageQueue.length"
 							x-transition
-							class="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"
+							class="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30"
 						></span>
 					</button>
-					<!-- Divider -->
-					<div class="w-px h-4 bg-white/[0.08]"></div>
-					<!-- PR -->
+					<!-- Merge button -->
 					<button
-						@click="confirmAction = 'pr'"
-						class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/[0.08] transition-all active:scale-90"
-						title="Create PR"
+						@click="confirmAction = 'merge'"
+						class="flex-1 h-9 bg-white hover:bg-gray-100 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
 					>
-						<i class="fab fa-github text-xs"></i>
+						<i class="fas fa-code-merge text-xs"></i>
+						<span class="text-xs font-medium">Merge</span>
 					</button>
 				</div>
-				<!-- Right: Primary action -->
-				<button
-					@click="confirmAction = 'merge'"
-					class="flex-1 max-w-[180px] h-10 bg-white hover:bg-gray-100 text-black rounded-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/5"
-				>
-					<i class="fas fa-code-merge text-xs"></i>
-					<span class="text-xs font-semibold">Merge to main</span>
-				</button>
 			</div>
 		</div>
 	</div>

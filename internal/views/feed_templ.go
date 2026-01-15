@@ -366,7 +366,7 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span></div><span class=\"text-[10px] text-[#b197fc] bg-[#b197fc]/10 px-2 py-0.5 rounded-md font-medium border border-[#b197fc]/20 shrink-0\">Review</span></div><p class=\"text-sm text-gray-200 font-medium leading-tight mb-2 pr-4 line-clamp-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span></div><span class=\"text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-medium border border-blue-500/20 shrink-0\">Review</span></div><p class=\"text-sm text-gray-200 font-medium leading-tight mb-2 pr-4 line-clamp-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

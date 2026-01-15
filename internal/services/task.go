@@ -205,6 +205,19 @@ func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status mo
 	return nil
 }
 
+// ClearHistory clears a task's message history and agent output.
+func (s *TaskService) ClearHistory(ctx context.Context, id string) error {
+	query := `
+		UPDATE tasks SET message_history = '', agent_output = '', updated_at = ?
+		WHERE id = ?
+	`
+	_, err := s.db.ExecContext(ctx, query, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to clear task history: %w", err)
+	}
+	return nil
+}
+
 // ResetInProgress resets tasks stuck in in_progress back to appropriate status.
 // This is called on server startup for recovery.
 // - Tasks with agent_output go to review (they completed but server restarted)
