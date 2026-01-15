@@ -101,46 +101,11 @@ templ InputBar(projects map[string]views.UIProject) {
 				</div>
 			</div>
 
-			<!-- Recorded Audio Preview -->
-			<div x-show="app.recordedAudio && !app.isRecording" x-cloak
-				class="absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10">
-				<!-- Delete Button -->
-				<button type="button" @click="app.recordedAudio = null"
-					class="w-8 h-8 rounded-full bg-gray-800 hover:bg-red-500/20 flex items-center justify-center text-gray-400 hover:text-red-400 transition shrink-0">
-					<i class="fas fa-trash text-sm"></i>
-				</button>
-				
-				<!-- Audio Waveform Display -->
-				<div class="flex-1 mx-4 flex items-center gap-3">
-					<button type="button" x-data="{ playing: false }" 
-						@click="
-							if (!$refs.audioPlayer) return;
-							if (playing) { $refs.audioPlayer.pause(); $refs.audioPlayer.currentTime = 0; }
-							else { $refs.audioPlayer.play(); }
-							playing = !playing;
-						"
-						class="w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-400 flex items-center justify-center text-white transition shrink-0">
-						<i class="fas" :class="playing ? 'fa-stop' : 'fa-play'" style="font-size: 10px; margin-left: 1px;"></i>
-					</button>
-					<audio x-ref="audioPlayer" :src="app.recordedAudio?.url" @ended="playing = false" class="hidden"></audio>
-					
-					<!-- Static waveform visualization -->
-					<div class="flex-1 flex items-center gap-[2px] h-8">
-						<template x-for="i in 30">
-							<div class="flex-1 bg-blue-500/60 rounded-full" 
-								:style="`height: ${4 + Math.sin(i * 0.5) * 8 + Math.random() * 8}px`"></div>
-						</template>
-					</div>
-					
-					<span class="text-xs text-gray-400 font-mono shrink-0" x-text="app.formatDuration(app.recordedAudio?.duration || 0)"></span>
-				</div>
-				
-				<!-- Send Button -->
-				<button type="button" @click="app.transcribeAndSubmit($refs.voiceForm, $refs.input)"
-					:disabled="app.isTranscribing"
-					class="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:bg-blue-500/50 disabled:cursor-not-allowed flex items-center justify-center text-white transition shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.4)]">
-					<i class="fas text-sm" :class="app.isTranscribing ? 'fa-spinner fa-spin' : 'fa-arrow-up'"></i>
-				</button>
+			<!-- Transcribing Overlay -->
+			<div x-show="app.isTranscribing" x-cloak
+				class="absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center justify-center z-10">
+				<i class="fas fa-spinner fa-spin text-blue-400 mr-2"></i>
+				<span class="text-gray-400 text-sm">Transcribing...</span>
 			</div>
 
 			<!-- Input Area -->
@@ -258,15 +223,15 @@ templ InputBar(projects map[string]views.UIProject) {
 
 					<!-- Submit/Voice Button -->
 					<button type="button" 
-						@click="if(text.length > 0 && !this._touchSubmitted) { $refs.voiceForm.requestSubmit(); } this._touchSubmitted = false;"
-						@mousedown="if (text.length === 0 && !app.isRecording) app.startVoiceRecording()"
+						@click="if(text.length > 0) { $refs.voiceForm.requestSubmit(); }"
+						@mousedown="if (text.length === 0 && !app.isRecording) app.startVoiceRecording($refs.input)"
 						@mouseup="if (app.isRecording) app.stopVoiceRecording()"
 						@mouseleave="if (app.isRecording) app.stopVoiceRecording()"
-						@touchstart="if (text.length === 0 && !app.isRecording) { $event.preventDefault(); app.startVoiceRecording(); }"
-						@touchend="if (app.isRecording) { $event.preventDefault(); app.stopVoiceRecording(); } else if (text.length > 0) { this._touchSubmitted = true; $refs.voiceForm.requestSubmit(); }"
+						@touchstart.prevent="if (text.length === 0 && !app.isRecording) app.startVoiceRecording($refs.input)"
+						@touchend.prevent="if (app.isRecording) { app.stopVoiceRecording(); } else if (text.length > 0) { $refs.voiceForm.requestSubmit(); }"
 						@touchcancel="if (app.isRecording) app.cancelRecording()"
 						:class="app.isRecording ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-110' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')"
-						class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 ml-1 select-none touch-none">
+						class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 ml-1 select-none">
 						<i class="fas" 
 						   :class="text.length > 0 ? 'fa-arrow-up' : (app.isRecording ? 'fa-microphone animate-pulse' : 'fa-microphone')"></i>
 					</button>

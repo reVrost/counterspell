@@ -118,7 +118,18 @@ document.addEventListener('alpine:init', () => {
     },
 
     // Voice Recording
-    async startVoiceRecording() {
+    async startVoiceRecording(inputRef) {
+      console.log('startVoiceRecording called, inputRef:', inputRef);
+      
+      // Vibrate on start (mobile) - before async call
+      if ('vibrate' in navigator) {
+        console.log('vibrating start');
+        navigator.vibrate(50);
+      }
+      
+      // Store inputRef for use in onstop callback
+      this._inputRef = inputRef;
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -131,6 +142,7 @@ document.addEventListener('alpine:init', () => {
         this.audioChunks = [];
         this.recordedDuration = 0;
         this.isRecording = true;
+        this._stream = stream;
 
         const startTime = Date.now();
         const updateLevels = () => {
@@ -171,66 +183,98 @@ document.addEventListener('alpine:init', () => {
     },
 
     stopVoiceRecording() {
+      console.log('stopVoiceRecording called, isRecording:', this.isRecording);
       if (!this.isRecording) return;
+      
+      // Vibrate on stop (mobile)
+      if ('vibrate' in navigator) {
+        console.log('vibrating stop');
+        navigator.vibrate([30, 50, 30]);
+      }
+
       this.isRecording = false;
       if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
       if (this.audioContext) this.audioContext.close();
+      
+      // Set up onstop to auto-transcribe
       if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        const inputRef = this._inputRef; // Capture from stored ref
+        console.log('setting up onstop, inputRef:', inputRef);
+        this.mediaRecorder.onstop = async () => {
+          console.log('mediaRecorder.onstop fired');
+          const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          console.log('blob size:', blob.size);
+          if (this._stream) {
+            this._stream.getTracks().forEach((t) => t.stop());
+          }
+          
+          // Auto-transcribe to input
+          if (blob.size > 0 && inputRef) {
+            console.log('calling transcribeToInput');
+            await this.transcribeToInput(blob, inputRef);
+          } else {
+            console.log('skipping transcribe, blob.size:', blob.size, 'inputRef:', inputRef);
+          }
+        };
         this.mediaRecorder.stop();
       }
       this.audioLevels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     },
 
     cancelRecording() {
-      this.stopVoiceRecording();
+      if (this._stream) {
+        this._stream.getTracks().forEach((t) => t.stop());
+      }
+      this.isRecording = false;
+      if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+      if (this.audioContext) this.audioContext.close();
+      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        this.mediaRecorder.onstop = () => {}; // Don't transcribe on cancel
+        this.mediaRecorder.stop();
+      }
+      this.audioLevels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
       this.recordedAudio = null;
     },
 
-    // Transcribe and submit voice recording
-    async transcribeAndSubmit(formRef, inputRef) {
-      if (!this.recordedAudio || !this.recordedAudio.blob) {
-        this.showToast('No recording available');
-        return;
-      }
-
-      if (!this.activeProjectId) {
-        this.showToast('Select a project first');
-        return;
-      }
-
+    // Transcribe audio blob and put text in input (no auto-submit)
+    async transcribeToInput(blob, inputRef) {
+      console.log('transcribeToInput called, inputRef:', inputRef);
       this.isTranscribing = true;
-      this.showToast('Transcribing...');
 
       try {
         const formData = new FormData();
-        formData.append('audio', this.recordedAudio.blob, 'recording.webm');
+        formData.append('audio', blob, 'recording.webm');
 
+        console.log('fetching /transcribe');
         const response = await fetch('/transcribe', {
           method: 'POST',
           body: formData,
         });
 
+        console.log('response status:', response.status);
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(errorText || 'Transcription failed');
         }
 
         const transcription = await response.text();
+        console.log('transcription result:', transcription);
 
         if (!transcription || transcription.trim() === '') {
           this.showToast('Could not understand audio');
-          this.recordedAudio = null;
           this.isTranscribing = false;
           return;
         }
 
-        // Set the transcribed text in the input and submit
-        inputRef.value = transcription;
-        this.recordedAudio = null;
+        // Set the transcribed text in the input (don't submit)
+        console.log('setting inputRef.value, inputRef:', inputRef);
+        if (inputRef) {
+          inputRef.value = transcription;
+          // Trigger Alpine to update x-model
+          inputRef.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('inputRef.value set to:', inputRef.value);
+        }
         this.isTranscribing = false;
-
-        // Trigger form submission via HTMX
-        formRef.requestSubmit();
       } catch (err) {
         console.error('Transcription error:', err);
         this.showToast('Transcription failed: ' + err.message);

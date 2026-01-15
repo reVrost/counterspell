@@ -1,19 +1,21 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"strings"
 
 	openrouter "github.com/revrost/go-openrouter"
 )
 
 const (
-	voxtralModel = "mistralai/mistral-small-3.1-24b-instruct"
+	voxtralModel = "mistralai/voxtral-small-24b-2507"
 )
 
 // TranscriptionService handles audio transcription via OpenRouter.
@@ -38,6 +40,23 @@ func NewTranscriptionService() *TranscriptionService {
 	return &TranscriptionService{client: client}
 }
 
+// convertToMp3 converts audio data to mp3 format using ffmpeg.
+func convertToMp3(input []byte) ([]byte, error) {
+	cmd := exec.Command("ffmpeg", "-i", "pipe:0", "-f", "mp3", "-ab", "128k", "-ar", "44100", "pipe:1")
+	cmd.Stdin = bytes.NewReader(input)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		slog.Error("ffmpeg conversion failed", "stderr", stderr.String())
+		return nil, fmt.Errorf("ffmpeg failed: %w", err)
+	}
+
+	return stdout.Bytes(), nil
+}
+
 // TranscribeAudio transcribes audio data to text.
 // audioData should be the raw audio bytes (webm/mp3/wav format).
 func (s *TranscriptionService) TranscribeAudio(ctx context.Context, audioData io.Reader, format string) (string, error) {
@@ -49,6 +68,15 @@ func (s *TranscriptionService) TranscribeAudio(ctx context.Context, audioData io
 	data, err := io.ReadAll(audioData)
 	if err != nil {
 		return "", fmt.Errorf("failed to read audio data: %w", err)
+	}
+
+	// Convert webm to mp3 using ffmpeg (Voxtral only supports mp3/wav)
+	if strings.Contains(format, "webm") {
+		converted, err := convertToMp3(data)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert audio: %w", err)
+		}
+		data = converted
 	}
 
 	// Base64 encode the audio
