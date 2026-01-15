@@ -318,7 +318,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				<form
 					hx-post={ fmt.Sprintf("/action/chat/%s", task.ID) }
 					hx-swap="none"
-					@htmx:after-request="showChat = false"
+					@htmx:after-request="showChat = false; text = ''"
 					class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl"
 					x-data="{
 						text: '',
