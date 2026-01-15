@@ -99,7 +99,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, task := range tasks {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"bg-[#13151A] border border-gray-800/50 rounded-xl p-3 opacity-90 transition hover:opacity-100 shadow-sm\" @click=\"modalOpen = true\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"bg-[#13151A] border border-gray-800/50 rounded-xl p-3 opacity-90 transition hover:opacity-100 shadow-sm\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -296,7 +296,7 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"bg-[#13151A] border border-gray-800 rounded-xl p-3 active:bg-gray-800 transition shadow-sm relative group\" @click=\"modalOpen = true\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"bg-[#13151A] border border-gray-800 rounded-xl p-3 active:bg-gray-800 transition shadow-sm relative group\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -421,7 +421,7 @@ func CompletedTaskRow(task *UITask, project UIProject) templ.Component {
 			templ_7745c5c3_Var22 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition\" @click=\"modalOpen = true\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

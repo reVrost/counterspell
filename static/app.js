@@ -53,6 +53,7 @@ document.addEventListener('alpine:init', () => {
       }
       this.connectSSE();
       this.setupPWAInstall();
+      this.setupModalHistory();
     },
 
     // Project Management
@@ -245,10 +246,25 @@ document.addEventListener('alpine:init', () => {
 
     // Modal
     closeModal() {
+      if (!this.modalOpen) return;
       this.modalOpen = false;
+      if (history.state?.modal) {
+        history.back();
+      }
       setTimeout(() => {
         document.getElementById('modal-content').innerHTML = '';
       }, 300);
+    },
+
+    setupModalHistory() {
+      window.addEventListener('popstate', (e) => {
+        if (this.modalOpen && !e.state?.modal) {
+          this.modalOpen = false;
+          setTimeout(() => {
+            document.getElementById('modal-content').innerHTML = '';
+          }, 300);
+        }
+      });
     },
 
     // PWA Installation

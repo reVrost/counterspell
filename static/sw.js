@@ -5,6 +5,7 @@ const ASSETS_TO_CACHE = [
   '/static/icon-512.svg',
   'https://unpkg.com/htmx.org@2.0.4',
   'https://unpkg.com/htmx-ext-sse@2.2.2/sse.js',
+  'https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js',
   'https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css'

@@ -878,7 +878,7 @@ const feedTemplate = `
             {{ range .Done }}
             {{ $p := getProject .ProjectID }}
             <div class="bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition"
-                 @click="modalOpen = true"
+                 @click="modalOpen = true; history.pushState({ modal: true }, '')"
                  hx-get="/task/{{.ID}}" hx-target="#modal-content">
                 <div class="flex items-center gap-3">
                     <div class="w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]">
@@ -903,7 +903,7 @@ const activeRowsTemplate = `
 {{ range . }}
     {{ $p := getProject .ProjectID }}
     <div class="bg-[#13151A] border border-gray-800/50 rounded-xl p-3 opacity-90 transition hover:opacity-100 shadow-sm"
-            @click="modalOpen = true"
+            @click="modalOpen = true; history.pushState({ modal: true }, '')"
             hx-get="/task/{{.ID}}" hx-target="#modal-content">
         <div class="flex justify-between items-start mb-2">
             <div class="flex items-center gap-2">
@@ -938,7 +938,7 @@ const reviewsTemplate = `
             {{ range .Reviews }}
             {{ $p := getProject .ProjectID }}
             <div class="bg-[#13151A] border border-gray-800 rounded-xl p-3 active:bg-gray-800 transition shadow-sm relative group"
-                 @click="modalOpen = true"
+                 @click="modalOpen = true; history.pushState({ modal: true }, '')"
                  hx-get="/task/{{.ID}}" hx-target="#modal-content">
 
                 <div class="flex justify-between items-start mb-1">
