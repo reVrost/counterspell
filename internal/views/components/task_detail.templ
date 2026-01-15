@@ -311,13 +311,26 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				</div>
 			</div>
 		</div>
-		<!-- Bottom Actions Toolbar (Sticky) -->
-		<div class="shrink-0 p-4 border-t border-white/5 bg-[#16191F] pb-8">
-			<!-- Chat Input Mode (Capsule Style) -->
-			<div x-show="showChat" x-transition.origin.bottom class="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#16191F] via-[#16191F] to-transparent z-20 pb-8 flex justify-center">
+		<!-- Chat Input Overlay (separate from toolbar to prevent layout shift) -->
+		<div x-show="showChat" x-transition.origin.bottom x-cloak class="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#16191F] via-[#16191F] to-transparent z-20 pb-8 flex justify-center">
 				<form
 					hx-post={ fmt.Sprintf("/action/chat/%s", task.ID) }
 					hx-swap="none"
+					@submit="
+						if (text.trim()) {
+							const msgHtml = `<div class='px-4 py-2 border-b border-gray-800/50'>
+								<div class='flex gap-2'>
+									<div class='w-4 h-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0'>
+										<i class='fas fa-user text-[7px] text-blue-400'></i>
+									</div>
+									<div class='flex-1 min-w-0 -mt-px'>
+										<div class='text-sm text-gray-200 whitespace-pre-wrap leading-normal'>${text}</div>
+									</div>
+								</div>
+							</div>`;
+							document.getElementById('agent-content').insertAdjacentHTML('beforeend', msgHtml);
+						}
+					"
 					@htmx:after-request="showChat = false; text = ''"
 					class="bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl"
 					x-data="{
@@ -394,8 +407,10 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					</button>
 				</form>
 			</div>
-			<!-- Default Buttons -->
-			<div x-show="!showChat" class="grid grid-cols-4 gap-2 h-12">
+			<!-- Bottom Actions Toolbar (Sticky) -->
+		<div class="shrink-0 p-4 border-t border-white/5 bg-[#16191F] pb-8">
+			<!-- Default Buttons (always in layout to prevent shift) -->
+			<div :class="showChat ? 'invisible pointer-events-none' : ''" class="grid grid-cols-4 gap-2 h-12">
 				<!-- Retry Button -->
 				<button
 					hx-post={ fmt.Sprintf("/action/retry/%s", task.ID) }

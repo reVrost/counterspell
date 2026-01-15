@@ -1,42 +1,42 @@
 package llm
 
-// Available models with provider prefix
+// Models are Available models with provider prefix
 var Models = []Model{
 	// OpenRouter models
 	{
-		ID:     "o#anthropic/claude-sonnet-4.5",
-		Name:    "Claude Sonnet 4.5",
+		ID:       "o#anthropic/claude-sonnet-4.5",
+		Name:     "Claude Sonnet 4.5",
 		Provider: "openrouter",
 	},
 	{
-		ID:     "o#anthropic/claude-opus-4.5",
-		Name:    "Claude Opus 4.5",
+		ID:       "o#anthropic/claude-opus-4.5",
+		Name:     "Claude Opus 4.5",
 		Provider: "openrouter",
 	},
 	{
-		ID:     "o#google/gemini-3-pro-preview",
-		Name:    "Gemini 3 Pro Preview",
+		ID:       "o#google/gemini-3-pro-preview",
+		Name:     "Gemini 3 Pro Preview",
 		Provider: "openrouter",
 	},
 	{
-		ID:     "o#google/gemini-3-flash-preview",
-		Name:    "Gemini 3 Flash Preview",
+		ID:       "o#google/gemini-3-flash-preview",
+		Name:     "Gemini 3 Flash Preview",
 		Provider: "openrouter",
 	},
 	{
-		ID:     "o#openai/gpt-5.2",
-		Name:    "GPT 5.2",
+		ID:       "o#openai/gpt-5.2",
+		Name:     "GPT 5.2",
 		Provider: "openrouter",
 	},
 	{
-		ID:     "o#openai/gpt-5.1-codex-max",
-		Name:    "GPT 5.1 Codex Max",
+		ID:       "o#openai/gpt-5.1-codex-max",
+		Name:     "GPT 5.1 Codex Max",
 		Provider: "openrouter",
 	},
 	// Z.ai models
 	{
-		ID:     "zai#glm-4.7",
-		Name:    "GLM 4.7",
+		ID:       "zai#glm-4.7",
+		Name:     "GLM 4.7",
 		Provider: "zai",
 	},
 }

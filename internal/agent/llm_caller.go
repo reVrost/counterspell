@@ -13,6 +13,27 @@ import (
 	"github.com/revrost/code/counterspell/internal/llm"
 )
 
+const (
+	// apiURL   = "https://api.anthropic.com/v1/messages"
+	// model    = "claude-opus-4-5"
+	// apiVer   = "2023-06-01"
+	maxToken = 8192
+)
+
+// APIRequest is what we send to Anthropic's API.
+type APIRequest struct {
+	Model     string    `json:"model"`
+	MaxTokens int       `json:"max_tokens"`
+	System    string    `json:"system"`   // System prompt (context for the assistant)
+	Messages  []Message `json:"messages"` // Conversation history
+	Tools     []ToolDef `json:"tools"`    // Tools available to the assistant
+}
+
+// APIResponse is what we get back from Anthropic's API.
+type APIResponse struct {
+	Content []ContentBlock `json:"content"` // Assistant's response
+}
+
 // LLMCaller is an interface for calling LLM APIs.
 // Implementations handle the specific protocol (Anthropic vs OpenAI).
 type LLMCaller interface {

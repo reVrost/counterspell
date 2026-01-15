@@ -16,7 +16,7 @@ import (
 	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/llm"
 	"github.com/revrost/code/counterspell/internal/models"
-	"github.com/revrost/code/counterspell/pkg/agent"
+	"github.com/revrost/code/counterspell/internal/agent"
 )
 
 // TaskResult represents the result of a completed task.
