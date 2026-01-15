@@ -151,7 +151,128 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleTaskSSE streams all updates (agent, diff, logs) for a specific task via a single SSE connection.
+// Events: "agent", "diff", "log", "complete"
+func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+
+	// Check if task exists and is in progress
+	task, err := h.tasks.Get(ctx, taskID)
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	// If task is already complete, send final state and close
+	if task.Status != models.StatusInProgress {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", task.Status)
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Subscribe to events
+	ch := h.events.Subscribe()
+	defer h.events.Unsubscribe(ch)
+
+	// Send initial state for all three types
+	sendAgent := func() {
+		task, err := h.tasks.Get(ctx, taskID)
+		if err != nil {
+			return
+		}
+		html := renderAgentConversation(ctx, task)
+		fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		flusher.Flush()
+	}
+
+	sendDiff := func() {
+		task, err := h.tasks.Get(ctx, taskID)
+		if err != nil {
+			return
+		}
+		var html string
+		if task.Status == models.StatusInProgress {
+			html = `<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4"><i class="fas fa-cog fa-spin text-3xl opacity-50"></i><p class="text-xs font-mono">Generating changes...</p></div>`
+		} else if task.GitDiff != "" {
+			html = renderDiffHTML(task.GitDiff)
+		} else {
+			html = `<div class="text-gray-500 italic">No changes made</div>`
+		}
+		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		flusher.Flush()
+	}
+
+	// Send initial state
+	sendAgent()
+	sendDiff()
+	flusher.Flush()
+
+	// Keepalive ticker - prevents proxy timeouts
+	keepalive := time.NewTicker(30 * time.Second)
+	defer keepalive.Stop()
+
+	// Stream all updates for this task
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+
+			// Only forward events for this task
+			if event.TaskID != taskID {
+				continue
+			}
+
+			switch event.Type {
+			case "agent_update":
+				// Live agent update with message history
+				html := renderAgentConversationFromJSON(ctx, event.HTMLPayload, true)
+				fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+				flusher.Flush()
+
+			case "log":
+				// Log entry
+				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
+				logHTML := fmt.Sprintf(`<div class="ml-4 relative"><div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div><p class="text-xs text-gray-400">%s</p></div>`, htmlData)
+				fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
+				flusher.Flush()
+
+			case "status_change":
+				// Task status changed - send final state and signal completion
+				sendAgent()
+				sendDiff()
+				fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", event.HTMLPayload)
+				flusher.Flush()
+				// Close connection after task completes
+				return
+			}
+
+		case <-keepalive.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		}
+	}
+}
+
 // HandleTaskLogsSSE streams log updates for a specific task.
+// Deprecated: Use HandleTaskSSE instead for unified streaming.
 func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 

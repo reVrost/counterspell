@@ -180,56 +180,30 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			</div>
 		</div>
 
-	<!-- Main Content Area -->
+		<!-- Unified SSE Connection (only for in-progress tasks) -->
+		if task.Status == "in_progress" {
+			<div 
+				hx-ext="sse" 
+				sse-connect={ fmt.Sprintf("/task/%s/stream", task.ID) }
+				class="hidden">
+				<!-- Hidden elements that receive SSE updates and swap into visible targets -->
+				<div sse-swap="agent" hx-target="#agent-content" hx-swap="innerHTML"></div>
+				<div sse-swap="diff" hx-target="#diff-content" hx-swap="innerHTML"></div>
+				<div sse-swap="log" hx-target="#log-content" hx-swap="beforeend"></div>
+				<div sse-swap="complete" hx-on::sse-message="htmx.trigger(document.body, 'close-modal')"></div>
+			</div>
+		}
+
+		<!-- Main Content Area -->
 		<div class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full" id="content-scroll" 
 			x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
 			@sse:agent.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
 			@sse:log.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)">
 
-			<!-- Tab 2: DIFF (SSE streaming) -->
-			<div x-show="activeTab === 'diff'" class="p-0 min-h-full pb-32">
-				<div class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between">
-					<span class="text-xs text-gray-400 font-mono">changes</span>
-					<span class="text-[10px] text-green-500 font-mono">git diff</span>
-				</div>
-				<div 
-					class="p-4 font-mono text-xs leading-6 text-gray-300 whitespace-pre overflow-x-auto"
-					hx-ext="sse"
-					sse-connect={ fmt.Sprintf("/task/%s/diff/stream", task.ID) }
-					sse-swap="diff"
-					hx-swap="innerHTML"
-				>
-					if task.Status == "in_progress" {
-						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
-							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
-							<p class="text-xs font-mono">Generating changes...</p>
-						</div>
-					} else if task.GitDiff != "" {
-						for _, line := range strings.Split(task.GitDiff, "\n") {
-							if strings.HasPrefix(line, "+") {
-								<div class="diff-add">{ line }</div>
-							} else if strings.HasPrefix(line, "-") {
-								<div class="diff-del">{ line }</div>
-							} else {
-								<div>{ line }</div>
-							}
-						}
-					} else {
-						<div class="text-gray-500 italic">No changes made</div>
-					}
-				</div>
-			</div>
-
 			<!-- Tab 1: AGENT CONVERSATION -->
 			<div x-show="activeTab === 'agent'" class="pb-32">
-				<div
-					hx-ext="sse"
-					sse-connect={ fmt.Sprintf("/task/%s/agent/stream", task.ID) }
-					sse-swap="agent"
-					hx-swap="innerHTML"
-				>
+				<div id="agent-content">
 					if task.Status == "in_progress" {
-						<!-- Show existing messages if any, plus loading -->
 						if len(task.Messages) > 0 {
 							<div class="space-y-0">
 								for _, msg := range task.Messages {
@@ -258,7 +232,6 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 							}
 						</div>
 					} else if task.AgentOutput != "" {
-						<!-- Fallback to raw output if no parsed messages -->
 						<div class="p-5">
 							<div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-xs">{ task.AgentOutput }</div>
 						</div>
@@ -268,15 +241,37 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				</div>
 			</div>
 
+			<!-- Tab 2: DIFF -->
+			<div x-show="activeTab === 'diff'" class="p-0 min-h-full pb-32">
+				<div class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between">
+					<span class="text-xs text-gray-400 font-mono">changes</span>
+					<span class="text-[10px] text-green-500 font-mono">git diff</span>
+				</div>
+				<div id="diff-content" class="p-4 font-mono text-xs leading-6 text-gray-300 whitespace-pre overflow-x-auto">
+					if task.Status == "in_progress" {
+						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
+							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
+							<p class="text-xs font-mono">Generating changes...</p>
+						</div>
+					} else if task.GitDiff != "" {
+						for _, line := range strings.Split(task.GitDiff, "\n") {
+							if strings.HasPrefix(line, "+") {
+								<div class="diff-add">{ line }</div>
+							} else if strings.HasPrefix(line, "-") {
+								<div class="diff-del">{ line }</div>
+							} else {
+								<div>{ line }</div>
+							}
+						}
+					} else {
+						<div class="text-gray-500 italic">No changes made</div>
+					}
+				</div>
+			</div>
+
 			<!-- Tab 3: ACTIVITY -->
 			<div x-show="activeTab === 'activity'" class="p-5 pb-32 space-y-6">
-				<div 
-					class="relative border-l border-gray-800 ml-2 space-y-6"
-					hx-ext="sse"
-					sse-connect={ fmt.Sprintf("/task/%s/logs/stream", task.ID) }
-					sse-swap="log"
-					hx-swap="beforeend"
-				>
+				<div id="log-content" class="relative border-l border-gray-800 ml-2 space-y-6">
 					if len(task.Logs) == 0 {
 						<div class="ml-4 text-xs text-gray-500 italic" id="no-activity-msg">No activity yet</div>
 					}
