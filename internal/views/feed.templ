@@ -4,7 +4,7 @@ import "fmt"
 
 // Feed renders the main dashboard
 templ Feed(data FeedData) {
-	<div class="px-3 pt-20 pb-24">
+	<div class="px-3 pt-20 pb-40">
 		<!-- NEEDS REVIEW (Target for OOB Swaps) -->
 		<div id="reviews-container">
 			@ReviewsSection(data)
@@ -94,10 +94,7 @@ templ ReviewTaskRow(task *UITask, project UIProject) {
 			</div>
 			<span class="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-medium border border-blue-500/20 shrink-0">Review</span>
 		</div>
-		<p class="text-sm text-gray-200 font-medium leading-tight mb-2 pr-4 line-clamp-2">{ task.Description }</p>
-		<div class="flex items-center gap-3 text-[11px] text-gray-600 font-mono">
-			<span><i class="fas fa-robot mr-1"></i>{ task.AgentName }</span>
-		</div>
+		<p class="text-sm text-gray-200 font-medium leading-tight pr-4 line-clamp-2">{ task.Description }</p>
 		<div class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-700">
 			<i class="fas fa-chevron-right text-xs"></i>
 		</div>

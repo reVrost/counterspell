@@ -119,14 +119,6 @@ document.addEventListener('alpine:init', () => {
 
     // Voice Recording
     async startVoiceRecording(inputRef) {
-      console.log('startVoiceRecording called, inputRef:', inputRef);
-      
-      // Vibrate on start (mobile) - before async call
-      if ('vibrate' in navigator) {
-        console.log('vibrating start');
-        navigator.vibrate(50);
-      }
-      
       // Store inputRef for use in onstop callback
       this._inputRef = inputRef;
 
@@ -183,14 +175,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     stopVoiceRecording() {
-      console.log('stopVoiceRecording called, isRecording:', this.isRecording);
       if (!this.isRecording) return;
-      
-      // Vibrate on stop (mobile)
-      if ('vibrate' in navigator) {
-        console.log('vibrating stop');
-        navigator.vibrate([30, 50, 30]);
-      }
 
       this.isRecording = false;
       if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
