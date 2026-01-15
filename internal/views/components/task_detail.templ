@@ -97,7 +97,7 @@ templ MessageBubble(msg views.UIMessage) {
 				<div class="flex-1 min-w-0 space-y-1 -mt-px">
 					for _, content := range msg.Content {
 						if content.Type == "text" && content.Text != "" {
-							<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none">
+							<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-3 prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-2 prose-code:text-xs prose-pre:text-xs prose-pre:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 max-w-none">
 								@templ.Raw(utils.RenderMarkdownHTML(content.Text))
 							</div>
 						} else if content.Type == "tool_use" {
@@ -263,7 +263,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 						</div>
 					} else if task.AgentOutput != "" {
 						<div class="p-5">
-							<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none">
+							<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-3 prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-2 prose-code:text-xs prose-pre:text-xs prose-pre:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 max-w-none">
 								@templ.Raw(utils.RenderMarkdownHTML(task.AgentOutput))
 							</div>
 						</div>
