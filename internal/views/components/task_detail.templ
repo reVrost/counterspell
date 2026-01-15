@@ -179,7 +179,8 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			</button>
 		</div>
 		<!-- Tabs Container -->
-		<div class="flex items-center justify-center p-2 bg-[#16191F] shrink-0 border-b border-white/5">
+		<div class="flex items-center justify-between p-2 bg-[#16191F] shrink-0 border-b border-white/5">
+			<div class="w-6"></div>
 			<div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50">
 				<button
 					@click="activeTab = 'agent'"
@@ -197,21 +198,30 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all"
 				>Log</button>
 			</div>
-		</div>
-		<!-- Unified SSE Connection (only for in-progress tasks) -->
-		if task.Status == "in_progress" {
-			<div
-				hx-ext="sse"
-				sse-connect={ fmt.Sprintf("/task/%s/stream", task.ID) }
-				class="hidden"
-			>
-				<!-- Hidden elements that receive SSE updates and swap into visible targets -->
-				<div sse-swap="agent" hx-target="#agent-content" hx-swap="innerHTML"></div>
-				<div sse-swap="diff" hx-target="#diff-content" hx-swap="innerHTML"></div>
-				<div sse-swap="log" hx-target="#log-content" hx-swap="beforeend"></div>
-				<div sse-swap="complete" hx-on::sse-message="htmx.trigger(document.body, 'close-modal')"></div>
+			<!-- Status Indicator -->
+			<div class="w-6 flex justify-end pr-2">
+				if task.Status == "in_progress" {
+					<div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
+				} else if task.Status == "review" {
+					<div class="w-1.5 h-1.5 rounded-full bg-[#b197fc]" title="Needs Review"></div>
+				}
 			</div>
-		}
+		</div>
+		<!-- Unified SSE Connection (always active - handles status changes including chat continuations) -->
+		<div
+			hx-ext="sse"
+			sse-connect={ fmt.Sprintf("/task/%s/stream", task.ID) }
+			class="hidden"
+			id="task-sse-connection"
+		>
+			<!-- Hidden elements that receive SSE updates and swap into visible targets -->
+			<div sse-swap="agent" hx-target="#agent-content" hx-swap="innerHTML"></div>
+			<div sse-swap="diff" hx-target="#diff-content" hx-swap="innerHTML"></div>
+			<div sse-swap="log" hx-target="#log-content" hx-swap="beforeend"></div>
+			<div sse-swap="complete" hx-on::sse-message="htmx.trigger(document.body, 'close-modal')"></div>
+			<!-- Reconnect SSE when task restarts (e.g., after chat) -->
+			<div sse-swap="restart" hx-on::sse-message="setTimeout(() => { htmx.ajax('GET', '/task/' + document.getElementById('task-sse-connection').getAttribute('data-task-id') + '/stream', {source: document.getElementById('task-sse-connection')}); }, 100)"></div>
+		</div>
 		<!-- Main Content Area -->
 		<div
 			class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full"
@@ -269,7 +279,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					<span class="text-sm text-gray-400 font-mono">changes</span>
 					<span class="text-[10px] text-green-500 font-mono">git diff</span>
 				</div>
-				<div id="diff-content" class="p-4 font-mono text-sm leading-6 text-gray-300 whitespace-pre overflow-x-auto">
+				<div id="diff-content" class="p-4 font-mono text-sm leading-6 text-gray-300 whitespace-pre-wrap break-all">
 					if task.Status == "in_progress" {
 						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
 							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
