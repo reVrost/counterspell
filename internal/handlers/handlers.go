@@ -73,11 +73,13 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	// Feed Routes
 	r.Get("/feed", h.HandleFeed)
 	r.Get("/feed/active", h.HandleFeedActive)
-	r.Get("/feed/active/stream", h.HandleFeedActiveSSE)
+	r.Get("/feed/stream", h.HandleFeedActiveSSE)
 	r.Get("/task/{id}", h.HandleTaskDetailUI)
 
 	// SSE for streaming
 	r.Get("/events", h.HandleSSE)
+	r.Get("/task/{id}/stream", h.HandleTaskSSE) // Unified stream for task updates
+	// Deprecated: individual streams (kept for backwards compatibility)
 	r.Get("/task/{id}/logs/stream", h.HandleTaskLogsSSE)
 	r.Get("/task/{id}/diff/stream", h.HandleTaskDiffSSE)
 	r.Get("/task/{id}/agent/stream", h.HandleTaskAgentSSE)
