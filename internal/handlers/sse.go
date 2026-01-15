@@ -528,7 +528,7 @@ func renderAgentHTML(output string) string {
 		return `<div class="text-gray-500 italic text-xs">No agent output</div>`
 	}
 	html := utils.RenderMarkdownHTML(output)
-	return fmt.Sprintf(`<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none">%s</div>`, html)
+	return fmt.Sprintf(`<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-3 prose-headings:font-bold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-2 prose-code:text-xs prose-pre:text-xs prose-pre:my-3 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 max-w-none">%s</div>`, html)
 }
 
 // escapeHTML escapes HTML special characters
