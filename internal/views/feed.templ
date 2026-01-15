@@ -54,7 +54,7 @@ templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
 			<p class="text-sm text-gray-400 leading-tight line-clamp-2">{ task.Description }</p>
 			if task.Progress < 100 {
 				<div class="mt-2 w-full bg-gray-800 h-0.5 rounded-full overflow-hidden">
-					<div class="bg-purple-600 h-full transition-all duration-300" style={ fmt.Sprintf("width: %d%%", task.Progress) }></div>
+					<div class="bg-orange-500 h-full transition-all duration-300" style={ fmt.Sprintf("width: %d%%", task.Progress) }></div>
 				</div>
 			}
 		</div>

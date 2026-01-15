@@ -200,7 +200,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 				return templ_7745c5c3_Err
 			}
 			if task.Progress < 100 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"mt-2 w-full bg-gray-800 h-0.5 rounded-full overflow-hidden\"><div class=\"bg-purple-600 h-full transition-all duration-300\" style=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"mt-2 w-full bg-gray-800 h-0.5 rounded-full overflow-hidden\"><div class=\"bg-orange-500 h-full transition-all duration-300\" style=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

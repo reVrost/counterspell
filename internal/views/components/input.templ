@@ -158,7 +158,7 @@ templ InputBar(projects map[string]views.UIProject) {
 
 				<textarea x-model="text" x-ref="input" name="voice_input" 
 					@input="resize()" @keyup="checkMention($event)"
-					@keydown.enter.prevent="if(!$event.shiftKey && text.trim().length > 0 && app.activeProjectId) { $refs.voiceForm.requestSubmit(); }"
+					@keydown.enter.prevent="if(!$event.shiftKey && text.trim().length > 0 && app.activeProjectId) { $refs.voiceForm.requestSubmit(); text = ''; resize(); }"
 					rows="1"
 					placeholder="What do you want to build?" 
 					class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]"></textarea>
