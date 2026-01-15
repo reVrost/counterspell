@@ -556,7 +556,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\" class=\"hidden\" id=\"task-sse-connection\"><!-- Hidden elements that receive SSE updates and swap into visible targets --><div sse-swap=\"agent\" hx-target=\"#agent-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"diff\" hx-target=\"#diff-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"log\" hx-target=\"#log-content\" hx-swap=\"beforeend\"></div><div sse-swap=\"complete\" hx-on::sse-message=\"htmx.trigger(document.body, 'close-modal')\"></div><!-- Reconnect SSE when task restarts (e.g., after chat) --><div sse-swap=\"restart\" hx-on::sse-message=\"setTimeout(() => { htmx.ajax('GET', '/task/' + document.getElementById('task-sse-connection').getAttribute('data-task-id') + '/stream', {source: document.getElementById('task-sse-connection')}); }, 100)\"></div></div><!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:agent.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:log.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\" class=\"hidden\" id=\"task-sse-connection\"><!-- Hidden elements that receive SSE updates and swap into visible targets --><div sse-swap=\"agent\" hx-target=\"#agent-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"diff\" hx-target=\"#diff-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"log\" hx-target=\"#log-content\" hx-swap=\"beforeend\"></div><div sse-swap=\"complete\"></div></div><!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"\n\t\t\t\t$nextTick(() => $el.scrollTop = $el.scrollHeight);\n\t\t\t\tnew MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, {childList: true, subtree: true});\n\t\t\t\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -577,7 +577,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, " <div class=\"flex items-center gap-3 px-4 py-3\"><div class=\"relative\"><div class=\"w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center\"><i class=\"fas fa-robot text-sm text-blue-400 pulse-glow\"></i></div><div class=\"absolute inset-0 animate-spin\" style=\"animation-duration: 3s;\"><div class=\"absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full\"></div></div></div><div><p class=\"text-sm font-medium shimmer\">Agent is thinking...</p><p class=\"text-[10px] text-gray-600\">Analyzing code</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, " <div class=\"flex items-center gap-3 px-4 py-3\"><div class=\"relative\"><div class=\"w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center\"><i class=\"fas fa-robot text-sm text-violet-400 pulse-glow\"></i></div><div class=\"absolute inset-0 animate-spin\" style=\"animation-duration: 3s;\"><div class=\"absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full\"></div></div></div><div><p class=\"text-sm font-medium shimmer\">Agent is thinking...</p><p class=\"text-[10px] text-gray-600\">Analyzing code</p></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -634,7 +634,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					var templ_7745c5c3_Var30 string
 					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 291, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 290, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 					if templ_7745c5c3_Err != nil {
@@ -652,7 +652,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					var templ_7745c5c3_Var31 string
 					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 293, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 292, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 					if templ_7745c5c3_Err != nil {
@@ -670,7 +670,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					var templ_7745c5c3_Var32 string
 					templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 295, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 294, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 					if templ_7745c5c3_Err != nil {
@@ -711,7 +711,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/chat/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 320, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 319, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -724,7 +724,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/retry/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 402, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 401, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -737,7 +737,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 419, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 418, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -750,7 +750,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 430, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 429, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
