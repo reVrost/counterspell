@@ -29,6 +29,9 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<script src="https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js" integrity="sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8" crossorigin="anonymous"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 			<script src="/static/app.js"></script>
 			<script>
 				tailwind.config = {
@@ -56,8 +59,77 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 
 				/* Custom syntax highlight feel */
 				.code-block { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; }
-				.diff-add { background-color: rgba(46, 160, 67, 0.15); display: block; }
-				.diff-del { background-color: rgba(248, 81, 73, 0.15); display: block; }
+
+				/* GitHub-style diff view */
+				.diff-container {
+					font-family: 'JetBrains Mono', monospace;
+					font-size: 12px;
+					line-height: 1.6;
+					tab-size: 4;
+				}
+				.diff-line {
+					display: flex;
+					min-height: 20px;
+				}
+				.diff-line-num {
+					min-width: 50px;
+					padding: 0 8px;
+					text-align: right;
+					color: #484f58;
+					user-select: none;
+					font-size: 11px;
+					border-right: 1px solid #30363d;
+					opacity: 0.6;
+				}
+				.diff-line-content {
+					flex: 1;
+					padding: 0 12px;
+					white-space: pre;
+					overflow-x: auto;
+				}
+				.diff-add {
+					background-color: rgba(63, 185, 80, 0.15);
+					display: flex;
+				}
+				.diff-add .diff-line-num { background-color: rgba(63, 185, 80, 0.2); color: #3fb950; opacity: 0.5; }
+				.diff-add .diff-line-content { color: #aff5b4; }
+				.diff-del {
+					background-color: rgba(248, 81, 73, 0.15);
+					display: flex;
+				}
+				.diff-del .diff-line-num { background-color: rgba(248, 81, 73, 0.20); color: #f85149; opacity: 0.5; }
+				.diff-del .diff-line-content { color: #ffa198; }
+				.diff-context {
+					background-color: transparent;
+					display: flex;
+				}
+				.diff-context .diff-line-num { color: #484f58; opacity: 0.5; }
+				.diff-context .diff-line-content { color: #8b949e; }
+				.diff-hunk {
+					background-color: rgba(56, 139, 253, 0.15);
+					color: #79c0ff;
+					padding: 4px 12px;
+					font-size: 11px;
+					border-top: 1px solid #30363d;
+					border-bottom: 1px solid #30363d;
+				}
+				.diff-file-header {
+					background-color: #161b22;
+					border: 1px solid #30363d;
+					border-radius: 6px 6px 0 0;
+					padding: 8px 12px;
+					color: #c9d1d9;
+					font-weight: 600;
+					font-size: 12px;
+					margin-top: 16px;
+				}
+				.diff-file-header:first-child { margin-top: 0; }
+				.diff-file-body {
+					border: 1px solid #30363d;
+					border-top: none;
+					border-radius: 0 0 6px 6px;
+					overflow: hidden;
+				}
 
 				/* Shimmer loading animation */
 				.shimmer {

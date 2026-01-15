@@ -471,23 +471,54 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// renderDiffHTML converts git diff text to styled HTML
+// renderDiffHTML converts git diff text to GitHub-styled HTML
 func renderDiffHTML(diff string) string {
 	if diff == "" {
 		return `<div class="text-gray-500 italic">No changes made</div>`
 	}
 
 	var buf strings.Builder
+	var currentFile string
+	var lineNum int
+	inFileBlock := false
+
 	for _, line := range strings.Split(diff, "\n") {
 		escapedLine := escapeHTML(line)
-		if strings.HasPrefix(line, "+") {
-			buf.WriteString(fmt.Sprintf(`<div class="diff-add">%s</div>`, escapedLine))
+
+		if strings.HasPrefix(line, "diff --git") {
+			// Close previous file block
+			if inFileBlock {
+				buf.WriteString(`</div>`)
+			}
+			inFileBlock = true
+			lineNum = 0
+
+			// Extract filename
+			parts := strings.Split(line, " b/")
+			if len(parts) > 1 {
+				currentFile = parts[len(parts)-1]
+			}
+			buf.WriteString(fmt.Sprintf(`<div class="diff-file-header"><i class="fas fa-file-code mr-2 text-gray-500"></i>%s</div><div class="diff-file-body">`, escapeHTML(currentFile)))
+		} else if strings.HasPrefix(line, "@@") {
+			// Hunk header
+			buf.WriteString(fmt.Sprintf(`<div class="diff-hunk">%s</div>`, escapedLine))
+		} else if strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "index ") {
+			// Skip meta lines
+		} else if strings.HasPrefix(line, "+") {
+			lineNum++
+			buf.WriteString(fmt.Sprintf(`<div class="diff-line diff-add"><span class="diff-line-num">%d</span><span class="diff-line-content">%s</span></div>`, lineNum, escapedLine))
 		} else if strings.HasPrefix(line, "-") {
-			buf.WriteString(fmt.Sprintf(`<div class="diff-del">%s</div>`, escapedLine))
-		} else {
-			buf.WriteString(fmt.Sprintf(`<div>%s</div>`, escapedLine))
+			buf.WriteString(fmt.Sprintf(`<div class="diff-line diff-del"><span class="diff-line-num"></span><span class="diff-line-content">%s</span></div>`, escapedLine))
+		} else if line != "" {
+			lineNum++
+			buf.WriteString(fmt.Sprintf(`<div class="diff-line diff-context"><span class="diff-line-num">%d</span><span class="diff-line-content">%s</span></div>`, lineNum, escapedLine))
 		}
 	}
+
+	if inFileBlock {
+		buf.WriteString(`</div>`)
+	}
+
 	return buf.String()
 }
 
