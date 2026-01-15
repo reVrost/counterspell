@@ -59,3 +59,10 @@ type FeedData struct {
 	Projects map[string]UIProject
 	Filter   string
 }
+
+// UITodo represents a todo item for display
+type UITodo struct {
+	Content    string `json:"content"`
+	Status     string `json:"status"` // pending, in_progress, completed
+	ActiveForm string `json:"active_form"`
+}

@@ -26,6 +26,7 @@ const (
 	EventError    = "error"
 	EventDone     = "done"
 	EventMessages = "messages" // Full message history update
+	EventTodo     = "todo"     // Todo list update
 )
 
 // Message represents a single message in the conversation.
@@ -77,6 +78,7 @@ type Runner struct {
 	systemPrompt   string
 	finalMessage   string
 	messageHistory []Message
+	todoState      *TodoState
 }
 
 // NewRunner creates a new agent runner.
@@ -87,6 +89,7 @@ func NewRunner(provider llm.Provider, workDir string, callback StreamCallback) *
 		workDir:      workDir,
 		callback:     callback,
 		systemPrompt: fmt.Sprintf("You are a coding assistant. Work directory: %s. Be concise. Make changes directly.", workDir),
+		todoState:    NewTodoState(),
 	}
 }
 
@@ -110,6 +113,16 @@ func (r *Runner) SetMessageHistory(historyJSON string) error {
 		return nil
 	}
 	return json.Unmarshal([]byte(historyJSON), &r.messageHistory)
+}
+
+// GetTodos returns the current todo list as JSON string.
+func (r *Runner) GetTodos() string {
+	return r.todoState.ToJSON()
+}
+
+// GetTodoState returns the todo state.
+func (r *Runner) GetTodoState() *TodoState {
+	return r.todoState
 }
 
 // Run executes the agent loop for a given task.
@@ -325,6 +338,7 @@ func (r *Runner) makeTools() map[string]Tool {
 			},
 			Func: r.toolLs,
 		},
+		"todos": r.makeTodoTool(),
 	}
 }
 

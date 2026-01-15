@@ -261,6 +261,11 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", event.HTMLPayload)
 				flusher.Flush()
 				// Don't close connection - keep alive for potential chat continuations
+
+			case "todo":
+				// Todo list update - forward JSON directly
+				fmt.Fprintf(w, "event: todo\ndata: %s\n\n", strings.ReplaceAll(event.HTMLPayload, "\n", ""))
+				flusher.Flush()
 			}
 
 		case <-keepalive.C:
