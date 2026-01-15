@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/code/counterspell/internal/utils"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/views/components"
 )
@@ -492,13 +493,13 @@ func renderDiffHTML(diff string) string {
 	return buf.String()
 }
 
-// renderAgentHTML converts agent output text to styled HTML
+// renderAgentHTML converts agent output text to styled HTML with markdown support
 func renderAgentHTML(output string) string {
 	if output == "" {
 		return `<div class="text-gray-500 italic text-xs">No agent output</div>`
 	}
-	escaped := escapeHTML(output)
-	return fmt.Sprintf(`<div class="prose prose-invert prose-xs max-w-none"><div class="text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-xs">%s</div></div>`, escaped)
+	html := utils.RenderMarkdownHTML(output)
+	return fmt.Sprintf(`<div class="text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none">%s</div>`, html)
 }
 
 // escapeHTML escapes HTML special characters

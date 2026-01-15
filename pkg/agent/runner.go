@@ -118,6 +118,9 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		},
 	})
 
+	// Emit immediately so user message appears in UI right away
+	r.emitMessages(messages)
+
 	// Agent loop
 	for {
 		select {
@@ -144,6 +147,10 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		}
 
 		toolResults := []ContentBlock{}
+
+		// Immediately add assistant message and emit so UI shows response right away
+		messages = append(messages, Message{Role: "assistant", Content: resp.Content})
+		r.emitMessages(messages)
 
 		for _, block := range resp.Content {
 			if block.Type == "text" && block.Text != "" {
@@ -181,11 +188,6 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 			}
 		}
 
-		messages = append(messages, Message{Role: "assistant", Content: resp.Content})
-
-		// Emit current message state for live UI updates
-		r.emitMessages(messages)
-
 		if len(toolResults) == 0 {
 			r.emit(StreamEvent{Type: EventPlan, Content: "No more tools to run, completing task"})
 			break
@@ -194,7 +196,7 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Running %d tool result(s) through agent loop", len(toolResults))})
 		messages = append(messages, Message{Role: "user", Content: toolResults})
 
-		// Emit again after adding tool results
+		// Emit with tool results so UI shows them
 		r.emitMessages(messages)
 	}
 

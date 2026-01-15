@@ -10,6 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
+	"github.com/revrost/code/counterspell/internal/utils"
 	"github.com/revrost/code/counterspell/internal/views"
 	"strings"
 )
@@ -102,7 +103,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 = []any{"text-xs font-bold block mb-0.5",
+		var templ_7745c5c3_Var4 = []any{"text-sm font-bold block mb-0.5",
 			templ.KV("text-red-400", log.Type == "error"),
 			templ.KV("text-green-400", log.Type == "success"),
 			templ.KV("text-yellow-400", log.Type == "plan"),
@@ -133,7 +134,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(log.Type)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 60, Col: 154}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 65, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -146,7 +147,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(log.Timestamp.Format("15:04:05"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 61, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 66, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -156,7 +157,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var8 = []any{"text-xs", templ.KV("text-red-300", log.Type == "error"), templ.KV("text-gray-400", log.Type != "error")}
+		var templ_7745c5c3_Var8 = []any{"text-sm", templ.KV("text-red-300", log.Type == "error"), templ.KV("text-gray-400", log.Type != "error")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -181,7 +182,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 63, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 68, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -224,14 +225,14 @@ func MessageBubble(msg views.UIMessage) templ.Component {
 			}
 			for _, content := range msg.Content {
 				if content.Type == "text" && content.Text != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"text-xs text-gray-200 whitespace-pre-wrap leading-normal\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"text-sm text-gray-200 whitespace-pre-wrap leading-normal\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(content.Text)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 79, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 84, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -254,16 +255,11 @@ func MessageBubble(msg views.UIMessage) templ.Component {
 			}
 			for _, content := range msg.Content {
 				if content.Type == "text" && content.Text != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"text-xs text-gray-300 whitespace-pre-wrap leading-normal\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var13 string
-					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(content.Text)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 95, Col: 91}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+					templ_7745c5c3_Err = templ.Raw(utils.RenderMarkdownHTML(content.Text)).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -309,17 +305,17 @@ func ToolCallBlock(content views.UIContent) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var14 == nil {
-			templ_7745c5c3_Var14 = templ.NopComponent
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"my-1\" x-data=\"{ expanded: false }\"><button @click=\"expanded = !expanded\" class=\"flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-gray-300 transition group\"><div class=\"w-4 h-4 rounded bg-gray-800 border border-gray-700 flex items-center justify-center group-hover:border-gray-600 transition\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"my-1\" x-data=\"{ expanded: false }\"><button @click=\"expanded = !expanded\" class=\"flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition group\"><div class=\"w-4 h-4 rounded bg-gray-800 border border-gray-700 flex items-center justify-center group-hover:border-gray-600 transition\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 = []any{fmt.Sprintf("fas %s text-[8px] text-gray-500 group-hover:text-gray-400", toolIcon(content.ToolName))}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
+		var templ_7745c5c3_Var14 = []any{fmt.Sprintf("fas %s text-xs text-gray-500 group-hover:text-gray-400", toolIcon(content.ToolName))}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var14...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -327,12 +323,12 @@ func ToolCallBlock(content views.UIContent) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var15).String())
+		var templ_7745c5c3_Var15 string
+		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var14).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -340,25 +336,25 @@ func ToolCallBlock(content views.UIContent) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(content.ToolName)
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(content.ToolName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 116, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 125, Col: 45}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</span> <i class=\"fas fa-chevron-right text-xs transition-transform\" :class=\"expanded ? 'rotate-90' : ''\"></i></button><div x-show=\"expanded\" x-collapse class=\"mt-1 ml-5\"><pre class=\"text-xs text-gray-500 bg-gray-900/50 rounded p-1.5 overflow-x-auto border border-gray-800\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var17 string
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(content.ToolInput)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 129, Col: 125}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</span> <i class=\"fas fa-chevron-right text-[7px] transition-transform\" :class=\"expanded ? 'rotate-90' : ''\"></i></button><div x-show=\"expanded\" x-collapse class=\"mt-1 ml-5\"><pre class=\"text-[9px] text-gray-500 bg-gray-900/50 rounded p-1.5 overflow-x-auto border border-gray-800\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(content.ToolInput)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 120, Col: 128}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -387,9 +383,9 @@ func ToolResultBlock(content views.UIContent) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var19 == nil {
-			templ_7745c5c3_Var19 = templ.NopComponent
+		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var18 == nil {
+			templ_7745c5c3_Var18 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		if content.Text != "" {
@@ -397,12 +393,12 @@ func ToolResultBlock(content views.UIContent) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(truncateResult(content.Text))
+			var templ_7745c5c3_Var19 string
+			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(truncateResult(content.Text))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 136, Col: 165}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 147, Col: 165}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -431,17 +427,17 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var21 == nil {
-			templ_7745c5c3_Var21 = templ.NopComponent
+		templ_7745c5c3_Var20 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var20 == nil {
+			templ_7745c5c3_Var20 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<div class=\"flex flex-col h-full\" x-data=\"{ showChat: false, activeTab: 'agent' }\"><!-- Modal Header --><div class=\"px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#16191F]\"><div class=\"flex items-center gap-3\"><button @click=\"closeModal()\" class=\"w-8 h-8 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400\"><i class=\"fas fa-arrow-left\"></i></button><div><div class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var22 = []any{fmt.Sprintf("%s text-[10px]", project.Color)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var22...)
+		var templ_7745c5c3_Var21 = []any{fmt.Sprintf("%s text-[10px]", project.Color)}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var21...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -449,12 +445,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var23 string
-		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var22).String())
+		var templ_7745c5c3_Var22 string
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var21).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -462,8 +458,8 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var24 = []any{fmt.Sprintf("fas %s", project.Icon)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var24...)
+		var templ_7745c5c3_Var23 = []any{fmt.Sprintf("fas %s", project.Icon)}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var23...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -471,12 +467,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var24).String())
+		var templ_7745c5c3_Var24 string
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var23).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -484,12 +480,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var26 string
-		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
+		var templ_7745c5c3_Var25 string
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 153, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 164, Col: 75}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -497,12 +493,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var27 string
-		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", task.ID))
+		var templ_7745c5c3_Var26 string
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 155, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 166, Col: 85}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -510,12 +506,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
+		var templ_7745c5c3_Var27 string
+		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 157, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 168, Col: 85}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -523,12 +519,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/discard/%s", task.ID))
+		var templ_7745c5c3_Var28 string
+		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/discard/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 162, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 173, Col: 56}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -541,12 +537,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var30 string
-			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s/stream", task.ID))
+			var templ_7745c5c3_Var29 string
+			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s/stream", task.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 187, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 205, Col: 57}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -555,7 +551,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:agent.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:log.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:agent.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\" @sse:log.window=\"$nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -576,7 +572,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, " <div class=\"flex items-center gap-3 px-4 py-3\"><div class=\"relative\"><div class=\"w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center\"><i class=\"fas fa-robot text-sm text-blue-400 pulse-glow\"></i></div><div class=\"absolute inset-0 animate-spin\" style=\"animation-duration: 3s;\"><div class=\"absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full\"></div></div></div><div><p class=\"text-xs font-medium shimmer\">Agent is thinking...</p><p class=\"text-[10px] text-gray-600\">Analyzing code</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, " <div class=\"flex items-center gap-3 px-4 py-3\"><div class=\"relative\"><div class=\"w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center\"><i class=\"fas fa-robot text-sm text-blue-400 pulse-glow\"></i></div><div class=\"absolute inset-0 animate-spin\" style=\"animation-duration: 3s;\"><div class=\"absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full\"></div></div></div><div><p class=\"text-sm font-medium shimmer\">Agent is thinking...</p><p class=\"text-[10px] text-gray-600\">Analyzing code</p></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -596,16 +592,11 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else if task.AgentOutput != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div class=\"p-5\"><div class=\"text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-xs\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div class=\"p-5\"><div class=\"text-sm text-gray-300 leading-normal prose prose-invert prose-sm prose-p:my-1 prose-headings:font-bold prose-headings:text-sm prose-code:text-xs prose-pre:text-xs max-w-none\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var31 string
-			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(task.AgentOutput)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 236, Col: 106}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+			templ_7745c5c3_Err = templ.Raw(utils.RenderMarkdownHTML(task.AgentOutput)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -614,17 +605,17 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<div class=\"p-5 text-gray-500 italic text-xs\">No agent output</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<div class=\"p-5 text-gray-500 italic text-sm\">No agent output</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div></div><!-- Tab 2: DIFF --><div x-show=\"activeTab === 'diff'\" class=\"p-0 min-h-full pb-32\"><div class=\"px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between\"><span class=\"text-xs text-gray-400 font-mono\">changes</span> <span class=\"text-[10px] text-green-500 font-mono\">git diff</span></div><div id=\"diff-content\" class=\"p-4 font-mono text-xs leading-6 text-gray-300 whitespace-pre overflow-x-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div></div><!-- Tab 2: DIFF --><div x-show=\"activeTab === 'diff'\" class=\"p-0 min-h-full pb-32\"><div class=\"px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between\"><span class=\"text-sm text-gray-400 font-mono\">changes</span> <span class=\"text-[10px] text-green-500 font-mono\">git diff</span></div><div id=\"diff-content\" class=\"p-4 font-mono text-sm leading-6 text-gray-300 whitespace-pre overflow-x-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if task.Status == "in_progress" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<div class=\"flex flex-col items-center justify-center h-48 text-gray-500 space-y-4\"><i class=\"fas fa-cog fa-spin text-3xl opacity-50\"></i><p class=\"text-xs font-mono\">Generating changes...</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<div class=\"flex flex-col items-center justify-center h-48 text-gray-500 space-y-4\"><i class=\"fas fa-cog fa-spin text-3xl opacity-50\"></i><p class=\"text-sm font-mono\">Generating changes...</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -635,12 +626,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var32 string
-					templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(line)
+					var templ_7745c5c3_Var30 string
+					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 259, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 281, Col: 36}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -653,12 +644,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var33 string
-					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(line)
+					var templ_7745c5c3_Var31 string
+					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 261, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 283, Col: 36}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -671,12 +662,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var34 string
-					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(line)
+					var templ_7745c5c3_Var32 string
+					templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(line)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 263, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 285, Col: 19}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -697,7 +688,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(task.Logs) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<div class=\"ml-4 text-xs text-gray-500 italic\" id=\"no-activity-msg\">No activity yet</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<div class=\"ml-4 text-sm text-gray-500 italic\" id=\"no-activity-msg\">No activity yet</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -712,25 +703,25 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/chat/%s", task.ID))
+		var templ_7745c5c3_Var33 string
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/chat/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 290, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 310, Col: 54}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" hx-swap=\"none\" @htmx:after-request=\"showChat = false\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl\" x-data=\"{ \n\t\t\t\t\t\ttext: '', \n\t\t\t\t\t\tshowFileMenu: false,\n\t\t\t\t\t\tfiles: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],\n\t\t\t\t\t\tresize() {\n\t\t\t\t\t\t\tthis.$refs.input.style.height = 'auto'; \n\t\t\t\t\t\t\tlet newHeight = this.$refs.input.scrollHeight;\n\t\t\t\t\t\t\tif(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;\n\t\t\t\t\t\t\tthis.$refs.input.style.height = newHeight + 'px';\n\t\t\t\t\t\t},\n\t\t\t\t\t\tcheckMention(e) {\n\t\t\t\t\t\t\tif (this.text.match(/@[^ ]*$/)) {\n\t\t\t\t\t\t\t\tthis.showFileMenu = true;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (e.key === 'Escape') this.showFileMenu = false;\n\t\t\t\t\t\t},\n\t\t\t\t\t\tinsertFile(f) {\n\t\t\t\t\t\t\tthis.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';\n\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\tthis.$nextTick(() => { this.$refs.input.focus(); });\n\t\t\t\t\t\t}\n\t\t\t\t\t}\"><!-- Cancel (X) --><button type=\"button\" @click=\"showChat = false\" class=\"text-gray-500 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-times text-lg\"></i></button><!-- Attachment --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-paperclip text-lg\"></i></button><!-- Expanding Textarea --><div class=\"flex-1 mx-2 relative min-w-0\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea name=\"message\" x-model=\"text\" x-ref=\"input\" @input=\"resize()\" @keyup=\"checkMention($event)\" @keydown.enter.prevent=\"if (!$event.shiftKey) $el.form.requestSubmit()\" rows=\"1\" placeholder=\"Refine code instructions...\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1\"></textarea></div><!-- Model Selector (Visual) --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mr-1 mb-0.5\"><i class=\"fas fa-bolt text-lg\"></i></button><!-- Submit Button --><button type=\"submit\" class=\"bg-white text-black hover:bg-gray-200 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mb-0.5 shadow-lg transition-transform active:scale-95 relative z-10\"><i class=\"fas fa-arrow-up text-sm\"></i></button></form></div><!-- Default Buttons --><div x-show=\"!showChat\" class=\"grid grid-cols-4 gap-2 h-12\"><!-- Retry Button --><button hx-post=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var36 string
-		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/retry/%s", task.ID))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" hx-swap=\"none\" @htmx:after-request=\"showChat = false\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-[32px] p-1.5 pl-4 flex items-end shadow-2xl relative backdrop-blur-md transition-all duration-200 w-full max-w-2xl\" x-data=\"{\n\t\t\t\t\t\ttext: '',\n\t\t\t\t\t\tshowFileMenu: false,\n\t\t\t\t\t\tfiles: ['main.go', 'go.mod', 'README.md', 'Dockerfile', 'pkg/server.go', 'pkg/utils.go', 'ui/app.js'],\n\t\t\t\t\t\tresize() {\n\t\t\t\t\t\t\tthis.$refs.input.style.height = 'auto';\n\t\t\t\t\t\t\tlet newHeight = this.$refs.input.scrollHeight;\n\t\t\t\t\t\t\tif(newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;\n\t\t\t\t\t\t\tthis.$refs.input.style.height = newHeight + 'px';\n\t\t\t\t\t\t},\n\t\t\t\t\t\tcheckMention(e) {\n\t\t\t\t\t\t\tif (this.text.match(/@[^ ]*$/)) {\n\t\t\t\t\t\t\t\tthis.showFileMenu = true;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (e.key === 'Escape') this.showFileMenu = false;\n\t\t\t\t\t\t},\n\t\t\t\t\t\tinsertFile(f) {\n\t\t\t\t\t\t\tthis.text = this.text.replace(/@[^ ]*$/, '') + f + ' ';\n\t\t\t\t\t\t\tthis.showFileMenu = false;\n\t\t\t\t\t\t\tthis.$nextTick(() => { this.$refs.input.focus(); });\n\t\t\t\t\t\t}\n\t\t\t\t\t}\"><!-- Cancel (X) --><button type=\"button\" @click=\"showChat = false\" class=\"text-gray-500 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-times text-lg\"></i></button><!-- Attachment --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mb-0.5\"><i class=\"fas fa-paperclip text-lg\"></i></button><!-- Expanding Textarea --><div class=\"flex-1 mx-2 relative min-w-0\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-sm text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span> <span x-text=\"file\"></span></div></template></div><textarea name=\"message\" x-model=\"text\" x-ref=\"input\" @input=\"resize()\" @keyup=\"checkMention($event)\" @keydown.enter.prevent=\"if (!$event.shiftKey) $el.form.requestSubmit()\" rows=\"1\" placeholder=\"Refine code instructions...\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] py-1\"></textarea></div><!-- Model Selector (Visual) --><button type=\"button\" class=\"text-gray-400 hover:text-white transition p-2 mr-1 mb-0.5\"><i class=\"fas fa-bolt text-lg\"></i></button><!-- Submit Button --><button type=\"submit\" class=\"bg-white text-black hover:bg-gray-200 w-10 h-10 rounded-full flex items-center justify-center shrink-0 mb-0.5 shadow-lg transition-transform active:scale-95 relative z-10\"><i class=\"fas fa-arrow-up text-sm\"></i></button></form></div><!-- Default Buttons --><div x-show=\"!showChat\" class=\"grid grid-cols-4 gap-2 h-12\"><!-- Retry Button --><button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 364, Col: 62}
+			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+		var templ_7745c5c3_Var34 string
+		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/retry/%s", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 392, Col: 55}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -738,29 +729,29 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var37 string
-		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
+		var templ_7745c5c3_Var35 string
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 378, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 409, Col: 52}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" hx-swap=\"none\" hx-indicator=\"#pr-spinner\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed\"><i class=\"fab fa-github text-[10px] htmx-request:hidden\"></i> <i id=\"pr-spinner\" class=\"fas fa-spinner fa-spin htmx-indicator text-[10px]\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide\">PR</span></button><!-- Merge to Main Button --><button hx-post=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 388, Col: 62}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none\"><i class=\"fab fa-github text-[10px] [.htmx-request>&]:hidden\"></i> <i class=\"fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden\">PR</span></button><!-- Merge to Main Button --><button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" hx-swap=\"none\" hx-indicator=\"#merge-spinner\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed\"><i class=\"fas fa-code-merge text-[10px] htmx-request:hidden\"></i> <i id=\"merge-spinner\" class=\"fas fa-spinner fa-spin htmx-indicator text-[10px]\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide htmx-request:hidden\">main</span> <span class=\"text-[10px] font-semibold uppercase tracking-wide hidden htmx-request:inline\">...</span></button></div></div></div>")
+		var templ_7745c5c3_Var36 string
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 420, Col: 55}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"col-span-1 bg-white hover:bg-gray-100 text-black rounded-lg flex items-center justify-center gap-px active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed [&.htmx-request]:pointer-events-none\"><i class=\"fas fa-code-merge text-[10px] [.htmx-request>&]:hidden\"></i> <i class=\"fas fa-spinner fa-spin text-[10px] hidden [.htmx-request>&]:inline\"></i> <span class=\"text-[10px] font-semibold uppercase tracking-wide [.htmx-request>&]:hidden\">main</span></button></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

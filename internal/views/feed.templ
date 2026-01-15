@@ -17,7 +17,6 @@ templ Feed(data FeedData) {
 				@ActiveRows(data.Active, data.Projects)
 			</div>
 		</div>
-
 		<!-- DONE HISTORY -->
 		if len(data.Done) > 0 {
 			<div class="pt-4 border-t border-gray-800/50">
@@ -52,7 +51,7 @@ templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
 					<i class="fas fa-circle-notch fa-spin"></i> { fmt.Sprintf("%d%%", task.Progress) }
 				</span>
 			</div>
-			<p class="text-sm text-gray-400 leading-tight">{ task.Description }</p>
+			<p class="text-sm text-gray-400 leading-tight line-clamp-2">{ task.Description }</p>
 			if task.Progress < 100 {
 				<div class="mt-2 w-full bg-gray-800 h-0.5 rounded-full overflow-hidden">
 					<div class="bg-purple-600 h-full transition-all duration-300" style={ fmt.Sprintf("width: %d%%", task.Progress) }></div>
@@ -95,7 +94,7 @@ templ ReviewTaskRow(task *UITask, project UIProject) {
 			</div>
 			<span class="text-[10px] text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-md font-medium border border-orange-400/20 shrink-0">Review</span>
 		</div>
-		<p class="text-sm text-gray-200 font-medium leading-tight mb-2 pr-4">{ task.Description }</p>
+		<p class="text-sm text-gray-200 font-medium leading-tight mb-2 pr-4 line-clamp-2">{ task.Description }</p>
 		<div class="flex items-center gap-3 text-[11px] text-gray-600 font-mono">
 			<span><i class="fas fa-robot mr-1"></i>{ task.AgentName }</span>
 		</div>
@@ -117,7 +116,7 @@ templ CompletedTaskRow(task *UITask, project UIProject) {
 				<i class="fas fa-check"></i>
 			</div>
 			<div>
-				<div class="text-xs text-gray-400 line-through decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition">{ task.Description }</div>
+				<div class="text-sm text-gray-400 decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition line-clamp-2">{ task.Description }</div>
 				<div class="text-[10px] text-gray-600">{ project.Name }</div>
 			</div>
 		</div>
