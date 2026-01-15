@@ -218,18 +218,17 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<div sse-swap="agent" hx-target="#agent-content" hx-swap="innerHTML"></div>
 			<div sse-swap="diff" hx-target="#diff-content" hx-swap="innerHTML"></div>
 			<div sse-swap="log" hx-target="#log-content" hx-swap="beforeend"></div>
-			<div sse-swap="complete" hx-on::sse-message="htmx.trigger(document.body, 'close-modal')"></div>
-			<!-- Reconnect SSE when task restarts (e.g., after chat) -->
-			<div sse-swap="restart" hx-on::sse-message="setTimeout(() => { htmx.ajax('GET', '/task/' + document.getElementById('task-sse-connection').getAttribute('data-task-id') + '/stream', {source: document.getElementById('task-sse-connection')}); }, 100)"></div>
+			<div sse-swap="complete"></div>
 		</div>
 		<!-- Main Content Area -->
 		<div
 			class="flex-1 overflow-y-auto bg-[#0D1117] relative w-full"
 			id="content-scroll"
-			x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+			x-init="
+				$nextTick(() => $el.scrollTop = $el.scrollHeight);
+				new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, {childList: true, subtree: true});
+			"
 			x-effect="activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)"
-			@sse:agent.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-			@sse:log.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
 		>
 			<!-- Tab 1: AGENT CONVERSATION -->
 			<div x-show="activeTab === 'agent'" class="pb-32">
@@ -244,11 +243,11 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 						}
 						<div class="flex items-center gap-3 px-4 py-3">
 							<div class="relative">
-								<div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-									<i class="fas fa-robot text-sm text-blue-400 pulse-glow"></i>
+								<div class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+									<i class="fas fa-robot text-sm text-violet-400 pulse-glow"></i>
 								</div>
 								<div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
-									<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full"></div>
+									<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"></div>
 								</div>
 							</div>
 							<div>

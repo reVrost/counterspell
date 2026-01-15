@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"log/slog"
@@ -518,6 +519,14 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 		Type:   "task_created",
 	})
 
+	// Immediately emit agent_update with user message appended so it shows right away
+	updatedHistory := appendUserMessage(task.MessageHistory, followUpMessage)
+	o.events.Publish(models.Event{
+		TaskID:      taskID,
+		Type:        "agent_update",
+		HTMLPayload: updatedHistory,
+	})
+
 	slog.Info("Continuing task", "task_id", taskID, "follow_up", followUpMessage)
 
 	// Submit job to worker pool
@@ -878,4 +887,31 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// appendUserMessage appends a user message to the existing message history JSON
+func appendUserMessage(historyJSON, message string) string {
+	// Parse existing history
+	var messages []map[string]any
+	if historyJSON != "" {
+		if err := json.Unmarshal([]byte(historyJSON), &messages); err != nil {
+			messages = []map[string]any{}
+		}
+	}
+
+	// Append user message
+	userMsg := map[string]any{
+		"role": "user",
+		"content": []map[string]any{
+			{"type": "text", "text": message},
+		},
+	}
+	messages = append(messages, userMsg)
+
+	// Marshal back to JSON
+	result, err := json.Marshal(messages)
+	if err != nil {
+		return historyJSON
+	}
+	return string(result)
 }

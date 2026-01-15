@@ -459,8 +459,7 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Just send toast - SSE will stream updates to agent tab
-	w.Header().Set("HX-Trigger", `{"toast": "Continuing task..."}`)
+	// SSE will stream updates to agent tab
 	w.WriteHeader(http.StatusOK)
 }
 
