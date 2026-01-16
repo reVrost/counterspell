@@ -28,7 +28,6 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<link rel="apple-touch-icon" href="/static/apple-touch-icon.png"/>
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-			<script src="https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js" integrity="sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8" crossorigin="anonymous"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -172,10 +171,15 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 					50% { opacity: 1; filter: drop-shadow(0 0 8px #8B5CF6); }
 				}
 			</style>
+			<!-- Alpine plugins must load BEFORE Alpine core -->
+			<script src="https://cdn.jsdelivr.net/npm/@alpinejs/morph@3.14.8/dist/cdn.min.js" defer></script>
 			<script src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js" defer></script>
 			<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+			<!-- htmx alpine-morph extension - must also defer so it loads AFTER Alpine -->
+			<script src="https://cdn.jsdelivr.net/npm/htmx-ext-alpine-morph@2.0.1/alpine-morph.js" defer></script>
 		</head>
 		<body
+			hx-ext="alpine-morph"
 			x-data="appState"
 			data-authenticated={ boolStr(isAuthenticated) }
 			@keydown.escape="closeModal()"

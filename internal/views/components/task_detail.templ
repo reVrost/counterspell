@@ -44,7 +44,6 @@ func hasTextContent(msg views.UIMessage) bool {
 }
 
 // taskDetailXData generates the Alpine.js x-data for the task detail component
-// Inline definition to avoid scope issues with nested x-data
 func taskDetailXData(task *views.UITask) string {
 	agentRunning := "false"
 	if task.Status == "in_progress" {
@@ -61,63 +60,24 @@ func taskDetailXData(task *views.UITask) string {
 		sendingMessage: false,
 		lastEventId: 0,
 		confirmAction: null,
-		activeModelId: localStorage.getItem("counterspell_model") || "%s",
-		models: %s,
 		chatUrl: "%s",
 		
-		// Chat form state (merged to avoid nested x-data scope issues)
-		chatText: "",
-		chatFocused: false,
-		showFileMenu: false,
-		modelOpen: false,
-		chatFiles: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
-		
+		get app() { return Alpine.$data(document.body); },
 		get completedCount() { return this.todos.filter(t => t.status === "completed").length },
 		get inProgressTask() { 
 			const t = this.todos.find(t => t.status === "in_progress");
 			return t ? (t.active_form || t.content) : "";
 		},
-		get modelName() {
-			const m = this.models.find(m => m.id === this.activeModelId);
-			return m ? m.name.split(" ")[1] : this.activeModelId.split("#")[1];
-		},
 		
-		setModel(id) {
-			this.activeModelId = id;
-			localStorage.setItem("counterspell_model", id);
-		},
-		
-		resizeChatInput() {
-			const el = this.$refs.chatInput;
-			if (!el) return;
-			el.style.height = "auto";
-			let newHeight = el.scrollHeight;
-			if (newHeight > window.innerHeight * 0.35) newHeight = window.innerHeight * 0.35;
-			el.style.height = newHeight + "px";
-		},
-		checkMention(e) {
-			if (this.chatText.match(/@[^ ]*$/)) {
-				this.showFileMenu = true;
-			} else {
-				this.showFileMenu = false;
-			}
-			if (e.key === "Escape") this.showFileMenu = false;
-		},
-		insertFile(f) {
-			this.chatText = this.chatText.replace(/@[^ ]*$/, "") + f + " ";
-			this.showFileMenu = false;
-			this.$nextTick(() => { if (this.$refs.chatInput) this.$refs.chatInput.focus(); });
-		},
-		
-		submitChat() {
-			if (!this.chatText.trim()) return;
-			const msgText = this.chatText.trim();
+		// Handle chat-submit event from ChatInput component
+		handleChatSubmit(detail) {
+			console.log("[TaskDetail.handleChatSubmit] received event:", detail);
+			const { message, modelId } = detail;
+			console.log("[TaskDetail.handleChatSubmit] message:", message, "modelId:", modelId);
 			if (this.agentRunning) {
-				this.queueMessage(msgText);
-				this.chatText = "";
+				this.queueMessage(message, modelId);
 			} else {
-				this.sendMessage(msgText);
-				this.chatText = "";
+				this.sendMessage(message, modelId);
 				this.showChat = false;
 			}
 		},
@@ -137,32 +97,36 @@ func taskDetailXData(task *views.UITask) string {
 			this.$nextTick(() => this.processQueue());
 		},
 		
-		queueMessage(msg) {
-			this.messageQueue = [...this.messageQueue, msg];
+		queueMessage(msg, modelId) {
+			this.messageQueue = [...this.messageQueue, { msg, modelId }];
 		},
 		async processQueue() {
 			if (this.messageQueue.length === 0) return;
-			const [msg, ...rest] = this.messageQueue;
+			const [item, ...rest] = this.messageQueue;
 			this.messageQueue = rest;
-			await this.sendMessage(msg);
+			await this.sendMessage(item.msg, item.modelId);
 		},
 		
-		async sendMessage(msg) {
+		async sendMessage(msg, modelId) {
 			if (!msg.trim()) return;
 			this.sendingMessage = true;
 			this.agentRunning = true;
-			const formData = new FormData();
-			formData.append("message", msg.trim());
-			formData.append("model_id", this.activeModelId);
+			const params = new URLSearchParams();
+			params.append("message", msg.trim());
+			params.append("model_id", modelId);
 			try {
-				await fetch(this.chatUrl, { method: "POST", body: formData });
+				await fetch(this.chatUrl, { 
+					method: "POST", 
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: params 
+				});
 			} catch (err) {
 				console.error("Failed to send message:", err);
 				this.sendingMessage = false;
 				this.agentRunning = false;
 			}
 		}
-	}`, agentRunning, uiModels[0].ID, getModelsJSON(), chatURL)
+	}`, agentRunning, chatURL)
 }
 
 templ LogEntry(log views.UILogEntry) {
@@ -273,7 +237,7 @@ templ ToolResultBlock(content views.UIContent) {
 }
 
 templ TaskDetail(task *views.UITask, project views.UIProject) {
-	<div class="flex flex-col h-full" x-data={ taskDetailXData(task) } @close-chat.window="showChat = false">
+	<div class="flex flex-col h-full" x-data={ taskDetailXData(task) } @close-chat.window="showChat = false" @chat-submit="handleChatSubmit($event.detail)">
 		<!-- Modal Header -->
 		<div class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#16191F]">
 			<div class="flex items-center gap-3">
@@ -582,147 +546,22 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				</div>
 			</div>
 		</div>
-		<!-- Chat Input Overlay (separate from toolbar to prevent layout shift) -->
-		<div x-show="showChat" x-transition.opacity.duration.150ms x-cloak class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3"
-			x-data="{ get app() { return Alpine.$data(document.body); } }">
+		<!-- Chat Input Overlay -->
+		<div 
+			x-show="showChat" 
+			x-transition.opacity.duration.150ms 
+			x-cloak 
+			class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3"
+		>
 			<!-- Subtle gradient fade -->
 			<div class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"></div>
-			<form
-				x-ref="chatForm"
-				@submit.prevent="submitChat()"
-				class="relative mx-auto max-w-xl bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10"
-				x-init="$nextTick(() => $refs.chatInput.focus())"
-			>
-				<!-- Voice Recording Visualization -->
-				<div x-show="app && app.isRecording" x-cloak
-					class="absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10">
-					<!-- Cancel Button -->
-					<button type="button" @click="app.cancelRecording()"
-						class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0">
-						<i class="fas fa-times text-sm"></i>
-					</button>
-					<!-- Waveform Bars -->
-					<div class="flex-1 flex items-center justify-center gap-[3px] h-10 mx-4">
-						<template x-for="(level, i) in (app ? app.audioLevels : [])" :key="i">
-							<div class="w-1 bg-red-500 rounded-full transition-all duration-75"
-								:style="`height: ${Math.max(4, level * 0.4)}px; opacity: ${0.4 + (level / 100) * 0.6}`"></div>
-						</template>
-					</div>
-					<!-- Duration -->
-					<div class="flex items-center gap-2 shrink-0">
-						<div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-						<span class="text-sm text-gray-300 font-mono" x-text="app ? app.formatDuration(app.recordedDuration) : '0:00'"></span>
-					</div>
-				</div>
-
-				<!-- Transcribing Overlay -->
-				<div x-show="app && app.isTranscribing" x-cloak
-					class="absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center justify-center z-10">
-					<i class="fas fa-spinner fa-spin text-blue-400 mr-2"></i>
-					<span class="text-gray-400 text-sm">Transcribing...</span>
-				</div>
-
-				<!-- Input Area -->
-				<div class="relative px-4 pt-4 pb-2">
-					<!-- File Menu Popover -->
-					<div
-						x-show="showFileMenu"
-						x-cloak
-						x-transition.opacity.duration.100ms
-						class="absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50"
-					>
-						<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800">Files</div>
-						<template x-for="file in chatFiles">
-							<div @click="insertFile(file)" class="px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition">
-								<span class="text-purple-400 opacity-60 mr-1">#</span><span x-text="file"></span>
-							</div>
-						</template>
-					</div>
-
-					<textarea
-						name="message"
-						x-model="chatText"
-						x-ref="chatInput"
-						@input="resizeChatInput()"
-						@keyup="checkMention($event)"
-						@keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); submitChat(); }"
-						rows="1"
-						placeholder="Continue the conversation..."
-						class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]"
-					></textarea>
-				</div>
-
-				<!-- Toolbar -->
-				<div class="flex items-center justify-between px-2 pb-2 mt-1">
-					<!-- Left: Close + Attachment + Model -->
-					<div class="flex items-center gap-1">
-						<!-- Close -->
-						<button type="button" @click="$dispatch('close-chat')"
-							class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200">
-							<i class="fas fa-xmark text-sm"></i>
-						</button>
-						<!-- Attachment -->
-						<button type="button"
-							class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200">
-							<i class="fas fa-paperclip text-sm"></i>
-						</button>
-						<!-- Model Selector -->
-						<div class="relative">
-							<button type="button" @click="modelOpen = !modelOpen"
-								class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200">
-								<i class="fas fa-bolt text-sm"></i>
-							</button>
-							<!-- Model Popover -->
-							<div x-show="modelOpen" @click.outside="modelOpen = false" x-cloak
-								x-transition.scale.origin.bottom.left
-								class="absolute bottom-full left-0 mb-3 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 z-50">
-								<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-900/50 border-b border-gray-800 mb-1">Select Model</div>
-								<div class="p-1 space-y-0.5">
-									<template x-for="m in models" :key="m.id">
-										<div @click="setModel(m.id); modelOpen = false"
-											:class="activeModelId === m.id ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white border-transparent'"
-											class="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition border">
-											<span class="text-xs font-medium" x-text="m.name"></span>
-											<div x-show="activeModelId === m.id"
-												class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-										</div>
-									</template>
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<!-- Right: Queue indicator + Submit/Mic -->
-					<div class="flex items-center gap-2">
-						<!-- Queue indicator -->
-						<template x-if="messageQueue.length > 0">
-							<span class="text-[10px] text-purple-400 flex items-center gap-1">
-								<i class="fas fa-clock"></i>
-								<span x-text="messageQueue.length"></span> queued
-							</span>
-						</template>
-
-						<!-- Divider -->
-						<div class="w-px h-4 bg-gray-700"></div>
-
-						<!-- Submit/Voice Button -->
-						<button type="button"
-							@click="if(chatText.length > 0) { navigator.vibrate && navigator.vibrate(30); submitChat(); }"
-							@mousedown="if (chatText.length === 0 && app && !app.isRecording) app.startVoiceRecording($refs.chatInput)"
-							@mouseup="if (app && app.isRecording) app.stopVoiceRecording()"
-							@mouseleave="if (app && app.isRecording) app.stopVoiceRecording()"
-							@touchstart.prevent="if (chatText.length === 0 && app && !app.isRecording) { navigator.vibrate && navigator.vibrate(50); app.startVoiceRecording($refs.chatInput); }"
-							@touchend.prevent="if (app && app.isRecording) { navigator.vibrate && navigator.vibrate([30, 50, 30]); app.stopVoiceRecording(); } else if (chatText.length > 0) { navigator.vibrate && navigator.vibrate(30); submitChat(); }"
-							@touchcancel="if (app && app.isRecording) app.cancelRecording()"
-							:class="(app && app.isRecording) ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-110' : (chatText.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')"
-							class="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 select-none"
-							:disabled="sendingMessage">
-							<i class="fas"
-								:class="sendingMessage ? 'fa-spinner fa-spin' : (chatText.length > 0 ? 'fa-arrow-up' : ((app && app.isRecording) ? 'fa-microphone animate-pulse' : 'fa-microphone'))"></i>
-						</button>
-					</div>
-				</div>
-			</form>
+			<div class="relative mx-auto max-w-xl">
+				@ChatInput(ChatInputConfig{
+					Mode:        ChatInputModeChat,
+					TaskID:      task.ID,
+					Placeholder: "Continue the conversation...",
+				}, nil)
+			</div>
 		</div>
 		<!-- Bottom Actions Toolbar (Sticky) -->
 		<div class="shrink-0 px-4 py-3 border-t border-white/[0.06] bg-[#16191F]/95 backdrop-blur-sm pb-6">
