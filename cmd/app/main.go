@@ -110,12 +110,14 @@ func main() {
 	})
 
 	// Start server
+	// Note: WriteTimeout is intentionally omitted for SSE support.
+	// SSE connections need to stay open indefinitely. Keepalives in
+	// the SSE handlers prevent proxy timeouts.
 	server := &http.Server{
-		Addr:         *addr,
-		Handler:      r,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:        *addr,
+		Handler:     r,
+		ReadTimeout: 15 * time.Second,
+		IdleTimeout: 120 * time.Second,
 	}
 
 	// Graceful shutdown

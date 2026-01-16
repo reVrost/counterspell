@@ -50,7 +50,8 @@ type AgentLog struct {
 
 // Event represents a server-sent event for real-time updates.
 type Event struct {
+	ID          int64  `json:"id"`           // Sequence number for deduplication
 	TaskID      string `json:"task_id"`
-	Type        string `json:"type"` // log, status, error
+	Type        string `json:"type"` // log, status, error, agent_update, todo, complete
 	HTMLPayload string `json:"html_payload"`
 }

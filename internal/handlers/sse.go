@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -39,6 +40,10 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
 	flusher.Flush()
 
+	// Keepalive ticker - prevents proxy timeouts
+	keepalive := time.NewTicker(10 * time.Second)
+	defer keepalive.Stop()
+
 	// Stream events
 	for {
 		select {
@@ -55,6 +60,9 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 			}
 
 			_, _ = fmt.Fprintf(w, "event: task\ndata: %s\n\n", string(data))
+			flusher.Flush()
+		case <-keepalive.C:
+			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 		}
 	}
@@ -131,7 +139,8 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	sendActiveUpdate()
 
 	// Keepalive ticker - prevents proxy timeouts (ngrok, cloudflare, etc.)
-	keepalive := time.NewTicker(30 * time.Second)
+	// 10s is safe for most proxies and ensures connection stays alive
+	keepalive := time.NewTicker(10 * time.Second)
 	defer keepalive.Stop()
 
 	// Stream updates
@@ -154,8 +163,9 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleTaskSSE streams all updates (agent, diff, logs) for a specific task via a single SSE connection.
-// Events: "agent", "diff", "log", "complete"
+// Events: "agent", "diff", "log", "complete", "todo"
 // The connection stays alive even for non-in_progress tasks to handle chat continuations.
+// Supports reconnection via Last-Event-ID header for missed event replay.
 func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
@@ -182,30 +192,38 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 	ch := h.events.Subscribe()
 	defer h.events.Unsubscribe(ch)
 
+	// Track last sent event ID for client-side deduplication
+	var lastSentID int64
+
 	// Send initial state for all three types
-	sendAgent := func() {
+	sendAgent := func() int64 {
 		task, err := h.tasks.Get(ctx, taskID)
 		if err != nil {
-			return
+			return lastSentID
 		}
 
-		// For in-progress tasks, check if we have cached live history
-		// This ensures SSE reconnections get the latest state even before DB persistence
+		// Check for cached live history first (regardless of DB status)
+		// This ensures user messages show immediately even before DB catches up
 		var html string
-		if task.Status == models.StatusInProgress {
-			if liveHistory := h.events.GetLiveHistory(taskID); liveHistory != "" {
-				// Use cached live history
-				html = renderAgentConversationFromJSON(ctx, liveHistory, true)
-			} else {
-				// Fall back to DB (might be empty for fresh tasks)
-				html = renderAgentConversation(ctx, task)
-			}
+		if liveHistory := h.events.GetLiveHistory(taskID); liveHistory != "" {
+			// Use cached live history - always prefer this for responsiveness
+			slog.Info("[SSE] sendAgent using live history cache", "task_id", taskID, "history_len", len(liveHistory))
+			html = renderAgentConversationFromJSON(ctx, liveHistory, true)
+		} else if task.Status == models.StatusInProgress {
+			// Fall back to DB for in-progress tasks
+			html = renderAgentConversation(ctx, task)
 		} else {
 			html = renderAgentConversation(ctx, task)
 		}
 
-		_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		eventID := h.events.GetLastEventID(taskID)
+		if eventID == 0 {
+			eventID = lastSentID + 1
+		}
+		//nolint:errcheck // SSE write may fail if client disconnects
+		fmt.Fprintf(w, "id: %d\nevent: agent\ndata: %s\n\n", eventID, strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
+		return eventID
 	}
 
 	sendDiff := func() {
@@ -221,17 +239,18 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 		} else {
 			html = `<div class="text-gray-500 italic">No changes made</div>`
 		}
-		_, _ = fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+		//nolint:errcheck // SSE write may fail if client disconnects
+		fmt.Fprintf(w, "event: diff\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
 		flusher.Flush()
 	}
 
 	// Send initial state
-	sendAgent()
+	lastSentID = sendAgent()
 	sendDiff()
 	flusher.Flush()
 
 	// Keepalive ticker - prevents proxy timeouts
-	keepalive := time.NewTicker(30 * time.Second)
+	keepalive := time.NewTicker(10 * time.Second)
 	defer keepalive.Stop()
 
 	// Stream all updates for this task
@@ -249,40 +268,49 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			// Skip if we've already sent this event (deduplication)
+			if event.ID <= lastSentID && event.ID != 0 {
+				continue
+			}
+			lastSentID = event.ID
+
 			switch event.Type {
 			case "task_created":
 				// Task restarted (e.g., from chat continuation) - send updated state
-				
-				sendAgent()
+				slog.Info("[SSE] Received task_created, calling sendAgent", "task_id", taskID, "event_id", event.ID)
+				lastSentID = sendAgent()
 				sendDiff()
 
 			case "agent_update":
 				// Live agent update with message history
+				slog.Info("[SSE] Received agent_update, rendering and sending", "task_id", taskID, "event_id", event.ID, "payload_len", len(event.HTMLPayload))
 				html := renderAgentConversationFromJSON(ctx, event.HTMLPayload, true)
-				_, _ = fmt.Fprintf(w, "event: agent\ndata: %s\n\n", strings.ReplaceAll(html, "\n", ""))
+				//nolint:errcheck // SSE write may fail if client disconnects
+				fmt.Fprintf(w, "id: %d\nevent: agent\ndata: %s\n\n", event.ID, strings.ReplaceAll(html, "\n", ""))
 				flusher.Flush()
+				slog.Info("[SSE] agent_update sent to client", "task_id", taskID)
 
 			case "log":
 				// Log entry
 				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
 				logHTML := fmt.Sprintf(`<div class="ml-4 relative"><div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div><p class="text-xs text-gray-400">%s</p></div>`, htmlData)
-				_, _ = fmt.Fprintf(w, "event: log\ndata: %s\n\n", logHTML)
+				//nolint:errcheck // SSE write may fail if client disconnects
+				fmt.Fprintf(w, "id: %d\nevent: log\ndata: %s\n\n", event.ID, logHTML)
 				flusher.Flush()
 
 			case "status_change":
 				// Task status changed - send final state
-				
-				sendAgent()
+				lastSentID = sendAgent()
 				sendDiff()
 				//nolint:errcheck // SSE write may fail if client disconnects
-				fmt.Fprintf(w, "event: complete\ndata: {\"status\": \"%s\"}\n\n", event.HTMLPayload)
+				fmt.Fprintf(w, "id: %d\nevent: complete\ndata: {\"status\": \"%s\"}\n\n", event.ID, event.HTMLPayload)
 				flusher.Flush()
 				// Don't close connection - keep alive for potential chat continuations
 
 			case "todo":
 				// Todo list update - forward JSON directly
 				//nolint:errcheck // SSE write may fail if client disconnects
-				fmt.Fprintf(w, "event: todo\ndata: %s\n\n", strings.ReplaceAll(event.HTMLPayload, "\n", ""))
+				fmt.Fprintf(w, "id: %d\nevent: todo\ndata: %s\n\n", event.ID, strings.ReplaceAll(event.HTMLPayload, "\n", ""))
 				flusher.Flush()
 			}
 

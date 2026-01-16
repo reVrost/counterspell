@@ -77,8 +77,6 @@ func (c *AnthropicCaller) Call(messages []Message, tools map[string]Tool, system
 		"tool_count", len(tools),
 	)
 	slog.Debug("[LLM REQUEST] Full payload", "body", string(prettyBody))
-	fmt.Printf("\n=== LLM API REQUEST ===\nURL: %s\nModel: %s\nMessages: %d\nTools: %d\n", c.provider.APIURL(), c.provider.Model(), len(messages), len(tools))
-	fmt.Printf("Full Request Body:\n%s\n=== END REQUEST ===\n\n", string(prettyBody))
 
 	httpReq, err := http.NewRequest("POST", c.provider.APIURL(), bytes.NewReader(body))
 	if err != nil {
@@ -268,8 +266,6 @@ func (c *OpenAICaller) Call(messages []Message, tools map[string]Tool, systemPro
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.provider.APIKey())
 
-	fmt.Printf("[DEBUG] OpenAICaller: url=%s model=%s apiKeyLen=%d\n", c.provider.APIURL(), c.provider.Model(), len(c.provider.APIKey()))
-
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
@@ -281,8 +277,6 @@ func (c *OpenAICaller) Call(messages []Message, tools map[string]Tool, systemPro
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
-
-	fmt.Printf("[DEBUG] OpenAICaller response: status=%d bodyLen=%d\n", resp.StatusCode, len(respBody))
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(respBody))

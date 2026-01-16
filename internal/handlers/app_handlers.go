@@ -475,8 +475,11 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get default model from settings or use a default
-	modelID := "o#anthropic/claude-sonnet-4" // Default model
+	// Get model from form, fall back to default
+	modelID := r.FormValue("model_id")
+	if modelID == "" {
+		modelID = "o#anthropic/claude-sonnet-4"
+	}
 
 	// Continue the task with the follow-up message
 	if err := h.orchestrator.ContinueTask(ctx, taskID, message, modelID); err != nil {
