@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -35,11 +37,10 @@ type ClaudeCodeBackend struct {
 	workDir    string
 	callback   StreamCallback
 
-	mu             sync.Mutex
-	cmd            *exec.Cmd
-	cancel         context.CancelFunc
-	messageHistory string
-	finalMessage   string
+	mu           sync.Mutex
+	cmd          *exec.Cmd
+	cancel       context.CancelFunc
+	finalMessage string
 }
 
 // ClaudeCodeOption configures a ClaudeCodeBackend.
@@ -129,9 +130,12 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 	b.mu.Unlock()
 
 	// Build command args for JSON streaming mode
+	// Note: --verbose is required for stream-json output format
 	args := []string{
 		"--print",
+		"--verbose",
 		"--output-format", "stream-json",
+		"--dangerously-skip-permissions",
 	}
 
 	if isContinuation {
@@ -160,12 +164,16 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 		return fmt.Errorf("stderr pipe: %w", err)
 	}
 
+	slog.Info("[CLAUDE-CODE] Starting command", "binary", b.binaryPath, "args", args, "workdir", b.workDir)
+
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start claude: %w", err)
 	}
 
 	// Parse output in background
 	var wg sync.WaitGroup
+	var stderrLines []string
+	var stderrMu sync.Mutex
 	wg.Add(2)
 
 	go func() {
@@ -175,12 +183,30 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 
 	go func() {
 		defer wg.Done()
-		b.parseStderr(bufio.NewScanner(stderr))
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line != "" {
+				slog.Warn("[CLAUDE-CODE] stderr", "line", line)
+				stderrMu.Lock()
+				stderrLines = append(stderrLines, line)
+				stderrMu.Unlock()
+				b.emit(StreamEvent{Type: EventError, Content: line})
+			}
+		}
 	}()
 
 	err = cmd.Wait()
 	wg.Wait()
 
+	if err != nil {
+		stderrMu.Lock()
+		stderrContent := strings.Join(stderrLines, "\n")
+		stderrMu.Unlock()
+		if stderrContent != "" {
+			return fmt.Errorf("%w: %s", err, stderrContent)
+		}
+	}
 	return err
 }
 
@@ -202,14 +228,7 @@ func (b *ClaudeCodeBackend) parseOutput(scanner *bufio.Scanner) {
 	}
 }
 
-func (b *ClaudeCodeBackend) parseStderr(scanner *bufio.Scanner) {
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line != "" {
-			b.emit(StreamEvent{Type: EventError, Content: line})
-		}
-	}
-}
+
 
 func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 	eventType, _ := event["type"].(string)

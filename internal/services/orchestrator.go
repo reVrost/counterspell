@@ -299,7 +299,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 			return
 		}
 		backend = claudeBackend
-		defer claudeBackend.Close()
+		defer func() { _ = claudeBackend.Close() }()
 
 	default:
 		// Use native backend (Counterspell)
@@ -393,7 +393,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 			return
 		}
 		backend = nativeBackend
-		defer nativeBackend.Close()
+		defer func() { _ = nativeBackend.Close() }()
 	}
 
 	// Load message history for continuations (if backend supports it)
