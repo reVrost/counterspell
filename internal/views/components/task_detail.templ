@@ -657,6 +657,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									hx-post={ fmt.Sprintf("/action/pr/%s", task.ID) }
 									hx-swap="none"
 									hx-disabled-elt="this"
+									hx-on::after-request="confirmAction = null"
 									class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
 								><span class="htmx-request:hidden">Create PR</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
