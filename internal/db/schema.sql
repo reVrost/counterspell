@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     project_id TEXT NOT NULL,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('todo', 'in_progress', 'review', 'human_review', 'done')),
+    status TEXT NOT NULL CHECK(status IN ('todo', 'in_progress', 'review', 'done')),
     position INTEGER DEFAULT 0,
     agent_output TEXT,
     git_diff TEXT,

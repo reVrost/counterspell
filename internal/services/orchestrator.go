@@ -149,7 +149,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	// Emit task_created event to trigger feed refresh
 	o.events.Publish(models.Event{
 		TaskID: task.ID,
-		Type:   "task_created",
+		Type:   models.EventTypeTaskCreated,
 	})
 
 	slog.Info("Submitting task to worker pool", "task_id", task.ID, "intent", intent)
@@ -280,13 +280,25 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		o.handleAgentEvent(job.TaskID, event)
 	}
 
+	// Claude Code integration configuration
+	type claudeCodeProvider struct {
+		baseURL  string
+		getKey   func(*models.UserSettings) string
+		supported bool
+	}
+
+	claudeCodeProviders := map[string]claudeCodeProvider{
+		"anthropic":  {getKey: func(s *models.UserSettings) string { return s.AnthropicKey }, supported: true},
+		"zai":        {baseURL: "https://api.z.ai/api/anthropic", getKey: func(s *models.UserSettings) string { return s.ZaiKey }, supported: true},
+		"z":          {baseURL: "https://api.z.ai/api/anthropic", getKey: func(s *models.UserSettings) string { return s.ZaiKey }, supported: true},
+		"openrouter": {baseURL: "https://openrouter.ai/api", getKey: func(s *models.UserSettings) string { return s.OpenRouterKey }, supported: true},
+		"o":          {baseURL: "https://openrouter.ai/api", getKey: func(s *models.UserSettings) string { return s.OpenRouterKey }, supported: true},
+	}
+
 	// Check if claude-code backend should be used
 	providerPrefix, modelName := llm.ParseModelID(job.ModelID)
-	
-	// Claude Code supports Anthropic directly and other providers via ANTHROPIC_BASE_URL
-	useClaudeCode := agentBackend == models.AgentBackendClaudeCode &&
-		(providerPrefix == "anthropic" || providerPrefix == "zai" || providerPrefix == "z" ||
-			providerPrefix == "openrouter" || providerPrefix == "o")
+	providerConfig, isSupported := claudeCodeProviders[providerPrefix]
+	useClaudeCode := agentBackend == models.AgentBackendClaudeCode && isSupported
 
 	if agentBackend == models.AgentBackendClaudeCode && !useClaudeCode {
 		slog.Info("[AGENT LOOP] Claude Code requested but unsupported provider, falling back to native",
@@ -298,34 +310,23 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	case useClaudeCode:
 		// Use Claude Code CLI backend
 		o.emit(job.TaskID, "plan", "Starting Claude Code agent...")
-		
+
 		// Configure based on provider
 		opts := []agent.ClaudeCodeOption{
 			agent.WithClaudeWorkDir(worktreePath),
 			agent.WithClaudeCallback(callback),
 		}
-		
-		switch providerPrefix {
-		case "zai", "z":
-			// Z.AI uses custom base URL
-			opts = append(opts,
-				agent.WithBaseURL("https://api.z.ai/api/anthropic"),
-				agent.WithAPIKey(settings.ZaiKey),
-				agent.WithModel(modelName),
-			)
-			slog.Info("[AGENT LOOP] Using Claude Code with Z.AI", "task_id", job.TaskID, "model", modelName)
-		case "openrouter", "o":
-			// OpenRouter uses custom base URL (no /v1 suffix per their docs)
-			opts = append(opts,
-				agent.WithBaseURL("https://openrouter.ai/api"),
-				agent.WithAPIKey(settings.OpenRouterKey),
-				agent.WithModel(modelName),
-			)
-			slog.Info("[AGENT LOOP] Using Claude Code with OpenRouter", "task_id", job.TaskID, "model", modelName)
-		default:
-			// Standard Anthropic
-			opts = append(opts, agent.WithAPIKey(settings.AnthropicKey))
+
+		// Apply provider configuration
+		if providerConfig.baseURL != "" {
+			opts = append(opts, agent.WithBaseURL(providerConfig.baseURL))
 		}
+		opts = append(opts, agent.WithAPIKey(providerConfig.getKey(settings)))
+		if modelName != "" {
+			opts = append(opts, agent.WithModel(modelName))
+		}
+
+		slog.Info("[AGENT LOOP] Using Claude Code", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
 		
 		claudeBackend, err := agent.NewClaudeCodeBackend(opts...)
 		if err != nil {
@@ -434,14 +435,12 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		defer func() { _ = nativeBackend.Close() }()
 	}
 
-	// Load message history for continuations (if backend supports it)
+	// Load message history for continuations
 	if job.IsContinuation && job.MessageHistory != "" {
-		if statefulBackend, ok := backend.(agent.StatefulBackend); ok {
-			if err := statefulBackend.RestoreState(job.MessageHistory); err != nil {
-				slog.Warn("[AGENT LOOP] Failed to load message history", "task_id", job.TaskID, "error", err)
-			} else {
-				slog.Info("[AGENT LOOP] Loaded message history", "task_id", job.TaskID)
-			}
+		if err := backend.RestoreState(job.MessageHistory); err != nil {
+			slog.Warn("[AGENT LOOP] Failed to load message history", "task_id", job.TaskID, "error", err)
+		} else {
+			slog.Info("[AGENT LOOP] Loaded message history", "task_id", job.TaskID)
 		}
 	}
 
@@ -470,12 +469,8 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	slog.Info("[AGENT LOOP] Agent execution completed successfully", "task_id", job.TaskID)
 
 	// Extract results from backend
-	if introspectable, ok := backend.(agent.IntrospectableBackend); ok {
-		agentOutput = introspectable.FinalMessage()
-	}
-	if stateful, ok := backend.(agent.StatefulBackend); ok {
-		messageHistory = stateful.GetState()
-	}
+	agentOutput = backend.FinalMessage()
+	messageHistory = backend.GetState()
 
 	// Commit and push changes
 	o.emit(job.TaskID, "info", "Committing changes...")
@@ -534,7 +529,7 @@ func (o *Orchestrator) processResults() {
 		// Emit status_change event to trigger SSE updates for diff/agent tabs
 		o.events.Publish(models.Event{
 			TaskID: result.TaskID,
-			Type:   "status_change",
+			Type:   models.EventTypeStatusChange,
 		})
 
 		slog.Info("[ORCHESTRATOR] Result processed", "task_id", result.TaskID)
@@ -561,14 +556,14 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 		// Publish message history for live agent panel updates
 		o.events.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "agent_update",
+			Type:        models.EventTypeAgentUpdate,
 			HTMLPayload: event.Messages, // JSON message history
 		})
 	case agent.EventTodo:
 		// Publish todo list for live todo panel updates
 		o.events.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "todo",
+			Type:        models.EventTypeTodo,
 			HTMLPayload: event.Content, // JSON todo list
 		})
 	}
@@ -621,7 +616,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	slog.Info("[CHAT] Publishing agent_update with user message", "task_id", taskID, "history_len", len(updatedHistory))
 	o.events.Publish(models.Event{
 		TaskID:      taskID,
-		Type:        "agent_update",
+		Type:        models.EventTypeAgentUpdate,
 		HTMLPayload: updatedHistory,
 	})
 
@@ -629,7 +624,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	slog.Info("[CHAT] Publishing task_created", "task_id", taskID)
 	o.events.Publish(models.Event{
 		TaskID: taskID,
-		Type:   "task_created",
+		Type:   models.EventTypeTaskCreated,
 	})
 
 	slog.Info("[CHAT] Events published, submitting to worker pool", "task_id", taskID, "follow_up", followUpMessage)
@@ -723,7 +718,7 @@ func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	// Emit status change event
 	o.events.Publish(models.Event{
 		TaskID: taskID,
-		Type:   "status_change",
+		Type:   models.EventTypeStatusChange,
 	})
 
 	return nil
@@ -874,7 +869,7 @@ func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID strin
 	// Emit status change event
 	o.events.Publish(models.Event{
 		TaskID: taskID,
-		Type:   "status_change",
+		Type:   models.EventTypeStatusChange,
 	})
 
 	return nil
@@ -935,7 +930,7 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 	// Emit status change event
 	o.events.Publish(models.Event{
 		TaskID: taskID,
-		Type:   "status_change",
+		Type:   models.EventTypeStatusChange,
 	})
 
 	return prURL, nil
@@ -983,7 +978,7 @@ func (o *Orchestrator) emit(taskID, level, message string) {
 
 	o.events.Publish(models.Event{
 		TaskID:      taskID,
-		Type:        "log",
+		Type:        models.EventTypeLog,
 		HTMLPayload: htmlPayload,
 	})
 }

@@ -3,6 +3,7 @@ package components
 import (
 	"strings"
 	"fmt"
+	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/utils"
 )
@@ -46,7 +47,7 @@ func hasTextContent(msg views.UIMessage) bool {
 // taskDetailXData generates the Alpine.js x-data for the task detail component
 func taskDetailXData(task *views.UITask) string {
 	agentRunning := "false"
-	if task.Status == "in_progress" {
+	if task.Status == models.StatusInProgress {
 		agentRunning = "true"
 	}
 	chatURL := fmt.Sprintf("/action/chat/%s", task.ID)
@@ -286,9 +287,9 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			</div>
 			<!-- Status Indicator -->
 			<div class="w-6 flex justify-end pr-2">
-				if task.Status == "in_progress" {
+				if task.Status == models.StatusInProgress {
 					<div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
-				} else if task.Status == "review" {
+				} else if task.Status == models.StatusReview {
 					<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Needs Review"></div>
 				}
 			</div>
@@ -468,7 +469,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<!-- Tab 1: AGENT CONVERSATION -->
 			<div x-show="activeTab === 'agent'" class="pb-32">
 				<div id="agent-content" class="mt-1">
-					if task.Status == "in_progress" {
+					if task.Status == models.StatusInProgress {
 						if len(task.Messages) > 0 {
 							<div class="space-y-0">
 								for _, msg := range task.Messages {
@@ -522,7 +523,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					<span class="text-[10px] text-green-500 font-mono">git diff</span>
 				</div>
 				<div id="diff-content" class="p-3 diff-container">
-					if task.Status == "in_progress" {
+					if task.Status == models.StatusInProgress {
 						<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
 							<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
 							<p class="text-sm font-mono">Generating changes...</p>

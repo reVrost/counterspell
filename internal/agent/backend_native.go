@@ -12,13 +12,8 @@ import (
 // ErrProviderRequired is returned when a NativeBackend is created without a provider.
 var ErrProviderRequired = errors.New("agent: llm.Provider is required for native backend")
 
-// Compile-time interface checks
-var (
-	_ Backend              = (*NativeBackend)(nil)
-	_ StatefulBackend      = (*NativeBackend)(nil)
-	_ IntrospectableBackend = (*NativeBackend)(nil)
-	_ Describable          = (*NativeBackend)(nil)
-)
+// Compile-time interface check
+var _ Backend = (*NativeBackend)(nil)
 
 // NativeBackend wraps the Go-based Runner to implement Backend.
 //
@@ -149,10 +144,6 @@ func (b *NativeBackend) Info() BackendInfo {
 	return BackendInfo{
 		Type:    BackendNative,
 		Version: "1.0.0",
-		Capabilities: []string{
-			"stateful",
-			"introspectable",
-		},
 	}
 }
 

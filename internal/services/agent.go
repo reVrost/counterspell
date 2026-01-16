@@ -33,7 +33,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: "Failed to get task",
 		})
 		return err
@@ -42,7 +42,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	// Publish planning log
 	r.eventBus.Publish(models.Event{
 		TaskID:      taskID,
-		Type:        "log",
+		Type:        models.EventTypeLog,
 		HTMLPayload: `<span class="text-yellow-400">[plan]</span> Analyzing task: ` + task.Title,
 	})
 
@@ -51,7 +51,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to create worktree: ` + err.Error(),
 		})
 		return err
@@ -59,14 +59,14 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 
 	r.eventBus.Publish(models.Event{
 		TaskID:      taskID,
-		Type:        "log",
+		Type:        models.EventTypeLog,
 		HTMLPayload: `<span class="text-blue-400">[info]</span> Created worktree: ` + worktreePath,
 	})
 
 	// Execute crush command with task's intent
 	r.eventBus.Publish(models.Event{
 		TaskID:      taskID,
-		Type:        "log",
+		Type:        models.EventTypeLog,
 		HTMLPayload: `<span class="text-purple-400">[code]</span> Starting agent...`,
 	})
 
@@ -77,7 +77,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to create stdout pipe: ` + err.Error(),
 		})
 		return err
@@ -87,7 +87,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to create stderr pipe: ` + err.Error(),
 		})
 		return err
@@ -96,7 +96,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err := cmd.Start(); err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to start agent: ` + err.Error(),
 		})
 		return err
@@ -113,7 +113,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 			line := outputScanner.Text()
 			r.eventBus.Publish(models.Event{
 				TaskID:      taskID,
-				Type:        "log",
+				Type:        models.EventTypeLog,
 				HTMLPayload: `<span class="text-gray-300">` + escapeHTML(line) + `</span>`,
 			})
 		}
@@ -126,13 +126,13 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 			if strings.Contains(strings.ToLower(line), "error") {
 				r.eventBus.Publish(models.Event{
 					TaskID:      taskID,
-					Type:        "log",
+					Type:        models.EventTypeLog,
 					HTMLPayload: `<span class="text-red-400">` + escapeHTML(line) + `</span>`,
 				})
 			} else {
 				r.eventBus.Publish(models.Event{
 					TaskID:      taskID,
-					Type:        "log",
+					Type:        models.EventTypeLog,
 					HTMLPayload: `<span class="text-yellow-400">` + escapeHTML(line) + `</span>`,
 				})
 			}
@@ -150,7 +150,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: `<span class="text-red-400">[error]</span> Agent failed: ` + err.Error(),
 		})
 		return err
@@ -160,7 +160,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 	if err := r.taskService.UpdateStatus(ctx, taskID, models.StatusReview); err != nil {
 		r.eventBus.Publish(models.Event{
 			TaskID:      taskID,
-			Type:        "error",
+			Type:        models.EventTypeError,
 			HTMLPayload: `<span class="text-red-400">[error]</span> Failed to update status`,
 		})
 		return err
@@ -168,7 +168,7 @@ func (r *AgentRunner) Run(ctx context.Context, taskID string) error {
 
 	r.eventBus.Publish(models.Event{
 		TaskID:      taskID,
-		Type:        "status",
+		Type:        models.EventTypeStatus,
 		HTMLPayload: `<span class="text-green-400">✓</span> Moved to review`,
 	})
 
