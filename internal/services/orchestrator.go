@@ -13,10 +13,10 @@ import (
 	"sync"
 
 	"github.com/panjf2000/ants/v2"
+	"github.com/revrost/code/counterspell/internal/agent"
 	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/llm"
 	"github.com/revrost/code/counterspell/internal/models"
-	"github.com/revrost/code/counterspell/internal/agent"
 )
 
 // TaskResult represents the result of a completed task.
@@ -45,16 +45,16 @@ type TaskJob struct {
 
 // Orchestrator manages task execution with agents.
 type Orchestrator struct {
-	tasks       *TaskService
-	github      *GitHubService
-	events      *EventBus
-	settings    *SettingsService
-	repos       *git.RepoManager
-	dataDir     string
-	workerPool  *ants.Pool
-	resultCh    chan TaskResult
-	running     map[string]context.CancelFunc
-	mu          sync.Mutex
+	tasks      *TaskService
+	github     *GitHubService
+	events     *EventBus
+	settings   *SettingsService
+	repos      *git.RepoManager
+	dataDir    string
+	workerPool *ants.Pool
+	resultCh   chan TaskResult
+	running    map[string]context.CancelFunc
+	mu         sync.Mutex
 }
 
 // NewOrchestrator creates a new orchestrator.
@@ -73,15 +73,15 @@ func NewOrchestrator(
 	}
 
 	orch := &Orchestrator{
-		tasks:       tasks,
-		github:      github,
-		events:      events,
-		settings:    settings,
-		repos:       git.NewRepoManager(dataDir),
-		dataDir:     dataDir,
-		workerPool:  pool,
-		resultCh:    make(chan TaskResult, 100),
-		running:     make(map[string]context.CancelFunc),
+		tasks:      tasks,
+		github:     github,
+		events:     events,
+		settings:   settings,
+		repos:      git.NewRepoManager(dataDir),
+		dataDir:    dataDir,
+		workerPool: pool,
+		resultCh:   make(chan TaskResult, 100),
+		running:    make(map[string]context.CancelFunc),
 	}
 
 	slog.Info("[ORCHESTRATOR] Worker pool created", "workers", 5, "prealloc", false)
@@ -203,7 +203,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		slog.Error("[AGENT LOOP] Failed to update task status", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to update status")
 		job.ResultCh <- TaskResult{
-			TaskID: job.TaskID,
+			TaskID:  job.TaskID,
 			Success: false,
 			Error:   "Failed to update status",
 		}
@@ -220,7 +220,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		slog.Error("[AGENT LOOP] Failed to prepare repo", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to prepare repo: "+err.Error())
 		job.ResultCh <- TaskResult{
-			TaskID: job.TaskID,
+			TaskID:  job.TaskID,
 			Success: false,
 			Error:   "Failed to prepare repo: " + err.Error(),
 		}
@@ -238,7 +238,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		slog.Error("[AGENT LOOP] Failed to create worktree", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to create worktree: "+err.Error())
 		job.ResultCh <- TaskResult{
-			TaskID: job.TaskID,
+			TaskID:  job.TaskID,
 			Success: false,
 			Error:   "Failed to create worktree: " + err.Error(),
 		}
@@ -255,7 +255,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		slog.Error("[AGENT LOOP] Failed to get settings", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to get settings")
 		job.ResultCh <- TaskResult{
-			TaskID: job.TaskID,
+			TaskID:  job.TaskID,
 			Success: false,
 			Error:   "Failed to get settings",
 		}
@@ -280,14 +280,54 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		o.handleAgentEvent(job.TaskID, event)
 	}
 
-	switch agentBackend {
-	case models.AgentBackendClaudeCode:
+	// Check if claude-code backend should be used
+	providerPrefix, modelName := llm.ParseModelID(job.ModelID)
+	
+	// Claude Code supports Anthropic directly and other providers via ANTHROPIC_BASE_URL
+	useClaudeCode := agentBackend == models.AgentBackendClaudeCode &&
+		(providerPrefix == "anthropic" || providerPrefix == "zai" || providerPrefix == "z" ||
+			providerPrefix == "openrouter" || providerPrefix == "o")
+
+	if agentBackend == models.AgentBackendClaudeCode && !useClaudeCode {
+		slog.Info("[AGENT LOOP] Claude Code requested but unsupported provider, falling back to native",
+			"task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
+		o.emit(job.TaskID, "plan", "Using native backend (Claude Code only supports Anthropic/Z.AI/OpenRouter)")
+	}
+
+	switch {
+	case useClaudeCode:
 		// Use Claude Code CLI backend
 		o.emit(job.TaskID, "plan", "Starting Claude Code agent...")
-		claudeBackend, err := agent.NewClaudeCodeBackend(
+		
+		// Configure based on provider
+		opts := []agent.ClaudeCodeOption{
 			agent.WithClaudeWorkDir(worktreePath),
 			agent.WithClaudeCallback(callback),
-		)
+		}
+		
+		switch providerPrefix {
+		case "zai", "z":
+			// Z.AI uses custom base URL
+			opts = append(opts,
+				agent.WithBaseURL("https://api.z.ai/api/anthropic"),
+				agent.WithAPIKey(settings.ZaiKey),
+				agent.WithModel(modelName),
+			)
+			slog.Info("[AGENT LOOP] Using Claude Code with Z.AI", "task_id", job.TaskID, "model", modelName)
+		case "openrouter", "o":
+			// OpenRouter uses custom base URL (no /v1 suffix per their docs)
+			opts = append(opts,
+				agent.WithBaseURL("https://openrouter.ai/api"),
+				agent.WithAPIKey(settings.OpenRouterKey),
+				agent.WithModel(modelName),
+			)
+			slog.Info("[AGENT LOOP] Using Claude Code with OpenRouter", "task_id", job.TaskID, "model", modelName)
+		default:
+			// Standard Anthropic
+			opts = append(opts, agent.WithAPIKey(settings.AnthropicKey))
+		}
+		
+		claudeBackend, err := agent.NewClaudeCodeBackend(opts...)
 		if err != nil {
 			slog.Error("[AGENT LOOP] Failed to create Claude Code backend", "task_id", job.TaskID, "error", err)
 			o.emitError(job.TaskID, "Claude Code not available: "+err.Error())
@@ -303,9 +343,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 
 	default:
 		// Use native backend (Counterspell)
-		// Parse model_id to get provider and model name
-		providerPrefix, modelName := llm.ParseModelID(job.ModelID)
-		slog.Info("[AGENT LOOP] Parsed model ID", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
+		slog.Info("[AGENT LOOP] Using native backend", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
 
 		var provider llm.Provider
 		switch providerPrefix {
@@ -514,7 +552,7 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 	case agent.EventResult:
 		o.emit(taskID, "info", truncate(event.Content, 100))
 	case agent.EventText:
-		o.emit(taskID, "text", event.Content)
+		o.emit(taskID, "info", event.Content)
 	case agent.EventError:
 		o.emitError(taskID, event.Content)
 	case agent.EventDone:
@@ -924,7 +962,7 @@ func (o *Orchestrator) emit(taskID, level, message string) {
 	// Store log in DB for persistence
 	ctx := context.Background()
 	if err := o.tasks.AddLog(ctx, taskID, level, message); err != nil {
-		slog.Error("Failed to store log", "task_id", taskID, "error", err)
+		slog.Error("Failed to store log", "task_id", taskID, "level", level, "message", message, "error", err)
 	}
 
 	colorClass := "text-gray-400"

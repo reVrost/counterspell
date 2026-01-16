@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -36,6 +37,9 @@ type ClaudeCodeBackend struct {
 	binaryPath string
 	workDir    string
 	callback   StreamCallback
+	apiKey     string
+	baseURL    string
+	model      string
 
 	mu           sync.Mutex
 	cmd          *exec.Cmd
@@ -65,6 +69,27 @@ func WithClaudeWorkDir(dir string) ClaudeCodeOption {
 func WithClaudeCallback(cb StreamCallback) ClaudeCodeOption {
 	return func(b *ClaudeCodeBackend) {
 		b.callback = cb
+	}
+}
+
+// WithAPIKey sets the Anthropic API key for Claude Code CLI.
+func WithAPIKey(key string) ClaudeCodeOption {
+	return func(b *ClaudeCodeBackend) {
+		b.apiKey = key
+	}
+}
+
+// WithBaseURL sets a custom API base URL (e.g., for Z.AI compatibility).
+func WithBaseURL(url string) ClaudeCodeOption {
+	return func(b *ClaudeCodeBackend) {
+		b.baseURL = url
+	}
+}
+
+// WithModel sets the model to use.
+func WithModel(model string) ClaudeCodeOption {
+	return func(b *ClaudeCodeBackend) {
+		b.model = model
 	}
 }
 
@@ -138,6 +163,10 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 		"--dangerously-skip-permissions",
 	}
 
+	if b.model != "" {
+		args = append(args, "--model", b.model)
+	}
+
 	if isContinuation {
 		args = append(args, "--continue")
 	}
@@ -149,6 +178,23 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 
 	cmd := exec.CommandContext(ctx, b.binaryPath, args...)
 	cmd.Dir = b.workDir
+
+	// Set environment variables for API authentication
+	// For Z.AI/OpenRouter, use ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL
+	env := os.Environ()
+	if b.baseURL != "" {
+		env = append(env, "ANTHROPIC_BASE_URL="+b.baseURL)
+		// Custom providers use ANTHROPIC_AUTH_TOKEN
+		if b.apiKey != "" {
+			env = append(env, "ANTHROPIC_AUTH_TOKEN="+b.apiKey)
+		}
+		// Important: Explicitly blank ANTHROPIC_API_KEY to prevent conflicts (required by OpenRouter)
+		env = append(env, "ANTHROPIC_API_KEY=")
+	} else if b.apiKey != "" {
+		// Standard Anthropic API
+		env = append(env, "ANTHROPIC_API_KEY="+b.apiKey)
+	}
+	cmd.Env = env
 
 	b.mu.Lock()
 	b.cmd = cmd
@@ -164,9 +210,10 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 		return fmt.Errorf("stderr pipe: %w", err)
 	}
 
-	slog.Info("[CLAUDE-CODE] Starting command", "binary", b.binaryPath, "args", args, "workdir", b.workDir)
+	slog.Info("[CLAUDE-CODE] Starting command", "binary", b.binaryPath, "args", args, "workdir", b.workDir, "api_key_len", len(b.apiKey), "base_url", b.baseURL)
 
 	if err := cmd.Start(); err != nil {
+		slog.Error("[CLAUDE-CODE] Failed to start command", "binary", b.binaryPath, "args", args, "workdir", b.workDir, "error", err)
 		return fmt.Errorf("start claude: %w", err)
 	}
 
@@ -174,15 +221,12 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 	var wg sync.WaitGroup
 	var stderrLines []string
 	var stderrMu sync.Mutex
-	wg.Add(2)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		b.parseOutput(bufio.NewScanner(stdout))
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -194,7 +238,7 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 				b.emit(StreamEvent{Type: EventError, Content: line})
 			}
 		}
-	}()
+	})
 
 	err = cmd.Wait()
 	wg.Wait()
@@ -227,8 +271,6 @@ func (b *ClaudeCodeBackend) parseOutput(scanner *bufio.Scanner) {
 		b.processClaudeEvent(event)
 	}
 }
-
-
 
 func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 	eventType, _ := event["type"].(string)
@@ -279,7 +321,15 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 		b.emit(StreamEvent{Type: EventResult, Content: content})
 
 	case "result":
-		b.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+		// Check if this is an error result
+		isError, _ := event["is_error"].(bool)
+		resultText, _ := event["result"].(string)
+		if isError {
+			slog.Error("[CLAUDE-CODE] Result error", "result", resultText)
+			b.emit(StreamEvent{Type: EventError, Content: resultText})
+		} else {
+			b.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+		}
 	}
 }
 
