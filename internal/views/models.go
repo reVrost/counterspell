@@ -2,6 +2,8 @@ package views
 
 import (
 	"time"
+
+	"github.com/revrost/code/counterspell/internal/models"
 )
 
 // UIProject represents a project for display
@@ -19,9 +21,9 @@ type UITask struct {
 	Description string // Mapped from Title
 	AgentName   string
 	Progress    int
-	Status      string // Mapped from state
+	Status      models.TaskStatus
 	Summary     string
-	AgentOutput  string // Final message from agent
+	AgentOutput string // Final message from agent
 	GitDiff     string // Git diff of changes
 	Logs        []UILogEntry
 	Messages    []UIMessage // Conversation history

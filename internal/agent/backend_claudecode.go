@@ -11,13 +11,12 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/revrost/code/counterspell/internal/agent/tools"
 )
 
-// Compile-time interface checks
-var (
-	_ Backend     = (*ClaudeCodeBackend)(nil)
-	_ Describable = (*ClaudeCodeBackend)(nil)
-)
+// Compile-time interface check
+var _ Backend = (*ClaudeCodeBackend)(nil)
 
 // ErrNoBinaryPath is returned when the claude binary cannot be found.
 var ErrNoBinaryPath = errors.New("agent: claude binary not found in PATH")
@@ -45,6 +44,7 @@ type ClaudeCodeBackend struct {
 	cmd          *exec.Cmd
 	cancel       context.CancelFunc
 	finalMessage string
+	messages     []Message // Track conversation for UI updates
 }
 
 // ClaudeCodeOption configures a ClaudeCodeBackend.
@@ -153,6 +153,15 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 	b.mu.Lock()
 	b.cancel = cancel
 	b.mu.Unlock()
+
+	// Add user message to history and emit immediately
+	b.mu.Lock()
+	b.messages = append(b.messages, Message{
+		Role:    "user",
+		Content: []ContentBlock{{Type: "text", Text: prompt}},
+	})
+	b.mu.Unlock()
+	b.emitMessages()
 
 	// Build command args for JSON streaming mode
 	// Note: --verbose is required for stream-json output format
@@ -276,18 +285,68 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 	eventType, _ := event["type"].(string)
 
 	switch eventType {
-	case "assistant":
+	case "user":
+		// User message from the CLI
 		if message, ok := event["message"].(map[string]any); ok {
 			if content, ok := message["content"].([]any); ok {
+				var blocks []ContentBlock
 				for _, block := range content {
 					if blockMap, ok := block.(map[string]any); ok {
 						if text, ok := blockMap["text"].(string); ok {
-							b.mu.Lock()
-							b.finalMessage += text
-							b.mu.Unlock()
-							b.emit(StreamEvent{Type: EventText, Content: text})
+							blocks = append(blocks, ContentBlock{Type: "text", Text: text})
 						}
 					}
+				}
+				if len(blocks) > 0 {
+					b.mu.Lock()
+					b.messages = append(b.messages, Message{Role: "user", Content: blocks})
+					b.mu.Unlock()
+					b.emitMessages()
+				}
+			}
+		}
+
+	case "assistant":
+		if message, ok := event["message"].(map[string]any); ok {
+			if content, ok := message["content"].([]any); ok {
+				var blocks []ContentBlock
+				for _, block := range content {
+					if blockMap, ok := block.(map[string]any); ok {
+						blockType, _ := blockMap["type"].(string)
+						switch blockType {
+						case "text":
+							if text, ok := blockMap["text"].(string); ok {
+								b.mu.Lock()
+								b.finalMessage += text
+								b.mu.Unlock()
+								blocks = append(blocks, ContentBlock{Type: "text", Text: text})
+								b.emit(StreamEvent{Type: EventText, Content: text})
+							}
+						case "tool_use":
+							name, _ := blockMap["name"].(string)
+							id, _ := blockMap["id"].(string)
+							input, _ := blockMap["input"].(map[string]any)
+							blocks = append(blocks, ContentBlock{
+								Type:  "tool_use",
+								Name:  name,
+								ID:    id,
+								Input: input,
+							})
+							inputJSON, _ := json.Marshal(input)
+							b.emit(StreamEvent{
+								Type:    EventTool,
+								Tool:    name,
+								Args:    string(inputJSON),
+								Content: fmt.Sprintf("Running %s", name),
+							})
+						}
+					}
+				}
+				if len(blocks) > 0 {
+					b.mu.Lock()
+					b.messages = append(b.messages, Message{Role: "assistant", Content: blocks})
+					b.mu.Unlock()
+					b.emitMessages()
 				}
 			}
 		}
@@ -304,8 +363,24 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 
 	case "tool_use":
 		name, _ := event["name"].(string)
+		id, _ := event["id"].(string)
 		input, _ := event["input"].(map[string]any)
 		inputJSON, _ := json.Marshal(input)
+		
+		// Add tool use to messages
+		b.mu.Lock()
+		b.messages = append(b.messages, Message{
+			Role: "assistant",
+			Content: []ContentBlock{{
+				Type:  "tool_use",
+				Name:  name,
+				ID:    id,
+				Input: input,
+			}},
+		})
+		b.mu.Unlock()
+		b.emitMessages()
+		
 		b.emit(StreamEvent{
 			Type:    EventTool,
 			Tool:    name,
@@ -315,6 +390,21 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 
 	case "tool_result":
 		content, _ := event["content"].(string)
+		toolUseID, _ := event["tool_use_id"].(string)
+		
+		// Add tool result to messages
+		b.mu.Lock()
+		b.messages = append(b.messages, Message{
+			Role: "user",
+			Content: []ContentBlock{{
+				Type:      "tool_result",
+				ToolUseID: toolUseID,
+				Content:   content,
+			}},
+		})
+		b.mu.Unlock()
+		b.emitMessages()
+		
 		if len(content) > 200 {
 			content = content[:200] + "..."
 		}
@@ -339,23 +429,86 @@ func (b *ClaudeCodeBackend) emit(event StreamEvent) {
 	}
 }
 
+func (b *ClaudeCodeBackend) emitMessages() {
+	if b.callback == nil {
+		return
+	}
+	b.mu.Lock()
+	msgs := make([]Message, len(b.messages))
+	copy(msgs, b.messages)
+	b.mu.Unlock()
+	
+	data, err := json.Marshal(msgs)
+	if err != nil {
+		return
+	}
+	b.callback(StreamEvent{
+		Type:     EventMessages,
+		Messages: string(data),
+	})
+}
+
 // --- Describable interface ---
 
 // Info returns backend metadata.
 func (b *ClaudeCodeBackend) Info() BackendInfo {
 	return BackendInfo{
-		Type:         BackendClaudeCode,
-		Version:      "1.0.0",
-		Capabilities: []string{}, // No optional interfaces fully supported
+		Type:    BackendClaudeCode,
+		Version: "1.0.0",
 	}
 }
 
-// --- Limited state access ---
-// These methods exist for API compatibility but have limitations.
+// --- StatefulBackend interface ---
 
-// GetFinalMessage returns the accumulated assistant response text.
-func (b *ClaudeCodeBackend) GetFinalMessage() string {
+// GetState returns the conversation history as JSON.
+func (b *ClaudeCodeBackend) GetState() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	data, err := json.Marshal(b.messages)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// RestoreState initializes the backend with previously saved state.
+func (b *ClaudeCodeBackend) RestoreState(stateJSON string) error {
+	if stateJSON == "" {
+		return nil
+	}
+	var msgs []Message
+	if err := json.Unmarshal([]byte(stateJSON), &msgs); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	b.messages = msgs
+	b.mu.Unlock()
+	// Emit restored messages to update UI
+	b.emitMessages()
+	return nil
+}
+
+// --- IntrospectableBackend interface ---
+
+// Messages returns the raw conversation history.
+func (b *ClaudeCodeBackend) Messages() []Message {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// Return a copy to prevent mutation
+	result := make([]Message, len(b.messages))
+	copy(result, b.messages)
+	return result
+}
+
+// FinalMessage returns the accumulated assistant response text.
+func (b *ClaudeCodeBackend) FinalMessage() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.finalMessage
+}
+
+// Todos returns the current task list (empty for Claude Code backend).
+func (b *ClaudeCodeBackend) Todos() []tools.TodoItem {
+	// Claude Code manages its own todos internally, we don't track them
+	return nil
 }

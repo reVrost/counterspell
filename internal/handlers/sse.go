@@ -89,15 +89,15 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	ch := h.events.Subscribe()
 	defer h.events.Unsubscribe(ch)
 
+	// Cache projects at connection start - only refresh on project events
+	internalProjects, _ := h.github.GetProjects(ctx)
+	projects := make(map[string]views.UIProject)
+	for _, p := range internalProjects {
+		projects[p.ID] = toUIProject(p)
+	}
+
 	// Helper to render and send active tasks and reviews
 	sendActiveUpdate := func() {
-		// Get real projects
-		internalProjects, _ := h.github.GetProjects(ctx)
-		projects := make(map[string]views.UIProject)
-		for _, p := range internalProjects {
-			projects[p.ID] = toUIProject(p)
-		}
-
 		// Get tasks from DB and categorize
 		dbTasks, _ := h.tasks.List(ctx, nil, nil)
 		var active []*views.UITask
@@ -108,13 +108,13 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 				ProjectID:   t.ProjectID,
 				Description: t.Title,
 				AgentName:   "Agent",
-				Status:      string(t.Status),
+				Status:      t.Status,
 				Progress:    50,
 			}
 			switch t.Status {
-			case "in_progress":
+			case models.StatusInProgress:
 				active = append(active, uiTask)
-			case "review", "human_review":
+			case models.StatusReview:
 				uiTask.Progress = 100
 				reviews = append(reviews, uiTask)
 			}
@@ -148,9 +148,17 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			return
-		case _, ok := <-ch:
+		case event, ok := <-ch:
 			if !ok {
 				return
+			}
+			// Refresh projects cache on project-related events
+			if event.Type == models.EventTypeProjectCreated || event.Type == models.EventTypeProjectUpdated || event.Type == models.EventTypeProjectDeleted {
+				internalProjects, _ = h.github.GetProjects(ctx)
+				projects = make(map[string]views.UIProject)
+				for _, p := range internalProjects {
+					projects[p.ID] = toUIProject(p)
+				}
 			}
 			// Task event received, send update
 			sendActiveUpdate()
@@ -275,13 +283,13 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 			lastSentID = event.ID
 
 			switch event.Type {
-			case "task_created":
+			case models.EventTypeTaskCreated:
 				// Task restarted (e.g., from chat continuation) - send updated state
 				slog.Info("[SSE] Received task_created, calling sendAgent", "task_id", taskID, "event_id", event.ID)
 				lastSentID = sendAgent()
 				sendDiff()
 
-			case "agent_update":
+			case models.EventTypeAgentUpdate:
 				// Live agent update with message history
 				slog.Info("[SSE] Received agent_update, rendering and sending", "task_id", taskID, "event_id", event.ID, "payload_len", len(event.HTMLPayload))
 				html := renderAgentConversationFromJSON(ctx, event.HTMLPayload, true)
@@ -290,7 +298,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				flusher.Flush()
 				slog.Info("[SSE] agent_update sent to client", "task_id", taskID)
 
-			case "log":
+			case models.EventTypeLog:
 				// Log entry
 				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
 				logHTML := fmt.Sprintf(`<div class="ml-4 relative"><div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div><p class="text-xs text-gray-400">%s</p></div>`, htmlData)
@@ -298,7 +306,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "id: %d\nevent: log\ndata: %s\n\n", event.ID, logHTML)
 				flusher.Flush()
 
-			case "status_change":
+			case models.EventTypeStatusChange:
 				// Task status changed - send final state
 				lastSentID = sendAgent()
 				sendDiff()
@@ -307,7 +315,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 				flusher.Flush()
 				// Don't close connection - keep alive for potential chat continuations
 
-			case "todo":
+			case models.EventTypeTodo:
 				// Todo list update - forward JSON directly
 				//nolint:errcheck // SSE write may fail if client disconnects
 				fmt.Fprintf(w, "id: %d\nevent: todo\ndata: %s\n\n", event.ID, strings.ReplaceAll(event.HTMLPayload, "\n", ""))
@@ -368,7 +376,7 @@ func (h *Handlers) HandleTaskLogsSSE(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Send log event as HTML for htmx SSE
-			if event.Type == "log" {
+			if event.Type == models.EventTypeLog {
 				// The HTMLPayload already has formatted content like: <span class="text-yellow-400">[plan]</span> message
 				// Wrap it in log entry structure and send
 				htmlData := strings.ReplaceAll(event.HTMLPayload, "\n", "")
@@ -412,7 +420,7 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var html string
-		if task.Status == "in_progress" {
+		if task.Status == models.StatusInProgress {
 			html = `<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4"><i class="fas fa-cog fa-spin text-3xl opacity-50"></i><p class="text-xs font-mono">Generating changes...</p></div>`
 		} else if task.GitDiff != "" {
 			html = renderDiffHTML(task.GitDiff)
@@ -514,9 +522,9 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 			}
 			// Handle live agent updates (message history JSON in HTMLPayload)
 			switch event.Type {
-			case "agent_update":
+			case models.EventTypeAgentUpdate:
 				sendAgentFromJSON(event.HTMLPayload, true)
-			case "status_change":
+			case models.EventTypeStatusChange:
 				// Task completed, reload from DB to get final state
 				sendAgentFromDB()
 			}

@@ -69,20 +69,20 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 			ProjectID:   t.ProjectID,
 			Description: t.Title,
 			AgentName:   "Agent",
-			Status:      string(t.Status),
+			Status:      t.Status,
 			Progress:    50, // TODO: track real progress
 		}
 
 		switch t.Status {
-		case "todo":
+		case models.StatusTodo:
 			uiTask.Progress = 0
 			data.Todo = append(data.Todo, uiTask)
-		case "review", "human_review":
+		case models.StatusReview:
 			uiTask.Progress = 100
 			data.Reviews = append(data.Reviews, uiTask)
-		case "in_progress":
+		case models.StatusInProgress:
 			data.Active = append(data.Active, uiTask)
-		case "done":
+		case models.StatusDone:
 			uiTask.Progress = 100
 			data.Done = append(data.Done, uiTask)
 		}
@@ -138,13 +138,13 @@ func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
 			ProjectID:   t.ProjectID,
 			Description: t.Title,
 			AgentName:   "Agent",
-			Status:      string(t.Status),
+			Status:      t.Status,
 			Progress:    50,
 		}
 		switch t.Status {
-		case "in_progress":
+		case models.StatusInProgress:
 			active = append(active, uiTask)
-		case "review", "human_review":
+		case models.StatusReview:
 			uiTask.Progress = 100
 			reviews = append(reviews, uiTask)
 		}
@@ -260,7 +260,7 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 		ProjectID:   dbTask.ProjectID,
 		Description: dbTask.Title,
 		AgentName:   "Agent",
-		Status:      string(dbTask.Status),
+		Status:      dbTask.Status,
 		Progress:    100,
 		AgentOutput: dbTask.AgentOutput,
 		GitDiff:     dbTask.GitDiff,

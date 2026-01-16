@@ -6,11 +6,10 @@ import "time"
 type TaskStatus string
 
 const (
-	StatusTodo        TaskStatus = "todo"
-	StatusInProgress  TaskStatus = "in_progress"
-	StatusReview      TaskStatus = "review"
-	StatusHumanReview TaskStatus = "human_review"
-	StatusDone        TaskStatus = "done"
+	StatusTodo       TaskStatus = "todo"
+	StatusInProgress TaskStatus = "in_progress"
+	StatusReview     TaskStatus = "review"
+	StatusDone       TaskStatus = "done"
 )
 
 // Task represents a work item in the system.
@@ -48,10 +47,26 @@ type AgentLog struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// EventType represents the type of server-sent event.
+type EventType string
+
+const (
+	EventTypeLog            EventType = "log"
+	EventTypeStatus         EventType = "status"
+	EventTypeStatusChange   EventType = "status_change"
+	EventTypeError          EventType = "error"
+	EventTypeAgentUpdate    EventType = "agent_update"
+	EventTypeTodo           EventType = "todo"
+	EventTypeTaskCreated    EventType = "task_created"
+	EventTypeProjectCreated EventType = "project_created"
+	EventTypeProjectUpdated EventType = "project_updated"
+	EventTypeProjectDeleted EventType = "project_deleted"
+)
+
 // Event represents a server-sent event for real-time updates.
 type Event struct {
-	ID          int64  `json:"id"`           // Sequence number for deduplication
-	TaskID      string `json:"task_id"`
-	Type        string `json:"type"` // log, status, error, agent_update, todo, complete
-	HTMLPayload string `json:"html_payload"`
+	ID          int64     `json:"id"`           // Sequence number for deduplication
+	TaskID      string    `json:"task_id"`
+	Type        EventType `json:"type"`
+	HTMLPayload string    `json:"html_payload"`
 }
