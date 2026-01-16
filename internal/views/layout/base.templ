@@ -50,8 +50,21 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			</script>
 			<style>
 				body { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
-				.hide-scrollbar::-webkit-scrollbar { display: none; }
+				.hide-scrollbar::-webkit-scrollbar { display: none !important; }
+				.hide-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; }
 				.no-tap-highlight { -webkit-tap-highlight-color: transparent; }
+
+				/* Hide scrollbars globally */
+				html, body, main, div, * {
+					scrollbar-width: none !important;
+					-ms-overflow-style: none !important;
+				}
+				::-webkit-scrollbar {
+					display: none !important;
+					width: 0 !important;
+					height: 0 !important;
+					background: transparent !important;
+				}
 
 				/* Mobile-native touch behavior */
 				button, a, [role="button"], .touch-target { 
@@ -59,6 +72,19 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 					-webkit-tap-highlight-color: transparent;
 				}
 				.no-select { user-select: none; -webkit-user-select: none; }
+
+				/* Screen reader only */
+				.sr-only {
+					position: absolute;
+					width: 1px;
+					height: 1px;
+					padding: 0;
+					margin: -1px;
+					overflow: hidden;
+					clip: rect(0, 0, 0, 0);
+					white-space: nowrap;
+					border-width: 0;
+				}
 
 				/* Slide-over animation */
 				.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -304,10 +330,11 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			@components.Header(projects)
 			<!-- Main Feed -->
 			<main
-				class="flex-1 overflow-y-auto bg-[#0C0E12] relative"
+				class="flex-1 overflow-y-auto bg-[#0C0E12] relative hide-scrollbar"
 				id="feed-container"
 				hx-get="/feed"
 				hx-trigger="load, close-modal from:body"
+				hx-swap="morph"
 			>
 				@content
 			</main>

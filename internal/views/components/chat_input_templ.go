@@ -344,7 +344,20 @@ func chatInputInner(config ChatInputConfig, projects map[string]views.UIProject)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]\"></textarea></div><!-- Toolbar --><div class=\"flex items-center justify-between px-2 pb-2 mt-1\"><!-- Left Side --><div class=\"flex items-center gap-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" aria-label=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(config.Placeholder)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 324, Col: 34}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]\"></textarea></div><!-- Toolbar --><div class=\"flex items-center justify-between px-2 pb-2 mt-1\"><!-- Left Side --><div class=\"flex items-center gap-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -354,7 +367,7 @@ func chatInputInner(config ChatInputConfig, projects map[string]views.UIProject)
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<!-- Close Button (chat mode) --> <button type=\"button\" @click=\"$dispatch('close-chat')\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-xmark text-sm\"></i></button><!-- Attachment (chat mode) --> <button type=\"button\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-paperclip text-sm\"></i></button><!-- Model Selector (chat mode - inline) --> <div class=\"relative\"><button type=\"button\" @click=\"modelOpen = !modelOpen\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-bolt text-sm\"></i></button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<!-- Close Button (chat mode) --> <button type=\"button\" @click=\"$dispatch('close-chat')\" aria-label=\"Close chat\" class=\"w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150\"><i class=\"fas fa-xmark text-sm\"></i></button><!-- Attachment (chat mode) --> <button type=\"button\" aria-label=\"Attach file\" class=\"w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150\"><i class=\"fas fa-paperclip text-sm\"></i></button><!-- Model Selector (chat mode - inline) --> <div class=\"relative\"><button type=\"button\" @click=\"modelOpen = !modelOpen\" aria-label=\"Select model\" class=\"w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150\"><i class=\"fas fa-bolt text-sm\"></i></button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -362,17 +375,17 @@ func chatInputInner(config ChatInputConfig, projects map[string]views.UIProject)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><!-- Right Side --><div class=\"flex items-center gap-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><!-- Right Side --><div class=\"flex items-center gap-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if config.Mode == ChatInputModeCreate {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<!-- Attachment (create mode) --> <button type=\"button\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-paperclip text-sm\"></i></button><!-- Model Selector (create mode) --> <div class=\"relative\"><button type=\"button\" @click=\"modelOpen = !modelOpen\" class=\"w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200\"><i class=\"fas fa-bolt text-sm\"></i></button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<!-- Attachment (create mode) --> <button type=\"button\" aria-label=\"Attach file\" class=\"w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150\"><i class=\"fas fa-paperclip text-sm\"></i></button><!-- Model Selector (create mode) --> <div class=\"relative\"><button type=\"button\" @click=\"modelOpen = !modelOpen\" aria-label=\"Select model\" class=\"w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150\"><i class=\"fas fa-bolt text-sm\"></i></button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -380,12 +393,12 @@ func chatInputInner(config ChatInputConfig, projects map[string]views.UIProject)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<!-- Divider --><div class=\"w-px h-4 bg-gray-700 mx-1\"></div><!-- Submit/Voice Button --><button type=\"button\" @click=\"if(text.length > 0) { navigator.vibrate && navigator.vibrate(30); submit(); }\" @mousedown=\"if (text.length === 0 && app && !app.isRecording) app.startVoiceRecording($refs.input)\" @mouseup=\"if (app && app.isRecording) app.stopVoiceRecording()\" @mouseleave=\"if (app && app.isRecording) app.stopVoiceRecording()\" @touchstart.prevent=\"if (text.length === 0 && app && !app.isRecording) { navigator.vibrate && navigator.vibrate(50); app.startVoiceRecording($refs.input); }\" @touchend.prevent=\"if (app && app.isRecording) { navigator.vibrate && navigator.vibrate([30, 50, 30]); app.stopVoiceRecording(); } else if (text.length > 0) { navigator.vibrate && navigator.vibrate(30); submit(); }\" @touchcancel=\"if (app && app.isRecording) app.cancelRecording()\" :class=\"(app && app.isRecording) ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] scale-110' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 hover:bg-gray-600')\" class=\"w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-200 select-none\"><i class=\"fas\" :class=\"text.length > 0 ? 'fa-arrow-up' : ((app && app.isRecording) ? 'fa-microphone animate-pulse' : 'fa-microphone')\"></i></button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<!-- Divider --><div class=\"w-px h-4 bg-gray-700 mx-1\"></div><!-- Submit/Voice Button --><button type=\"button\" aria-label=\"Send message or hold to record voice\" @click=\"if(text.length > 0) { navigator.vibrate && navigator.vibrate(30); submit(); }\" @mousedown=\"if (text.length === 0 && app && !app.isRecording) app.startVoiceRecording($refs.input)\" @mouseup=\"if (app && app.isRecording) app.stopVoiceRecording()\" @mouseleave=\"if (app && app.isRecording) app.stopVoiceRecording()\" @touchstart.prevent=\"if (text.length === 0 && app && !app.isRecording) { navigator.vibrate && navigator.vibrate(50); app.startVoiceRecording($refs.input); }\" @touchend.prevent=\"if (app && app.isRecording) { navigator.vibrate && navigator.vibrate([30, 50, 30]); app.stopVoiceRecording(); } else if (text.length > 0) { navigator.vibrate && navigator.vibrate(30); submit(); }\" @touchcancel=\"if (app && app.isRecording) app.cancelRecording()\" :class=\"(app && app.isRecording) ? 'bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] scale-110' : (text.length > 0 ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-gray-700 text-gray-300 active:bg-gray-600')\" class=\"w-11 h-11 rounded-2xl flex items-center justify-center text-base transition-all duration-150 select-none\"><i class=\"fas\" :class=\"text.length > 0 ? 'fa-arrow-up' : ((app && app.isRecording) ? 'fa-microphone animate-pulse' : 'fa-microphone')\"></i></button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -410,115 +423,115 @@ func projectSelector(projects map[string]views.UIProject) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var5 == nil {
-			templ_7745c5c3_Var5 = templ.NopComponent
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"relative\"><button type=\"button\" @click=\"app.inputProjectMenuOpen = !app.inputProjectMenuOpen\" class=\"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border border-transparent hover:border-gray-700\" :class=\"app.activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'\"><div class=\"flex items-center justify-center w-4 h-4 rounded-full\" :class=\"app.activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'\"><i class=\"fas fa-folder text-[9px]\" :class=\"app.activeProjectId ? 'text-blue-400' : 'text-gray-400'\"></i></div><span x-text=\"app.activeProjectName ? app.activeProjectName.split('/').pop() : 'Select project'\" class=\"max-w-[120px] truncate\"></span> <i class=\"fas fa-chevron-down text-[8px] opacity-50 ml-0.5\"></i></button><!-- Project Dropdown --><div x-show=\"app.inputProjectMenuOpen\" @click.outside=\"app.inputProjectMenuOpen = false\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-3 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col\" x-data=\"{ search: '' }\"><div class=\"p-3 border-b border-gray-800 bg-[#16191F]/50 backdrop-blur-sm sticky top-0\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Search projects...\" class=\"w-full bg-gray-900/50 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600 transition-colors\"></div></div><div class=\"max-h-[240px] overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-700\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"relative\"><button type=\"button\" @click=\"app.inputProjectMenuOpen = !app.inputProjectMenuOpen\" class=\"flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border border-transparent hover:border-gray-700\" :class=\"app.activeProjectId ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'\"><div class=\"flex items-center justify-center w-4 h-4 rounded-full\" :class=\"app.activeProjectId ? 'bg-blue-500/20' : 'bg-gray-700/50'\"><i class=\"fas fa-folder text-[9px]\" :class=\"app.activeProjectId ? 'text-blue-400' : 'text-gray-400'\"></i></div><span x-text=\"app.activeProjectName ? app.activeProjectName.split('/').pop() : 'Select project'\" class=\"max-w-[120px] truncate\"></span> <i class=\"fas fa-chevron-down text-[8px] opacity-50 ml-0.5\"></i></button><!-- Project Dropdown --><div x-show=\"app.inputProjectMenuOpen\" @click.outside=\"app.inputProjectMenuOpen = false\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-3 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col\" x-data=\"{ search: '' }\"><div class=\"p-3 border-b border-gray-800 bg-[#16191F]/50 backdrop-blur-sm sticky top-0\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Search projects...\" class=\"w-full bg-gray-900/50 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600 transition-colors\"></div></div><div class=\"max-h-[240px] overflow-y-auto py-1 scrollbar-thin scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-700\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, p := range projects {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div @click=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 424, Col: 80}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" class=\"px-3 py-2.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition border-l-2 border-transparent hover:border-blue-500\" x-show=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div @click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 426, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 430, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\"><div class=\"w-6 h-6 rounded-md bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0 group-hover:border-gray-600 transition-colors\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"px-3 py-2.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition border-l-2 border-transparent hover:border-blue-500\" x-show=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var8 = []any{fmt.Sprintf("fas %s %s text-[10px]", p.Icon, p.Color)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 432, Col: 87}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<i class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><div class=\"w-6 h-6 rounded-md bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0 group-hover:border-gray-600 transition-colors\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var8).String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 1, Col: 0}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			var templ_7745c5c3_Var9 = []any{fmt.Sprintf("fas %s %s text-[10px]", p.Icon, p.Color)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\"></i></div><div class=\"flex-1 min-w-0 flex flex-col gap-0.5\"><span class=\"text-xs font-medium text-gray-300 group-hover:text-white truncate\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<i class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var9).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 431, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 1, Col: 0}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span> <span class=\"text-[10px] text-gray-500 truncate\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"></i></div><div class=\"flex-1 min-w-0 flex flex-col gap-0.5\"><span class=\"text-xs font-medium text-gray-300 group-hover:text-white truncate\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var11 string
-			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 432, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 437, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></div><i class=\"fas fa-check text-blue-500 text-xs\" x-show=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span> <span class=\"text-[10px] text-gray-500 truncate\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var12 string
-			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s'", p.ID))
+			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 434, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 438, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\"></i></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span></div><i class=\"fas fa-check text-blue-500 text-xs\" x-show=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var13 string
+			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s'", p.ID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 440, Col: 110}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"></i></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if len(projects) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div class=\"px-4 py-8 text-center flex flex-col items-center gap-2 text-gray-500\"><i class=\"fas fa-folder-open text-2xl opacity-50\"></i> <span class=\"text-xs\">No projects found.</span></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"px-4 py-8 text-center flex flex-col items-center gap-2 text-gray-500\"><i class=\"fas fa-folder-open text-2xl opacity-50\"></i> <span class=\"text-xs\">No projects found.</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -543,35 +556,35 @@ func modelPopover(origin string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var13 == nil {
-			templ_7745c5c3_Var13 = templ.NopComponent
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var14 = []any{fmt.Sprintf("absolute bottom-full %s mb-3 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 z-50", func() string {
+		var templ_7745c5c3_Var15 = []any{fmt.Sprintf("absolute bottom-full %s mb-3 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-xl overflow-hidden py-1 z-50", func() string {
 			if origin == "bottom-right" {
 				return "right-0"
 			}
 			return "left-0"
 		}())}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var14...)
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<div x-show=\"modelOpen\" @click.outside=\"modelOpen = false\" x-cloak x-transition.scale.origin.bottom.left class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div x-show=\"modelOpen\" @click.outside=\"modelOpen = false\" x-cloak x-transition.scale.origin.bottom.left class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var14).String())
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var15).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-900/50 border-b border-gray-800 mb-1\">Select Model</div><div class=\"p-1 space-y-0.5\"><template x-for=\"m in models\" :key=\"m.id\"><div @click=\"setModel(m.id); modelOpen = false\" :class=\"activeModelId === m.id ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white border-transparent'\" class=\"flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition border\"><span class=\"text-xs font-medium\" x-text=\"m.name\"></span><div x-show=\"activeModelId === m.id\" class=\"w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]\"></div></div></template></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-900/50 border-b border-gray-800 mb-1\">Select Model</div><div class=\"p-1 space-y-0.5\"><template x-for=\"m in models\" :key=\"m.id\"><div @click=\"setModel(m.id); modelOpen = false\" :class=\"activeModelId === m.id ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white border-transparent'\" class=\"flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition border\"><span class=\"text-xs font-medium\" x-text=\"m.name\"></span><div x-show=\"activeModelId === m.id\" class=\"w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]\"></div></div></template></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

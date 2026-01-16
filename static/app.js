@@ -16,6 +16,10 @@ document.addEventListener('alpine:init', () => {
     toastOpen: false,
     settingsOpen: false,
     userMenuOpen: false,
+    
+    // Feed Section Collapse State
+    reviewsExpanded: localStorage.getItem('feed_reviews_expanded') !== 'false',
+    completedExpanded: localStorage.getItem('feed_completed_expanded') !== 'false',
 
     // Voice Recording State
     listening: false,
@@ -57,6 +61,16 @@ document.addEventListener('alpine:init', () => {
       this.connectSSE();
       this.setupPWAInstall();
       this.setupModalHistory();
+    },
+
+    // Feed Section Toggles
+    toggleReviews() {
+      this.reviewsExpanded = !this.reviewsExpanded;
+      localStorage.setItem('feed_reviews_expanded', this.reviewsExpanded);
+    },
+    toggleCompleted() {
+      this.completedExpanded = !this.completedExpanded;
+      localStorage.setItem('feed_completed_expanded', this.completedExpanded);
     },
 
     // Project Management
@@ -284,7 +298,8 @@ document.addEventListener('alpine:init', () => {
         history.back();
       }
       setTimeout(() => {
-        document.getElementById('modal-content').innerHTML = '';
+        const el = document.getElementById('modal-content');
+        if (el) el.innerHTML = '';
       }, 300);
     },
 
@@ -328,5 +343,3 @@ document.addEventListener('alpine:init', () => {
 });
 
 // NOTE: Using htmx-ext-alpine-morph extension for HTMX + Alpine integration.
-// It uses Alpine.morph() for swaps, which preserves Alpine state automatically.
-// No need for manual Alpine.initTree() calls when using hx-swap="morph".
