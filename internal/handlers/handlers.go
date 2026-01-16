@@ -100,6 +100,7 @@ func (h *Handlers) RegisterRoutes(r chi.Router) {
 	r.Post("/action/complete-merge/{id}", h.HandleCompleteMerge)
 	r.Post("/settings", h.HandleSaveSettings)
 	r.Post("/transcribe", h.HandleTranscribe)
+	r.Get("/api/files/search", h.HandleFileSearch)
 
 	// GitHub OAuth routes
 	r.Get("/github/authorize", h.HandleGitHubAuthorize)

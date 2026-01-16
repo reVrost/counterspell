@@ -961,6 +961,157 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
+// SearchProjectFiles searches for files in a project using fuzzy matching.
+// Returns a list of file paths relative to the repo root, sorted by match score.
+func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// Get project info
+	projects, err := o.github.GetProjects(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get projects: %w", err)
+	}
+
+	var owner, repo string
+	for _, p := range projects {
+		if p.ID == projectID {
+			owner = p.GitHubOwner
+			repo = p.GitHubRepo
+			break
+		}
+	}
+
+	if owner == "" {
+		return nil, fmt.Errorf("project not found")
+	}
+
+	repoPath := o.repos.RepoPath(owner, repo)
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("repository not cloned yet")
+	}
+
+	// Collect all file paths
+	var files []string
+	err = filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip errors
+		}
+		// Skip hidden directories and common non-source dirs
+		name := info.Name()
+		if info.IsDir() {
+			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "__pycache__" || name == "dist" || name == "build" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Skip hidden files
+		if strings.HasPrefix(name, ".") {
+			return nil
+		}
+		// Get relative path from repo root
+		relPath, _ := filepath.Rel(repoPath, path)
+		files = append(files, relPath)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk repo: %w", err)
+	}
+
+	// If no query, return first N files sorted alphabetically
+	if query == "" {
+		if len(files) > limit {
+			files = files[:limit]
+		}
+		return files, nil
+	}
+
+	// Fuzzy search files
+	matches := fuzzySearch(files, query, limit)
+	return matches, nil
+}
+
+// fuzzySearch performs fuzzy matching on file paths and returns top N matches.
+func fuzzySearch(files []string, query string, limit int) []string {
+	type scored struct {
+		path  string
+		score int
+	}
+
+	var results []scored
+	queryLower := strings.ToLower(query)
+
+	for _, f := range files {
+		fLower := strings.ToLower(f)
+		score := fuzzyScore(fLower, queryLower)
+		if score > 0 {
+			results = append(results, scored{path: f, score: score})
+		}
+	}
+
+	// Sort by score descending
+	for i := 0; i < len(results)-1; i++ {
+		for j := i + 1; j < len(results); j++ {
+			if results[j].score > results[i].score {
+				results[i], results[j] = results[j], results[i]
+			}
+		}
+	}
+
+	// Return top N
+	var out []string
+	for i := 0; i < len(results) && i < limit; i++ {
+		out = append(out, results[i].path)
+	}
+	return out
+}
+
+// fuzzyScore computes a simple fuzzy match score.
+// Higher score = better match. 0 = no match.
+func fuzzyScore(text, pattern string) int {
+	if len(pattern) == 0 {
+		return 1
+	}
+	if len(text) == 0 {
+		return 0
+	}
+
+	score := 0
+	patternIdx := 0
+	prevMatchIdx := -1
+	consecutiveBonus := 0
+
+	for i := 0; i < len(text) && patternIdx < len(pattern); i++ {
+		if text[i] == pattern[patternIdx] {
+			score += 1
+
+			// Bonus for consecutive matches
+			if prevMatchIdx == i-1 {
+				consecutiveBonus++
+				score += consecutiveBonus
+			} else {
+				consecutiveBonus = 0
+			}
+
+			// Bonus for matching at start or after separator
+			if i == 0 || text[i-1] == '/' || text[i-1] == '_' || text[i-1] == '-' || text[i-1] == '.' {
+				score += 2
+			}
+
+			prevMatchIdx = i
+			patternIdx++
+		}
+	}
+
+	// All pattern characters must match
+	if patternIdx < len(pattern) {
+		return 0
+	}
+
+	return score
+}
+
 // appendUserMessage appends a user message to the existing message history JSON
 func appendUserMessage(historyJSON, message string) string {
 	// Parse existing history

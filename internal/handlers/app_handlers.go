@@ -562,6 +562,36 @@ func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// HandleFileSearch searches for files in a project using fuzzy matching.
+func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
+	projectID := r.URL.Query().Get("project_id")
+	query := r.URL.Query().Get("q")
+
+	if projectID == "" {
+		http.Error(w, "project_id required", http.StatusBadRequest)
+		return
+	}
+
+	files, err := h.orchestrator.SearchProjectFiles(r.Context(), projectID, query, 20)
+	if err != nil {
+		slog.Error("File search failed", "error", err)
+		// Return empty array instead of error to avoid breaking UI
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+		return
+	}
+
+	// Ensure we never return null, always return empty array
+	if files == nil {
+		files = []string{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(files); err != nil {
+		slog.Error("Failed to encode file search results", "error", err)
+	}
+}
+
 // HandleTranscribe transcribes uploaded audio to text.
 func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

@@ -37,7 +37,9 @@ func chatInputXData(config ChatInputConfig) string {
 			modelOpen: false,
 			activeModelId: localStorage.getItem("counterspell_model") || "%s",
 			models: %s,
-			files: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
+			files: [],
+			selectedIndex: 0,
+			fileSearchDebounce: null,
 			
 			get app() { return Alpine.$data(document.body); },
 			get modelName() {
@@ -53,17 +55,58 @@ func chatInputXData(config ChatInputConfig) string {
 				if (newHeight > window.innerHeight * 0.35) newHeight = window.innerHeight * 0.35;
 				el.style.height = newHeight + "px";
 			},
-			checkMention(e) {
-				if (this.text.match(/@[^ ]*$/)) {
+			async checkMention(e) {
+				const match = this.text.match(/@([^ ]*)$/);
+				if (match) {
 					this.showFileMenu = true;
+					const query = match[1] || "";
+					// Debounce file search
+					clearTimeout(this.fileSearchDebounce);
+					this.fileSearchDebounce = setTimeout(() => this.searchFiles(query), 50);
 				} else {
 					this.showFileMenu = false;
+					this.files = [];
 				}
-				if (e.key === "Escape") this.showFileMenu = false;
+				if (e.key === "Escape") {
+					this.showFileMenu = false;
+					this.files = [];
+				}
+			},
+			async searchFiles(query) {
+				const projectId = this.app?.activeProjectId;
+				if (!projectId) return;
+				try {
+					const resp = await fetch("/api/files/search?project_id=" + encodeURIComponent(projectId) + "&q=" + encodeURIComponent(query));
+					if (resp.ok) {
+						const data = await resp.json();
+						this.files = Array.isArray(data) ? data : [];
+						this.selectedIndex = 0;
+					}
+				} catch (e) {
+					console.error("File search failed:", e);
+					this.files = [];
+				}
+			},
+			handleFileNav(e) {
+				if (!this.showFileMenu || !this.files || this.files.length === 0) return;
+				if (e.key === "ArrowDown") {
+					e.preventDefault();
+					this.selectedIndex = Math.min(this.selectedIndex + 1, this.files.length - 1);
+				} else if (e.key === "ArrowUp") {
+					e.preventDefault();
+					this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+				} else if (e.key === "Enter" || e.key === "Tab") {
+					e.preventDefault();
+					if (this.files[this.selectedIndex]) {
+						this.insertFile(this.files[this.selectedIndex]);
+					}
+				}
 			},
 			insertFile(f) {
 				this.text = this.text.replace(/@[^ ]*$/, "") + f + " ";
 				this.showFileMenu = false;
+				this.files = [];
+				this.selectedIndex = 0;
 				this.$nextTick(() => { if (this.$refs.input) this.$refs.input.focus(); });
 			},
 			setModel(id) {
@@ -92,7 +135,9 @@ func chatInputXData(config ChatInputConfig) string {
 		modelOpen: false,
 		activeModelId: localStorage.getItem("counterspell_model") || "%s",
 		models: %s,
-		files: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
+		files: [],
+		selectedIndex: 0,
+		fileSearchDebounce: null,
 		
 		get app() { return Alpine.$data(document.body); },
 		get modelName() {
@@ -108,17 +153,58 @@ func chatInputXData(config ChatInputConfig) string {
 			if (newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
 			el.style.height = newHeight + "px";
 		},
-		checkMention(e) {
-			if (this.text.match(/@[^ ]*$/)) {
+		async checkMention(e) {
+			const match = this.text.match(/@([^ ]*)$/);
+			if (match) {
 				this.showFileMenu = true;
+				const query = match[1] || "";
+				// Debounce file search
+				clearTimeout(this.fileSearchDebounce);
+				this.fileSearchDebounce = setTimeout(() => this.searchFiles(query), 50);
 			} else {
 				this.showFileMenu = false;
+				this.files = [];
 			}
-			if (e.key === "Escape") this.showFileMenu = false;
+			if (e.key === "Escape") {
+				this.showFileMenu = false;
+				this.files = [];
+			}
+		},
+		async searchFiles(query) {
+			const projectId = this.app?.activeProjectId;
+			if (!projectId) return;
+			try {
+				const resp = await fetch("/api/files/search?project_id=" + encodeURIComponent(projectId) + "&q=" + encodeURIComponent(query));
+				if (resp.ok) {
+					const data = await resp.json();
+					this.files = Array.isArray(data) ? data : [];
+					this.selectedIndex = 0;
+				}
+			} catch (e) {
+				console.error("File search failed:", e);
+				this.files = [];
+			}
+		},
+		handleFileNav(e) {
+			if (!this.showFileMenu || !this.files || this.files.length === 0) return;
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				this.selectedIndex = Math.min(this.selectedIndex + 1, this.files.length - 1);
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+			} else if (e.key === "Enter" || e.key === "Tab") {
+				e.preventDefault();
+				if (this.files[this.selectedIndex]) {
+					this.insertFile(this.files[this.selectedIndex]);
+				}
+			}
 		},
 		insertFile(f) {
 			this.text = this.text.replace(/@[^ ]*$/, "") + f + " ";
 			this.showFileMenu = false;
+			this.files = [];
+			this.selectedIndex = 0;
 			this.$nextTick(() => { if (this.$refs.input) this.$refs.input.focus(); });
 		},
 		setModel(id) {
@@ -168,7 +254,7 @@ func ChatInput(config ChatInputConfig, projects map[string]views.UIProject) temp
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(chatInputXData(config))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 137, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 223, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -235,7 +321,7 @@ func chatInputInner(config ChatInputConfig, projects map[string]views.UIProject)
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!-- Voice Recording Visualization --><div x-show=\"app && app.isRecording\" x-cloak class=\"absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10\"><!-- Cancel Button --><button type=\"button\" @click=\"app.cancelRecording()\" class=\"w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0\"><i class=\"fas fa-times text-sm\"></i></button><!-- Waveform Bars --><div class=\"flex-1 flex items-center justify-center gap-[3px] h-10 mx-4\"><template x-for=\"(level, i) in (app ? app.audioLevels : [])\" :key=\"i\"><div class=\"w-1 bg-red-500 rounded-full transition-all duration-75\" :style=\"`height: ${Math.max(4, level * 0.4)}px; opacity: ${0.4 + (level / 100) * 0.6}`\"></div></template></div><!-- Duration --><div class=\"flex items-center gap-2 shrink-0\"><div class=\"w-2 h-2 rounded-full bg-red-500 animate-pulse\"></div><span class=\"text-sm text-gray-300 font-mono\" x-text=\"app ? app.formatDuration(app.recordedDuration) : '0:00'\"></span></div></div><!-- Transcribing Overlay --><div x-show=\"app && app.isTranscribing\" x-cloak class=\"absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center justify-center z-10\"><i class=\"fas fa-spinner fa-spin text-blue-400 mr-2\"></i> <span class=\"text-gray-400 text-sm\">Transcribing...</span></div><!-- Input Area --><div class=\"relative px-4 pt-4 pb-2\"><!-- File Menu Popover --><div x-show=\"showFileMenu\" x-cloak x-transition.opacity.duration.100ms class=\"absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800\">Files</div><template x-for=\"file in files\"><div @click=\"insertFile(file)\" class=\"px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition\"><span class=\"text-purple-400 opacity-60 mr-1\">#</span><span x-text=\"file\"></span></div></template></div><textarea x-model=\"text\" x-ref=\"input\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!-- Voice Recording Visualization --><div x-show=\"app && app.isRecording\" x-cloak class=\"absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center px-4 z-10\"><!-- Cancel Button --><button type=\"button\" @click=\"app.cancelRecording()\" class=\"w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0\"><i class=\"fas fa-times text-sm\"></i></button><!-- Waveform Bars --><div class=\"flex-1 flex items-center justify-center gap-[3px] h-10 mx-4\"><template x-for=\"(level, i) in (app ? app.audioLevels : [])\" :key=\"i\"><div class=\"w-1 bg-red-500 rounded-full transition-all duration-75\" :style=\"`height: ${Math.max(4, level * 0.4)}px; opacity: ${0.4 + (level / 100) * 0.6}`\"></div></template></div><!-- Duration --><div class=\"flex items-center gap-2 shrink-0\"><div class=\"w-2 h-2 rounded-full bg-red-500 animate-pulse\"></div><span class=\"text-sm text-gray-300 font-mono\" x-text=\"app ? app.formatDuration(app.recordedDuration) : '0:00'\"></span></div></div><!-- Transcribing Overlay --><div x-show=\"app && app.isTranscribing\" x-cloak class=\"absolute inset-0 bg-[#1C1F26] rounded-3xl flex items-center justify-center z-10\"><i class=\"fas fa-spinner fa-spin text-blue-400 mr-2\"></i> <span class=\"text-gray-400 text-sm\">Transcribing...</span></div><!-- Input Area --><div class=\"relative px-4 pt-4 pb-2\"><!-- File Menu Popover --><div x-show=\"showFileMenu && files && files.length > 0\" x-cloak x-transition.opacity.duration.100ms x-ref=\"fileMenu\" class=\"absolute bottom-full left-0 mb-2 w-80 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto z-50\"><div class=\"px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800 flex items-center justify-between\"><span>Files</span> <span class=\"text-gray-600 font-normal normal-case\">↑↓ to navigate, Enter to select</span></div><template x-for=\"(file, idx) in files\" :key=\"file\"><div @click=\"insertFile(file)\" @mouseenter=\"selectedIndex = idx\" :class=\"idx === selectedIndex ? 'bg-blue-500/20 text-blue-300' : 'text-gray-300 hover:bg-white/5'\" class=\"px-3 py-2 text-xs font-mono cursor-pointer transition flex items-center gap-2\"><i class=\"fas fa-file text-[10px] opacity-40\"></i> <span x-text=\"file\" class=\"truncate\"></span></div></template></div><!-- Empty State --><div x-show=\"showFileMenu && files && files.length === 0\" x-cloak class=\"absolute bottom-full left-0 mb-2 w-64 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50\"><div class=\"px-3 py-4 text-xs text-gray-500 text-center\"><i class=\"fas fa-search mb-2 opacity-50\"></i><div>No files found</div></div></div><textarea x-model=\"text\" x-ref=\"input\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -245,14 +331,14 @@ func chatInputInner(config ChatInputConfig, projects map[string]views.UIProject)
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " @input=\"resize()\" @keyup=\"checkMention($event)\" @keydown.enter=\"if (!$event.shiftKey) { $event.preventDefault(); submit(); }\" rows=\"1\" placeholder=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " @input=\"resize()\" @keyup=\"checkMention($event)\" @keydown=\"if (showFileMenu && files && files.length > 0 && ['ArrowUp', 'ArrowDown', 'Tab'].includes($event.key)) { handleFileNav($event); } else if (showFileMenu && files && files.length > 0 && $event.key === 'Enter' && !$event.shiftKey) { handleFileNav($event); } else if (!showFileMenu && $event.key === 'Enter' && !$event.shiftKey) { $event.preventDefault(); submit(); }\" rows=\"1\" placeholder=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(config.Placeholder)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 221, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 323, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -341,7 +427,7 @@ func projectSelector(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 322, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 424, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -354,7 +440,7 @@ func projectSelector(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 324, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 426, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -389,7 +475,7 @@ func projectSelector(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 329, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 431, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -402,7 +488,7 @@ func projectSelector(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 330, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 432, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -415,7 +501,7 @@ func projectSelector(projects map[string]views.UIProject) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s'", p.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 332, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/chat_input.templ`, Line: 434, Col: 110}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
