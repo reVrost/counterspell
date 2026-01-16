@@ -574,21 +574,27 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
 
-	// Emit task_created event to trigger feed refresh
-	o.events.Publish(models.Event{
-		TaskID: taskID,
-		Type:   "task_created",
-	})
-
 	// Immediately emit agent_update with user message appended so it shows right away
+	// This MUST come BEFORE task_created because:
+	// 1. agent_update caches the history in EventBus.lastAgentState
+	// 2. task_created triggers sendAgent() which calls GetLiveHistory()
+	// 3. If agent_update comes second, GetLiveHistory() returns empty (race condition)
 	updatedHistory := appendUserMessage(task.MessageHistory, followUpMessage)
+	slog.Info("[CHAT] Publishing agent_update with user message", "task_id", taskID, "history_len", len(updatedHistory))
 	o.events.Publish(models.Event{
 		TaskID:      taskID,
 		Type:        "agent_update",
 		HTMLPayload: updatedHistory,
 	})
 
-	slog.Info("Continuing task", "task_id", taskID, "follow_up", followUpMessage)
+	// Emit task_created event to trigger feed refresh (after agent_update is cached)
+	slog.Info("[CHAT] Publishing task_created", "task_id", taskID)
+	o.events.Publish(models.Event{
+		TaskID: taskID,
+		Type:   "task_created",
+	})
+
+	slog.Info("[CHAT] Events published, submitting to worker pool", "task_id", taskID, "follow_up", followUpMessage)
 
 	// Submit job to worker pool
 	job := &TaskJob{
