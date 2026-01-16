@@ -2,18 +2,11 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
-	"time"
 
+	"github.com/revrost/code/counterspell/internal/agent/tools"
 	"github.com/revrost/code/counterspell/internal/llm"
 )
 
@@ -78,19 +71,30 @@ type Runner struct {
 	systemPrompt   string
 	finalMessage   string
 	messageHistory []Message
-	todoState      *TodoState
+	todoState      *tools.TodoState
+	toolRegistry   *tools.Registry
 }
 
 // NewRunner creates a new agent runner.
 func NewRunner(provider llm.Provider, workDir string, callback StreamCallback) *Runner {
-	return &Runner{
+	r := &Runner{
 		provider:     provider,
 		llmCaller:    NewLLMCaller(provider),
 		workDir:      workDir,
 		callback:     callback,
 		systemPrompt: fmt.Sprintf("You are a coding assistant. Work directory: %s. Be concise. Make changes directly.", workDir),
-		todoState:    NewTodoState(),
+		todoState:    tools.NewTodoState(),
 	}
+
+	// Create tool registry with context
+	toolCtx := &tools.Context{
+		WorkDir:      workDir,
+		TodoState:    r.todoState,
+		OnTodoUpdate: r.emitTodoUpdate,
+	}
+	r.toolRegistry = tools.NewRegistry(toolCtx)
+
+	return r
 }
 
 // GetFinalMessage returns the accumulated final message from the agent.
@@ -117,11 +121,12 @@ func (r *Runner) SetMessageHistory(historyJSON string) error {
 
 // GetTodos returns the current todo list as JSON string.
 func (r *Runner) GetTodos() string {
-	return r.todoState.ToJSON()
+	data, _ := json.Marshal(r.todoState.GetTodos())
+	return string(data)
 }
 
 // GetTodoState returns the todo state.
-func (r *Runner) GetTodoState() *TodoState {
+func (r *Runner) GetTodoState() *tools.TodoState {
 	return r.todoState
 }
 
@@ -137,7 +142,7 @@ func (r *Runner) Continue(ctx context.Context, followUpMessage string) error {
 
 // runWithMessage is the core loop that handles both new runs and continuations.
 func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isContinuation bool) error {
-	tools := r.makeTools()
+	allTools := r.toolRegistry.All()
 
 	// Use existing message history or start fresh
 	messages := r.messageHistory
@@ -172,7 +177,7 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		}
 
 		r.emit(StreamEvent{Type: EventPlan, Content: "Calling LLM API..."})
-		resp, err := r.llmCaller.Call(messages, tools, r.systemPrompt)
+		resp, err := r.llmCaller.Call(messages, allTools, r.systemPrompt)
 		if err != nil {
 			r.messageHistory = messages
 			r.emit(StreamEvent{Type: EventError, Content: err.Error()})
@@ -208,7 +213,7 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 					Content: fmt.Sprintf("Running %s", block.Name),
 				})
 
-				result := r.runTool(block.Name, block.Input, tools)
+				result := r.runTool(block.Name, block.Input, allTools)
 
 				// Truncate result for display
 				displayResult := result
@@ -265,8 +270,8 @@ func (r *Runner) emitMessages(messages []Message) {
 	})
 }
 
-func (r *Runner) runTool(name string, args map[string]any, tools map[string]Tool) string {
-	tool, ok := tools[name]
+func (r *Runner) runTool(name string, args map[string]any, allTools map[string]tools.Tool) string {
+	tool, ok := allTools[name]
 	if !ok {
 		return fmt.Sprintf("error: unknown tool %s", name)
 	}
@@ -278,291 +283,17 @@ func (r *Runner) runTool(name string, args map[string]any, tools map[string]Tool
 	return tool.Func(args)
 }
 
-// makeTools creates tools that work in the runner's work directory.
-func (r *Runner) makeTools() map[string]Tool {
-	return map[string]Tool{
-		"read": {
-			Description: "Read file with line numbers",
-			Schema: map[string]any{
-				"path":   "string",
-				"offset": "number?",
-				"limit":  "number?",
-			},
-			Func: r.toolRead,
-		},
-		"write": {
-			Description: "Write content to file",
-			Schema: map[string]any{
-				"path":    "string",
-				"content": "string",
-			},
-			Func: r.toolWrite,
-		},
-		"edit": {
-			Description: "Replace old with new in file",
-			Schema: map[string]any{
-				"path": "string",
-				"old":  "string",
-				"new":  "string",
-				"all":  "boolean?",
-			},
-			Func: r.toolEdit,
-		},
-		"glob": {
-			Description: "Find files by pattern",
-			Schema: map[string]any{
-				"pat":  "string",
-				"path": "string?",
-			},
-			Func: r.toolGlob,
-		},
-		"grep": {
-			Description: "Search files for regex pattern",
-			Schema: map[string]any{
-				"pat":  "string",
-				"path": "string?",
-			},
-			Func: r.toolGrep,
-		},
-		"bash": {
-			Description: "Run shell command",
-			Schema: map[string]any{
-				"cmd": "string",
-			},
-			Func: r.toolBash,
-		},
-		"ls": {
-			Description: "List directory contents",
-			Schema: map[string]any{
-				"path": "string?",
-			},
-			Func: r.toolLs,
-		},
-		"todos": r.makeTodoTool(),
-	}
-}
-
-func (r *Runner) resolvePath(path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(r.workDir, path)
-}
-
-func (r *Runner) toolRead(args map[string]any) string {
-	path := r.resolvePath(args["path"].(string))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-	lines := strings.Split(string(data), "\n")
-
-	offset := 0
-	if o, ok := args["offset"].(float64); ok {
-		offset = int(o)
-	}
-	limit := len(lines)
-	if l, ok := args["limit"].(float64); ok {
-		limit = int(l)
+// emitTodoUpdate sends a todo update event through the callback
+func (r *Runner) emitTodoUpdate() {
+	if r.callback == nil {
+		return
 	}
 
-	end := min(offset+limit, len(lines))
+	todos := r.todoState.GetTodos()
+	data, _ := json.Marshal(todos)
 
-	var sb strings.Builder
-	for i := offset; i < end; i++ {
-		fmt.Fprintf(&sb, "%4d| %s\n", i+1, lines[i])
-	}
-	return sb.String()
-}
-
-func (r *Runner) toolWrite(args map[string]any) string {
-	path := r.resolvePath(args["path"].(string))
-	content := args["content"].(string)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-	return "ok"
-}
-
-func (r *Runner) toolEdit(args map[string]any) string {
-	path := r.resolvePath(args["path"].(string))
-	oldStr := args["old"].(string)
-	newStr := args["new"].(string)
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-	text := string(data)
-
-	if !strings.Contains(text, oldStr) {
-		return "error: old_string not found"
-	}
-
-	count := strings.Count(text, oldStr)
-	doAll := false
-	if a, ok := args["all"].(bool); ok {
-		doAll = a
-	}
-	if !doAll && count > 1 {
-		return fmt.Sprintf("error: old_string appears %d times, use all=true", count)
-	}
-
-	var replacement string
-	if doAll {
-		replacement = strings.ReplaceAll(text, oldStr, newStr)
-	} else {
-		replacement = strings.Replace(text, oldStr, newStr, 1)
-	}
-
-	if err := os.WriteFile(path, []byte(replacement), 0644); err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-	return "ok"
-}
-
-func (r *Runner) toolGlob(args map[string]any) string {
-	pat := args["pat"].(string)
-	basePath := r.workDir
-	if p, ok := args["path"].(string); ok {
-		basePath = r.resolvePath(p)
-	}
-
-	fullPat := filepath.Join(basePath, pat)
-	matches, err := filepath.Glob(fullPat)
-	if err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-
-	type fileInfo struct {
-		path  string
-		mtime time.Time
-	}
-	fileInfos := []fileInfo{}
-	for _, match := range matches {
-		info, err := os.Stat(match)
-		if err != nil {
-			continue
-		}
-		fileInfos = append(fileInfos, fileInfo{match, info.ModTime()})
-	}
-
-	sort.Slice(fileInfos, func(i, j int) bool {
-		return fileInfos[i].mtime.After(fileInfos[j].mtime)
+	r.emit(StreamEvent{
+		Type:    EventTodo,
+		Content: string(data),
 	})
-
-	if len(fileInfos) == 0 {
-		return "none"
-	}
-
-	var sb strings.Builder
-	for _, fi := range fileInfos {
-		// Make path relative to workdir for cleaner output
-		rel, _ := filepath.Rel(r.workDir, fi.path)
-		if rel == "" {
-			rel = fi.path
-		}
-		sb.WriteString(rel + "\n")
-	}
-	return sb.String()
-}
-
-func (r *Runner) toolGrep(args map[string]any) string {
-	pat := args["pat"].(string)
-	basePath := r.workDir
-	if p, ok := args["path"].(string); ok {
-		basePath = r.resolvePath(p)
-	}
-
-	re, err := regexp.Compile(pat)
-	if err != nil {
-		return fmt.Sprintf("error: invalid regex: %v", err)
-	}
-
-	hits := []string{}
-	_ = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		// Skip binary files and hidden directories
-		if strings.Contains(path, "/.git/") || strings.Contains(path, "/node_modules/") {
-			return nil
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-
-		lines := strings.Split(string(data), "\n")
-		for lineNum, line := range lines {
-			if re.MatchString(line) {
-				rel, _ := filepath.Rel(r.workDir, path)
-				if rel == "" {
-					rel = path
-				}
-				hits = append(hits, fmt.Sprintf("%s:%d:%s", rel, lineNum+1, strings.TrimSpace(line)))
-			}
-		}
-		return nil
-	})
-
-	if len(hits) == 0 {
-		return "none"
-	}
-
-	if len(hits) > 50 {
-		hits = hits[:50]
-	}
-	return strings.Join(hits, "\n")
-}
-
-func (r *Runner) toolBash(args map[string]any) string {
-	cmdStr := args["cmd"].(string)
-	cmd := exec.Command("bash", "-c", cmdStr)
-	cmd.Dir = r.workDir
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	output := stdout.String() + stderr.String()
-
-	if err != nil {
-		output += fmt.Sprintf("\n(exit: %v)", err)
-	}
-
-	if strings.TrimSpace(output) == "" {
-		return "(empty)"
-	}
-	return output
-}
-
-func (r *Runner) toolLs(args map[string]any) string {
-	path := r.workDir
-	if p, ok := args["path"].(string); ok {
-		path = r.resolvePath(p)
-	}
-
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return fmt.Sprintf("error: %v", err)
-	}
-
-	var sb strings.Builder
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() {
-			name += "/"
-		}
-		sb.WriteString(name + "\n")
-	}
-	return sb.String()
 }
