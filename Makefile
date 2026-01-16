@@ -61,10 +61,11 @@ deps:
 	@go install github.com/air-verse/air@latest
 	@go install github.com/a-h/templ/cmd/templ@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 ##@ Code Generation
 
-generate:
+generate: sqlc
 	@echo "Generating code..."
 	@if command -v templ >/dev/null 2>&1; then \
 		templ generate; \
@@ -72,6 +73,14 @@ generate:
 		echo "templ not installed, skipping... (run 'make deps' to install)"; \
 	fi
 	go generate ./...
+
+sqlc:
+	@echo "Generating sqlc code..."
+	@if command -v sqlc >/dev/null 2>&1; then \
+		sqlc generate; \
+	else \
+		echo "sqlc not installed, skipping... (run 'go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest')"; \
+	fi
 
 ##@ Docker
 
