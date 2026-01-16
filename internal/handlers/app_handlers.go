@@ -577,7 +577,7 @@ func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
 		slog.Error("File search failed", "error", err)
 		// Return empty array instead of error to avoid breaking UI
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("[]"))
+		_, _ = w.Write([]byte("[]"))
 		return
 	}
 
