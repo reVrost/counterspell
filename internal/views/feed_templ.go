@@ -40,7 +40,7 @@ func Feed(data FeedData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><!-- IN PROGRESS (SSE streaming) --><div class=\"mb-6\"><h3 class=\"px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2\">In Progress</h3><div class=\"space-y-2\" hx-ext=\"sse\" sse-connect=\"/feed/stream\" sse-swap=\"active-update\" hx-swap=\"innerHTML\"><!-- Initial content, replaced by SSE updates -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><!-- IN PROGRESS (SSE streaming) --><div class=\"mb-6\"><h3 class=\"px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3\">In Progress</h3><div class=\"space-y-3\" hx-ext=\"sse\" sse-connect=\"/feed/stream\" sse-swap=\"active-update\" hx-swap=\"innerHTML\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -53,7 +53,7 @@ func Feed(data FeedData) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(data.Done) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"pt-4 border-t border-gray-800/50\"><h3 class=\"px-2 text-xs font-bold text-gray-600 uppercase tracking-wider mb-2\">Completed</h3><div class=\"space-y-2 opacity-60 hover:opacity-100 transition\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"pt-4 border-t border-gray-800/50\"><h3 class=\"px-2 text-xs font-bold text-gray-600 uppercase tracking-wider mb-3\">Completed</h3><div class=\"space-y-3\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -99,7 +99,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, task := range tasks {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"bg-[#13151A] border border-gray-800/50 rounded-xl p-3 opacity-90 transition hover:opacity-100 shadow-sm\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<button type=\"button\" class=\"w-full text-left bg-[#13151A] border border-gray-800/50 rounded-2xl p-4 transition-all duration-150 shadow-sm active:scale-[0.98] active:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -129,7 +129,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 = []any{fmt.Sprintf("%s opacity-70 w-5 h-5 rounded flex items-center justify-center text-[10px]", projects[task.ProjectID].Color)}
+			var templ_7745c5c3_Var5 = []any{fmt.Sprintf("%s opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-xs", projects[task.ProjectID].Color)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var5...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -169,7 +169,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\"></i></span> <span class=\"text-xs font-medium text-gray-400\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\"></i></span> <span class=\"text-sm font-medium text-gray-400\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -182,26 +182,26 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span></div><div class=\"flex items-center gap-2\"><span class=\"text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-md font-medium border border-orange-500/20 shrink-0\">In Progress</span> <span class=\"text-[10px] text-orange-400/80 font-mono tabular-nums\" x-text=\"elapsed + 's'\"></span></div></div><p class=\"text-sm text-gray-200 font-medium leading-tight line-clamp-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span></div><div class=\"flex items-center gap-2\"><span class=\"text-xs text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20\">In Progress</span> <span class=\"text-xs text-orange-400/80 font-mono tabular-nums\" x-text=\"elapsed + 's'\"></span></div></div><p class=\"text-base text-gray-200 font-medium leading-snug line-clamp-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 61, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 61, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</p></button> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if len(tasks) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"px-2 text-xs text-gray-600 italic\">No active agents running...</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"px-2 py-8 text-sm text-gray-600 text-center\">No active agents running</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -233,7 +233,7 @@ func ReviewsSection(data FeedData) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		if len(data.Reviews) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"mb-6\"><h3 class=\"px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2\">Needs Review</h3><div class=\"space-y-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"mb-6\"><h3 class=\"px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3\">Needs Review</h3><div class=\"space-y-3\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -273,24 +273,24 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"bg-[#13151A] border border-gray-800 rounded-xl p-3 active:bg-gray-800 transition shadow-sm relative group\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" class=\"w-full text-left bg-[#13151A] border border-gray-800 rounded-2xl p-4 transition-all duration-150 shadow-sm relative active:scale-[0.98] active:bg-gray-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500/50\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 87, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 88, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" hx-target=\"#modal-content\" hx-swap=\"morph\"><div class=\"flex justify-between items-start mb-1\"><div class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" hx-target=\"#modal-content\" hx-swap=\"morph\"><div class=\"flex justify-between items-start mb-2\"><div class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var14 = []any{fmt.Sprintf("%s bg-gray-800/50 border border-gray-700/50 w-5 h-5 rounded flex items-center justify-center text-[10px]", project.Color)}
+		var templ_7745c5c3_Var14 = []any{fmt.Sprintf("%s bg-gray-800/50 border border-gray-700/50 w-6 h-6 rounded-lg flex items-center justify-center text-xs", project.Color)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var14...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -330,33 +330,33 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"></i></span> <span class=\"text-xs font-medium text-gray-400\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"></i></span> <span class=\"text-sm font-medium text-gray-400\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 96, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 97, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></div><span class=\"text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-medium border border-blue-500/20 shrink-0\">Review</span></div><p class=\"text-sm text-gray-200 font-medium leading-tight pr-4 line-clamp-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></div><span class=\"text-xs text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg font-medium border border-blue-500/20\">Review</span></div><p class=\"text-base text-gray-200 font-medium leading-snug pr-6 line-clamp-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 100, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 101, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p><div class=\"absolute right-3 top-1/2 -translate-y-1/2 text-gray-700\"><i class=\"fas fa-chevron-right text-xs\"></i></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p><div class=\"absolute right-4 top-1/2 -translate-y-1/2 text-gray-600\"><i class=\"fas fa-chevron-right text-sm\"></i></div></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -385,46 +385,46 @@ func CompletedTaskRow(task *UITask, project UIProject) templ.Component {
 			templ_7745c5c3_Var20 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div class=\"bg-[#13151A] border border-gray-800/20 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-gray-800/50 transition\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<button type=\"button\" class=\"w-full text-left bg-[#13151A]/60 border border-gray-800/20 rounded-2xl p-4 flex justify-between items-center transition-all duration-150 active:scale-[0.98] active:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-green-500/50\" @click=\"modalOpen = true; history.pushState({ modal: true }, '')\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 111, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 113, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" hx-target=\"#modal-content\" hx-swap=\"morph\"><div class=\"flex items-center gap-3\"><div class=\"w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]\"><i class=\"fas fa-check\"></i></div><div><div class=\"text-sm text-gray-400 decoration-gray-600 group-hover:no-underline group-hover:text-gray-300 transition line-clamp-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" hx-target=\"#modal-content\" hx-swap=\"morph\"><div class=\"flex items-center gap-3\"><div class=\"w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-xs shrink-0\"><i class=\"fas fa-check\"></i></div><div class=\"min-w-0\"><div class=\"text-base text-gray-400 leading-snug line-clamp-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 120, Col: 152}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 122, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div><div class=\"text-[10px] text-gray-600\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div><div class=\"text-xs text-gray-600 mt-0.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 121, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 123, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</div></div></div><i class=\"fas fa-chevron-right text-[10px] text-gray-700 opacity-0 group-hover:opacity-100 transition\"></i></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</div></div></div><i class=\"fas fa-chevron-right text-sm text-gray-700 ml-3 shrink-0\"></i></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
