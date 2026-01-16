@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/revrost/code/counterspell/internal/db"
+	"github.com/revrost/code/counterspell/internal/db/sqlc"
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
@@ -22,22 +23,7 @@ func NewSettingsService(db *db.DB) *SettingsService {
 
 // GetSettings retrieves the user settings.
 func (s *SettingsService) GetSettings(ctx context.Context) (*models.UserSettings, error) {
-	// We assume a single user for now with ID "default"
-	query := `SELECT user_id, openrouter_key, zai_key, anthropic_key, openai_key, 
-	          COALESCE(agent_backend, 'native') as agent_backend, updated_at 
-	          FROM user_settings WHERE user_id = 'default'`
-
-	var settings models.UserSettings
-	err := s.db.QueryRowContext(ctx, query).Scan(
-		&settings.UserID,
-		&settings.OpenRouterKey,
-		&settings.ZaiKey,
-		&settings.AnthropicKey,
-		&settings.OpenAIKey,
-		&settings.AgentBackend,
-		&settings.UpdatedAt,
-	)
-
+	row, err := s.db.Queries.GetUserSettings(ctx)
 	if err == sql.ErrNoRows {
 		// Return empty settings with default backend
 		return &models.UserSettings{UserID: "default", AgentBackend: models.AgentBackendNative}, nil
@@ -46,29 +32,29 @@ func (s *SettingsService) GetSettings(ctx context.Context) (*models.UserSettings
 		return nil, fmt.Errorf("failed to get settings: %w", err)
 	}
 
-	return &settings, nil
+	settings := &models.UserSettings{
+		UserID:        row.UserID,
+		OpenRouterKey: row.OpenrouterKey.String,
+		ZaiKey:        row.ZaiKey.String,
+		AnthropicKey:  row.AnthropicKey.String,
+		OpenAIKey:     row.OpenaiKey.String,
+		AgentBackend:  row.AgentBackend,
+		UpdatedAt:     row.UpdatedAt.Time,
+	}
+
+	return settings, nil
 }
 
 // UpdateSettings updates the user settings.
 func (s *SettingsService) UpdateSettings(ctx context.Context, settings *models.UserSettings) error {
-	query := `INSERT INTO user_settings (user_id, openrouter_key, zai_key, anthropic_key, openai_key, agent_backend, updated_at)
-	          VALUES ('default', ?, ?, ?, ?, ?, ?)
-	          ON CONFLICT(user_id) DO UPDATE SET
-	          openrouter_key = excluded.openrouter_key,
-	          zai_key = excluded.zai_key,
-	          anthropic_key = excluded.anthropic_key,
-	          openai_key = excluded.openai_key,
-	          agent_backend = excluded.agent_backend,
-	          updated_at = excluded.updated_at`
-
-	_, err := s.db.ExecContext(ctx, query,
-		settings.OpenRouterKey,
-		settings.ZaiKey,
-		settings.AnthropicKey,
-		settings.OpenAIKey,
-		settings.GetAgentBackend(),
-		time.Now(),
-	)
+	err := s.db.Queries.UpsertUserSettings(ctx, sqlc.UpsertUserSettingsParams{
+		OpenrouterKey: sql.NullString{String: settings.OpenRouterKey, Valid: settings.OpenRouterKey != ""},
+		ZaiKey:        sql.NullString{String: settings.ZaiKey, Valid: settings.ZaiKey != ""},
+		AnthropicKey:  sql.NullString{String: settings.AnthropicKey, Valid: settings.AnthropicKey != ""},
+		OpenaiKey:     sql.NullString{String: settings.OpenAIKey, Valid: settings.OpenAIKey != ""},
+		AgentBackend:  sql.NullString{String: settings.GetAgentBackend(), Valid: true},
+		UpdatedAt:     sql.NullTime{Time: time.Now(), Valid: true},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update settings: %w", err)
 	}

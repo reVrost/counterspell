@@ -2,6 +2,7 @@
 .env
 .envrc
 tmp
+app
 
 # Database
 *.db

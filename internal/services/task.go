@@ -9,6 +9,7 @@ import (
 
 	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/code/counterspell/internal/db"
+	"github.com/revrost/code/counterspell/internal/db/sqlc"
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
@@ -27,129 +28,72 @@ func (s *TaskService) Create(ctx context.Context, projectID, title, intent strin
 	id := shortuuid.New()
 	now := time.Now()
 
-	query := `
-		INSERT INTO tasks (id, project_id, title, intent, status, position, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`
-	_, err := s.db.ExecContext(ctx, query, id, projectID, title, intent, models.StatusTodo, 0, now, now)
+	task, err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
+		ID:        id,
+		ProjectID: projectID,
+		Title:     title,
+		Intent:    intent,
+		Status:    string(models.StatusTodo),
+		Position:  sql.NullInt64{Int64: 0, Valid: true},
+		CreatedAt: sql.NullTime{Time: now, Valid: true},
+		UpdatedAt: sql.NullTime{Time: now, Valid: true},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
-	return s.Get(ctx, id)
+	return sqlcTaskToModel(task), nil
 }
 
 // Get retrieves a task by ID.
 func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) {
-	query := `
-		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, message_history, created_at, updated_at
-		FROM tasks WHERE id = ?
-	`
-	var agentOutput, gitDiff, messageHistory sql.NullString
-	var task models.Task
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
-		&task.Position, &agentOutput, &gitDiff, &messageHistory, &task.CreatedAt, &task.UpdatedAt,
-	)
+	task, err := s.db.Queries.GetTask(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("task not found")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task: %w", err)
 	}
-	if agentOutput.Valid {
-		task.AgentOutput = agentOutput.String
-	}
-	if gitDiff.Valid {
-		task.GitDiff = gitDiff.String
-	}
-	if messageHistory.Valid {
-		task.MessageHistory = messageHistory.String
-	}
-	return &task, nil
+	return sqlcTaskToModel(task), nil
 }
 
 // List returns all tasks, optionally filtered by status and/or project.
 func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, projectID *string) ([]models.Task, error) {
-	var query string
-	var args []interface{}
+	var tasks []sqlc.Task
+	var err error
 
-	whereClauses := []string{}
-	if status != nil {
-		whereClauses = append(whereClauses, "status = ?")
-		args = append(args, *status)
+	switch {
+	case status != nil && projectID != nil:
+		tasks, err = s.db.Queries.ListTasksByStatusAndProject(ctx, sqlc.ListTasksByStatusAndProjectParams{
+			Status:    string(*status),
+			ProjectID: *projectID,
+		})
+	case status != nil:
+		tasks, err = s.db.Queries.ListTasksByStatus(ctx, string(*status))
+	case projectID != nil:
+		tasks, err = s.db.Queries.ListTasksByProject(ctx, *projectID)
+	default:
+		tasks, err = s.db.Queries.ListTasks(ctx)
 	}
-	if projectID != nil {
-		whereClauses = append(whereClauses, "project_id = ?")
-		args = append(args, *projectID)
-	}
 
-	whereClause := ""
-	if len(whereClauses) > 0 {
-		whereClause = "WHERE " + joinStrings(whereClauses, " AND ")
-	}
-
-	query = `
-		SELECT id, project_id, title, intent, status, position, agent_output, git_diff, message_history, created_at, updated_at
-		FROM tasks
-	` + whereClause + `
-		ORDER BY status ASC, position ASC, created_at DESC
-	`
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tasks: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			fmt.Printf("Failed to close rows: %v\n", err)
-		}
-	}()
 
-	var tasks []models.Task
-	for rows.Next() {
-		var task models.Task
-		var agentOutput, gitDiff, messageHistory sql.NullString
-		err := rows.Scan(
-			&task.ID, &task.ProjectID, &task.Title, &task.Intent, &task.Status,
-			&task.Position, &agentOutput, &gitDiff, &messageHistory, &task.CreatedAt, &task.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan task: %w", err)
-		}
-		if agentOutput.Valid {
-			task.AgentOutput = agentOutput.String
-		}
-		if gitDiff.Valid {
-			task.GitDiff = gitDiff.String
-		}
-		if messageHistory.Valid {
-			task.MessageHistory = messageHistory.String
-		}
-		tasks = append(tasks, task)
+	result := make([]models.Task, len(tasks))
+	for i, t := range tasks {
+		result[i] = *sqlcTaskToModel(t)
 	}
-
-	return tasks, nil
-}
-
-func joinStrings(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for _, s := range strs[1:] {
-		result += sep + s
-	}
-	return result
+	return result, nil
 }
 
 // UpdateStatus updates a task's status.
 func (s *TaskService) UpdateStatus(ctx context.Context, id string, status models.TaskStatus) error {
-	query := `
-		UPDATE tasks SET status = ?, updated_at = ?
-		WHERE id = ?
-	`
-	_, err := s.db.ExecContext(ctx, query, status, time.Now(), id)
+	err := s.db.Queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
+		Status:    string(status),
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		ID:        id,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
@@ -158,11 +102,11 @@ func (s *TaskService) UpdateStatus(ctx context.Context, id string, status models
 
 // Move updates a task's position within its status column.
 func (s *TaskService) Move(ctx context.Context, id string, newPosition int) error {
-	query := `
-		UPDATE tasks SET position = ?, updated_at = ?
-		WHERE id = ?
-	`
-	_, err := s.db.ExecContext(ctx, query, newPosition, time.Now(), id)
+	err := s.db.Queries.UpdateTaskPosition(ctx, sqlc.UpdateTaskPositionParams{
+		Position:  sql.NullInt64{Int64: int64(newPosition), Valid: true},
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		ID:        id,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to move task: %w", err)
 	}
@@ -171,11 +115,12 @@ func (s *TaskService) Move(ctx context.Context, id string, newPosition int) erro
 
 // UpdatePositionAndStatus updates both position and status in one operation.
 func (s *TaskService) UpdatePositionAndStatus(ctx context.Context, id string, status models.TaskStatus, position int) error {
-	query := `
-		UPDATE tasks SET status = ?, position = ?, updated_at = ?
-		WHERE id = ?
-	`
-	_, err := s.db.ExecContext(ctx, query, status, position, time.Now(), id)
+	err := s.db.Queries.UpdateTaskPositionAndStatus(ctx, sqlc.UpdateTaskPositionAndStatusParams{
+		Status:    string(status),
+		Position:  sql.NullInt64{Int64: int64(position), Valid: true},
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		ID:        id,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update task position and status: %w", err)
 	}
@@ -184,8 +129,7 @@ func (s *TaskService) UpdatePositionAndStatus(ctx context.Context, id string, st
 
 // Delete removes a task.
 func (s *TaskService) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM tasks WHERE id = ?`
-	_, err := s.db.ExecContext(ctx, query, id)
+	err := s.db.Queries.DeleteTask(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}
@@ -194,11 +138,14 @@ func (s *TaskService) Delete(ctx context.Context, id string) error {
 
 // UpdateWithResult updates a task's status, agent output, git diff, and message history.
 func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status models.TaskStatus, agentOutput, gitDiff, messageHistory string) error {
-	query := `
-		UPDATE tasks SET status = ?, agent_output = ?, git_diff = ?, message_history = ?, updated_at = ?
-		WHERE id = ?
-	`
-	_, err := s.db.ExecContext(ctx, query, status, agentOutput, gitDiff, messageHistory, time.Now(), id)
+	err := s.db.Queries.UpdateTaskResult(ctx, sqlc.UpdateTaskResultParams{
+		Status:         string(status),
+		AgentOutput:    sql.NullString{String: agentOutput, Valid: agentOutput != ""},
+		GitDiff:        sql.NullString{String: gitDiff, Valid: gitDiff != ""},
+		MessageHistory: sql.NullString{String: messageHistory, Valid: messageHistory != ""},
+		UpdatedAt:      sql.NullTime{Time: time.Now(), Valid: true},
+		ID:             id,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to update task result: %w", err)
 	}
@@ -207,11 +154,10 @@ func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status mo
 
 // ClearHistory clears a task's message history and agent output.
 func (s *TaskService) ClearHistory(ctx context.Context, id string) error {
-	query := `
-		UPDATE tasks SET message_history = '', agent_output = '', updated_at = ?
-		WHERE id = ?
-	`
-	_, err := s.db.ExecContext(ctx, query, time.Now(), id)
+	err := s.db.Queries.ClearTaskHistory(ctx, sqlc.ClearTaskHistoryParams{
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		ID:        id,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to clear task history: %w", err)
 	}
@@ -224,11 +170,11 @@ func (s *TaskService) ClearHistory(ctx context.Context, id string) error {
 // - Tasks without output go to todo (they were interrupted)
 func (s *TaskService) ResetInProgress(ctx context.Context) error {
 	// Tasks that have output should go to review, not todo
-	query := `
-		UPDATE tasks SET status = ?, updated_at = ?
-		WHERE status = ? AND (agent_output IS NOT NULL AND agent_output != '')
-	`
-	result, err := s.db.ExecContext(ctx, query, models.StatusReview, time.Now(), models.StatusInProgress)
+	result, err := s.db.Queries.ResetCompletedInProgressTasks(ctx, sqlc.ResetCompletedInProgressTasksParams{
+		Status:    string(models.StatusReview),
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		Status_2:  string(models.StatusInProgress),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to reset completed in-progress tasks: %w", err)
 	}
@@ -238,11 +184,11 @@ func (s *TaskService) ResetInProgress(ctx context.Context) error {
 	}
 
 	// Tasks without output should go back to todo
-	query = `
-		UPDATE tasks SET status = ?, updated_at = ?
-		WHERE status = ? AND (agent_output IS NULL OR agent_output = '')
-	`
-	result, err = s.db.ExecContext(ctx, query, models.StatusTodo, time.Now(), models.StatusInProgress)
+	result, err = s.db.Queries.ResetStuckInProgressTasks(ctx, sqlc.ResetStuckInProgressTasksParams{
+		Status:    string(models.StatusTodo),
+		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		Status_2:  string(models.StatusInProgress),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to reset stuck in-progress tasks: %w", err)
 	}
@@ -255,8 +201,11 @@ func (s *TaskService) ResetInProgress(ctx context.Context) error {
 
 // AddLog adds a log entry for a task.
 func (s *TaskService) AddLog(ctx context.Context, taskID, level, message string) error {
-	query := `INSERT INTO agent_logs (task_id, level, message) VALUES (?, ?, ?)`
-	_, err := s.db.ExecContext(ctx, query, taskID, level, message)
+	err := s.db.Queries.CreateAgentLog(ctx, sqlc.CreateAgentLogParams{
+		TaskID:  taskID,
+		Level:   sql.NullString{String: level, Valid: level != ""},
+		Message: message,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to add log: %w", err)
 	}
@@ -265,20 +214,44 @@ func (s *TaskService) AddLog(ctx context.Context, taskID, level, message string)
 
 // GetLogs retrieves logs for a task.
 func (s *TaskService) GetLogs(ctx context.Context, taskID string) ([]*models.AgentLog, error) {
-	query := `SELECT id, task_id, level, message, created_at FROM agent_logs WHERE task_id = ? ORDER BY id ASC`
-	rows, err := s.db.QueryContext(ctx, query, taskID)
+	logs, err := s.db.Queries.GetAgentLogsByTask(ctx, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get logs: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
 
-	var logs []*models.AgentLog
-	for rows.Next() {
-		var log models.AgentLog
-		if err := rows.Scan(&log.ID, &log.TaskID, &log.Level, &log.Message, &log.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan log: %w", err)
+	result := make([]*models.AgentLog, len(logs))
+	for i, log := range logs {
+		result[i] = &models.AgentLog{
+			ID:        log.ID,
+			TaskID:    log.TaskID,
+			Level:     models.LogLevel(log.Level.String),
+			Message:   log.Message,
+			CreatedAt: log.CreatedAt.Time,
 		}
-		logs = append(logs, &log)
 	}
-	return logs, nil
+	return result, nil
+}
+
+// sqlcTaskToModel converts a sqlc Task to a models.Task
+func sqlcTaskToModel(t sqlc.Task) *models.Task {
+	task := &models.Task{
+		ID:        t.ID,
+		ProjectID: t.ProjectID,
+		Title:     t.Title,
+		Intent:    t.Intent,
+		Status:    models.TaskStatus(t.Status),
+		Position:  int(t.Position.Int64),
+		CreatedAt: t.CreatedAt.Time,
+		UpdatedAt: t.UpdatedAt.Time,
+	}
+	if t.AgentOutput.Valid {
+		task.AgentOutput = t.AgentOutput.String
+	}
+	if t.GitDiff.Valid {
+		task.GitDiff = t.GitDiff.String
+	}
+	if t.MessageHistory.Valid {
+		task.MessageHistory = t.MessageHistory.String
+	}
+	return task
 }

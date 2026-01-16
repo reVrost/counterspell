@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/revrost/code/counterspell/internal/db/sqlc"
 	_ "modernc.org/sqlite"
 )
 
 //go:embed schema.sql
 var schemaFS embed.FS
 
-// DB wraps SQL database connection.
+// DB wraps SQL database connection and sqlc queries.
 type DB struct {
 	*sql.DB
+	Queries *sqlc.Queries
 }
 
 // Open opens a SQLite database at the given path and runs migrations.
@@ -36,7 +38,10 @@ func Open(path string) (*DB, error) {
 
 	slog.Info("Database opened", "path", path)
 
-	return &DB{sqlDB}, nil
+	return &DB{
+		DB:      sqlDB,
+		Queries: sqlc.New(sqlDB),
+	}, nil
 }
 
 // migrate runs schema migrations.
