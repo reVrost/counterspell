@@ -1,14 +1,13 @@
-package agent
+package tools
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"sync"
 )
 
-//go:embed todos.md
-var todosDescription string
+//go:embed todo.md
+var todoDescription string
 
 // TodoStatus represents the status of a todo item
 type TodoStatus string
@@ -83,27 +82,13 @@ func (ts *TodoState) GetProgress() (completed, total int) {
 	return
 }
 
-// ToJSON returns the todos as JSON string
-func (ts *TodoState) ToJSON() string {
-	ts.mu.RLock()
-	defer ts.mu.RUnlock()
-	data, _ := json.Marshal(ts.todos)
-	return string(data)
-}
-
-// TodoToolDescription returns the embedded description for the todo tool
-func TodoToolDescription() string {
-	return todosDescription
-}
-
-// makeTodoTool creates the todo tool for the agent
-func (r *Runner) makeTodoTool() Tool {
+func (r *Registry) makeTodoTool() Tool {
 	return Tool{
-		Description: "Manage a structured task list for tracking progress on complex tasks. " +
-			"Use this for multi-step tasks, complex work requiring planning, or when the user provides multiple tasks. " +
-			"Each task needs content (imperative), status (pending/in_progress/completed), and active_form (present continuous).",
+		Description: todoDescription,
+		// Description: "Manage a structured task list for tracking progress on complex tasks. " +
+		// 	"Use this for multi-step tasks, complex work requiring planning, or when the user provides multiple tasks. " +
+		// 	"Each task needs content (imperative), status (pending/in_progress/completed), and active_form (present continuous).",
 		Schema: map[string]any{
-			// Full JSON Schema for array of todo objects
 			"todos": map[string]any{
 				"type":        "array",
 				"description": "The updated todo list",
@@ -132,8 +117,7 @@ func (r *Runner) makeTodoTool() Tool {
 	}
 }
 
-// toolTodos handles the todo tool call
-func (r *Runner) toolTodos(args map[string]any) string {
+func (r *Registry) toolTodos(args map[string]any) string {
 	todosRaw, ok := args["todos"]
 	if !ok {
 		return "error: todos parameter required"
@@ -159,7 +143,6 @@ func (r *Runner) toolTodos(args map[string]any) string {
 			return "error: todo content is required"
 		}
 
-		// Validate status
 		var todoStatus TodoStatus
 		switch status {
 		case "pending":
@@ -179,18 +162,24 @@ func (r *Runner) toolTodos(args map[string]any) string {
 		})
 	}
 
+	if r.ctx.TodoState == nil {
+		return "error: todo state not initialized"
+	}
+
 	// Track what changed for the response
-	oldTodos := r.todoState.GetTodos()
+	oldTodos := r.ctx.TodoState.GetTodos()
 	oldStatusMap := make(map[string]TodoStatus)
 	for _, t := range oldTodos {
 		oldStatusMap[t.Content] = t.Status
 	}
 
 	// Update the state
-	r.todoState.SetTodos(newTodos)
+	r.ctx.TodoState.SetTodos(newTodos)
 
 	// Emit todo update event
-	r.emitTodoUpdate()
+	if r.ctx.OnTodoUpdate != nil {
+		r.ctx.OnTodoUpdate()
+	}
 
 	// Calculate stats
 	var pending, inProgress, completed int
@@ -233,19 +222,4 @@ func (r *Runner) toolTodos(args map[string]any) string {
 	response += "Continue with current tasks."
 
 	return response
-}
-
-// emitTodoUpdate sends a todo update event through the callback
-func (r *Runner) emitTodoUpdate() {
-	if r.callback == nil {
-		return
-	}
-
-	todos := r.todoState.GetTodos()
-	data, _ := json.Marshal(todos)
-
-	r.emit(StreamEvent{
-		Type:    EventTodo,
-		Content: string(data),
-	})
 }

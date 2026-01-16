@@ -25,6 +25,8 @@ package agent
 
 import (
 	"context"
+
+	"github.com/revrost/code/counterspell/internal/agent/tools"
 )
 
 // Backend is the core interface for agent task execution.
@@ -78,7 +80,7 @@ type IntrospectableBackend interface {
 	FinalMessage() string
 
 	// Todos returns the current task list (if agent tracks todos).
-	Todos() []TodoItem
+	Todos() []tools.TodoItem
 }
 
 // --- Backend info for introspection ---

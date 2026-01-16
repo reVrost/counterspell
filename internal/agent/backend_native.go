@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/revrost/code/counterspell/internal/agent/tools"
 	"github.com/revrost/code/counterspell/internal/llm"
 )
 
@@ -137,7 +138,7 @@ func (b *NativeBackend) FinalMessage() string {
 }
 
 // Todos returns the current task list.
-func (b *NativeBackend) Todos() []TodoItem {
+func (b *NativeBackend) Todos() []tools.TodoItem {
 	return b.runner.GetTodoState().GetTodos()
 }
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/revrost/code/counterspell/internal/agent/tools"
 	"github.com/revrost/code/counterspell/internal/llm"
 )
 
@@ -22,11 +23,11 @@ const (
 
 // APIRequest is what we send to Anthropic's API.
 type APIRequest struct {
-	Model     string    `json:"model"`
-	MaxTokens int       `json:"max_tokens"`
-	System    string    `json:"system"`   // System prompt (context for the assistant)
-	Messages  []Message `json:"messages"` // Conversation history
-	Tools     []ToolDef `json:"tools"`    // Tools available to the assistant
+	Model     string          `json:"model"`
+	MaxTokens int             `json:"max_tokens"`
+	System    string          `json:"system"`   // System prompt (context for the assistant)
+	Messages  []Message       `json:"messages"` // Conversation history
+	Tools     []tools.ToolDef `json:"tools"`    // Tools available to the assistant
 }
 
 // APIResponse is what we get back from Anthropic's API.
@@ -37,7 +38,7 @@ type APIResponse struct {
 // LLMCaller is an interface for calling LLM APIs.
 // Implementations handle the specific protocol (Anthropic vs OpenAI).
 type LLMCaller interface {
-	Call(messages []Message, tools map[string]Tool, systemPrompt string) (*APIResponse, error)
+	Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error)
 }
 
 // NewLLMCaller creates an LLMCaller based on the provider type.
@@ -55,13 +56,13 @@ type AnthropicCaller struct {
 	provider llm.Provider
 }
 
-func (c *AnthropicCaller) Call(messages []Message, tools map[string]Tool, systemPrompt string) (*APIResponse, error) {
+func (c *AnthropicCaller) Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error) {
 	req := APIRequest{
 		Model:     c.provider.Model(),
 		MaxTokens: maxToken,
 		System:    systemPrompt,
 		Messages:  messages,
-		Tools:     makeSchema(tools),
+		Tools:     tools.MakeSchema(allTools),
 	}
 
 	body, err := json.Marshal(req)
@@ -74,7 +75,7 @@ func (c *AnthropicCaller) Call(messages []Message, tools map[string]Tool, system
 		"url", c.provider.APIURL(),
 		"model", c.provider.Model(),
 		"message_count", len(messages),
-		"tool_count", len(tools),
+		"tool_count", len(allTools),
 	)
 	slog.Debug("[LLM REQUEST] Full payload", "body", string(prettyBody))
 
@@ -150,9 +151,9 @@ type OpenAIToolDef struct {
 }
 
 type FunctionDef struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Parameters  InputSchema `json:"parameters"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Parameters  tools.InputSchema `json:"parameters"`
 }
 
 type OpenAIToolCall struct {
@@ -172,7 +173,7 @@ type OpenAIResponse struct {
 	} `json:"choices"`
 }
 
-func (c *OpenAICaller) Call(messages []Message, tools map[string]Tool, systemPrompt string) (*APIResponse, error) {
+func (c *OpenAICaller) Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error) {
 	openAIMessages := []OpenAIMessage{}
 
 	openAIMessages = append(openAIMessages, OpenAIMessage{
@@ -236,13 +237,13 @@ func (c *OpenAICaller) Call(messages []Message, tools map[string]Tool, systemPro
 	}
 
 	openAITools := []OpenAIToolDef{}
-	for name, tool := range tools {
+	for name, tool := range allTools {
 		openAITools = append(openAITools, OpenAIToolDef{
 			Type: "function",
 			Function: FunctionDef{
 				Name:        name,
 				Description: tool.Description,
-				Parameters:  makeSchema(map[string]Tool{name: tool})[0].InputSchema,
+				Parameters:  tools.MakeSchema(map[string]tools.Tool{name: tool})[0].InputSchema,
 			},
 		})
 	}
