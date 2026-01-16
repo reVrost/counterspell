@@ -59,5 +59,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     zai_key TEXT,
     anthropic_key TEXT,
     openai_key TEXT,
+    agent_backend TEXT DEFAULT 'native',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

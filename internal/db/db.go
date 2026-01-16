@@ -137,6 +137,26 @@ func runMigrations(db *sql.DB) error {
 		}
 	}
 
+	// Migration 3: Add agent_backend column to user_settings table
+	var hasAgentBackend bool
+	err = db.QueryRow(`
+		SELECT COUNT(*) > 0
+		FROM pragma_table_info('user_settings')
+		WHERE name = 'agent_backend'
+	`).Scan(&hasAgentBackend)
+
+	if err != nil {
+		return fmt.Errorf("failed to check agent_backend column: %w", err)
+	}
+
+	if !hasAgentBackend {
+		slog.Info("Adding agent_backend column to user_settings table")
+		_, err = db.Exec(`ALTER TABLE user_settings ADD COLUMN agent_backend TEXT DEFAULT 'native'`)
+		if err != nil {
+			return fmt.Errorf("failed to add agent_backend column: %w", err)
+		}
+	}
+
 	return nil
 }
 

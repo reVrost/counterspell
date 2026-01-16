@@ -265,105 +265,155 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		"openrouter_key_len", len(settings.OpenRouterKey),
 		"zai_key_len", len(settings.ZaiKey),
 		"anthropic_key_len", len(settings.AnthropicKey),
-		"openai_key_len", len(settings.OpenAIKey))
+		"openai_key_len", len(settings.OpenAIKey),
+		"agent_backend", settings.GetAgentBackend())
 
-	// Parse model_id to get provider and model name
-	providerPrefix, modelName := llm.ParseModelID(job.ModelID)
-	slog.Info("[AGENT LOOP] Parsed model ID", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
+	// Create agent backend based on settings
+	agentBackend := settings.GetAgentBackend()
+	slog.Info("[AGENT LOOP] Creating agent backend", "task_id", job.TaskID, "backend", agentBackend)
 
-	var provider llm.Provider
-	switch providerPrefix {
-	case "openrouter", "o":
-		if settings.OpenRouterKey == "" {
-			o.emitError(job.TaskID, "OpenRouter API key not configured")
-			job.ResultCh <- TaskResult{
-				TaskID: job.TaskID,
-				Success: false,
-				Error:   "OpenRouter API key not configured",
-			}
-			return
-		}
-		provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
-	case "zai", "z":
-		if settings.ZaiKey == "" {
-			slog.Error("[AGENT LOOP] Z.ai API key not configured", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
-			o.emitError(job.TaskID, "Z.ai API key not configured")
-			job.ResultCh <- TaskResult{
-				TaskID: job.TaskID,
-				Success: false,
-				Error:   "Z.ai API key not configured",
-			}
-			return
-		}
-		slog.Info("[AGENT LOOP] Creating Z.ai provider", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
-		provider = llm.NewZaiProvider(settings.ZaiKey)
-	case "anthropic":
-		if settings.AnthropicKey == "" {
-			o.emitError(job.TaskID, "Anthropic API key not configured")
-			job.ResultCh <- TaskResult{
-				TaskID: job.TaskID,
-				Success: false,
-				Error:   "Anthropic API key not configured",
-			}
-			return
-		}
-		provider = llm.NewAnthropicProvider(settings.AnthropicKey)
-	default:
-		// Try auto-detect based on available keys
-		if settings.OpenRouterKey != "" {
-			provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
-		} else if settings.ZaiKey != "" {
-			provider = llm.NewZaiProvider(settings.ZaiKey)
-		} else if settings.AnthropicKey != "" {
-			provider = llm.NewAnthropicProvider(settings.AnthropicKey)
-		} else {
-			o.emitError(job.TaskID, "No API key configured. Add OpenRouter, Z.ai, or Anthropic key in Settings.")
-			job.ResultCh <- TaskResult{
-				TaskID: job.TaskID,
-				Success: false,
-				Error:   "No API key configured",
-			}
-			return
-		}
-	}
+	var backend agent.Backend
+	var agentOutput, messageHistory string
 
-	// Set model name on provider
-	if modelName != "" {
-		provider.SetModel(modelName)
-	}
-
-	finalModel := provider.Model()
-	slog.Info("[AGENT LOOP] Provider configured", "task_id", job.TaskID, "final_model", finalModel)
-
-	if job.IsContinuation {
-		o.emit(job.TaskID, "plan", fmt.Sprintf("Continuing with model: %s...", finalModel))
-	} else {
-		o.emit(job.TaskID, "plan", fmt.Sprintf("Starting agent with model: %s...", finalModel))
-	}
-
-	// Create agent runner with streaming callback
-	slog.Info("[AGENT LOOP] Creating agent runner", "task_id", job.TaskID, "worktree", worktreePath, "intent", job.Intent, "provider", providerPrefix, "model", finalModel, "is_continuation", job.IsContinuation)
-	runner := agent.NewRunner(provider, worktreePath, func(event agent.StreamEvent) {
+	callback := func(event agent.StreamEvent) {
 		slog.Debug("[AGENT LOOP] Agent event", "task_id", job.TaskID, "event_type", event.Type)
 		o.handleAgentEvent(job.TaskID, event)
-	})
+	}
 
-	// Load message history for continuations
-	if job.IsContinuation && job.MessageHistory != "" {
-		if err := runner.SetMessageHistory(job.MessageHistory); err != nil {
-			slog.Warn("[AGENT LOOP] Failed to load message history", "task_id", job.TaskID, "error", err)
+	switch agentBackend {
+	case models.AgentBackendClaudeCode:
+		// Use Claude Code CLI backend
+		o.emit(job.TaskID, "plan", "Starting Claude Code agent...")
+		claudeBackend, err := agent.NewClaudeCodeBackend(
+			agent.WithClaudeWorkDir(worktreePath),
+			agent.WithClaudeCallback(callback),
+		)
+		if err != nil {
+			slog.Error("[AGENT LOOP] Failed to create Claude Code backend", "task_id", job.TaskID, "error", err)
+			o.emitError(job.TaskID, "Claude Code not available: "+err.Error())
+			job.ResultCh <- TaskResult{
+				TaskID:  job.TaskID,
+				Success: false,
+				Error:   "Claude Code not available: " + err.Error(),
+			}
+			return
+		}
+		backend = claudeBackend
+		defer claudeBackend.Close()
+
+	default:
+		// Use native backend (Counterspell)
+		// Parse model_id to get provider and model name
+		providerPrefix, modelName := llm.ParseModelID(job.ModelID)
+		slog.Info("[AGENT LOOP] Parsed model ID", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
+
+		var provider llm.Provider
+		switch providerPrefix {
+		case "openrouter", "o":
+			if settings.OpenRouterKey == "" {
+				o.emitError(job.TaskID, "OpenRouter API key not configured")
+				job.ResultCh <- TaskResult{
+					TaskID:  job.TaskID,
+					Success: false,
+					Error:   "OpenRouter API key not configured",
+				}
+				return
+			}
+			provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
+		case "zai", "z":
+			if settings.ZaiKey == "" {
+				slog.Error("[AGENT LOOP] Z.ai API key not configured", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
+				o.emitError(job.TaskID, "Z.ai API key not configured")
+				job.ResultCh <- TaskResult{
+					TaskID:  job.TaskID,
+					Success: false,
+					Error:   "Z.ai API key not configured",
+				}
+				return
+			}
+			slog.Info("[AGENT LOOP] Creating Z.ai provider", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
+			provider = llm.NewZaiProvider(settings.ZaiKey)
+		case "anthropic":
+			if settings.AnthropicKey == "" {
+				o.emitError(job.TaskID, "Anthropic API key not configured")
+				job.ResultCh <- TaskResult{
+					TaskID:  job.TaskID,
+					Success: false,
+					Error:   "Anthropic API key not configured",
+				}
+				return
+			}
+			provider = llm.NewAnthropicProvider(settings.AnthropicKey)
+		default:
+			// Try auto-detect based on available keys
+			if settings.OpenRouterKey != "" {
+				provider = llm.NewOpenRouterProvider(settings.OpenRouterKey)
+			} else if settings.ZaiKey != "" {
+				provider = llm.NewZaiProvider(settings.ZaiKey)
+			} else if settings.AnthropicKey != "" {
+				provider = llm.NewAnthropicProvider(settings.AnthropicKey)
+			} else {
+				o.emitError(job.TaskID, "No API key configured. Add OpenRouter, Z.ai, or Anthropic key in Settings.")
+				job.ResultCh <- TaskResult{
+					TaskID:  job.TaskID,
+					Success: false,
+					Error:   "No API key configured",
+				}
+				return
+			}
+		}
+
+		// Set model name on provider
+		if modelName != "" {
+			provider.SetModel(modelName)
+		}
+
+		finalModel := provider.Model()
+		slog.Info("[AGENT LOOP] Provider configured", "task_id", job.TaskID, "final_model", finalModel)
+
+		if job.IsContinuation {
+			o.emit(job.TaskID, "plan", fmt.Sprintf("Continuing with model: %s...", finalModel))
 		} else {
-			slog.Info("[AGENT LOOP] Loaded message history", "task_id", job.TaskID)
+			o.emit(job.TaskID, "plan", fmt.Sprintf("Starting Counterspell agent with model: %s...", finalModel))
+		}
+
+		nativeBackend, err := agent.NewNativeBackend(
+			agent.WithProvider(provider),
+			agent.WithWorkDir(worktreePath),
+			agent.WithCallback(callback),
+		)
+		if err != nil {
+			slog.Error("[AGENT LOOP] Failed to create native backend", "task_id", job.TaskID, "error", err)
+			o.emitError(job.TaskID, "Failed to create agent: "+err.Error())
+			job.ResultCh <- TaskResult{
+				TaskID:  job.TaskID,
+				Success: false,
+				Error:   "Failed to create agent: " + err.Error(),
+			}
+			return
+		}
+		backend = nativeBackend
+		defer nativeBackend.Close()
+	}
+
+	// Load message history for continuations (if backend supports it)
+	if job.IsContinuation && job.MessageHistory != "" {
+		if statefulBackend, ok := backend.(agent.StatefulBackend); ok {
+			if err := statefulBackend.RestoreState(job.MessageHistory); err != nil {
+				slog.Warn("[AGENT LOOP] Failed to load message history", "task_id", job.TaskID, "error", err)
+			} else {
+				slog.Info("[AGENT LOOP] Loaded message history", "task_id", job.TaskID)
+			}
 		}
 	}
 
-	// Run the agent (Run for new tasks, Continue for continuations)
-	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation)
+	// Run the agent (Run for new tasks, Send for continuations)
+	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation, "backend", agentBackend)
 	var runErr error
 	if job.IsContinuation {
-		runErr = runner.Continue(ctx, job.Intent)
+		runErr = backend.Send(ctx, job.Intent)
 	} else {
-		runErr = runner.Run(ctx, job.Intent)
+		runErr = backend.Run(ctx, job.Intent)
 	}
 	if runErr != nil {
 		slog.Error("[AGENT LOOP] Agent execution failed", "task_id", job.TaskID, "error", runErr)
@@ -381,6 +431,14 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	}
 	slog.Info("[AGENT LOOP] Agent execution completed successfully", "task_id", job.TaskID)
 
+	// Extract results from backend
+	if introspectable, ok := backend.(agent.IntrospectableBackend); ok {
+		agentOutput = introspectable.FinalMessage()
+	}
+	if stateful, ok := backend.(agent.StatefulBackend); ok {
+		messageHistory = stateful.GetState()
+	}
+
 	// Commit and push changes
 	o.emit(job.TaskID, "info", "Committing changes...")
 
@@ -397,10 +455,6 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		slog.Warn("Failed to get git diff", "task_id", job.TaskID, "error", err)
 		gitDiff = ""
 	}
-
-	// Get final agent output and message history
-	agentOutput := runner.GetFinalMessage()
-	messageHistory := runner.GetMessageHistory()
 
 	// Send result to channel for processing
 	job.ResultCh <- TaskResult{

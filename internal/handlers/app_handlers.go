@@ -541,6 +541,7 @@ func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		ZaiKey:        r.FormValue("zai_key"),
 		AnthropicKey:  r.FormValue("anthropic_key"),
 		OpenAIKey:     r.FormValue("openai_key"),
+		AgentBackend:  r.FormValue("agent_backend"),
 	}
 
 	if err := h.settings.UpdateSettings(ctx, settings); err != nil {
