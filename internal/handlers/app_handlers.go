@@ -461,15 +461,19 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	taskID := chi.URLParam(r, "id")
+	slog.Info("[CHAT] HandleActionChat called", "task_id", taskID)
 
 	if err := r.ParseForm(); err != nil {
+		slog.Error("[CHAT] ParseForm failed", "error", err)
 		w.Header().Set("HX-Trigger", `{"toast": "Invalid request"}`)
 		h.HandleFeed(w, r)
 		return
 	}
 
 	message := r.FormValue("message")
+	slog.Info("[CHAT] Got message", "message", message)
 	if message == "" {
+		slog.Warn("[CHAT] Empty message")
 		w.Header().Set("HX-Trigger", `{"toast": "Message required"}`)
 		h.HandleFeed(w, r)
 		return

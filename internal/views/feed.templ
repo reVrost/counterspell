@@ -1,9 +1,6 @@
 package views
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 // Feed renders the main dashboard
 templ Feed(data FeedData) {
@@ -42,19 +39,26 @@ templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
 			@click="modalOpen = true; history.pushState({ modal: true }, '')"
 			hx-get={ fmt.Sprintf("/task/%s", task.ID) }
 			hx-target="#modal-content"
+			hx-swap="morph"
+			x-data={ fmt.Sprintf(`{ tid: '%s', elapsed: 0 }`, task.ID) }
+			x-init="if (!window.taskTimers[tid]) window.taskTimers[tid] = Date.now(); elapsed = Math.floor((Date.now() - window.taskTimers[tid])/1000); setInterval(() => elapsed = Math.floor((Date.now() - window.taskTimers[tid])/1000), 1000)"
 		>
 			<div class="flex justify-between items-start mb-2">
 				<div class="flex items-center gap-2">
 					<span class={ fmt.Sprintf("%s opacity-70 w-5 h-5 rounded flex items-center justify-center text-[10px]", projects[task.ProjectID].Color) }>
 						<i class={ fmt.Sprintf("fas %s", projects[task.ProjectID].Icon) }></i>
 					</span>
-					<span class="text-sm text-gray-500">{ projects[task.ProjectID].Name }</span>
+					<span class="text-xs font-medium text-gray-400">{ projects[task.ProjectID].Name }</span>
 				</div>
-				<span class="text-sm text-orange-400 font-mono">
-					{ fmt.Sprintf("%ds", int(time.Since(task.CreatedAt).Seconds())) }
-				</span>
+				<div class="flex items-center gap-2">
+					<span class="text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-md font-medium border border-orange-500/20 shrink-0">In Progress</span>
+					<span 
+						class="text-[10px] text-orange-400/80 font-mono tabular-nums"
+						x-text="elapsed + 's'"
+					></span>
+				</div>
 			</div>
-			<p class="text-sm text-gray-400 leading-tight line-clamp-2">{ task.Description }</p>
+			<p class="text-sm text-gray-200 font-medium leading-tight line-clamp-2">{ task.Description }</p>
 		</div>
 	}
 	if len(tasks) == 0 {
@@ -82,6 +86,7 @@ templ ReviewTaskRow(task *UITask, project UIProject) {
 		@click="modalOpen = true; history.pushState({ modal: true }, '')"
 		hx-get={ fmt.Sprintf("/task/%s", task.ID) }
 		hx-target="#modal-content"
+		hx-swap="morph"
 	>
 		<div class="flex justify-between items-start mb-1">
 			<div class="flex items-center gap-2">
@@ -105,6 +110,7 @@ templ CompletedTaskRow(task *UITask, project UIProject) {
 		@click="modalOpen = true; history.pushState({ modal: true }, '')"
 		hx-get={ fmt.Sprintf("/task/%s", task.ID) }
 		hx-target="#modal-content"
+		hx-swap="morph"
 	>
 		<div class="flex items-center gap-3">
 			<div class="w-5 h-5 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-[10px]">

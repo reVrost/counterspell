@@ -1,3 +1,101 @@
+## ⚠️ CRITICAL: Nested x-data Scope Rules
+
+**NEVER create nested `x-data` attributes.** This creates isolated scopes that break state access.
+
+### The Problem
+
+When you add `x-data` to a child element, it creates a NEW isolated scope. The child can NO longer access parent state:
+
+```html
+<!-- ❌ BROKEN: Nested x-data creates isolated scope -->
+<div x-data="{ count: 0, name: 'parent' }">
+  <div x-data="{ helper: 'child' }">
+    <!-- count is UNDEFINED here! Parent state is inaccessible -->
+    <span x-text="count"></span>  <!-- FAILS -->
+  </div>
+</div>
+```
+
+### The Solution
+
+**Merge all state into the parent `x-data`:**
+
+```html
+<!-- ✅ CORRECT: Single x-data with all state -->
+<div x-data="{ count: 0, name: 'parent', helper: 'child' }">
+  <div>
+    <span x-text="count"></span>  <!-- Works! -->
+  </div>
+</div>
+```
+
+### Common Mistake: Adding x-data for `app` Access
+
+```html
+<!-- ❌ WRONG: Adding x-data to access global app state -->
+<div x-data="parentState()">
+  <div x-data="{ get app() { return Alpine.$data(document.body); } }">
+    <!-- parentState properties are now GONE -->
+  </div>
+</div>
+
+<!-- ✅ CORRECT: Add app getter to parent state -->
+<script>
+function parentState() {
+  return {
+    count: 0,
+    get app() { return Alpine.$data(document.body); }
+  }
+}
+</script>
+<div x-data="parentState()">
+  <div>
+    <!-- Both count and app accessible -->
+  </div>
+</div>
+```
+
+### Key Rules
+
+1. **One x-data per component tree** - all state in the root
+2. **Need to access global state?** Add a getter to the parent x-data, not a new x-data
+3. **$root only goes to nearest x-data** - not to top-level, so avoid nested x-data entirely
+4. **Use $dispatch for cross-component communication** instead of trying to access other scopes
+
+### Symptoms of Nested x-data Bugs
+
+- State "resets to 0" or initial values
+- Variables are "undefined" 
+- Changes don't persist
+- Functions not found
+
+**If you see these, search for nested x-data attributes.**
+
+--------------------------------
+
+## ⚠️ CRITICAL: HTMX + Alpine.js Integration
+
+When HTMX swaps in new HTML content with `x-data`, Alpine.js does NOT automatically initialize it. You MUST call `Alpine.initTree()` on the swapped content.
+
+### The Fix (already in app.js)
+
+```javascript
+document.addEventListener('htmx:afterSwap', (event) => {
+  if (window.Alpine && event.detail.target) {
+    Alpine.initTree(event.detail.target);
+  }
+});
+```
+
+### Symptoms Without This Fix
+
+- `x-data` components loaded via HTMX don't work at all
+- Variables are undefined
+- Event handlers don't fire
+- x-model doesn't bind
+
+--------------------------------
+
 ### Alpine.js x-init for Initialization Code
 
 Source: https://alpinejs.dev/docs/index

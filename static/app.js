@@ -1,3 +1,6 @@
+// Global task timer storage (persists across SSE swaps)
+window.taskTimers = window.taskTimers || {};
+
 /**
  * Main Alpine.js application state
  * Registered as Alpine.data('appState') before Alpine initializes
@@ -323,3 +326,7 @@ document.addEventListener('alpine:init', () => {
     },
   }));
 });
+
+// NOTE: Using htmx-ext-alpine-morph extension for HTMX + Alpine integration.
+// It uses Alpine.morph() for swaps, which preserves Alpine state automatically.
+// No need for manual Alpine.initTree() calls when using hx-swap="morph".
