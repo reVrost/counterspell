@@ -50,9 +50,16 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				}
 			</script>
 			<style>
-				body { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; }
+				body { background-color: #0C0E12; color: #EBEBEB; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
 				.hide-scrollbar::-webkit-scrollbar { display: none; }
 				.no-tap-highlight { -webkit-tap-highlight-color: transparent; }
+
+				/* Mobile-native touch behavior */
+				button, a, [role="button"], .touch-target { 
+					touch-action: manipulation; 
+					-webkit-tap-highlight-color: transparent;
+				}
+				.no-select { user-select: none; -webkit-user-select: none; }
 
 				/* Slide-over animation */
 				.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
