@@ -1,6 +1,9 @@
 package components
 
-import "github.com/revrost/code/counterspell/internal/models"
+import (
+	"fmt"
+	"github.com/revrost/code/counterspell/internal/models"
+)
 
 templ SettingsModal(settings models.UserSettings) {
 	<div x-show="settingsOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" x-cloak
@@ -13,7 +16,50 @@ templ SettingsModal(settings models.UserSettings) {
 				<button @click="settingsOpen = false" class="text-gray-500 hover:text-white transition"><i class="fas fa-times"></i></button>
 			</div>
 
-			<form hx-post="/settings" hx-swap="none" class="p-6 space-y-8">
+			<form hx-post="/settings" hx-swap="none" class="p-6 space-y-8" x-data={ fmt.Sprintf("{ agentBackend: '%s' }", settings.GetAgentBackend()) }>
+				<!-- Agent Backend -->
+				<div>
+					<h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+						<i class="fas fa-robot"></i> Agent Backend
+					</h3>
+					<div class="grid grid-cols-2 gap-3">
+						<label @click="agentBackend = 'native'"
+							:class="agentBackend === 'native' ? 'border-purple-500 bg-purple-500/10' : 'border-gray-700 bg-gray-900 hover:border-gray-600'"
+							class="relative flex items-center p-3 rounded-lg border cursor-pointer transition-all">
+							<input type="radio" name="agent_backend" value="native" 
+								x-model="agentBackend"
+								class="sr-only"/>
+							<div class="flex flex-col">
+								<span class="text-sm font-medium text-white">Counterspell</span>
+								<span class="text-xs text-gray-500">Native Go agent</span>
+							</div>
+							<div :class="agentBackend === 'native' ? 'border-purple-500' : 'border-gray-600'"
+								class="absolute top-2 right-2 w-4 h-4 rounded-full border-2 flex items-center justify-center">
+								<div x-show="agentBackend === 'native'" class="w-2 h-2 rounded-full bg-purple-500"></div>
+							</div>
+						</label>
+						<label @click="agentBackend = 'claude-code'"
+							:class="agentBackend === 'claude-code' ? 'border-purple-500 bg-purple-500/10' : 'border-gray-700 bg-gray-900 hover:border-gray-600'"
+							class="relative flex items-center p-3 rounded-lg border cursor-pointer transition-all">
+							<input type="radio" name="agent_backend" value="claude-code"
+								x-model="agentBackend"
+								class="sr-only"/>
+							<div class="flex flex-col">
+								<span class="text-sm font-medium text-white">Claude Code</span>
+								<span class="text-xs text-gray-500">Anthropic CLI</span>
+							</div>
+							<div :class="agentBackend === 'claude-code' ? 'border-purple-500' : 'border-gray-600'"
+								class="absolute top-2 right-2 w-4 h-4 rounded-full border-2 flex items-center justify-center">
+								<div x-show="agentBackend === 'claude-code'" class="w-2 h-2 rounded-full bg-purple-500"></div>
+							</div>
+						</label>
+					</div>
+					<p class="text-xs text-gray-600 mt-2">
+						<i class="fas fa-info-circle mr-1"></i>
+						Counterspell uses your API keys. Claude Code requires the <code class="text-purple-400">claude</code> CLI installed.
+					</p>
+				</div>
+
 				<!-- API Keys -->
 				<div>
 					<h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
