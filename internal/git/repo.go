@@ -52,6 +52,11 @@ func (m *RepoManager) WorktreePath(taskID string) string {
 	return m.worktreePath(taskID)
 }
 
+// RepoPath returns the local path for a given owner/repo (exported).
+func (m *RepoManager) RepoPath(owner, repo string) string {
+	return m.repoPath(owner, repo)
+}
+
 // EnsureRepo clones or updates a repository.
 // Returns the local repo path.
 func (m *RepoManager) EnsureRepo(owner, repo, token string) (string, error) {

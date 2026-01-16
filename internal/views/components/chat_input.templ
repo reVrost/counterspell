@@ -29,7 +29,9 @@ func chatInputXData(config ChatInputConfig) string {
 			modelOpen: false,
 			activeModelId: localStorage.getItem("counterspell_model") || "%s",
 			models: %s,
-			files: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
+			files: [],
+			selectedIndex: 0,
+			fileSearchDebounce: null,
 			
 			get app() { return Alpine.$data(document.body); },
 			get modelName() {
@@ -45,17 +47,58 @@ func chatInputXData(config ChatInputConfig) string {
 				if (newHeight > window.innerHeight * 0.35) newHeight = window.innerHeight * 0.35;
 				el.style.height = newHeight + "px";
 			},
-			checkMention(e) {
-				if (this.text.match(/@[^ ]*$/)) {
+			async checkMention(e) {
+				const match = this.text.match(/@([^ ]*)$/);
+				if (match) {
 					this.showFileMenu = true;
+					const query = match[1] || "";
+					// Debounce file search
+					clearTimeout(this.fileSearchDebounce);
+					this.fileSearchDebounce = setTimeout(() => this.searchFiles(query), 50);
 				} else {
 					this.showFileMenu = false;
+					this.files = [];
 				}
-				if (e.key === "Escape") this.showFileMenu = false;
+				if (e.key === "Escape") {
+					this.showFileMenu = false;
+					this.files = [];
+				}
+			},
+			async searchFiles(query) {
+				const projectId = this.app?.activeProjectId;
+				if (!projectId) return;
+				try {
+					const resp = await fetch("/api/files/search?project_id=" + encodeURIComponent(projectId) + "&q=" + encodeURIComponent(query));
+					if (resp.ok) {
+						const data = await resp.json();
+						this.files = Array.isArray(data) ? data : [];
+						this.selectedIndex = 0;
+					}
+				} catch (e) {
+					console.error("File search failed:", e);
+					this.files = [];
+				}
+			},
+			handleFileNav(e) {
+				if (!this.showFileMenu || !this.files || this.files.length === 0) return;
+				if (e.key === "ArrowDown") {
+					e.preventDefault();
+					this.selectedIndex = Math.min(this.selectedIndex + 1, this.files.length - 1);
+				} else if (e.key === "ArrowUp") {
+					e.preventDefault();
+					this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+				} else if (e.key === "Enter" || e.key === "Tab") {
+					e.preventDefault();
+					if (this.files[this.selectedIndex]) {
+						this.insertFile(this.files[this.selectedIndex]);
+					}
+				}
 			},
 			insertFile(f) {
 				this.text = this.text.replace(/@[^ ]*$/, "") + f + " ";
 				this.showFileMenu = false;
+				this.files = [];
+				this.selectedIndex = 0;
 				this.$nextTick(() => { if (this.$refs.input) this.$refs.input.focus(); });
 			},
 			setModel(id) {
@@ -84,7 +127,9 @@ func chatInputXData(config ChatInputConfig) string {
 		modelOpen: false,
 		activeModelId: localStorage.getItem("counterspell_model") || "%s",
 		models: %s,
-		files: ["main.go", "go.mod", "README.md", "Dockerfile", "pkg/server.go", "pkg/utils.go", "ui/app.js"],
+		files: [],
+		selectedIndex: 0,
+		fileSearchDebounce: null,
 		
 		get app() { return Alpine.$data(document.body); },
 		get modelName() {
@@ -100,17 +145,58 @@ func chatInputXData(config ChatInputConfig) string {
 			if (newHeight > window.innerHeight * 0.4) newHeight = window.innerHeight * 0.4;
 			el.style.height = newHeight + "px";
 		},
-		checkMention(e) {
-			if (this.text.match(/@[^ ]*$/)) {
+		async checkMention(e) {
+			const match = this.text.match(/@([^ ]*)$/);
+			if (match) {
 				this.showFileMenu = true;
+				const query = match[1] || "";
+				// Debounce file search
+				clearTimeout(this.fileSearchDebounce);
+				this.fileSearchDebounce = setTimeout(() => this.searchFiles(query), 50);
 			} else {
 				this.showFileMenu = false;
+				this.files = [];
 			}
-			if (e.key === "Escape") this.showFileMenu = false;
+			if (e.key === "Escape") {
+				this.showFileMenu = false;
+				this.files = [];
+			}
+		},
+		async searchFiles(query) {
+			const projectId = this.app?.activeProjectId;
+			if (!projectId) return;
+			try {
+				const resp = await fetch("/api/files/search?project_id=" + encodeURIComponent(projectId) + "&q=" + encodeURIComponent(query));
+				if (resp.ok) {
+					const data = await resp.json();
+					this.files = Array.isArray(data) ? data : [];
+					this.selectedIndex = 0;
+				}
+			} catch (e) {
+				console.error("File search failed:", e);
+				this.files = [];
+			}
+		},
+		handleFileNav(e) {
+			if (!this.showFileMenu || !this.files || this.files.length === 0) return;
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				this.selectedIndex = Math.min(this.selectedIndex + 1, this.files.length - 1);
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+			} else if (e.key === "Enter" || e.key === "Tab") {
+				e.preventDefault();
+				if (this.files[this.selectedIndex]) {
+					this.insertFile(this.files[this.selectedIndex]);
+				}
+			}
 		},
 		insertFile(f) {
 			this.text = this.text.replace(/@[^ ]*$/, "") + f + " ";
 			this.showFileMenu = false;
+			this.files = [];
+			this.selectedIndex = 0;
 			this.$nextTick(() => { if (this.$refs.input) this.$refs.input.focus(); });
 		},
 		setModel(id) {
@@ -197,15 +283,31 @@ templ chatInputInner(config ChatInputConfig, projects map[string]views.UIProject
 	<!-- Input Area -->
 	<div class="relative px-4 pt-4 pb-2">
 		<!-- File Menu Popover -->
-		<div x-show="showFileMenu" x-cloak
+		<div x-show="showFileMenu && files && files.length > 0" x-cloak
 			x-transition.opacity.duration.100ms
-			class="absolute bottom-full left-0 mb-2 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-40 overflow-y-auto z-50">
-			<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800">Files</div>
-			<template x-for="file in files">
-				<div @click="insertFile(file)" class="px-3 py-2 hover:bg-white/10 text-xs text-gray-300 font-mono cursor-pointer transition">
-					<span class="text-purple-400 opacity-60 mr-1">#</span><span x-text="file"></span>
+			x-ref="fileMenu"
+			class="absolute bottom-full left-0 mb-2 w-80 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto z-50">
+			<div class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800 flex items-center justify-between">
+				<span>Files</span>
+				<span class="text-gray-600 font-normal normal-case">↑↓ to navigate, Enter to select</span>
+			</div>
+			<template x-for="(file, idx) in files" :key="file">
+				<div @click="insertFile(file)" 
+					@mouseenter="selectedIndex = idx"
+					:class="idx === selectedIndex ? 'bg-blue-500/20 text-blue-300' : 'text-gray-300 hover:bg-white/5'"
+					class="px-3 py-2 text-xs font-mono cursor-pointer transition flex items-center gap-2">
+					<i class="fas fa-file text-[10px] opacity-40"></i>
+					<span x-text="file" class="truncate"></span>
 				</div>
 			</template>
+		</div>
+		<!-- Empty State -->
+		<div x-show="showFileMenu && files && files.length === 0" x-cloak
+			class="absolute bottom-full left-0 mb-2 w-64 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+			<div class="px-3 py-4 text-xs text-gray-500 text-center">
+				<i class="fas fa-search mb-2 opacity-50"></i>
+				<div>No files found</div>
+			</div>
 		</div>
 
 		<textarea
@@ -216,7 +318,7 @@ templ chatInputInner(config ChatInputConfig, projects map[string]views.UIProject
 			}
 			@input="resize()"
 			@keyup="checkMention($event)"
-			@keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); submit(); }"
+			@keydown="if (showFileMenu && files && files.length > 0 && ['ArrowUp', 'ArrowDown', 'Tab'].includes($event.key)) { handleFileNav($event); } else if (showFileMenu && files && files.length > 0 && $event.key === 'Enter' && !$event.shiftKey) { handleFileNav($event); } else if (!showFileMenu && $event.key === 'Enter' && !$event.shiftKey) { $event.preventDefault(); submit(); }"
 			rows="1"
 			placeholder={ config.Placeholder }
 			class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-6 max-h-[40vh] min-h-[24px]"
