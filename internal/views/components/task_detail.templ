@@ -242,7 +242,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 		<!-- Modal Header -->
 		<div class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#16191F]">
 			<div class="flex items-center gap-3">
-				<button @click="closeModal()" class="w-8 h-8 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400">
+				<button @click="closeModal()" class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50" aria-label="Go back">
 					<i class="fas fa-arrow-left"></i>
 				</button>
 				<div>
@@ -259,8 +259,9 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<button
 				hx-post={ fmt.Sprintf("/action/discard/%s", task.ID) }
 				hx-swap="none"
-				class="text-gray-600 hover:text-red-400 transition"
+				class="w-11 h-11 flex items-center justify-center text-gray-600 hover:text-red-400 transition focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-lg"
 				onclick="if(!confirm('Discard task?')) return false;"
+				aria-label="Discard task"
 			>
 				<i class="fas fa-trash"></i>
 			</button>
@@ -272,17 +273,17 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				<button
 					@click="activeTab = 'agent'"
 					:class="activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
-					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all"
+					class="px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
 				>Agent</button>
 				<button
 					@click="activeTab = 'diff'"
 					:class="activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
-					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all"
+					class="px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
 				>Diff</button>
 				<button
 					@click="activeTab = 'activity'"
 					:class="activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'"
-					class="px-4 py-1 text-[11px] font-medium rounded-md transition-all"
+					class="px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
 				>Log</button>
 			</div>
 			<!-- Status Indicator -->
@@ -315,6 +316,8 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			<div sse-swap="complete" hx-swap="none"></div>
 			<div sse-swap="todo" hx-swap="none"></div>
 		</div>
+		<!-- Screen reader announcements for async updates -->
+		<div aria-live="polite" aria-atomic="true" class="sr-only" x-text="inProgressTask ? 'Agent is ' + inProgressTask : ''"></div>
 		<!-- Floating Todo Indicator (only shows when todos exist) -->
 		<div 
 			x-show="todos.length > 0" 
@@ -493,10 +496,10 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 							<button
 								hx-post={ fmt.Sprintf("/action/abort/%s", task.ID) }
 								hx-swap="none"
-								class="w-6 h-6 rounded bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-colors"
-								title="Stop agent"
+								class="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/30 active:bg-red-500/40 hover:text-red-300 transition-colors"
+								aria-label="Stop agent"
 							>
-								<i class="fas fa-stop text-[10px]"></i>
+								<i class="fas fa-stop text-xs"></i>
 							</button>
 						</div>
 					} else if len(task.Messages) > 0 {
@@ -697,28 +700,28 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 				<div class="flex justify-center gap-1">
 					<button
 						@click="confirmAction = 'retry'"
-						class="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all"
-						title="Retry"
+						class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
+						aria-label="Retry task"
 					>
-						<i class="fas fa-arrow-rotate-left text-[10px]"></i>
+						<i class="fas fa-arrow-rotate-left text-xs"></i>
 						<span>Retry</span>
 					</button>
 					<span class="text-gray-700 self-center">·</span>
 					<button
 						@click="confirmAction = 'clear'"
-						class="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all"
-						title="Clear history"
+						class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
+						aria-label="Clear history"
 					>
-						<i class="fas fa-eraser text-[10px]"></i>
+						<i class="fas fa-eraser text-xs"></i>
 						<span>Clear</span>
 					</button>
 					<span class="text-gray-700 self-center">·</span>
 					<button
 						@click="confirmAction = 'pr'"
-						class="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all"
-						title="Create PR"
+						class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
+						aria-label="Create pull request"
 					>
-						<i class="fab fa-github text-[10px]"></i>
+						<i class="fab fa-github text-xs"></i>
 						<span>Create PR</span>
 					</button>
 				</div>
@@ -727,25 +730,25 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					<!-- Chat button -->
 					<button
 						@click="showChat = true"
-						class="flex-1 h-9 bg-[#21262d] hover:bg-[#2d333b] border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group"
+						class="flex-1 h-12 bg-[#21262d] hover:bg-[#2d333b] active:bg-[#3d434b] border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group"
 					>
-						<i class="fas fa-message text-xs text-purple-400 group-hover:text-purple-300 transition-colors"></i>
-						<span class="text-xs font-medium">Chat</span>
+						<i class="fas fa-message text-sm text-purple-400 group-hover:text-purple-300 transition-colors"></i>
+						<span class="text-sm font-medium">Chat</span>
 						<!-- Queue badge -->
 						<span 
 							x-show="messageQueue.length > 0" 
 							x-text="messageQueue.length"
 							x-transition
-							class="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30"
+							class="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30"
 						></span>
 					</button>
 					<!-- Merge button -->
 					<button
 						@click="confirmAction = 'merge'"
-						class="flex-1 h-9 bg-white hover:bg-gray-100 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
+						class="flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
 					>
-						<i class="fas fa-code-merge text-xs"></i>
-						<span class="text-xs font-medium">Merge</span>
+						<i class="fas fa-code-merge text-sm"></i>
+						<span class="text-sm font-medium">Merge</span>
 					</button>
 				</div>
 			</div>
