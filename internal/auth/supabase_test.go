@@ -40,13 +40,13 @@ func TestSetSessionCookie(t *testing.T) {
 	}
 }
 
-func TestClearSessionCookie(t *testing.T) {
+func TestClearSessionCookies(t *testing.T) {
 	t.Parallel()
 
 	svc := &AuthService{supabaseURL: "https://example.supabase.co"}
 
 	rec := httptest.NewRecorder()
-	svc.ClearSessionCookie(rec)
+	svc.ClearSessionCookies(rec)
 
 	cookie := findCookie(t, rec.Result().Cookies(), "sb-access-token")
 

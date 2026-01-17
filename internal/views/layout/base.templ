@@ -14,7 +14,7 @@ func boolStr(b bool) string {
 }
 
 // Base is the main shell of the application
-templ Base(title string, projects map[string]views.UIProject, settings models.UserSettings, isAuthenticated bool, content templ.Component) {
+templ Base(title string, projects map[string]views.UIProject, settings models.UserSettings, isAuthenticated bool, userEmail string, content templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en" class="dark">
 		<head>
@@ -28,6 +28,7 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			<link rel="apple-touch-icon" href="/static/apple-touch-icon.png"/>
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+			<script src="https://unpkg.com/htmx-ext-idiomorph@0.3.0/idiomorph.min.js"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -229,16 +230,19 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				<span x-text="toastMsg"></span>
 			</div>
 			<!-- User Header -->
-			@components.Header(projects)
+			@components.Header(projects, userEmail)
 			<!-- Main Feed -->
 			<main
 				class="flex-1 overflow-y-auto bg-[#0C0E12] relative hide-scrollbar"
 				id="feed-container"
-				hx-get="/feed"
-				hx-trigger="load, close-modal from:body"
-				hx-swap="morph"
 			>
-				@content
+				<div
+					hx-get="/feed"
+					hx-trigger="load, close-modal from:body"
+					hx-swap="innerHTML"
+				>
+					@content
+				</div>
 			</main>
 			<!-- Input Bar -->
 			@components.InputBar(projects)

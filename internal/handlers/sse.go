@@ -73,6 +73,13 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// Get user services upfront
+	svc, err := h.getServices(ctx)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -90,7 +97,7 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	defer h.events.Unsubscribe(ch)
 
 	// Cache projects at connection start - only refresh on project events
-	internalProjects, _ := h.github.GetProjects(ctx)
+	internalProjects, _ := svc.GitHub.GetProjects(ctx)
 	projects := make(map[string]views.UIProject)
 	for _, p := range internalProjects {
 		projects[p.ID] = toUIProject(p)
@@ -99,7 +106,7 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 	// Helper to render and send active tasks and reviews
 	sendActiveUpdate := func() {
 		// Get tasks from DB and categorize
-		dbTasks, _ := h.tasks.List(ctx, nil, nil)
+		dbTasks, _ := svc.Tasks.List(ctx, nil, nil)
 		var active []*views.UITask
 		var reviews []*views.UITask
 		for _, t := range dbTasks {
@@ -154,7 +161,7 @@ func (h *Handlers) HandleFeedActiveSSE(w http.ResponseWriter, r *http.Request) {
 			}
 			// Refresh projects cache on project-related events
 			if event.Type == models.EventTypeProjectCreated || event.Type == models.EventTypeProjectUpdated || event.Type == models.EventTypeProjectDeleted {
-				internalProjects, _ = h.github.GetProjects(ctx)
+				internalProjects, _ = svc.GitHub.GetProjects(ctx)
 				projects = make(map[string]views.UIProject)
 				for _, p := range internalProjects {
 					projects[p.ID] = toUIProject(p)
@@ -178,8 +185,15 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
 
+	// Get user services upfront
+	svc, err := h.getServices(ctx)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	// Check if task exists
-	if _, err := h.tasks.Get(ctx, taskID); err != nil {
+	if _, err := svc.Tasks.Get(ctx, taskID); err != nil {
 		http.Error(w, "Task not found", http.StatusNotFound)
 		return
 	}
@@ -205,7 +219,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 
 	// Send initial state for all three types
 	sendAgent := func() int64 {
-		task, err := h.tasks.Get(ctx, taskID)
+		task, err := svc.Tasks.Get(ctx, taskID)
 		if err != nil {
 			return lastSentID
 		}
@@ -235,7 +249,7 @@ func (h *Handlers) HandleTaskSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendDiff := func() {
-		task, err := h.tasks.Get(ctx, taskID)
+		task, err := svc.Tasks.Get(ctx, taskID)
 		if err != nil {
 			return
 		}
@@ -397,6 +411,13 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
 
+	// Get user services upfront
+	svc, err := h.getServices(ctx)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -415,7 +436,7 @@ func (h *Handlers) HandleTaskDiffSSE(w http.ResponseWriter, r *http.Request) {
 
 	// Helper to send current diff state
 	sendDiff := func() {
-		task, err := h.tasks.Get(ctx, taskID)
+		task, err := svc.Tasks.Get(ctx, taskID)
 		if err != nil {
 			return
 		}
@@ -466,6 +487,14 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
 
+	// Get user services upfront
+	svc, err := h.getServices(ctx)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	_ = svc // used in sendAgentFromDB closure
+
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -484,7 +513,7 @@ func (h *Handlers) HandleTaskAgentSSE(w http.ResponseWriter, r *http.Request) {
 
 	// Helper to send current agent state from DB (used for initial load)
 	sendAgentFromDB := func() {
-		task, err := h.tasks.Get(ctx, taskID)
+		task, err := svc.Tasks.Get(ctx, taskID)
 		if err != nil {
 			return
 		}

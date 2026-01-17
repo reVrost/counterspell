@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/revrost/code/counterspell/internal/config"
+	"github.com/revrost/code/counterspell/internal/db"
 )
 
 // contextKey is used for storing values in context.
@@ -22,10 +23,11 @@ const (
 type Middleware struct {
 	cfg       *config.Config
 	validator *JWTValidator
+	dbManager *db.DBManager
 }
 
 // NewMiddleware creates a new auth middleware.
-func NewMiddleware(cfg *config.Config) *Middleware {
+func NewMiddleware(cfg *config.Config, dbManager *db.DBManager) *Middleware {
 	var validator *JWTValidator
 	if cfg.MultiTenant && cfg.SupabaseURL != "" {
 		// Use JWKS-based validation for ES256 tokens
@@ -34,6 +36,7 @@ func NewMiddleware(cfg *config.Config) *Middleware {
 	return &Middleware{
 		cfg:       cfg,
 		validator: validator,
+		dbManager: dbManager,
 	}
 }
 
@@ -46,6 +49,12 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		// Single-player mode: skip auth, use default user
 		if !m.cfg.MultiTenant {
 			ctx = context.WithValue(ctx, UserIDKey, "default")
+			// Inject default user's DB into context
+			if m.dbManager != nil {
+				if userDB, err := m.dbManager.GetDB("default"); err == nil {
+					ctx = db.ContextWithDB(ctx, userDB)
+				}
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -63,6 +72,17 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		if claims != nil {
 			ctx = context.WithValue(ctx, ClaimsKey, claims)
 		}
+		
+		// Inject user's DB into context
+		if m.dbManager != nil {
+			userDB, err := m.dbManager.GetDB(userID)
+			if err != nil {
+				slog.Error("Failed to get user database", "error", err, "user_id", userID)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			ctx = db.ContextWithDB(ctx, userDB)
+		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -78,6 +98,12 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 		// Single-player mode: always use default user
 		if !m.cfg.MultiTenant {
 			ctx = context.WithValue(ctx, UserIDKey, "default")
+			// Inject default user's DB into context
+			if m.dbManager != nil {
+				if userDB, err := m.dbManager.GetDB("default"); err == nil {
+					ctx = db.ContextWithDB(ctx, userDB)
+				}
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -88,6 +114,12 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, UserIDKey, userID)
 			if claims != nil {
 				ctx = context.WithValue(ctx, ClaimsKey, claims)
+			}
+			// Inject user's DB into context
+			if m.dbManager != nil {
+				if userDB, err := m.dbManager.GetDB(userID); err == nil {
+					ctx = db.ContextWithDB(ctx, userDB)
+				}
 			}
 		}
 

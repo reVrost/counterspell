@@ -13,7 +13,7 @@ func TestMiddleware_SinglePlayerMode(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.Config{MultiTenant: false}
-	m := NewMiddleware(cfg)
+	m := NewMiddleware(cfg, nil)
 
 	handler := m.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := UserIDFromContext(r.Context())
@@ -40,7 +40,7 @@ func TestMiddleware_MultiTenantNoToken(t *testing.T) {
 		MultiTenant: true,
 		SupabaseURL: "https://example.supabase.co",
 	}
-	m := NewMiddleware(cfg)
+	m := NewMiddleware(cfg, nil)
 
 	handler := m.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called without token")
@@ -80,7 +80,7 @@ func TestOptionalAuth_SinglePlayer(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.Config{MultiTenant: false}
-	m := NewMiddleware(cfg)
+	m := NewMiddleware(cfg, nil)
 
 	handler := m.OptionalAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := UserIDFromContext(r.Context())
@@ -107,7 +107,7 @@ func TestOptionalAuth_MultiTenantNoToken(t *testing.T) {
 		MultiTenant: true,
 		SupabaseURL: "https://example.supabase.co",
 	}
-	m := NewMiddleware(cfg)
+	m := NewMiddleware(cfg, nil)
 
 	handler := m.OptionalAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := UserIDFromContext(r.Context())
