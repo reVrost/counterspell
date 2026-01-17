@@ -92,7 +92,7 @@ func main() {
 	authMiddleware := auth.NewMiddleware(cfg)
 
 	// Create handlers (pass config for multi-tenant awareness)
-	h, err := handlers.NewHandlers(taskSvc, eventBus, defaultDB, cfg.DataDir)
+	h, err := handlers.NewHandlers(taskSvc, eventBus, defaultDB, cfg)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)
@@ -132,6 +132,9 @@ func main() {
 			http.ServeFile(w, r, "static/sw.js")
 		})
 
+		// Landing page (public home)
+		r.Get("/", h.HandleHome)
+
 		// Auth routes (login page, OAuth callbacks)
 		r.Get("/auth/login", h.HandleAuth)
 		r.Get("/auth/register", h.HandleRegister)
@@ -145,8 +148,8 @@ func main() {
 		// Apply auth middleware - in single-player mode this sets userID to "default"
 		r.Use(authMiddleware.RequireAuth)
 
-		// Main app routes
-		r.Get("/", h.HandleFeed)
+		// Main app routes (authenticated users go to /app or /feed)
+		r.Get("/app", h.HandleFeed)
 		r.Get("/feed", h.HandleFeed)
 		r.Get("/feed/active", h.HandleFeedActive)
 		r.Get("/feed/stream", h.HandleFeedActiveSSE)
