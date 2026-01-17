@@ -22,22 +22,22 @@ templ Header(projects map[string]views.UIProject, userEmail string) {
 			<span class="font-semibold text-sm tracking-tight text-gray-200">All Projects</span>
 			<i class="fas fa-chevron-down text-[10px] text-gray-600"></i>
 		</div>
-		
 		<div class="relative" x-data="{ userMenuOpen: false }">
 			<div @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition p-1">
 				<div class="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></div>
 				<div class="w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300">{ emailInitial(userEmail) }</div>
 			</div>
-
-			<div x-show="userMenuOpen" @click.outside="userMenuOpen = false" x-cloak
+			<div
+				x-show="userMenuOpen"
+				@click.outside="userMenuOpen = false"
+				x-cloak
 				x-transition.scale.origin.top.right.duration.200ms
-				class="absolute top-10 right-0 z-50 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 transform">
-
+				class="absolute top-10 right-0 z-50 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 transform"
+			>
 				<div class="px-4 py-3 border-b border-gray-800 mb-1">
 					<p class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Signed in as</p>
 					<p class="text-xs font-medium text-gray-200 mt-1 truncate">{ userEmail }</p>
 				</div>
-
 				<div class="px-2">
 					<div @click="userMenuOpen = false; settingsOpen = true" class="px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2 transition-colors">
 						<i class="fas fa-cog w-4"></i> Settings
@@ -46,13 +46,14 @@ templ Header(projects map[string]views.UIProject, userEmail string) {
 						<i class="fas fa-download w-4"></i> Install App
 					</div>
 				</div>
-
 				<div class="h-px bg-gray-800 my-1 mx-2"></div>
-
 				<div class="px-2 pb-1">
 					<form method="POST" action="/disconnect" class="contents" @submit="console.log('[LOGOUT] Form submitting to /disconnect')">
-						<button type="submit" @click="console.log('[LOGOUT] Button clicked'); localStorage.removeItem('counterspell_v1_onboarded'); localStorage.removeItem('counterspell_active_project_id'); localStorage.removeItem('counterspell_active_project_name'); localStorage.removeItem('counterspell_model')" 
-							class="w-full px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left">
+						<button
+							type="submit"
+							@click="console.log('[LOGOUT] Button clicked'); localStorage.removeItem('counterspell_v1_onboarded'); localStorage.removeItem('counterspell_active_project_id'); localStorage.removeItem('counterspell_active_project_name'); localStorage.removeItem('counterspell_model')"
+							class="w-full px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left"
+						>
 							<i class="fas fa-sign-out-alt w-4"></i> Sign Out
 						</button>
 					</form>
@@ -60,37 +61,46 @@ templ Header(projects map[string]views.UIProject, userEmail string) {
 			</div>
 		</div>
 	</header>
-
 	<!-- Project Filter Menu -->
-	<div x-show="projectMenuOpen" @click.outside="projectMenuOpen = false"
+	<div
+		x-show="projectMenuOpen"
+		@click.outside="projectMenuOpen = false"
 		x-data="{ search: '', get app() { return Alpine.$data(document.body); } }"
 		x-transition.opacity.duration.150ms
-		class="absolute top-16 left-4 z-30 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col">
-		
+		class="absolute top-16 left-4 z-30 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col"
+	>
 		<!-- Sticky Search Header -->
 		<div class="p-3 border-b border-gray-700 bg-[#16191F]">
 			<div class="relative">
 				<i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
-				<input x-model="search" type="text" placeholder="Filter repositories..." 
-					class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600"/>
+				<input
+					x-model="search"
+					type="text"
+					placeholder="Filter repositories..."
+					class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600"
+				/>
 			</div>
 		</div>
-
 		<!-- Scrollable List -->
 		<div class="max-h-[320px] overflow-y-auto py-1">
-			<div hx-get="/feed" hx-target="#feed-container" 
-				@click="projectMenuOpen = false" 
+			<div
+				hx-get="/feed"
+				hx-target="#feed-container"
+				@click="projectMenuOpen = false"
 				class="px-4 py-2 hover:bg-white/5 cursor-pointer text-sm font-bold text-white border-b border-gray-800/50 mb-1"
-				x-show="'all projects'.includes(search.toLowerCase())">
+				x-show="'all projects'.includes(search.toLowerCase())"
+			>
 				All Projects
 			</div>
-
 			for _, p := range projects {
-				<div hx-get={ fmt.Sprintf("/feed?project=%s", p.ID) } hx-target="#feed-container" 
+				<div
+					hx-get={ fmt.Sprintf("/feed?project=%s", p.ID) }
+					hx-target="#feed-container"
 					@click={ fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name) }
 					class="px-4 py-2 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition"
 					x-show={ fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name) }
-					:class={ fmt.Sprintf("app.activeProjectId === '%s' ? 'bg-white/5' : ''", p.ID) }>
+					:class={ fmt.Sprintf("app.activeProjectId === '%s' ? 'bg-white/5' : ''", p.ID) }
+				>
 					<div class="w-6 h-6 rounded bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0">
 						<i class={ fmt.Sprintf("fas %s %s text-[10px]", p.Icon, p.Color) }></i>
 					</div>
@@ -100,14 +110,14 @@ templ Header(projects map[string]views.UIProject, userEmail string) {
 					<i class="fas fa-check text-green-500 text-xs" x-show={ fmt.Sprintf("app.activeProjectId === '%s'", p.ID) }></i>
 				</div>
 			}
-
 			<!-- Empty State -->
-			<div x-show="$el.parentElement.querySelectorAll('div[hx-get]:not([style*=\'display: none\'])').length === 0" 
-				class="px-4 py-8 text-center text-gray-600 text-xs">
+			<div
+				x-show="$el.parentElement.querySelectorAll('div[hx-get]:not([style*=\'display: none\'])').length === 0"
+				class="px-4 py-8 text-center text-gray-600 text-xs"
+			>
 				No projects found.
 			</div>
 		</div>
-		
 		<!-- Footer -->
 		<div class="px-3 py-2 bg-gray-900/50 border-t border-gray-800 text-[10px] text-gray-500 flex justify-between">
 			<span>{ fmt.Sprintf("%d Repositories", len(projects)) }</span>

@@ -14,7 +14,7 @@ func boolStr(b bool) string {
 }
 
 // Base is the main shell of the application
-templ Base(title string, projects map[string]views.UIProject, settings models.UserSettings, isAuthenticated bool, userEmail string, content templ.Component) {
+templ Base(title string, projects map[string]views.UIProject, settings models.UserSettings, isAuthenticated bool, userEmail string, data views.FeedData) {
 	<!DOCTYPE html>
 	<html lang="en" class="dark">
 		<head>
@@ -68,8 +68,8 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				}
 
 				/* Mobile-native touch behavior */
-				button, a, [role="button"], .touch-target { 
-					touch-action: manipulation; 
+				button, a, [role="button"], .touch-target {
+					touch-action: manipulation;
 					-webkit-tap-highlight-color: transparent;
 				}
 				.no-select { user-select: none; -webkit-user-select: none; }
@@ -237,11 +237,15 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 				id="feed-container"
 			>
 				<div
-					hx-get="/feed"
-					hx-trigger="load, close-modal from:body"
+					class="px-3 pt-20 pb-40"
+					hx-ext="sse"
+					sse-connect="/events"
+					hx-trigger="sse:task, sse:task_created, load, close-modal from:body"
+					hx-target="#feed-content"
 					hx-swap="innerHTML"
+					hx-get="/feed"
 				>
-					@content
+					@views.Feed(data)
 				</div>
 			</main>
 			<!-- Input Bar -->
@@ -261,7 +265,6 @@ templ Base(title string, projects map[string]views.UIProject, settings models.Us
 			</div>
 			<!-- Settings Modal -->
 			@components.SettingsModal(settings)
-	
 		</body>
 	</html>
 }

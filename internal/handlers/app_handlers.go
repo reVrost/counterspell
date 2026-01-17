@@ -1,3 +1,4 @@
+// Package handlers contains the handlers for the API.
 package handlers
 
 import (
@@ -130,7 +131,7 @@ func (h *Handlers) RenderApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("[FEED] Rendering page", "isAuthenticated", isAuthenticated, "projectCount", len(projects))
-	component := layout.Base("Counterspell", projects, *settings, isAuthenticated, userEmail, views.Feed(data))
+	component := layout.Base("Counterspell", projects, *settings, isAuthenticated, userEmail, data)
 	if err := component.Render(ctx, w); err != nil {
 		slog.Error("[FEED] Failed to render", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -178,14 +179,18 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render Active Rows
-	if err := views.ActiveRows(active, projects).Render(ctx, w); err != nil {
-		slog.Error("render error", "error", err)
-	}
+	// if err := views.ActiveRows(active, projects).Render(ctx, w); err != nil {
+	// 	slog.Error("render error", "error", err)
+	// }
 
 	// Render Reviews OOB
 	//nolint:errcheck
-	w.Write([]byte(`<div id="reviews-container" hx-swap-oob="true">`))
-	if err := views.ReviewsSection(views.FeedData{Reviews: reviews, Projects: projects}).Render(ctx, w); err != nil {
+	w.Write([]byte(`<div id="feed-content" hx-swap-oob="true">`))
+	if err := views.Feed(views.FeedData{
+		Active:   active,
+		Reviews:  reviews,
+		Projects: projects,
+	}).Render(ctx, w); err != nil {
 		slog.Error("render error", "error", err)
 	}
 	//nolint:errcheck
