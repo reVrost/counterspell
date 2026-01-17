@@ -27,8 +27,9 @@ type Middleware struct {
 // NewMiddleware creates a new auth middleware.
 func NewMiddleware(cfg *config.Config) *Middleware {
 	var validator *JWTValidator
-	if cfg.MultiTenant && cfg.SupabaseJWTSecret != "" {
-		validator = NewJWTValidator(cfg.SupabaseJWTSecret)
+	if cfg.MultiTenant && cfg.SupabaseURL != "" {
+		// Use JWKS-based validation for ES256 tokens
+		validator = NewJWTValidatorWithURL(cfg.SupabaseURL, cfg.SupabaseAnonKey)
 	}
 	return &Middleware{
 		cfg:       cfg,
@@ -105,24 +106,31 @@ func (m *Middleware) validateRequest(r *http.Request) (string, *Claims, error) {
 		cookie, err := r.Cookie("sb-access-token")
 		if err == nil {
 			token = cookie.Value
+			slog.Debug("Found token in cookie", "token_len", len(token))
+		} else {
+			slog.Debug("No cookie found", "error", err)
 		}
 	}
 
 	// No token found
 	if token == "" {
+		slog.Debug("No token found in request")
 		return "", nil, ErrInvalidToken
 	}
 
 	// Validate the token
 	if m.validator == nil {
+		slog.Error("JWT validator is nil")
 		return "", nil, ErrInvalidToken
 	}
 
 	claims, err := m.validator.Validate(token)
 	if err != nil {
+		slog.Error("JWT validation failed", "error", err)
 		return "", nil, err
 	}
 
+	slog.Info("JWT validated successfully", "user_id", claims.UserID(), "email", claims.Email)
 	return claims.UserID(), claims, nil
 }
 

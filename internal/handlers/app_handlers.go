@@ -14,6 +14,15 @@ import (
 	"github.com/revrost/code/counterspell/internal/views/layout"
 )
 
+// HandleHome renders the public landing page for unauthenticated users
+func (h *Handlers) HandleHome(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := layout.Home().Render(ctx, w); err != nil {
+		slog.Error("[HOME] Failed to render landing page", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // Helper to convert internal project to UI project
 func toUIProject(p models.Project) views.UIProject {
 	// Generate a deterministic color/icon based on ID or Name
