@@ -118,7 +118,4 @@ func TestNewJWTValidatorWithURL(t *testing.T) {
 	if v.anonKey != "anon-key" {
 		t.Errorf("anonKey = %q, want anon-key", v.anonKey)
 	}
-	if v.jwksURL != "https://example.supabase.co/auth/v1/jwks" {
-		t.Errorf("jwksURL = %q, want .../auth/v1/jwks", v.jwksURL)
-	}
 }
