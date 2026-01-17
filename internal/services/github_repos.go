@@ -140,6 +140,9 @@ func FetchUserRepos(ctx context.Context, token string, params RepoListParams) (*
 	return result, nil
 }
 
+// CacheTTL is how long cached repos are valid before requiring refresh.
+const CacheTTL = 1 * time.Hour
+
 // RepoCache handles caching repo metadata in SQLite.
 type RepoCache struct {
 	database *db.DB
@@ -186,6 +189,25 @@ func (c *RepoCache) GetCachedRepos(ctx context.Context) ([]GitHubRepo, error) {
 	}
 
 	return repos, nil
+}
+
+// IsCacheStale checks if the cache needs refreshing.
+func (c *RepoCache) IsCacheStale(ctx context.Context) bool {
+	var lastFetched int64
+	err := c.database.QueryRow(`
+		SELECT COALESCE(MAX(last_fetched_at), 0) FROM repo_cache
+	`).Scan(&lastFetched)
+	if err != nil || lastFetched == 0 {
+		return true // No cache or error, consider stale
+	}
+	return time.Since(time.Unix(lastFetched, 0)) > CacheTTL
+}
+
+// CacheCount returns the number of cached repos.
+func (c *RepoCache) CacheCount(ctx context.Context) int {
+	var count int
+	_ = c.database.QueryRow(`SELECT COUNT(*) FROM repo_cache`).Scan(&count)
+	return count
 }
 
 // SetFavorite marks a repo as favorite.

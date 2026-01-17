@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/revrost/code/counterspell/internal/auth"
-	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/views"
 	"github.com/revrost/code/counterspell/internal/views/components"
@@ -42,8 +41,8 @@ func toUIProject(p models.Project) views.UIProject {
 	}
 }
 
-// HandleFeed renders the main feed page
-func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
+// RenderApp renders the base templ page
+func (h *Handlers) RenderApp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	slog.Info("[FEED] HandleFeed called", "method", r.Method, "url", r.URL.String(), "hx_request", r.Header.Get("HX-Request"))
 
@@ -138,9 +137,10 @@ func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleFeedActive returns the active rows partial
-func (h *Handlers) HandleFeedActive(w http.ResponseWriter, r *http.Request) {
+// HandleFeed returns the active rows partial
+func (h *Handlers) HandleFeed(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	slog.Info("[FEED_ACTIVE] Rendering active rows")
 
 	svc, err := h.getServices(ctx)
 	if err != nil {
@@ -306,281 +306,6 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleActionRetry mocks retry action
-func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Task restarting..."}`)
-	h.HandleFeed(w, r)
-}
-
-// HandleActionClear clears a task's chat history and context
-func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-
-	svc, err := h.getServices(ctx)
-	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	if err := svc.Tasks.ClearHistory(ctx, taskID); err != nil {
-		slog.Error("Failed to clear task history", "error", err, "task_id", taskID)
-		w.Header().Set("HX-Trigger", `{"toast": "Failed to clear history"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", `{"toast": "Chat history cleared"}`)
-	h.HandleFeed(w, r)
-}
-
-// HandleActionMerge merges a task's branch to main and pushes
-func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		slog.Error("Failed to get orchestrator", "error", err)
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	err = orchestrator.MergeTask(ctx, taskID)
-	if err != nil {
-		// Check if it's a merge conflict
-		if conflictErr, ok := err.(*git.ErrMergeConflict); ok {
-			slog.Info("Merge conflict detected, showing conflict UI", "task_id", taskID, "files", conflictErr.ConflictedFiles)
-
-			conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, conflictErr.ConflictedFiles)
-			if err != nil {
-				slog.Error("Failed to get conflict details", "error", err)
-				w.Header().Set("HX-Trigger", `{"toast": "Failed to load conflict details"}`)
-				h.HandleFeed(w, r)
-				return
-			}
-
-			uiConflicts := make([]components.ConflictFile, len(conflicts))
-			for i, c := range conflicts {
-				uiConflicts[i] = components.ConflictFile{
-					Path:   c.Path,
-					Ours:   c.Ours,
-					Theirs: c.Theirs,
-				}
-			}
-
-			if err := components.ConflictView(taskID, uiConflicts).Render(ctx, w); err != nil {
-				slog.Error("render error", "error", err)
-			}
-			return
-		}
-
-		slog.Error("Failed to merge task", "task_id", taskID, "error", err)
-		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Merge failed: %s"}`, err.Error()))
-		h.HandleFeed(w, r)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merged to main and pushed!"}`)
-	h.HandleFeed(w, r)
-}
-
-// HandleResolveConflict resolves a single file conflict
-func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-
-	if err := r.ParseForm(); err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Invalid request"}`)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	filePath := r.FormValue("file")
-	choice := r.FormValue("choice")
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, []string{filePath})
-	if err != nil || len(conflicts) == 0 {
-		w.Header().Set("HX-Trigger", `{"toast": "Failed to get conflict"}`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var resolution string
-	switch choice {
-	case "ours":
-		resolution = conflicts[0].Ours
-	case "theirs":
-		resolution = conflicts[0].Theirs
-	default:
-		w.Header().Set("HX-Trigger", `{"toast": "Invalid choice"}`)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if err := orchestrator.ResolveConflict(ctx, taskID, filePath, resolution); err != nil {
-		slog.Error("Failed to resolve conflict", "error", err)
-		w.Header().Set("HX-Trigger", `{"toast": "Failed to resolve conflict"}`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Resolved %s"}`, filePath))
-	w.WriteHeader(http.StatusOK)
-}
-
-// HandleAbortMerge aborts the current merge
-func (h *Handlers) HandleAbortMerge(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if err := orchestrator.AbortMerge(ctx, taskID); err != nil {
-		slog.Error("Failed to abort merge", "error", err)
-		w.Header().Set("HX-Trigger", `{"toast": "Failed to abort merge"}`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merge aborted"}`)
-	h.HandleFeed(w, r)
-}
-
-// HandleCompleteMerge completes the merge after conflicts are resolved
-func (h *Handlers) HandleCompleteMerge(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if err := orchestrator.CompleteMergeResolution(ctx, taskID); err != nil {
-		slog.Error("Failed to complete merge", "error", err)
-		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Merge failed: %s"}`, err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Merged to main!"}`)
-	h.HandleFeed(w, r)
-}
-
-// HandleActionPR creates a GitHub Pull Request for the task
-func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	prURL, err := orchestrator.CreatePR(ctx, taskID)
-	if err != nil {
-		slog.Error("Failed to create PR", "task_id", taskID, "error", err)
-		w.Header().Set("HX-Trigger", fmt.Sprintf(`{"toast": "Failed to create PR: %s"}`, err.Error()))
-		h.HandleFeed(w, r)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", fmt.Sprintf(`{"close-modal": true, "toast": "PR created!", "open-url": "%s"}`, prURL))
-	h.HandleFeed(w, r)
-}
-
-// HandleActionDiscard deletes a task and cleans up its worktree
-func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
-
-	svc, err := h.getServices(ctx)
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
-
-	// Clean up worktree first
-	if err := orchestrator.CleanupTask(id); err != nil {
-		slog.Error("Failed to cleanup worktree", "task_id", id, "error", err)
-	}
-
-	if err := svc.Tasks.Delete(ctx, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("HX-Trigger", `{"close-modal": true, "toast": "Task discarded"}`)
-	h.HandleFeed(w, r)
-}
-
-// HandleActionChat continues a task with a follow-up message.
-func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-	slog.Info("[CHAT] HandleActionChat called", "task_id", taskID)
-
-	if err := r.ParseForm(); err != nil {
-		slog.Error("[CHAT] ParseForm failed", "error", err)
-		w.Header().Set("HX-Trigger", `{"toast": "Invalid request"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	message := r.FormValue("message")
-	slog.Info("[CHAT] Got message", "message", message)
-	if message == "" {
-		slog.Warn("[CHAT] Empty message")
-		w.Header().Set("HX-Trigger", `{"toast": "Message required"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	modelID := r.FormValue("model_id")
-	if modelID == "" {
-		modelID = "o#anthropic/claude-sonnet-4"
-	}
-
-	orchestrator, err := h.getOrchestrator(ctx)
-	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	if err := orchestrator.ContinueTask(ctx, taskID, message, modelID); err != nil {
-		slog.Error("Failed to continue task", "task_id", taskID, "error", err)
-		w.Header().Set("HX-Trigger", `{"toast": "Failed to continue task"}`)
-		h.HandleFeed(w, r)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
 
 // HandleAddTask creates a new task and starts execution.
 func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
@@ -596,13 +321,13 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	modelID := r.FormValue("model_id")
 
 	if intent == "" {
-		h.HandleFeed(w, r)
+		// h.HandleFeed(w, r)
 		return
 	}
 
 	if projectID == "" {
 		w.Header().Set("HX-Trigger", `{"toast": "Select a project first", "taskCreated": "false"}`)
-		h.HandleFeed(w, r)
+		h.RenderApp(w, r)
 		return
 	}
 
@@ -610,7 +335,7 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("Failed to get orchestrator", "error", err)
 		w.Header().Set("HX-Trigger", `{"toast": "Internal error", "taskCreated": "false"}`)
-		h.HandleFeed(w, r)
+		h.RenderApp(w, r)
 		return
 	}
 
@@ -618,12 +343,12 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		w.Header().Set("HX-Trigger", `{"toast": "Failed to start task", "taskCreated": "false"}`)
-		h.HandleFeed(w, r)
+		h.RenderApp(w, r)
 		return
 	}
 
 	w.Header().Set("HX-Trigger", `{"toast": "Task started", "taskCreated": "true"}`)
-	h.HandleFeed(w, r)
+	h.RenderApp(w, r)
 }
 
 // HandleSaveSettings saves user settings

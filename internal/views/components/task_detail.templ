@@ -45,21 +45,14 @@ func hasTextContent(msg views.UIMessage) bool {
 }
 
 // taskDetailXData generates the Alpine.js x-data for the task detail component
+// NOTE: Task status is managed server-side and pushed via SSE. Alpine only handles UI state.
 func taskDetailXData(task *views.UITask) string {
-	agentRunning := "false"
-	if task.Status == models.StatusInProgress {
-		agentRunning = "true"
-	}
 	chatURL := fmt.Sprintf("/action/chat/%s", task.ID)
 	return fmt.Sprintf(`{
 		showChat: false,
 		showTodos: false,
 		todos: [],
 		activeTab: "agent",
-		messageQueue: [],
-		agentRunning: %s,
-		sendingMessage: false,
-		lastEventId: 0,
 		confirmAction: null,
 		chatUrl: "%s",
 		
@@ -72,46 +65,17 @@ func taskDetailXData(task *views.UITask) string {
 		
 		// Handle chat-submit event from ChatInput component
 		handleChatSubmit(detail) {
-			console.log("[TaskDetail.handleChatSubmit] received event:", detail);
 			const { message, modelId } = detail;
-			console.log("[TaskDetail.handleChatSubmit] message:", message, "modelId:", modelId);
-			if (this.agentRunning) {
-				this.queueMessage(message, modelId);
-			} else {
-				this.sendMessage(message, modelId);
-				this.showChat = false;
-			}
+			this.sendMessage(message, modelId);
+			this.showChat = false;
 		},
 		
-		handleAgentEvent(eventId) {
-			if (eventId && eventId > this.lastEventId) {
-				this.lastEventId = eventId;
-			}
-			this.sendingMessage = false;
-		},
 		handleTodoEvent(data) {
 			try { this.todos = JSON.parse(data); } catch(err) { console.error("Todo parse error:", err); }
-		},
-		handleCompleteEvent() {
-			this.agentRunning = false;
-			this.sendingMessage = false;
-			this.$nextTick(() => this.processQueue());
-		},
-		
-		queueMessage(msg, modelId) {
-			this.messageQueue = [...this.messageQueue, { msg, modelId }];
-		},
-		async processQueue() {
-			if (this.messageQueue.length === 0) return;
-			const [item, ...rest] = this.messageQueue;
-			this.messageQueue = rest;
-			await this.sendMessage(item.msg, item.modelId);
 		},
 		
 		async sendMessage(msg, modelId) {
 			if (!msg.trim()) return;
-			this.sendingMessage = true;
-			this.agentRunning = true;
 			const params = new URLSearchParams();
 			params.append("message", msg.trim());
 			params.append("model_id", modelId);
@@ -123,11 +87,9 @@ func taskDetailXData(task *views.UITask) string {
 				});
 			} catch (err) {
 				console.error("Failed to send message:", err);
-				this.sendingMessage = false;
-				this.agentRunning = false;
 			}
 		}
-	}`, agentRunning, chatURL)
+	}`, chatURL)
 }
 
 templ LogEntry(log views.UILogEntry) {
@@ -257,10 +219,8 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 			</div>
 			<!-- Trash Action -->
 			<button
-				hx-post={ fmt.Sprintf("/action/discard/%s", task.ID) }
-				hx-swap="none"
+				@click="confirmAction = 'discard'"
 				class="w-11 h-11 flex items-center justify-center text-gray-600 hover:text-red-400 transition focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-lg"
-				onclick="if(!confirm('Discard task?')) return false;"
 				aria-label="Discard task"
 			>
 				<i class="fas fa-trash"></i>
@@ -286,12 +246,14 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					class="px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
 				>Log</button>
 			</div>
-			<!-- Status Indicator -->
-			<div class="w-6 flex justify-end pr-2">
+			<!-- Status Indicator (server-rendered, updated via SSE) -->
+			<div class="w-6 flex justify-end pr-2" id="status-indicator">
 				if task.Status == models.StatusInProgress {
 					<div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
 				} else if task.Status == models.StatusReview {
 					<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Needs Review"></div>
+				} else if task.Status == models.StatusDone {
+					<div class="w-1.5 h-1.5 rounded-full bg-green-400" title="Done"></div>
 				}
 			</div>
 		</div>
@@ -299,20 +261,18 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 		<!-- Event IDs are tracked for deduplication on reconnection -->
 		<div
 			hx-ext="sse"
-			sse-connect={ fmt.Sprintf("/task/%s/stream", task.ID) }
+			sse-connect={ fmt.Sprintf("/events?task_id=%s", task.ID) }
 			class="hidden"
 			id="task-sse-connection"
 			@htmx:sse-message.camel="
-				const eventId = $event.detail.lastEventId ? parseInt($event.detail.lastEventId) : 0;
-				if ($event.detail.type === 'agent') handleAgentEvent(eventId);
-				else if ($event.detail.type === 'todo') handleTodoEvent($event.detail.data);
-				else if ($event.detail.type === 'complete') handleCompleteEvent();
+				if ($event.detail.type === 'todo') handleTodoEvent($event.detail.data);
 			"
 		>
 			<!-- Hidden elements that receive SSE updates and swap into visible targets -->
-			<div sse-swap="agent" hx-target="#agent-content" hx-swap="innerHTML"></div>
-			<div sse-swap="diff" hx-target="#diff-content" hx-swap="innerHTML"></div>
+			<div sse-swap="agent_update" hx-target="#agent-content" hx-swap="innerHTML"></div>
+			<div sse-swap="diff_update" hx-target="#diff-content" hx-swap="innerHTML"></div>
 			<div sse-swap="log" hx-target="#log-content" hx-swap="beforeend"></div>
+			<div sse-swap="status" hx-target="#status-indicator" hx-swap="innerHTML"></div>
 			<div sse-swap="complete" hx-swap="none"></div>
 			<div sse-swap="todo" hx-swap="none"></div>
 		</div>
@@ -613,6 +573,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									hx-post={ fmt.Sprintf("/action/retry/%s", task.ID) }
 									hx-swap="none"
 									hx-disabled-elt="this"
+									hx-on::after-request="confirmAction = null"
 									class="flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors"
 								><span class="htmx-request:hidden">Retry</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
@@ -637,6 +598,7 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									hx-post={ fmt.Sprintf("/action/clear/%s", task.ID) }
 									hx-swap="none"
 									hx-disabled-elt="this"
+									hx-on::after-request="confirmAction = null"
 									class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
 								><span class="htmx-request:hidden">Clear</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
@@ -686,8 +648,34 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 									hx-post={ fmt.Sprintf("/action/merge/%s", task.ID) }
 									hx-swap="none"
 									hx-disabled-elt="this"
+									hx-on::after-request="confirmAction = null"
 									class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
 								><span class="htmx-request:hidden">Merge</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
+							</div>
+						</div>
+					</template>
+					<!-- Discard Confirmation -->
+					<template x-if="confirmAction === 'discard'">
+						<div class="space-y-4" x-init="htmx.process($el)">
+							<div class="flex items-center gap-3">
+								<div class="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+									<i class="fas fa-trash text-red-500"></i>
+								</div>
+								<div>
+									<h3 class="font-semibold text-white">Discard Task</h3>
+									<p class="text-xs text-gray-400">Permanently delete task</p>
+								</div>
+							</div>
+							<p class="text-sm text-gray-300">This will permanently delete this task and all its data. This action cannot be undone.</p>
+							<div class="flex gap-2 pt-2">
+								<button @click="confirmAction = null" class="flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">Cancel</button>
+								<button
+									hx-post={ fmt.Sprintf("/action/discard/%s", task.ID) }
+									hx-swap="none"
+									hx-disabled-elt="this"
+									hx-on::after-request="confirmAction = null"
+									class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+								><span class="htmx-request:hidden">Discard</span><i class="fas fa-spinner fa-spin hidden htmx-request:inline"></i></button>
 							</div>
 						</div>
 					</template>
@@ -734,13 +722,6 @@ templ TaskDetail(task *views.UITask, project views.UIProject) {
 					>
 						<i class="fas fa-message text-sm text-purple-400 group-hover:text-purple-300 transition-colors"></i>
 						<span class="text-sm font-medium">Chat</span>
-						<!-- Queue badge -->
-						<span 
-							x-show="messageQueue.length > 0" 
-							x-text="messageQueue.length"
-							x-transition
-							class="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30"
-						></span>
 					</button>
 					<!-- Merge button -->
 					<button

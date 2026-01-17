@@ -1,3 +1,4 @@
+// Package services package contains all the services used by the server.
 package services
 
 import (
@@ -14,7 +15,6 @@ import (
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/revrost/code/counterspell/internal/agent"
-	"github.com/revrost/code/counterspell/internal/git"
 	"github.com/revrost/code/counterspell/internal/llm"
 	"github.com/revrost/code/counterspell/internal/models"
 )
@@ -47,9 +47,9 @@ type TaskJob struct {
 type Orchestrator struct {
 	tasks      *TaskService
 	github     *GitHubService
+	repos      *RepoManager
 	events     *EventBus
 	settings   *SettingsService
-	repos      *git.RepoManager
 	dataDir    string
 	workerPool *ants.Pool
 	resultCh   chan TaskResult
@@ -77,7 +77,7 @@ func NewOrchestrator(
 		github:     github,
 		events:     events,
 		settings:   settings,
-		repos:      git.NewRepoManager(dataDir),
+		repos:      NewRepoManager(dataDir),
 		dataDir:    dataDir,
 		workerPool: pool,
 		resultCh:   make(chan TaskResult, 100),
@@ -282,8 +282,8 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 
 	// Claude Code integration configuration
 	type claudeCodeProvider struct {
-		baseURL  string
-		getKey   func(*models.UserSettings) string
+		baseURL   string
+		getKey    func(*models.UserSettings) string
 		supported bool
 	}
 
@@ -327,7 +327,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		}
 
 		slog.Info("[AGENT LOOP] Using Claude Code", "task_id", job.TaskID, "provider", providerPrefix, "model", modelName)
-		
+
 		claudeBackend, err := agent.NewClaudeCodeBackend(opts...)
 		if err != nil {
 			slog.Error("[AGENT LOOP] Failed to create Claude Code backend", "task_id", job.TaskID, "error", err)
@@ -539,6 +539,7 @@ func (o *Orchestrator) processResults() {
 
 // handleAgentEvent converts agent events to UI events.
 func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) {
+	slog.Info("[ORCHESTRATOR] handleAgentEvent", "task_id", taskID, "event_type", event.Type, "content_len", len(event.Content))
 	switch event.Type {
 	case agent.EventPlan:
 		o.emit(taskID, "plan", event.Content)
@@ -684,7 +685,7 @@ func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	// First, pull main into the worktree to check for conflicts
 	if err := o.repos.PullMainIntoWorktree(owner, repo, taskID); err != nil {
 		// Check if it's a merge conflict - return it for the handler to show UI
-		if conflictErr, ok := err.(*git.ErrMergeConflict); ok {
+		if conflictErr, ok := err.(*ErrMergeConflict); ok {
 			slog.Info("[ORCHESTRATOR] Merge conflict detected",
 				"task_id", taskID, "files", conflictErr.ConflictedFiles)
 			return conflictErr

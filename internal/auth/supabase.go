@@ -1,7 +1,10 @@
 package auth
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -17,6 +20,7 @@ type SupabaseConfig struct {
 // AuthService handles authentication with Supabase
 type AuthService struct {
 	supabaseURL string
+	anonKey     string
 }
 
 // NewAuthService creates a new auth service
@@ -27,7 +31,7 @@ func NewAuthService(config *SupabaseConfig) (*AuthService, error) {
 
 	slog.Info("Auth service initialized", "url", config.URL)
 
-	return &AuthService{supabaseURL: config.URL}, nil
+	return &AuthService{supabaseURL: config.URL, anonKey: config.Key}, nil
 }
 
 // NewAuthServiceFromEnv creates auth service from environment variables
@@ -116,4 +120,58 @@ func (s *AuthService) ClearSessionCookies(w http.ResponseWriter) {
 	})
 	
 	slog.Info("Supabase session cookies cleared")
+}
+
+// RefreshTokenResponse contains the response from Supabase token refresh
+type RefreshTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+// RefreshToken uses a refresh token to get a new access token from Supabase
+func (s *AuthService) RefreshToken(refreshToken string) (*RefreshTokenResponse, error) {
+	if refreshToken == "" {
+		return nil, fmt.Errorf("refresh token is empty")
+	}
+
+	reqBody := map[string]string{"refresh_token": refreshToken}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/auth/v1/token?grant_type=refresh_token", s.supabaseURL)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("apikey", s.anonKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("Supabase token refresh failed", "status", resp.StatusCode, "body", string(body))
+		return nil, fmt.Errorf("refresh failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp RefreshTokenResponse
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	slog.Info("Token refreshed successfully", "expires_in", tokenResp.ExpiresIn)
+	return &tokenResp, nil
 }

@@ -424,6 +424,7 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 }
 
 func (b *ClaudeCodeBackend) emit(event StreamEvent) {
+	slog.Debug("[CLAUDE-CODE] emit", "type", event.Type, "content_len", len(event.Content), "has_callback", b.callback != nil)
 	if b.callback != nil {
 		b.callback(event)
 	}
@@ -431,6 +432,7 @@ func (b *ClaudeCodeBackend) emit(event StreamEvent) {
 
 func (b *ClaudeCodeBackend) emitMessages() {
 	if b.callback == nil {
+		slog.Debug("[CLAUDE-CODE] emitMessages skipped - no callback")
 		return
 	}
 	b.mu.Lock()
@@ -440,8 +442,10 @@ func (b *ClaudeCodeBackend) emitMessages() {
 	
 	data, err := json.Marshal(msgs)
 	if err != nil {
+		slog.Error("[CLAUDE-CODE] emitMessages failed to marshal", "error", err)
 		return
 	}
+	slog.Debug("[CLAUDE-CODE] emitMessages", "msg_count", len(msgs), "data_len", len(data))
 	b.callback(StreamEvent{
 		Type:     EventMessages,
 		Messages: string(data),

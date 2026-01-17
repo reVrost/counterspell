@@ -32,7 +32,7 @@ func Feed(data FeedData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"px-3 pt-20 pb-40\"><!-- NEEDS REVIEW (Target for OOB Swaps) --><div id=\"reviews-container\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"px-3 pt-20 pb-40\"><!-- Unified SSE Connection for feed updates --><!-- Listens to /events, filters for task status changes --><div hx-ext=\"sse\" sse-connect=\"/events\" class=\"hidden\"><!-- When receiving 'task' event, refresh reviews container --><div sse-swap=\"task\" hx-trigger=\"sse:message\" hx-target=\"#reviews-container\" hx-get=\"/feed\" hx-swap=\"innerHTML\"></div></div><!-- NEEDS REVIEW (Target for OOB Swaps) --><div id=\"reviews-container\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -40,7 +40,7 @@ func Feed(data FeedData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><!-- IN PROGRESS (SSE streaming) --><div class=\"mb-6\"><h3 class=\"px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3\">In Progress</h3><div class=\"space-y-3\" hx-ext=\"sse\" sse-connect=\"/feed/stream\" sse-swap=\"active-update\" hx-swap=\"innerHTML\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><!-- IN PROGRESS (SSE streaming) --><div class=\"mb-6\"><h3 class=\"px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3\">In Progress</h3><div class=\"space-y-3\" hx-ext=\"sse\" sse-connect=\"/events\" sse-swap=\"active-update\" hx-swap=\"innerHTML\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -106,7 +106,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 40, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 46, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -119,7 +119,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{ tid: '%s', elapsed: 0 }`, task.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 43, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 49, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -176,7 +176,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(projects[task.ProjectID].Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 51, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 57, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -189,7 +189,7 @@ func ActiveRows(tasks []*UITask, projects map[string]UIProject) templ.Component 
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 61, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 67, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -280,7 +280,7 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 88, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 94, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -337,7 +337,7 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 97, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 103, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -350,7 +350,7 @@ func ReviewTaskRow(task *UITask, project UIProject) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 101, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 107, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -392,7 +392,7 @@ func CompletedTaskRow(task *UITask, project UIProject) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 113, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 119, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -405,7 +405,7 @@ func CompletedTaskRow(task *UITask, project UIProject) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 122, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 128, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -418,7 +418,7 @@ func CompletedTaskRow(task *UITask, project UIProject) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 123, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/feed.templ`, Line: 129, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
