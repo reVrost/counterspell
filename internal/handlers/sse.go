@@ -178,7 +178,7 @@ func (h *Handlers) sendSSEEvent(w http.ResponseWriter, flusher http.Flusher, ctx
 			_, _ = fmt.Fprintf(w, "id: %d\nevent: complete\ndata: {\"status\": \"%s\"}\n\n", event.ID, event.HTMLPayload)
 			flusher.Flush()
 		} else {
-			// Feed page: send JSON event for status change
+			// Feed page: send JSON event for status change dont do anything la
 			data, _ := json.Marshal(event)
 			_, _ = fmt.Fprintf(w, "event: task\ndata: %s\n\n", string(data))
 			flusher.Flush()

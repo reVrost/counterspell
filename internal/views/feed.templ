@@ -4,23 +4,17 @@ import "fmt"
 
 // Feed renders the main dashboard
 templ Feed(data FeedData) {
-	<div class="px-3 pt-20 pb-40">
-		<!-- Unified SSE Connection for feed updates -->
-		<!-- Listens to /events, filters for task status changes -->
-		<div hx-ext="sse" sse-connect="/events" class="hidden">
-			<!-- When receiving 'task' event, refresh reviews container -->
-			<div sse-swap="task" hx-trigger="sse:message" hx-target="#reviews-container" hx-get="/feed" hx-swap="innerHTML"></div>
-		</div>
+	<!-- Unified SSE Connection for feed updates -->
+	<!-- Listens to /events, filters for task status changes -->
+	<!-- When receiving 'task' event, refresh reviews container -->
+	<div id="feed-content">
 		<!-- NEEDS REVIEW (Target for OOB Swaps) -->
 		<div id="reviews-container">
 			@ReviewsSection(data)
 		</div>
 		<!-- IN PROGRESS (SSE streaming) -->
-		<div class="mb-6">
-			<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">In Progress</h3>
-			<div class="space-y-3" hx-ext="sse" sse-connect="/events" sse-swap="active-update" hx-swap="innerHTML">
-				@ActiveRows(data.Active, data.Projects)
-			</div>
+		<div id="active-container">
+			@ActiveSection(data)
 		</div>
 		<!-- DONE HISTORY -->
 		if len(data.Done) > 0 {
@@ -36,40 +30,49 @@ templ Feed(data FeedData) {
 	</div>
 }
 
+templ ActiveSection(data FeedData) {
+	<div class="mb-6">
+		<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">In Progress</h3>
+		<div class="space-y-3">
+			for _, task := range data.Active {
+				@ActiveRow(task, data.Projects[task.ProjectID])
+			}
+			if len(data.Active) == 0 {
+				<div class="px-2 py-2 text-sm text-gray-600 text-center">No active agents running</div>
+			}
+		</div>
+	</div>
+}
+
 // ActiveRows renders the list of active tasks (polling target)
-templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
-	for _, task := range tasks {
-		<button
-			type="button"
-			class="w-full text-left bg-[#13151A] border border-gray-800/50 rounded-2xl p-4 transition-all duration-150 shadow-sm active:scale-[0.98] active:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-			@click="modalOpen = true; history.pushState({ modal: true }, '')"
-			hx-get={ fmt.Sprintf("/task/%s", task.ID) }
-			hx-target="#modal-content"
-			hx-swap="morph"
-			x-data={ fmt.Sprintf(`{ tid: '%s', elapsed: 0 }`, task.ID) }
-			x-init="if (!window.taskTimers[tid]) window.taskTimers[tid] = Date.now(); elapsed = Math.floor((Date.now() - window.taskTimers[tid])/1000); setInterval(() => elapsed = Math.floor((Date.now() - window.taskTimers[tid])/1000), 1000)"
-		>
-			<div class="flex justify-between items-start mb-2">
-				<div class="flex items-center gap-2">
-					<span class={ fmt.Sprintf("%s opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-xs", projects[task.ProjectID].Color) }>
-						<i class={ fmt.Sprintf("fas %s", projects[task.ProjectID].Icon) }></i>
-					</span>
-					<span class="text-sm font-medium text-gray-400">{ projects[task.ProjectID].Name }</span>
-				</div>
-				<div class="flex items-center gap-2">
-					<span class="text-xs text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20">In Progress</span>
-					<span
-						class="text-xs text-orange-400/80 font-mono tabular-nums"
-						x-text="elapsed + 's'"
-					></span>
-				</div>
+templ ActiveRow(task *UITask, project UIProject) {
+	<button
+		type="button"
+		class="w-full text-left bg-[#13151A] border border-gray-800/50 rounded-2xl p-4 transition-all duration-150 shadow-sm active:scale-[0.98] active:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+		@click="modalOpen = true; modalTask = task; history.pushState({ modal: true }, '')"
+		hx-get={ fmt.Sprintf("/task/%s", task.ID) }
+		hx-target="#modal-content"
+		hx-swap="morph"
+		x-data={ fmt.Sprintf(`{ tid: '%s', elapsed: 0 }`, task.ID) }
+		x-init="if (!window.taskTimers[tid]) window.taskTimers[tid] = Date.now(); elapsed = Math.floor((Date.now() - window.taskTimers[tid])/1000); setInterval(() => elapsed = Math.floor((Date.now() - window.taskTimers[tid])/1000), 1000)"
+	>
+		<div class="flex justify-between items-start mb-2">
+			<div class="flex items-center gap-2">
+				<span class={ fmt.Sprintf("%s opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-xs", project.Color) }>
+					<i class={ fmt.Sprintf("fas %s", project.Icon) }></i>
+				</span>
+				<span class="text-sm font-medium text-gray-400">{ project.Name }</span>
 			</div>
-			<p class="text-base text-gray-200 font-medium leading-snug line-clamp-2">{ task.Description }</p>
-		</button>
-	}
-	if len(tasks) == 0 {
-		<div class="px-2 py-8 text-sm text-gray-600 text-center">No active agents running</div>
-	}
+			<div class="flex items-center gap-2">
+				<span class="text-xs text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20">In Progress</span>
+				<span
+					class="text-xs text-orange-400/80 font-mono tabular-nums"
+					x-text="elapsed + 's'"
+				></span>
+			</div>
+		</div>
+		<p class="text-base text-gray-200 font-medium leading-snug line-clamp-2">{ task.Description }</p>
+	</button>
 }
 
 // ReviewsSection renders the Needs Review section (OOB target)
@@ -90,7 +93,7 @@ templ ReviewTaskRow(task *UITask, project UIProject) {
 	<button
 		type="button"
 		class="w-full text-left bg-[#13151A] border border-gray-800 rounded-2xl p-4 transition-all duration-150 shadow-sm relative active:scale-[0.98] active:bg-gray-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-		@click="modalOpen = true; history.pushState({ modal: true }, '')"
+		@click="modalOpen = true; modalTask = task; history.pushState({ modal: true }, '')"
 		hx-get={ fmt.Sprintf("/task/%s", task.ID) }
 		hx-target="#modal-content"
 		hx-swap="morph"
@@ -115,7 +118,7 @@ templ CompletedTaskRow(task *UITask, project UIProject) {
 	<button
 		type="button"
 		class="w-full text-left bg-[#13151A]/60 border border-gray-800/20 rounded-2xl p-4 flex justify-between items-center transition-all duration-150 active:scale-[0.98] active:bg-gray-800/50 focus:outline-none focus:ring-2 focus:ring-green-500/50"
-		@click="modalOpen = true; history.pushState({ modal: true }, '')"
+		@click="modalOpen = true; modalTask = task; history.pushState({ modal: true }, '')"
 		hx-get={ fmt.Sprintf("/task/%s", task.ID) }
 		hx-target="#modal-content"
 		hx-swap="morph"
