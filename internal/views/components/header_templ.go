@@ -11,9 +11,17 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 	"github.com/revrost/code/counterspell/internal/views"
+	"strings"
 )
 
-func Header(projects map[string]views.UIProject) templ.Component {
+func emailInitial(email string) string {
+	if email == "" {
+		return "?"
+	}
+	return strings.ToUpper(string(email[0]))
+}
+
+func Header(projects map[string]views.UIProject, userEmail string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -34,130 +42,156 @@ func Header(projects map[string]views.UIProject) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"h-14 border-b border-linear-border bg-gray-900/80 backdrop-blur-md flex items-center justify-between px-4 z-20 shrink-0 fixed top-0 left-0 right-0\"><div @click=\"projectMenuOpen = !projectMenuOpen\" class=\"flex items-center gap-2 cursor-pointer active:opacity-70 transition\"><div class=\"w-5 h-5 rounded bg-gray-800 flex items-center justify-center text-[10px] text-gray-400 border border-gray-700\"><i class=\"fas fa-layer-group\"></i></div><span class=\"font-semibold text-sm tracking-tight text-gray-200\">All Projects</span> <i class=\"fas fa-chevron-down text-[10px] text-gray-600\"></i></div><div class=\"relative\" x-data=\"{ userMenuOpen: false }\"><div @click=\"userMenuOpen = !userMenuOpen\" class=\"flex items-center gap-3 cursor-pointer hover:opacity-80 transition p-1\"><div class=\"h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]\"></div><div class=\"w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300\">BOB</div></div><div x-show=\"userMenuOpen\" @click.outside=\"userMenuOpen = false\" x-cloak x-transition.scale.origin.top.right.duration.200ms class=\"absolute top-10 right-0 z-50 w-48 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 transform\"><div class=\"px-4 py-3 border-b border-gray-800 mb-1\"><p class=\"text-[10px] text-gray-500 uppercase tracking-wider font-bold\">Current User</p><div class=\"flex items-center gap-2 mt-1\"><div class=\"w-4 h-4 rounded-full bg-gray-700 flex items-center justify-center text-[8px]\">BOB</div><p class=\"text-xs font-medium text-gray-200\">Bob Engineer</p></div></div><div class=\"px-2\"><div @click=\"userMenuOpen = false; settingsOpen = true\" class=\"px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2 transition-colors\"><i class=\"fas fa-cog w-4\"></i> Settings</div><div x-show=\"deferredPrompt\" @click=\"userMenuOpen = false; installPWA()\" class=\"px-2 py-1.5 hover:bg-purple-500/10 rounded cursor-pointer text-xs text-purple-400 hover:text-purple-300 flex items-center gap-2 transition-colors\"><i class=\"fas fa-download w-4\"></i> Install App</div></div><div class=\"h-px bg-gray-800 my-1 mx-2\"></div><div class=\"px-2 pb-1\"><form method=\"POST\" action=\"/disconnect\" class=\"contents\" @submit=\"console.log('[LOGOUT] Form submitting to /disconnect')\"><button type=\"submit\" @click=\"console.log('[LOGOUT] Button clicked'); localStorage.removeItem('counterspell_v1_onboarded'); localStorage.removeItem('counterspell_active_project_id'); localStorage.removeItem('counterspell_active_project_name'); localStorage.removeItem('counterspell_model')\" class=\"w-full px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left\"><i class=\"fas fa-sign-out-alt w-4\"></i> Sign Out</button></form></div></div></div></header><!-- Project Filter Menu --><div x-show=\"projectMenuOpen\" @click.outside=\"projectMenuOpen = false\" x-data=\"{ search: '', get app() { return Alpine.$data(document.body); } }\" x-transition.opacity.duration.150ms class=\"absolute top-16 left-4 z-30 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col\"><!-- Sticky Search Header --><div class=\"p-3 border-b border-gray-700 bg-[#16191F]\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Filter repositories...\" class=\"w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600\"></div></div><!-- Scrollable List --><div class=\"max-h-[320px] overflow-y-auto py-1\"><div hx-get=\"/feed\" hx-target=\"#feed-container\" @click=\"projectMenuOpen = false\" class=\"px-4 py-2 hover:bg-white/5 cursor-pointer text-sm font-bold text-white border-b border-gray-800/50 mb-1\" x-show=\"'all projects'.includes(search.toLowerCase())\">All Projects</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header class=\"h-14 border-b border-linear-border bg-gray-900/80 backdrop-blur-md flex items-center justify-between px-4 z-20 shrink-0 fixed top-0 left-0 right-0\"><div @click=\"projectMenuOpen = !projectMenuOpen\" class=\"flex items-center gap-2 cursor-pointer active:opacity-70 transition\"><div class=\"w-5 h-5 rounded bg-gray-800 flex items-center justify-center text-[10px] text-gray-400 border border-gray-700\"><i class=\"fas fa-layer-group\"></i></div><span class=\"font-semibold text-sm tracking-tight text-gray-200\">All Projects</span> <i class=\"fas fa-chevron-down text-[10px] text-gray-600\"></i></div><div class=\"relative\" x-data=\"{ userMenuOpen: false }\"><div @click=\"userMenuOpen = !userMenuOpen\" class=\"flex items-center gap-3 cursor-pointer hover:opacity-80 transition p-1\"><div class=\"h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]\"></div><div class=\"w-6 h-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(emailInitial(userEmail))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 29, Col: 167}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div></div><div x-show=\"userMenuOpen\" @click.outside=\"userMenuOpen = false\" x-cloak x-transition.scale.origin.top.right.duration.200ms class=\"absolute top-10 right-0 z-50 w-56 bg-[#16191F] border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 transform\"><div class=\"px-4 py-3 border-b border-gray-800 mb-1\"><p class=\"text-[10px] text-gray-500 uppercase tracking-wider font-bold\">Signed in as</p><p class=\"text-xs font-medium text-gray-200 mt-1 truncate\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(userEmail)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 38, Col: 75}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p></div><div class=\"px-2\"><div @click=\"userMenuOpen = false; settingsOpen = true\" class=\"px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer text-xs text-gray-400 flex items-center gap-2 transition-colors\"><i class=\"fas fa-cog w-4\"></i> Settings</div><div x-show=\"deferredPrompt\" @click=\"userMenuOpen = false; installPWA()\" class=\"px-2 py-1.5 hover:bg-purple-500/10 rounded cursor-pointer text-xs text-purple-400 hover:text-purple-300 flex items-center gap-2 transition-colors\"><i class=\"fas fa-download w-4\"></i> Install App</div></div><div class=\"h-px bg-gray-800 my-1 mx-2\"></div><div class=\"px-2 pb-1\"><form method=\"POST\" action=\"/disconnect\" class=\"contents\" @submit=\"console.log('[LOGOUT] Form submitting to /disconnect')\"><button type=\"submit\" @click=\"console.log('[LOGOUT] Button clicked'); localStorage.removeItem('counterspell_v1_onboarded'); localStorage.removeItem('counterspell_active_project_id'); localStorage.removeItem('counterspell_active_project_name'); localStorage.removeItem('counterspell_model')\" class=\"w-full px-2 py-1.5 hover:bg-red-500/10 rounded cursor-pointer text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left\"><i class=\"fas fa-sign-out-alt w-4\"></i> Sign Out</button></form></div></div></div></header><!-- Project Filter Menu --><div x-show=\"projectMenuOpen\" @click.outside=\"projectMenuOpen = false\" x-data=\"{ search: '', get app() { return Alpine.$data(document.body); } }\" x-transition.opacity.duration.150ms class=\"absolute top-16 left-4 z-30 w-72 bg-[#16191F] border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col\"><!-- Sticky Search Header --><div class=\"p-3 border-b border-gray-700 bg-[#16191F]\"><div class=\"relative\"><i class=\"fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs\"></i> <input x-model=\"search\" type=\"text\" placeholder=\"Filter repositories...\" class=\"w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600\"></div></div><!-- Scrollable List --><div class=\"max-h-[320px] overflow-y-auto py-1\"><div hx-get=\"/feed\" hx-target=\"#feed-container\" @click=\"projectMenuOpen = false\" class=\"px-4 py-2 hover:bg-white/5 cursor-pointer text-sm font-bold text-white border-b border-gray-800/50 mb-1\" x-show=\"'all projects'.includes(search.toLowerCase())\">All Projects</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, p := range projects {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div hx-get=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var2 string
-			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/feed?project=%s", p.ID))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 84, Col: 55}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-target=\"#feed-container\" @click=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 85, Col: 75}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" class=\"px-4 py-2 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition\" x-show=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/feed?project=%s", p.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 87, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 89, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" :class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-target=\"#feed-container\" @click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s' ? 'bg-white/5' : ''", p.ID))
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.setActiveProject('%s', '%s')", p.ID, p.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 88, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 90, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"><div class=\"w-6 h-6 rounded bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"px-4 py-2 hover:bg-white/5 cursor-pointer flex items-center gap-3 group transition\" x-show=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var6 = []any{fmt.Sprintf("fas %s %s text-[10px]", p.Icon, p.Color)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("'%s'.toLowerCase().includes(search.toLowerCase())", p.Name))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 92, Col: 86}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<i class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" :class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var6).String())
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s' ? 'bg-white/5' : ''", p.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 93, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"></i></div><div class=\"flex-1 min-w-0\"><div class=\"text-sm text-gray-400 group-hover:text-white truncate transition\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><div class=\"w-6 h-6 rounded bg-gray-800 border border-gray-700 flex items-center justify-center shrink-0\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 93, Col: 92}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+			var templ_7745c5c3_Var8 = []any{fmt.Sprintf("fas %s %s text-[10px]", p.Icon, p.Color)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></div><i class=\"fas fa-check text-green-500 text-xs\" x-show=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<i class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s'", p.ID))
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var8).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 95, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 1, Col: 0}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"></i></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"></i></div><div class=\"flex-1 min-w-0\"><div class=\"text-sm text-gray-400 group-hover:text-white truncate transition\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 98, Col: 92}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></div><i class=\"fas fa-check text-green-500 text-xs\" x-show=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("app.activeProjectId === '%s'", p.ID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 100, Col: 110}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"></i></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<!-- Empty State --><div x-show=\"$el.parentElement.querySelectorAll('div[hx-get]:not([style*=\\'display: none\\'])').length === 0\" class=\"px-4 py-8 text-center text-gray-600 text-xs\">No projects found.</div></div><!-- Footer --><div class=\"px-3 py-2 bg-gray-900/50 border-t border-gray-800 text-[10px] text-gray-500 flex justify-between\"><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<!-- Empty State --><div x-show=\"$el.parentElement.querySelectorAll('div[hx-get]:not([style*=\\'display: none\\'])').length === 0\" class=\"px-4 py-8 text-center text-gray-600 text-xs\">No projects found.</div></div><!-- Footer --><div class=\"px-3 py-2 bg-gray-900/50 border-t border-gray-800 text-[10px] text-gray-500 flex justify-between\"><span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d Repositories", len(projects)))
+		var templ_7745c5c3_Var12 string
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d Repositories", len(projects)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 108, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/header.templ`, Line: 113, Col: 56}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span> <span class=\"hover:text-blue-400 cursor-pointer\"><i class=\"fas fa-plus\"></i> New</span></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span> <span class=\"hover:text-blue-400 cursor-pointer\"><i class=\"fas fa-plus\"></i> New</span></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

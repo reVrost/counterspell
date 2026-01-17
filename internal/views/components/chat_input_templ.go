@@ -265,7 +265,7 @@ func ChatInput(config ChatInputConfig, projects map[string]views.UIProject) temp
 			return templ_7745c5c3_Err
 		}
 		if config.Mode == ChatInputModeCreate {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form x-ref=\"form\" hx-post=\"/add-task\" hx-target=\"#feed-container\" hx-swap=\"innerHTML\" hx-on::after-request=\"if(event.detail.successful) { text = ''; $refs.input.value = ''; $refs.input.style.height = 'auto'; }\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10\"><!-- Hidden fields for create mode --><input type=\"hidden\" name=\"project_id\" :value=\"app.activeProjectId\"> <input type=\"hidden\" name=\"model_id\" :value=\"activeModelId\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form x-ref=\"form\" hx-post=\"/add-task\" hx-target=\"#feed-container > div\" hx-swap=\"innerHTML\" @htmx:after-request=\"if(event.detail.successful) { text = ''; $refs.input.value = ''; $refs.input.style.height = 'auto'; }\" class=\"bg-[#1C1F26] border border-gray-700/50 rounded-3xl shadow-2xl relative backdrop-blur-md transition-all duration-200 ring-1 ring-white/5 flex flex-col group focus-within:border-gray-600 focus-within:ring-white/10\"><!-- Hidden fields for create mode --><input type=\"hidden\" name=\"project_id\" :value=\"app.activeProjectId\"> <input type=\"hidden\" name=\"model_id\" :value=\"activeModelId\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

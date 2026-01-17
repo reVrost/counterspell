@@ -51,6 +51,11 @@ func (s *AuthService) GetOAuthURL(provider, redirectURL string) (string, error) 
 	params.Set("provider", provider)
 	params.Set("redirect_to", redirectURL)
 	params.Set("skip_http_redirect", "true")
+	
+	// Request GitHub scopes to get provider_token for repo access
+	if provider == "github" {
+		params.Set("scopes", "repo,read:user,read:org")
+	}
 
 	oauthURL := fmt.Sprintf("%s/auth/v1/authorize?%s", s.supabaseURL, params.Encode())
 
@@ -89,14 +94,26 @@ func (s *AuthService) SetSessionCookie(w http.ResponseWriter, token string) {
 	})
 }
 
-// ClearSessionCookie clears the session cookie
-func (s *AuthService) ClearSessionCookie(w http.ResponseWriter) {
+// ClearSessionCookies clears all Supabase session cookies
+func (s *AuthService) ClearSessionCookies(w http.ResponseWriter) {
+	secure := os.Getenv("ENV") == "production"
+	
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sb-access-token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
-		Secure:   os.Getenv("ENV") == "production",
+		Secure:   secure,
 		HttpOnly: true,
 	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sb-refresh-token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Secure:   secure,
+		HttpOnly: true,
+	})
+	
+	slog.Info("Supabase session cookies cleared")
 }

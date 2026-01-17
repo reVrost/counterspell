@@ -70,29 +70,28 @@ func main() {
 	// Create user manager registry (handles per-user concurrency)
 	userRegistry := services.NewUserManagerRegistry(cfg, dbManager)
 
-	// For backward compatibility, get the default user's database
-	// This is used by services that haven't been updated for multi-tenant yet
-	defaultDB, err := dbManager.GetDB("default")
-	if err != nil {
-		logger.Error("Failed to open default database", "error", err)
-		os.Exit(1)
-	}
-
 	// Create services
-	taskSvc := services.NewTaskService(defaultDB)
 	eventBus := services.NewEventBus()
 
-	// Reset stuck tasks on startup
-	ctx := context.Background()
-	if err := taskSvc.ResetInProgress(ctx); err != nil {
-		logger.Error("Failed to reset in-progress tasks", "error", err)
+	// Reset stuck tasks on startup for default user (single-player mode)
+	if !cfg.MultiTenant {
+		defaultDB, err := dbManager.GetDB("default")
+		if err != nil {
+			logger.Error("Failed to open default database", "error", err)
+			os.Exit(1)
+		}
+		taskSvc := services.NewTaskService(defaultDB)
+		ctx := context.Background()
+		if err := taskSvc.ResetInProgress(ctx); err != nil {
+			logger.Error("Failed to reset in-progress tasks", "error", err)
+		}
 	}
 
 	// Create auth middleware
-	authMiddleware := auth.NewMiddleware(cfg)
+	authMiddleware := auth.NewMiddleware(cfg, dbManager)
 
-	// Create handlers (pass config for multi-tenant awareness)
-	h, err := handlers.NewHandlers(taskSvc, eventBus, defaultDB, cfg)
+	// Create handlers with user registry for per-user service creation
+	h, err := handlers.NewHandlers(userRegistry, eventBus, cfg)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)

@@ -40,6 +40,15 @@ func NewGitHubService(clientID, clientSecret, redirectURI string, db *db.DB) *Gi
 	}
 }
 
+// getDB returns the database from context if available, otherwise the default db.
+// This enables multi-tenant support where each user has their own database.
+func (s *GitHubService) getDB(ctx context.Context) *db.DB {
+	if ctxDB := db.DBFromContext(ctx); ctxDB != nil {
+		return ctxDB
+	}
+	return s.db
+}
+
 // maskString masks sensitive values for logging
 func maskString(s string) string {
 	if s == "" {
@@ -155,7 +164,8 @@ func (s *GitHubService) GetUserInfo(ctx context.Context, token string) (login, a
 
 // SaveConnection saves a GitHub connection to the database.
 func (s *GitHubService) SaveConnection(ctx context.Context, connType, login, avatarURL, token, scope string) error {
-	err := s.db.Queries.CreateGitHubConnection(ctx, sqlc.CreateGitHubConnectionParams{
+	userDB := s.getDB(ctx)
+	err := userDB.Queries.CreateGitHubConnection(ctx, sqlc.CreateGitHubConnectionParams{
 		ID:        shortuuid.New(),
 		Type:      connType,
 		Login:     login,
@@ -174,7 +184,8 @@ func (s *GitHubService) SaveConnection(ctx context.Context, connType, login, ava
 // GetActiveConnection retrieves the active GitHub connection.
 func (s *GitHubService) GetActiveConnection(ctx context.Context) (*models.GitHubConnection, error) {
 	fmt.Println("[GITHUB] GetActiveConnection: querying database")
-	conn, err := s.db.Queries.GetActiveGitHubConnection(ctx)
+	userDB := s.getDB(ctx)
+	conn, err := userDB.Queries.GetActiveGitHubConnection(ctx)
 	if err != nil {
 		fmt.Printf("[GITHUB] GetActiveConnection: no connection found, error=%v\n", err)
 		return nil, err
@@ -196,7 +207,8 @@ func (s *GitHubService) GetActiveConnection(ctx context.Context) (*models.GitHub
 
 // SaveProject saves a project to the database.
 func (s *GitHubService) SaveProject(ctx context.Context, owner, repo string) error {
-	err := s.db.Queries.CreateProject(ctx, sqlc.CreateProjectParams{
+	userDB := s.getDB(ctx)
+	err := userDB.Queries.CreateProject(ctx, sqlc.CreateProjectParams{
 		ID:          shortuuid.New(),
 		GithubOwner: owner,
 		GithubRepo:  repo,
@@ -212,7 +224,8 @@ func (s *GitHubService) SaveProject(ctx context.Context, owner, repo string) err
 // GetProjects retrieves all projects.
 func (s *GitHubService) GetProjects(ctx context.Context) ([]models.Project, error) {
 	fmt.Println("[GITHUB] GetProjects: querying database")
-	projects, err := s.db.Queries.GetProjects(ctx)
+	userDB := s.getDB(ctx)
+	projects, err := userDB.Queries.GetProjects(ctx)
 	if err != nil {
 		fmt.Printf("[GITHUB] GetProjects: query error=%v\n", err)
 		return nil, fmt.Errorf("failed to query projects: %w", err)
@@ -234,7 +247,8 @@ func (s *GitHubService) GetProjects(ctx context.Context) ([]models.Project, erro
 
 // GetRecentProjects retrieves the first 5 recent projects.
 func (s *GitHubService) GetRecentProjects(ctx context.Context) ([]models.Project, error) {
-	projects, err := s.db.Queries.GetRecentProjects(ctx)
+	userDB := s.getDB(ctx)
+	projects, err := userDB.Queries.GetRecentProjects(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent projects: %w", err)
 	}
@@ -254,7 +268,8 @@ func (s *GitHubService) GetRecentProjects(ctx context.Context) ([]models.Project
 
 // GetProjectByRepo retrieves a project by repository name.
 func (s *GitHubService) GetProjectByRepo(ctx context.Context, repo string) (*models.Project, error) {
-	p, err := s.db.Queries.GetProjectByRepo(ctx, repo)
+	userDB := s.getDB(ctx)
+	p, err := userDB.Queries.GetProjectByRepo(ctx, repo)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -275,7 +290,8 @@ func (s *GitHubService) GetProjectByRepo(ctx context.Context, repo string) (*mod
 // DeleteConnection deletes the active GitHub connection.
 func (s *GitHubService) DeleteConnection(ctx context.Context) error {
 	fmt.Println("[GITHUB] DeleteConnection: starting")
-	result, err := s.db.Queries.DeleteAllGitHubConnections(ctx)
+	userDB := s.getDB(ctx)
+	result, err := userDB.Queries.DeleteAllGitHubConnections(ctx)
 	if err != nil {
 		fmt.Printf("[GITHUB] DeleteConnection: error=%v\n", err)
 		return fmt.Errorf("failed to delete connection: %w", err)
@@ -288,7 +304,8 @@ func (s *GitHubService) DeleteConnection(ctx context.Context) error {
 // DeleteAllProjects deletes all projects.
 func (s *GitHubService) DeleteAllProjects(ctx context.Context) error {
 	fmt.Println("[GITHUB] DeleteAllProjects: starting")
-	result, err := s.db.Queries.DeleteAllProjects(ctx)
+	userDB := s.getDB(ctx)
+	result, err := userDB.Queries.DeleteAllProjects(ctx)
 	if err != nil {
 		fmt.Printf("[GITHUB] DeleteAllProjects: error=%v\n", err)
 		return fmt.Errorf("failed to delete projects: %w", err)
@@ -360,7 +377,8 @@ func (s *GitHubService) FetchAndSaveRepositories(ctx context.Context, conn *mode
 			fmt.Printf("Checking repo: %s/%s\n", owner, repoName)
 
 			// Check if already exists
-			exists, err := s.db.Queries.ProjectExists(ctx, sqlc.ProjectExistsParams{
+			userDB := s.getDB(ctx)
+			exists, err := userDB.Queries.ProjectExists(ctx, sqlc.ProjectExistsParams{
 				GithubOwner: owner,
 				GithubRepo:  repoName,
 			})
@@ -388,7 +406,9 @@ func (s *GitHubService) FetchAndSaveRepositories(ctx context.Context, conn *mode
 			for _, link := range links {
 				if strings.Contains(link, `rel="next"`) {
 					parts := strings.Split(link, ";")
-					url = strings.Trim(strings.Trim(parts[0], "<>"), " ")
+					url = strings.TrimSpace(parts[0])
+					url = strings.TrimPrefix(url, "<")
+					url = strings.TrimSuffix(url, ">")
 					break
 				}
 			}

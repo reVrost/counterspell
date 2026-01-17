@@ -23,12 +23,21 @@ func NewTaskService(database *db.DB) *TaskService {
 	return &TaskService{db: database}
 }
 
+// getDB returns the database from context if available, otherwise the default db.
+// This enables multi-tenant support where each user has their own database.
+func (s *TaskService) getDB(ctx context.Context) *db.DB {
+	if ctxDB := db.DBFromContext(ctx); ctxDB != nil {
+		return ctxDB
+	}
+	return s.db
+}
+
 // Create creates a new task.
 func (s *TaskService) Create(ctx context.Context, projectID, title, intent string) (*models.Task, error) {
 	id := shortuuid.New()
 	now := time.Now()
 
-	task, err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
+	task, err := s.getDB(ctx).Queries.CreateTask(ctx, sqlc.CreateTaskParams{
 		ID:        id,
 		ProjectID: projectID,
 		Title:     title,
@@ -47,7 +56,7 @@ func (s *TaskService) Create(ctx context.Context, projectID, title, intent strin
 
 // Get retrieves a task by ID.
 func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) {
-	task, err := s.db.Queries.GetTask(ctx, id)
+	task, err := s.getDB(ctx).Queries.GetTask(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("task not found")
 	}
@@ -64,16 +73,16 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 
 	switch {
 	case status != nil && projectID != nil:
-		tasks, err = s.db.Queries.ListTasksByStatusAndProject(ctx, sqlc.ListTasksByStatusAndProjectParams{
+		tasks, err = s.getDB(ctx).Queries.ListTasksByStatusAndProject(ctx, sqlc.ListTasksByStatusAndProjectParams{
 			Status:    string(*status),
 			ProjectID: *projectID,
 		})
 	case status != nil:
-		tasks, err = s.db.Queries.ListTasksByStatus(ctx, string(*status))
+		tasks, err = s.getDB(ctx).Queries.ListTasksByStatus(ctx, string(*status))
 	case projectID != nil:
-		tasks, err = s.db.Queries.ListTasksByProject(ctx, *projectID)
+		tasks, err = s.getDB(ctx).Queries.ListTasksByProject(ctx, *projectID)
 	default:
-		tasks, err = s.db.Queries.ListTasks(ctx)
+		tasks, err = s.getDB(ctx).Queries.ListTasks(ctx)
 	}
 
 	if err != nil {
@@ -89,7 +98,7 @@ func (s *TaskService) List(ctx context.Context, status *models.TaskStatus, proje
 
 // UpdateStatus updates a task's status.
 func (s *TaskService) UpdateStatus(ctx context.Context, id string, status models.TaskStatus) error {
-	err := s.db.Queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
+	err := s.getDB(ctx).Queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
 		Status:    string(status),
 		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
 		ID:        id,
@@ -102,7 +111,7 @@ func (s *TaskService) UpdateStatus(ctx context.Context, id string, status models
 
 // Move updates a task's position within its status column.
 func (s *TaskService) Move(ctx context.Context, id string, newPosition int) error {
-	err := s.db.Queries.UpdateTaskPosition(ctx, sqlc.UpdateTaskPositionParams{
+	err := s.getDB(ctx).Queries.UpdateTaskPosition(ctx, sqlc.UpdateTaskPositionParams{
 		Position:  sql.NullInt64{Int64: int64(newPosition), Valid: true},
 		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
 		ID:        id,
@@ -115,7 +124,7 @@ func (s *TaskService) Move(ctx context.Context, id string, newPosition int) erro
 
 // UpdatePositionAndStatus updates both position and status in one operation.
 func (s *TaskService) UpdatePositionAndStatus(ctx context.Context, id string, status models.TaskStatus, position int) error {
-	err := s.db.Queries.UpdateTaskPositionAndStatus(ctx, sqlc.UpdateTaskPositionAndStatusParams{
+	err := s.getDB(ctx).Queries.UpdateTaskPositionAndStatus(ctx, sqlc.UpdateTaskPositionAndStatusParams{
 		Status:    string(status),
 		Position:  sql.NullInt64{Int64: int64(position), Valid: true},
 		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
@@ -129,7 +138,7 @@ func (s *TaskService) UpdatePositionAndStatus(ctx context.Context, id string, st
 
 // Delete removes a task.
 func (s *TaskService) Delete(ctx context.Context, id string) error {
-	err := s.db.Queries.DeleteTask(ctx, id)
+	err := s.getDB(ctx).Queries.DeleteTask(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}
@@ -138,7 +147,7 @@ func (s *TaskService) Delete(ctx context.Context, id string) error {
 
 // UpdateWithResult updates a task's status, agent output, git diff, and message history.
 func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status models.TaskStatus, agentOutput, gitDiff, messageHistory string) error {
-	err := s.db.Queries.UpdateTaskResult(ctx, sqlc.UpdateTaskResultParams{
+	err := s.getDB(ctx).Queries.UpdateTaskResult(ctx, sqlc.UpdateTaskResultParams{
 		Status:         string(status),
 		AgentOutput:    sql.NullString{String: agentOutput, Valid: agentOutput != ""},
 		GitDiff:        sql.NullString{String: gitDiff, Valid: gitDiff != ""},
@@ -154,7 +163,7 @@ func (s *TaskService) UpdateWithResult(ctx context.Context, id string, status mo
 
 // ClearHistory clears a task's message history and agent output.
 func (s *TaskService) ClearHistory(ctx context.Context, id string) error {
-	err := s.db.Queries.ClearTaskHistory(ctx, sqlc.ClearTaskHistoryParams{
+	err := s.getDB(ctx).Queries.ClearTaskHistory(ctx, sqlc.ClearTaskHistoryParams{
 		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
 		ID:        id,
 	})
@@ -170,7 +179,7 @@ func (s *TaskService) ClearHistory(ctx context.Context, id string) error {
 // - Tasks without output go to todo (they were interrupted)
 func (s *TaskService) ResetInProgress(ctx context.Context) error {
 	// Tasks that have output should go to review, not todo
-	result, err := s.db.Queries.ResetCompletedInProgressTasks(ctx, sqlc.ResetCompletedInProgressTasksParams{
+	result, err := s.getDB(ctx).Queries.ResetCompletedInProgressTasks(ctx, sqlc.ResetCompletedInProgressTasksParams{
 		Status:    string(models.StatusReview),
 		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
 		Status_2:  string(models.StatusInProgress),
@@ -184,7 +193,7 @@ func (s *TaskService) ResetInProgress(ctx context.Context) error {
 	}
 
 	// Tasks without output should go back to todo
-	result, err = s.db.Queries.ResetStuckInProgressTasks(ctx, sqlc.ResetStuckInProgressTasksParams{
+	result, err = s.getDB(ctx).Queries.ResetStuckInProgressTasks(ctx, sqlc.ResetStuckInProgressTasksParams{
 		Status:    string(models.StatusTodo),
 		UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
 		Status_2:  string(models.StatusInProgress),
@@ -201,7 +210,7 @@ func (s *TaskService) ResetInProgress(ctx context.Context) error {
 
 // AddLog adds a log entry for a task.
 func (s *TaskService) AddLog(ctx context.Context, taskID, level, message string) error {
-	err := s.db.Queries.CreateAgentLog(ctx, sqlc.CreateAgentLogParams{
+	err := s.getDB(ctx).Queries.CreateAgentLog(ctx, sqlc.CreateAgentLogParams{
 		TaskID:  taskID,
 		Level:   sql.NullString{String: level, Valid: level != ""},
 		Message: message,
@@ -214,7 +223,7 @@ func (s *TaskService) AddLog(ctx context.Context, taskID, level, message string)
 
 // GetLogs retrieves logs for a task.
 func (s *TaskService) GetLogs(ctx context.Context, taskID string) ([]*models.AgentLog, error) {
-	logs, err := s.db.Queries.GetAgentLogsByTask(ctx, taskID)
+	logs, err := s.getDB(ctx).Queries.GetAgentLogsByTask(ctx, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get logs: %w", err)
 	}

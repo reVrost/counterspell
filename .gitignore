@@ -1,6 +1,8 @@
 # Environment variables
 .env
 .envrc
+.envrc.multi
+.envrc.single
 tmp
 app
 
