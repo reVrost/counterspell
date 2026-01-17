@@ -1,62 +1,110 @@
-# counterspell
+# Counterspell
 
-A mobile-first, self-hosted AI agent orchestration system that allows parallel coding tasks ("fire and forget"). The system acts as a "Command & Control" center where humans define intent, and AI agents execute, review, and report back.
+A multi-tenant AI agent orchestration platform for parallel coding tasks. Fire-and-forget task execution with real-time feedback, sandboxed code execution, and per-user isolation.
+
+> **Philosophy:** "Persistent Brain (Go), Ephemeral Hands (Bubblewrap), Segmented Memory (SQLite)"
 
 ## Features
 
-- **GitHub Integration**: Connect your personal account or organization (similar to Vercel)
-- **Mobile-First PWA**: Native-feeling mobile interface with tab navigation for phones, grid for desktop
-- **Optimistic UI**: Drag-and-drop with instant feedback using HTMX and Alpine.js
-- **Real-Time Logs**: SSE streaming of agent execution logs (the "Matrix Rain" console)
-- **Git Worktrees**: Isolated agent workspaces for safe code execution
-- **Task State Machine**: Rigid status flow (backlog → in_progress → review → done)
-- **Offline Support**: Service worker caching for offline access
+- **Multi-Tenant SaaS**: Per-user SQLite databases, isolated workspaces, Supabase authentication
+- **Single-Player Mode**: Self-host with `MULTI_TENANT=false` for personal use
+- **Bubblewrap Sandboxing**: Secure code execution with Linux kernel namespaces (<5ms startup)
+- **GitHub Integration**: OAuth-based repo access, shared bare repos, user-isolated worktrees
+- **Mobile-First PWA**: Native-feeling interface with offline support
+- **Real-Time Logs**: SSE streaming of agent execution (the "Matrix Rain" console)
+- **Task State Machine**: Backlog → In Progress → Review → Done
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
+│  Browser/PWA    │────▶│   Supabase   │────▶│  GitHub OAuth   │
+└─────────────────┘     └──────────────┘     └─────────────────┘
+         │                                           │
+         └──────────────┬────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Go Server                                │
+│  ┌─────────────┐   ┌─────────────┐   ┌──────────────────┐   │
+│  │ Auth Layer  │──▶│ User Manager│──▶│ Worker Pool (20) │   │
+│  │ (JWT/OAuth) │   │ (per-user)  │   │ (FIFO scheduling)│   │
+│  └─────────────┘   └─────────────┘   └──────────────────┘   │
+│         │                │                     │             │
+│         ▼                ▼                     ▼             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              Bubblewrap Sandbox                      │    │
+│  │  • Isolated filesystem (user workspace only)         │    │
+│  │  • 10min timeout, 1MB output limit                   │    │
+│  │  • Full network (npm, go get, etc.)                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+data/
+├── db/
+│   ├── {user_uuid}.db      # Per-user SQLite (history, settings, logs)
+│   └── default.db          # Single-player mode
+├── repos/                  # Shared bare git repos (deduplicated)
+│   └── {owner}/{repo}.git
+└── workspaces/
+    └── {user_uuid}/
+        └── worktrees/
+            └── {repo}_{task_id}/   # Isolated agent workspace
+```
 
 ## Tech Stack
 
-- **Backend**: Go 1.25+
-- **Routing**: `go-chi/chi`
-- **Database**: SQLite (WAL mode)
-- **Frontend**: HTMX + Alpine.js + TailwindCSS
-- **Drag & Drop**: SortableJS with haptic feedback
-- **Real-time**: SSE (Server-Sent Events)
-- **Agent Engine**: Orion (LLM orchestration)
-
-## Project Structure
-
-```
-counterspell/
-├── cmd/app/           # Application entry point
-├── internal/
-│   ├── db/           # SQLite database layer
-│   ├── git/          # Git worktree management
-│   ├── handlers/      # HTTP handlers
-│   ├── models/        # Data models (tasks, projects, github connections)
-│   ├── services/      # Business logic (tasks, agents, events)
-│   └── ui/           # HTML templates (templ)
-├── web/static/       # Static assets, PWA files
-└── pkg/orion/       # Existing agent brain library
-```
+| Component | Technology |
+|-----------|------------|
+| Language | Go 1.25+ |
+| Frontend | HTMX + Alpine.js + TailwindCSS |
+| Templates | templ (type-safe) |
+| Database | SQLite (WAL mode, per-user) |
+| Auth | Supabase (GitHub OAuth) |
+| Isolation | Bubblewrap (bwrap) |
+| Agent Engine | Orion (LLM orchestration) |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Go 1.25+
-- Git (for worktree functionality)
+- Git
+- Bubblewrap (`bwrap`) - for sandboxed execution
 
 ### Installation
 
 ```bash
-# Clone repository
-git clone https://github.com/revrost/code/counterspell.git
+git clone https://github.com/revrost/counterspell.git
 cd counterspell
 
-# Build
 go build -o counterspell ./cmd/app
+./counterspell
+```
 
-# Run
-./counterspell -addr :8710 -db ./data/counterspell.db
+### Environment Variables
+
+```bash
+# Mode (default: single-player)
+MULTI_TENANT=false          # Set to true for SaaS mode
+
+# Supabase (required when MULTI_TENANT=true)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_JWT_SECRET=your-jwt-secret
+
+# Worker pool
+WORKER_POOL_SIZE=20         # Concurrent workers
+MAX_TASKS_PER_USER=5        # Per-user task limit
+USER_MANAGER_TTL=2h         # Inactive user cleanup
+
+# Sandbox
+SANDBOX_TIMEOUT=600         # 10 minutes
+SANDBOX_OUTPUT_LIMIT=1048576  # 1MB
+NATIVE_ALLOWLIST=git,ls,cat,head,tail,grep,find,wc,sort,uniq
 ```
 
 ### Docker
@@ -70,48 +118,55 @@ docker run -p 8710:8710 -v $(pwd)/data:/app/data counterspell
 
 ### 1. Connect GitHub
 
-Access the app at **http://localhost:8710** and connect your GitHub account or organization. This grants counterspell access to your repositories.
+Access **http://localhost:8710** and authenticate with GitHub OAuth. This grants Counterspell access to your repositories.
 
 ### 2. Select a Project
 
-After connecting, you'll see a list of your available repositories. Select one to start creating tasks.
+Choose a repository from your GitHub account to start creating tasks.
 
-### 3. Create Tasks
+### 3. Create & Execute Tasks
 
-- Click "+ New Task" button
-- Enter a title (e.g., "Fix login bug")
-- Describe the intent for the agent
+- Create a task with a title and intent description
+- Drag to "In Progress" to trigger the AI agent
+- Watch real-time logs as the agent works
+- Review changes and approve/reject
 
-### 4. Manage Tasks
+### Agent Workflow
 
-**Desktop**: Drag tasks between columns:
-- **Backlog** → **In Progress** → Triggers agent execution
-- **Review** → **Done** → Approves and merges changes
+1. **Planning**: Agent analyzes task and creates execution plan
+2. **Worktree Creation**: Isolated git worktree in user's workspace
+3. **Sandboxed Execution**: Code runs inside Bubblewrap container
+4. **Review**: Task moves to review with diffs
+5. **Approval**: Human approves or rejects changes
 
-**Mobile**: 
-- Tap tabs to switch between status columns
-- Drag tasks within columns to reorganize
-- Moving to "In Progress" triggers agent
+## Deployment
 
-## Agent Workflow
+### Single Server (Recommended)
 
-1. **Planning**: Agent analyzes the task and creates a plan
-2. **Worktree Creation**: Isolated git worktree is created
-3. **Execution**: Agent writes code in the sandbox
-4. **Review**: Task moves to review status with diffs
-5. **Approval**: Human approves or rejects the changes
+Deploy to a CPU-optimized server (DigitalOcean, EC2, etc.):
 
-## PWA Installation
+```bash
+# Fly.io
+flyctl deploy
 
-1. Access the app via HTTPS or localhost
-2. Tap "Share" → "Add to Home Screen" (iOS)
-3. Tap "Install App" (Android)
-4. The app runs in standalone mode (no browser chrome)
+# Or any VPS with Docker
+docker-compose up -d
+```
+
+**Deployment docs:**
+- [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md) - Fly.io setup
+- [FLY_CHECKLIST.md](FLY_CHECKLIST.md) - Pre-deploy checklist
+
+### Authentication Setup
+
+See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for Supabase configuration.
+
+**Note:** Only GitHub OAuth is supported - GitHub IS the login method since this is a GitHub-centric tool.
 
 ## Development
 
 ```bash
-# Run with live reload
+# Live reload
 make dev
 
 # Run tests
@@ -119,106 +174,32 @@ go test ./...
 
 # Generate templates
 templ generate
+
+# Generate sqlc
+sqlc generate
 ```
 
-## Mobile Testing
+## Documentation
 
-Test on iOS Safari or Chrome DevTools Device Mode:
+| Document | Description |
+|----------|-------------|
+| [docs/MULTI_TENANT_DESIGN.md](docs/MULTI_TENANT_DESIGN.md) | Multi-tenant architecture design |
+| [docs/STACK_GUIDE.md](docs/STACK_GUIDE.md) | templ + HTMX + Alpine.js guide |
+| [gobox.md](gobox.md) | Original architecture vision |
 
-```bash
-# Use ngrok for tunneling
-ngrok http 8710
+## Security
 
-# Then access https://<ngrok-id>.ngrok.io from your phone
-```
-
-## GitHub Integration
-
-counterspell supports two connection types:
-
-1. **Personal Account**: Connect your personal GitHub repositories
-2. **Organization**: Connect your entire organization (requires admin approval)
-
-Both provide read/write access to:
-- Repository code
-- Issues
-- Pull requests
-
-The system creates isolated worktrees for each task, keeping your main branch safe.
+- **Sandbox Escape Prevention**: All user file/shell operations go through Bubblewrap
+- **Path Traversal**: Bind mounts prevent access outside user's workspace
+- **Resource Limits**: 10min timeout, 1MB output per execution
+- **Token Security**: GitHub tokens in Supabase vault + user SQLite
+- **Cross-User Isolation**: Separate SQLite files, separate workspace directories
 
 ## License
 
-FSL-1.1-MIT (Functional Source License with MIT Future Grant)
+FSL-1.1-MIT (Functional Source License)
 
-This software is licensed under the FSL-1.1-MIT license, which permits:
-- Internal use and access
-- Non-commercial education
-- Non-commercial research
-- Professional services with licensed clients
+- Internal use, non-commercial education/research permitted
+- Converts to MIT on January 5, 2028
 
-On the second anniversary of release (2028-01-05), the license automatically converts to standard MIT.
-
-See the [LICENSE](LICENSE) file for full terms.
-
----
-
-## ☁️ Cloud Deployment
-
-Counterspell is ready to deploy to Fly.io!
-
-### Quick Deploy to Fly.io
-
-```bash
-# Install Fly CLI
-curl -L https://fly.io/install.sh | sh
-
-# Login
-flyctl auth login
-
-# Deploy
-flyctl deploy
-```
-
-**App URL:** https://counterspell.fly.dev
-
-**Complete Documentation:**
-- [FLY_SUMMARY.md](FLY_SUMMARY.md) - Quick start guide
-- [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md) - Step-by-step instructions
-- [FLY_CHECKLIST.md](FLY_CHECKLIST.md) - Deployment checklist
-
-**Expected Cost:** ~$5-10/month (or free for first month with new credits)
-
-### Other Hosting Options
-
-- **Render** - Free tier, easy GitHub integration
-- **Oracle Cloud** - Always free tier (2 CPUs, 24GB RAM)
-- **DigitalOcean** - $4/month, simple VPS
-- **EC2 (t3.nano)** - $5/month after AWS free tier
-
----
-
-## 🔐 Authentication Setup
-
-Counterspell uses Supabase for user authentication.
-
-**Setup Guide:** [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
-
-**Providers:**
-- GitHub OAuth
-- Google OAuth
-- Email magic links
-
-**Required Environment Variables:**
-```bash
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your_anon_key_here
-```
-
-**Deploy Configuration Files:**
-- `Dockerfile` - Multi-stage Go build
-- `fly.toml` - Fly.io configuration
-- `.flyignore` - Exclude files from deployment
-
----
-
-**Need help?** See [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md) or visit [Fly.io Docs](https://fly.io/docs)
+See [LICENSE](LICENSE) for full terms.

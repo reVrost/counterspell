@@ -26,6 +26,7 @@ type GitHubService struct {
 }
 
 // NewGitHubService creates a new GitHub service.
+// This are github details that are stored in the sqlite database
 func NewGitHubService(clientID, clientSecret, redirectURI string, db *db.DB) *GitHubService {
 	fmt.Printf("GitHub Service initialized:\n")
 	fmt.Printf("  Client ID: %s\n", maskString(clientID))

@@ -5,21 +5,22 @@ window.taskTimers = window.taskTimers || {};
  * Main Alpine.js application state
  * Registered as Alpine.data('appState') before Alpine initializes
  */
-document.addEventListener('alpine:init', () => {
-  Alpine.data('appState', () => ({
+document.addEventListener("alpine:init", () => {
+  Alpine.data("appState", () => ({
     // UI State
     modalOpen: false,
-    activeTab: 'diff',
+    activeTab: "diff",
     projectMenuOpen: false,
     inputProjectMenuOpen: false,
-    toastMsg: '',
+    toastMsg: "",
     toastOpen: false,
     settingsOpen: false,
     userMenuOpen: false,
-    
+
     // Feed Section Collapse State
-    reviewsExpanded: localStorage.getItem('feed_reviews_expanded') !== 'false',
-    completedExpanded: localStorage.getItem('feed_completed_expanded') !== 'false',
+    reviewsExpanded: localStorage.getItem("feed_reviews_expanded") !== "false",
+    completedExpanded:
+      localStorage.getItem("feed_completed_expanded") !== "false",
 
     // Voice Recording State
     listening: false,
@@ -40,25 +41,31 @@ document.addEventListener('alpine:init', () => {
     canInstallPWA: false,
 
     // Project State
-    activeProjectId: localStorage.getItem('counterspell_active_project_id') || '',
-    activeProjectName: localStorage.getItem('counterspell_active_project_name') || '',
+    activeProjectId:
+      localStorage.getItem("counterspell_active_project_id") || "",
+    activeProjectName:
+      localStorage.getItem("counterspell_active_project_name") || "",
 
     // Onboarding State
-    showOnboarding: !localStorage.getItem('counterspell_v1_onboarded'),
+    showOnboarding: !localStorage.getItem("counterspell_v1_onboarded"),
     onboardingStep: 0,
 
     // Auth State (read from data attribute)
     get isAuthenticated() {
-      return document.body.dataset.authenticated === 'true';
+      return document.body.dataset.authenticated === "true";
     },
 
     // Lifecycle
     init() {
-      console.log('[APP] Alpine init, isAuthenticated:', this.isAuthenticated, 'showOnboarding:', this.showOnboarding);
+      console.log(
+        "[APP] Alpine init, isAuthenticated:",
+        this.isAuthenticated,
+        "showOnboarding:",
+        this.showOnboarding,
+      );
       if (this.showOnboarding && this.isAuthenticated) {
         this.runPostAuthSequence();
       }
-      this.connectSSE();
       this.setupPWAInstall();
       this.setupModalHistory();
     },
@@ -66,48 +73,29 @@ document.addEventListener('alpine:init', () => {
     // Feed Section Toggles
     toggleReviews() {
       this.reviewsExpanded = !this.reviewsExpanded;
-      localStorage.setItem('feed_reviews_expanded', this.reviewsExpanded);
+      localStorage.setItem("feed_reviews_expanded", this.reviewsExpanded);
     },
     toggleCompleted() {
       this.completedExpanded = !this.completedExpanded;
-      localStorage.setItem('feed_completed_expanded', this.completedExpanded);
+      localStorage.setItem("feed_completed_expanded", this.completedExpanded);
     },
 
     // Project Management
     setActiveProject(id, name) {
-      console.log('[setActiveProject] called with:', id, name);
+      console.log("[setActiveProject] called with:", id, name);
       this.activeProjectId = id;
       this.activeProjectName = name;
-      localStorage.setItem('counterspell_active_project_id', id);
-      localStorage.setItem('counterspell_active_project_name', name);
+      localStorage.setItem("counterspell_active_project_id", id);
+      localStorage.setItem("counterspell_active_project_name", name);
       this.inputProjectMenuOpen = false;
       this.projectMenuOpen = false;
-    },
-
-    // SSE Connection
-    connectSSE() {
-      if (this._eventSource) {
-        this._eventSource.close();
-      }
-      const eventSource = new EventSource('/events');
-      this._eventSource = eventSource;
-      eventSource.addEventListener('task', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.type === 'status_change') {
-          htmx.trigger('#reviews-container', 'refresh');
-        }
-      });
-      eventSource.onerror = () => {
-        eventSource.close();
-        setTimeout(() => this.connectSSE(), 5000);
-      };
     },
 
     // Onboarding
     startOnboarding() {
       this.onboardingStep = 1;
       setTimeout(() => {
-        window.location.href = '/github/authorize?type=user';
+        window.location.href = "/github/authorize?type=user";
       }, 1000);
     },
 
@@ -140,8 +128,12 @@ document.addEventListener('alpine:init', () => {
       this._inputRef = inputRef;
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        this.audioContext = new (
+          window.AudioContext || window.webkitAudioContext
+        )();
         const source = this.audioContext.createMediaStreamSource(stream);
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 64;
@@ -175,7 +167,7 @@ document.addEventListener('alpine:init', () => {
         };
 
         this.mediaRecorder.onstop = () => {
-          const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          const blob = new Blob(this.audioChunks, { type: "audio/webm" });
           this.recordedAudio = {
             blob: blob,
             url: URL.createObjectURL(blob),
@@ -186,7 +178,7 @@ document.addEventListener('alpine:init', () => {
 
         this.mediaRecorder.start();
       } catch (err) {
-        this.showToast('Microphone access denied');
+        this.showToast("Microphone access denied");
         this.isRecording = false;
       }
     },
@@ -197,25 +189,30 @@ document.addEventListener('alpine:init', () => {
       this.isRecording = false;
       if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
       if (this.audioContext) this.audioContext.close();
-      
+
       // Set up onstop to auto-transcribe
-      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
         const inputRef = this._inputRef; // Capture from stored ref
-        console.log('setting up onstop, inputRef:', inputRef);
+        console.log("setting up onstop, inputRef:", inputRef);
         this.mediaRecorder.onstop = async () => {
-          console.log('mediaRecorder.onstop fired');
-          const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
-          console.log('blob size:', blob.size);
+          console.log("mediaRecorder.onstop fired");
+          const blob = new Blob(this.audioChunks, { type: "audio/webm" });
+          console.log("blob size:", blob.size);
           if (this._stream) {
             this._stream.getTracks().forEach((t) => t.stop());
           }
-          
+
           // Auto-transcribe to input
           if (blob.size > 0 && inputRef) {
-            console.log('calling transcribeToInput');
+            console.log("calling transcribeToInput");
             await this.transcribeToInput(blob, inputRef);
           } else {
-            console.log('skipping transcribe, blob.size:', blob.size, 'inputRef:', inputRef);
+            console.log(
+              "skipping transcribe, blob.size:",
+              blob.size,
+              "inputRef:",
+              inputRef,
+            );
           }
         };
         this.mediaRecorder.stop();
@@ -230,7 +227,7 @@ document.addEventListener('alpine:init', () => {
       this.isRecording = false;
       if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
       if (this.audioContext) this.audioContext.close();
-      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
         this.mediaRecorder.onstop = () => {}; // Don't transcribe on cancel
         this.mediaRecorder.stop();
       }
@@ -240,46 +237,46 @@ document.addEventListener('alpine:init', () => {
 
     // Transcribe audio blob and put text in input (no auto-submit)
     async transcribeToInput(blob, inputRef) {
-      console.log('transcribeToInput called, inputRef:', inputRef);
+      console.log("transcribeToInput called, inputRef:", inputRef);
       this.isTranscribing = true;
 
       try {
         const formData = new FormData();
-        formData.append('audio', blob, 'recording.webm');
+        formData.append("audio", blob, "recording.webm");
 
-        console.log('fetching /transcribe');
-        const response = await fetch('/transcribe', {
-          method: 'POST',
+        console.log("fetching /transcribe");
+        const response = await fetch("/transcribe", {
+          method: "POST",
           body: formData,
         });
 
-        console.log('response status:', response.status);
+        console.log("response status:", response.status);
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(errorText || 'Transcription failed');
+          throw new Error(errorText || "Transcription failed");
         }
 
         const transcription = await response.text();
-        console.log('transcription result:', transcription);
+        console.log("transcription result:", transcription);
 
-        if (!transcription || transcription.trim() === '') {
-          this.showToast('Could not understand audio');
+        if (!transcription || transcription.trim() === "") {
+          this.showToast("Could not understand audio");
           this.isTranscribing = false;
           return;
         }
 
         // Set the transcribed text in the input (don't submit)
-        console.log('setting inputRef.value, inputRef:', inputRef);
+        console.log("setting inputRef.value, inputRef:", inputRef);
         if (inputRef) {
           inputRef.value = transcription;
           // Trigger Alpine to update x-model
-          inputRef.dispatchEvent(new Event('input', { bubbles: true }));
-          console.log('inputRef.value set to:', inputRef.value);
+          inputRef.dispatchEvent(new Event("input", { bubbles: true }));
+          console.log("inputRef.value set to:", inputRef.value);
         }
         this.isTranscribing = false;
       } catch (err) {
-        console.error('Transcription error:', err);
-        this.showToast('Transcription failed: ' + err.message);
+        console.error("Transcription error:", err);
+        this.showToast("Transcription failed: " + err.message);
         this.isTranscribing = false;
       }
     },
@@ -287,7 +284,7 @@ document.addEventListener('alpine:init', () => {
     formatDuration(secs) {
       const m = Math.floor(secs / 60);
       const s = secs % 60;
-      return m + ':' + (s < 10 ? '0' : '') + s;
+      return m + ":" + (s < 10 ? "0" : "") + s;
     },
 
     // Modal
@@ -298,17 +295,17 @@ document.addEventListener('alpine:init', () => {
         history.back();
       }
       setTimeout(() => {
-        const el = document.getElementById('modal-content');
-        if (el) el.innerHTML = '';
+        const el = document.getElementById("modal-content");
+        if (el) el.innerHTML = "";
       }, 300);
     },
 
     setupModalHistory() {
-      window.addEventListener('popstate', (e) => {
+      window.addEventListener("popstate", (e) => {
         if (this.modalOpen && !e.state?.modal) {
           this.modalOpen = false;
           setTimeout(() => {
-            document.getElementById('modal-content').innerHTML = '';
+            document.getElementById("modal-content").innerHTML = "";
           }, 300);
         }
       });
@@ -316,15 +313,15 @@ document.addEventListener('alpine:init', () => {
 
     // PWA Installation
     setupPWAInstall() {
-      window.addEventListener('beforeinstallprompt', (e) => {
+      window.addEventListener("beforeinstallprompt", (e) => {
         e.preventDefault();
         this.deferredPrompt = e;
         this.canInstallPWA = true;
       });
-      window.addEventListener('appinstalled', () => {
+      window.addEventListener("appinstalled", () => {
         this.deferredPrompt = null;
         this.canInstallPWA = false;
-        this.showToast('App installed successfully!');
+        this.showToast("App installed successfully!");
       });
     },
 
@@ -332,8 +329,8 @@ document.addEventListener('alpine:init', () => {
       if (!this.deferredPrompt) return;
       this.deferredPrompt.prompt();
       this.deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-          this.showToast('Installing app...');
+        if (choiceResult.outcome === "accepted") {
+          this.showToast("Installing app...");
         }
         this.deferredPrompt = null;
         this.canInstallPWA = false;

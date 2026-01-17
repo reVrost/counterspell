@@ -53,21 +53,14 @@ func hasTextContent(msg views.UIMessage) bool {
 }
 
 // taskDetailXData generates the Alpine.js x-data for the task detail component
+// NOTE: Task status is managed server-side and pushed via SSE. Alpine only handles UI state.
 func taskDetailXData(task *views.UITask) string {
-	agentRunning := "false"
-	if task.Status == models.StatusInProgress {
-		agentRunning = "true"
-	}
 	chatURL := fmt.Sprintf("/action/chat/%s", task.ID)
 	return fmt.Sprintf(`{
 		showChat: false,
 		showTodos: false,
 		todos: [],
 		activeTab: "agent",
-		messageQueue: [],
-		agentRunning: %s,
-		sendingMessage: false,
-		lastEventId: 0,
 		confirmAction: null,
 		chatUrl: "%s",
 		
@@ -80,46 +73,17 @@ func taskDetailXData(task *views.UITask) string {
 		
 		// Handle chat-submit event from ChatInput component
 		handleChatSubmit(detail) {
-			console.log("[TaskDetail.handleChatSubmit] received event:", detail);
 			const { message, modelId } = detail;
-			console.log("[TaskDetail.handleChatSubmit] message:", message, "modelId:", modelId);
-			if (this.agentRunning) {
-				this.queueMessage(message, modelId);
-			} else {
-				this.sendMessage(message, modelId);
-				this.showChat = false;
-			}
+			this.sendMessage(message, modelId);
+			this.showChat = false;
 		},
 		
-		handleAgentEvent(eventId) {
-			if (eventId && eventId > this.lastEventId) {
-				this.lastEventId = eventId;
-			}
-			this.sendingMessage = false;
-		},
 		handleTodoEvent(data) {
 			try { this.todos = JSON.parse(data); } catch(err) { console.error("Todo parse error:", err); }
-		},
-		handleCompleteEvent() {
-			this.agentRunning = false;
-			this.sendingMessage = false;
-			this.$nextTick(() => this.processQueue());
-		},
-		
-		queueMessage(msg, modelId) {
-			this.messageQueue = [...this.messageQueue, { msg, modelId }];
-		},
-		async processQueue() {
-			if (this.messageQueue.length === 0) return;
-			const [item, ...rest] = this.messageQueue;
-			this.messageQueue = rest;
-			await this.sendMessage(item.msg, item.modelId);
 		},
 		
 		async sendMessage(msg, modelId) {
 			if (!msg.trim()) return;
-			this.sendingMessage = true;
-			this.agentRunning = true;
 			const params = new URLSearchParams();
 			params.append("message", msg.trim());
 			params.append("model_id", modelId);
@@ -131,11 +95,9 @@ func taskDetailXData(task *views.UITask) string {
 				});
 			} catch (err) {
 				console.error("Failed to send message:", err);
-				this.sendingMessage = false;
-				this.agentRunning = false;
 			}
 		}
-	}`, agentRunning, chatURL)
+	}`, chatURL)
 }
 
 func LogEntry(log views.UILogEntry) templ.Component {
@@ -221,7 +183,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(log.Type)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 152, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 114, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -234,7 +196,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(log.Timestamp.Format("15:04:05"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 153, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 115, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -269,7 +231,7 @@ func LogEntry(log views.UILogEntry) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 155, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 117, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -319,7 +281,7 @@ func MessageBubble(msg views.UIMessage) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(content.Text)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 171, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 133, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -426,7 +388,7 @@ func ToolCallBlock(content views.UIContent) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(content.ToolName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 212, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 174, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -439,7 +401,7 @@ func ToolCallBlock(content views.UIContent) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(content.ToolInput)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 216, Col: 125}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 178, Col: 125}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -483,7 +445,7 @@ func ToolResultBlock(content views.UIContent) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(truncateResult(content.Text))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 234, Col: 165}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 196, Col: 165}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -526,7 +488,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(taskDetailXData(task))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 241, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 203, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -583,7 +545,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(project.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 251, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 213, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -596,7 +558,7 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 253, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 215, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -609,36 +571,28 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(task.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 255, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 217, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</h2></div></div><!-- Trash Action --><button hx-post=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/discard/%s", task.ID))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 260, Col: 56}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" hx-swap=\"none\" class=\"w-11 h-11 flex items-center justify-center text-gray-600 hover:text-red-400 transition focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-lg\" onclick=\"if(!confirm('Discard task?')) return false;\" aria-label=\"Discard task\"><i class=\"fas fa-trash\"></i></button></div><!-- Tabs Container --><div class=\"flex items-center justify-between p-2 bg-[#16191F] shrink-0 border-b border-white/5\"><div class=\"w-6\"></div><div class=\"flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50\"><button @click=\"activeTab = 'agent'\" :class=\"activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50\">Agent</button> <button @click=\"activeTab = 'diff'\" :class=\"activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50\">Diff</button> <button @click=\"activeTab = 'activity'\" :class=\"activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50\">Log</button></div><!-- Status Indicator --><div class=\"w-6 flex justify-end pr-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</h2></div></div><!-- Trash Action --><button @click=\"confirmAction = 'discard'\" class=\"w-11 h-11 flex items-center justify-center text-gray-600 hover:text-red-400 transition focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-lg\" aria-label=\"Discard task\"><i class=\"fas fa-trash\"></i></button></div><!-- Tabs Container --><div class=\"flex items-center justify-between p-2 bg-[#16191F] shrink-0 border-b border-white/5\"><div class=\"w-6\"></div><div class=\"flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50\"><button @click=\"activeTab = 'agent'\" :class=\"activeTab === 'agent' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50\">Agent</button> <button @click=\"activeTab = 'diff'\" :class=\"activeTab === 'diff' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50\">Diff</button> <button @click=\"activeTab = 'activity'\" :class=\"activeTab === 'activity' ? 'bg-gray-800 text-white shadow' : 'text-gray-500'\" class=\"px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50\">Log</button></div><!-- Status Indicator (server-rendered, updated via SSE) --><div class=\"w-6 flex justify-end pr-2\" id=\"status-indicator\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if task.Status == models.StatusInProgress {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"w-1.5 h-1.5 rounded-full bg-orange-400\" title=\"In Progress\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<div class=\"w-1.5 h-1.5 rounded-full bg-orange-400\" title=\"In Progress\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if task.Status == models.StatusReview {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"w-1.5 h-1.5 rounded-full bg-blue-400\" title=\"Needs Review\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"w-1.5 h-1.5 rounded-full bg-blue-400\" title=\"Needs Review\"></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if task.Status == models.StatusDone {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div class=\"w-1.5 h-1.5 rounded-full bg-green-400\" title=\"Done\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -647,16 +601,16 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/task/%s/stream", task.ID))
+		var templ_7745c5c3_Var29 string
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/events?task_id=%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 302, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 264, Col: 59}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" class=\"hidden\" id=\"task-sse-connection\" @htmx:sse-message.camel=\"\n\t\t\t\tconst eventId = $event.detail.lastEventId ? parseInt($event.detail.lastEventId) : 0;\n\t\t\t\tif ($event.detail.type === 'agent') handleAgentEvent(eventId);\n\t\t\t\telse if ($event.detail.type === 'todo') handleTodoEvent($event.detail.data);\n\t\t\t\telse if ($event.detail.type === 'complete') handleCompleteEvent();\n\t\t\t\"><!-- Hidden elements that receive SSE updates and swap into visible targets --><div sse-swap=\"agent\" hx-target=\"#agent-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"diff\" hx-target=\"#diff-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"log\" hx-target=\"#log-content\" hx-swap=\"beforeend\"></div><div sse-swap=\"complete\" hx-swap=\"none\"></div><div sse-swap=\"todo\" hx-swap=\"none\"></div></div><!-- Screen reader announcements for async updates --><div aria-live=\"polite\" aria-atomic=\"true\" class=\"sr-only\" x-text=\"inProgressTask ? 'Agent is ' + inProgressTask : ''\"></div><!-- Floating Todo Indicator (only shows when todos exist) --><div x-show=\"todos.length > 0\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 translate-y-2\" x-transition:enter-end=\"opacity-100 translate-y-0\" class=\"fixed bottom-24 right-4 z-30\"><button @click=\"showTodos = true\" class=\"group flex items-center gap-2 h-9 pl-3 pr-4 bg-[#161B22] hover:bg-[#1C2128] border border-white/[0.08] hover:border-purple-500/30 rounded-full shadow-xl shadow-black/40 transition-all\"><!-- Progress circle --><div class=\"relative w-5 h-5\"><svg class=\"w-5 h-5 -rotate-90\" viewBox=\"0 0 20 20\"><circle cx=\"10\" cy=\"10\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" class=\"text-gray-700\"></circle> <circle cx=\"10\" cy=\"10\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" class=\"text-green-500 transition-all duration-300\" :stroke-dasharray=\"`${(completedCount / todos.length) * 50.26} 50.26`\"></circle></svg> <span class=\"absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white\" x-text=\"completedCount + '/' + todos.length\"></span></div><!-- Current task (truncated) --><span x-show=\"inProgressTask\" class=\"text-[11px] text-gray-400 group-hover:text-gray-300 max-w-[120px] truncate transition-colors\" x-text=\"inProgressTask\"></span> <span x-show=\"!inProgressTask && completedCount < todos.length\" class=\"text-[11px] text-gray-500\">Tasks</span> <span x-show=\"completedCount === todos.length\" class=\"text-[11px] text-green-400\">Done!</span></button></div><!-- Todo Modal --><template x-teleport=\"body\"><div x-show=\"showTodos\" x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0\" x-transition:enter-end=\"opacity-100\" x-transition:leave=\"transition ease-in duration-150\" x-transition:leave-start=\"opacity-100\" x-transition:leave-end=\"opacity-0\" class=\"fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm\" @click.self=\"showTodos = false\" @keydown.escape.window=\"showTodos = false\"><div x-show=\"showTodos\" x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 scale-95 translate-y-4\" x-transition:enter-end=\"opacity-100 scale-100 translate-y-0\" x-transition:leave=\"transition ease-in duration-150\" x-transition:leave-start=\"opacity-100 scale-100 translate-y-0\" x-transition:leave-end=\"opacity-0 scale-95 translate-y-4\" class=\"bg-[#161B22] border border-white/[0.08] rounded-2xl w-[380px] max-h-[60vh] shadow-2xl shadow-black/50 overflow-hidden flex flex-col\"><!-- Modal Header --><div class=\"px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0\"><div class=\"flex items-center gap-2\"><div class=\"w-6 h-6 rounded-lg bg-purple-500/10 flex items-center justify-center\"><i class=\"fas fa-list-check text-xs text-purple-400\"></i></div><h3 class=\"text-sm font-semibold text-white\">Agent Tasks</h3></div><div class=\"flex items-center gap-2\"><span class=\"text-[10px] text-gray-500 font-mono\" x-text=\"completedCount + ' / ' + todos.length + ' done'\"></span> <button @click=\"showTodos = false\" class=\"w-6 h-6 rounded-lg hover:bg-white/[0.06] flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors\"><i class=\"fas fa-xmark text-xs\"></i></button></div></div><!-- Progress Bar --><div class=\"h-0.5 bg-gray-800\"><div class=\"h-full bg-gradient-to-r from-purple-500 to-green-500 transition-all duration-300\" :style=\"`width: ${todos.length ? (completedCount / todos.length) * 100 : 0}%`\"></div></div><!-- Task List --><div class=\"flex-1 overflow-y-auto p-2 space-y-1\"><template x-for=\"(todo, index) in todos\" :key=\"index\"><div class=\"flex items-start gap-3 px-3 py-2 rounded-xl transition-colors\" :class=\"{\n\t\t\t\t\t\t\t\t\t'bg-green-500/5': todo.status === 'completed',\n\t\t\t\t\t\t\t\t\t'bg-purple-500/10 border border-purple-500/20': todo.status === 'in_progress',\n\t\t\t\t\t\t\t\t\t'hover:bg-white/[0.02]': todo.status === 'pending'\n\t\t\t\t\t\t\t\t}\"><!-- Status Icon --><div class=\"w-5 h-5 shrink-0 flex items-center justify-center mt-0.5\"><template x-if=\"todo.status === 'completed'\"><div class=\"w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center\"><i class=\"fas fa-check text-[8px] text-green-400\"></i></div></template><template x-if=\"todo.status === 'in_progress'\"><div class=\"w-4 h-4 rounded-full bg-purple-500/20 flex items-center justify-center relative\"><div class=\"w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse\"></div><div class=\"absolute inset-0 rounded-full border border-purple-400/50 animate-ping\" style=\"animation-duration: 2s;\"></div></div></template><template x-if=\"todo.status === 'pending'\"><div class=\"w-4 h-4 rounded-full border border-gray-600\"></div></template></div><!-- Content --><div class=\"flex-1 min-w-0\"><p class=\"text-sm leading-tight\" :class=\"{\n\t\t\t\t\t\t\t\t\t\t\t'text-gray-400 line-through': todo.status === 'completed',\n\t\t\t\t\t\t\t\t\t\t\t'text-white': todo.status === 'in_progress',\n\t\t\t\t\t\t\t\t\t\t\t'text-gray-300': todo.status === 'pending'\n\t\t\t\t\t\t\t\t\t\t}\" x-text=\"todo.status === 'in_progress' ? (todo.active_form || todo.content) : todo.content\"></p></div></div></template><!-- Empty State --><div x-show=\"todos.length === 0\" class=\"py-8 text-center\"><div class=\"w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-3\"><i class=\"fas fa-clipboard-list text-gray-600 text-lg\"></i></div><p class=\"text-sm text-gray-500\">No tasks yet</p><p class=\"text-xs text-gray-600 mt-1\">The agent will create tasks as needed</p></div></div></div></div></template><!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"\n\t\t\t\t$nextTick(() => $el.scrollTop = $el.scrollHeight);\n\t\t\t\tnew MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, {childList: true, subtree: true});\n\t\t\t\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\" class=\"mt-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" class=\"hidden\" id=\"task-sse-connection\" @htmx:sse-message.camel=\"\n\t\t\t\tif ($event.detail.type === 'todo') handleTodoEvent($event.detail.data);\n\t\t\t\"><!-- Hidden elements that receive SSE updates and swap into visible targets --><div sse-swap=\"agent_update\" hx-target=\"#agent-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"diff_update\" hx-target=\"#diff-content\" hx-swap=\"innerHTML\"></div><div sse-swap=\"log\" hx-target=\"#log-content\" hx-swap=\"beforeend\"></div><div sse-swap=\"status\" hx-target=\"#status-indicator\" hx-swap=\"innerHTML\"></div><div sse-swap=\"complete\" hx-swap=\"none\"></div><div sse-swap=\"todo\" hx-swap=\"none\"></div></div><!-- Screen reader announcements for async updates --><div aria-live=\"polite\" aria-atomic=\"true\" class=\"sr-only\" x-text=\"inProgressTask ? 'Agent is ' + inProgressTask : ''\"></div><!-- Floating Todo Indicator (only shows when todos exist) --><div x-show=\"todos.length > 0\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 translate-y-2\" x-transition:enter-end=\"opacity-100 translate-y-0\" class=\"fixed bottom-24 right-4 z-30\"><button @click=\"showTodos = true\" class=\"group flex items-center gap-2 h-9 pl-3 pr-4 bg-[#161B22] hover:bg-[#1C2128] border border-white/[0.08] hover:border-purple-500/30 rounded-full shadow-xl shadow-black/40 transition-all\"><!-- Progress circle --><div class=\"relative w-5 h-5\"><svg class=\"w-5 h-5 -rotate-90\" viewBox=\"0 0 20 20\"><circle cx=\"10\" cy=\"10\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" class=\"text-gray-700\"></circle> <circle cx=\"10\" cy=\"10\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" class=\"text-green-500 transition-all duration-300\" :stroke-dasharray=\"`${(completedCount / todos.length) * 50.26} 50.26`\"></circle></svg> <span class=\"absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white\" x-text=\"completedCount + '/' + todos.length\"></span></div><!-- Current task (truncated) --><span x-show=\"inProgressTask\" class=\"text-[11px] text-gray-400 group-hover:text-gray-300 max-w-[120px] truncate transition-colors\" x-text=\"inProgressTask\"></span> <span x-show=\"!inProgressTask && completedCount < todos.length\" class=\"text-[11px] text-gray-500\">Tasks</span> <span x-show=\"completedCount === todos.length\" class=\"text-[11px] text-green-400\">Done!</span></button></div><!-- Todo Modal --><template x-teleport=\"body\"><div x-show=\"showTodos\" x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0\" x-transition:enter-end=\"opacity-100\" x-transition:leave=\"transition ease-in duration-150\" x-transition:leave-start=\"opacity-100\" x-transition:leave-end=\"opacity-0\" class=\"fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm\" @click.self=\"showTodos = false\" @keydown.escape.window=\"showTodos = false\"><div x-show=\"showTodos\" x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 scale-95 translate-y-4\" x-transition:enter-end=\"opacity-100 scale-100 translate-y-0\" x-transition:leave=\"transition ease-in duration-150\" x-transition:leave-start=\"opacity-100 scale-100 translate-y-0\" x-transition:leave-end=\"opacity-0 scale-95 translate-y-4\" class=\"bg-[#161B22] border border-white/[0.08] rounded-2xl w-[380px] max-h-[60vh] shadow-2xl shadow-black/50 overflow-hidden flex flex-col\"><!-- Modal Header --><div class=\"px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0\"><div class=\"flex items-center gap-2\"><div class=\"w-6 h-6 rounded-lg bg-purple-500/10 flex items-center justify-center\"><i class=\"fas fa-list-check text-xs text-purple-400\"></i></div><h3 class=\"text-sm font-semibold text-white\">Agent Tasks</h3></div><div class=\"flex items-center gap-2\"><span class=\"text-[10px] text-gray-500 font-mono\" x-text=\"completedCount + ' / ' + todos.length + ' done'\"></span> <button @click=\"showTodos = false\" class=\"w-6 h-6 rounded-lg hover:bg-white/[0.06] flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors\"><i class=\"fas fa-xmark text-xs\"></i></button></div></div><!-- Progress Bar --><div class=\"h-0.5 bg-gray-800\"><div class=\"h-full bg-gradient-to-r from-purple-500 to-green-500 transition-all duration-300\" :style=\"`width: ${todos.length ? (completedCount / todos.length) * 100 : 0}%`\"></div></div><!-- Task List --><div class=\"flex-1 overflow-y-auto p-2 space-y-1\"><template x-for=\"(todo, index) in todos\" :key=\"index\"><div class=\"flex items-start gap-3 px-3 py-2 rounded-xl transition-colors\" :class=\"{\n\t\t\t\t\t\t\t\t\t'bg-green-500/5': todo.status === 'completed',\n\t\t\t\t\t\t\t\t\t'bg-purple-500/10 border border-purple-500/20': todo.status === 'in_progress',\n\t\t\t\t\t\t\t\t\t'hover:bg-white/[0.02]': todo.status === 'pending'\n\t\t\t\t\t\t\t\t}\"><!-- Status Icon --><div class=\"w-5 h-5 shrink-0 flex items-center justify-center mt-0.5\"><template x-if=\"todo.status === 'completed'\"><div class=\"w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center\"><i class=\"fas fa-check text-[8px] text-green-400\"></i></div></template><template x-if=\"todo.status === 'in_progress'\"><div class=\"w-4 h-4 rounded-full bg-purple-500/20 flex items-center justify-center relative\"><div class=\"w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse\"></div><div class=\"absolute inset-0 rounded-full border border-purple-400/50 animate-ping\" style=\"animation-duration: 2s;\"></div></div></template><template x-if=\"todo.status === 'pending'\"><div class=\"w-4 h-4 rounded-full border border-gray-600\"></div></template></div><!-- Content --><div class=\"flex-1 min-w-0\"><p class=\"text-sm leading-tight\" :class=\"{\n\t\t\t\t\t\t\t\t\t\t\t'text-gray-400 line-through': todo.status === 'completed',\n\t\t\t\t\t\t\t\t\t\t\t'text-white': todo.status === 'in_progress',\n\t\t\t\t\t\t\t\t\t\t\t'text-gray-300': todo.status === 'pending'\n\t\t\t\t\t\t\t\t\t\t}\" x-text=\"todo.status === 'in_progress' ? (todo.active_form || todo.content) : todo.content\"></p></div></div></template><!-- Empty State --><div x-show=\"todos.length === 0\" class=\"py-8 text-center\"><div class=\"w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-3\"><i class=\"fas fa-clipboard-list text-gray-600 text-lg\"></i></div><p class=\"text-sm text-gray-500\">No tasks yet</p><p class=\"text-xs text-gray-600 mt-1\">The agent will create tasks as needed</p></div></div></div></div></template><!-- Main Content Area --><div class=\"flex-1 overflow-y-auto bg-[#0D1117] relative w-full\" id=\"content-scroll\" x-init=\"\n\t\t\t\t$nextTick(() => $el.scrollTop = $el.scrollHeight);\n\t\t\t\tnew MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, {childList: true, subtree: true});\n\t\t\t\" x-effect=\"activeTab; $nextTick(() => $el.scrollTop = $el.scrollHeight)\"><!-- Tab 1: AGENT CONVERSATION --><div x-show=\"activeTab === 'agent'\" class=\"pb-32\"><div id=\"agent-content\" class=\"mt-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -681,12 +635,12 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var31 string
-			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/abort/%s", task.ID))
+			var templ_7745c5c3_Var30 string
+			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/abort/%s", task.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 497, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 457, Col: 58}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -780,38 +734,38 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var32 string
-		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/retry/%s", task.ID))
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/retry/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 613, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 573, Col: 59}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" hx-on::after-request=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Retry</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template><!-- Clear Confirmation --><template x-if=\"confirmAction === 'clear'\"><div class=\"space-y-4\" x-init=\"htmx.process($el)\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center\"><i class=\"fas fa-eraser text-red-500\"></i></div><div><h3 class=\"font-semibold text-white\">Clear History</h3><p class=\"text-xs text-gray-400\">Reset memory and context</p></div></div><p class=\"text-sm text-gray-300\">This will clear the chat history and agent output. The task will start fresh without any prior context.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var32 string
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/clear/%s", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 598, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Retry</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template><!-- Clear Confirmation --><template x-if=\"confirmAction === 'clear'\"><div class=\"space-y-4\" x-init=\"htmx.process($el)\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center\"><i class=\"fas fa-eraser text-red-500\"></i></div><div><h3 class=\"font-semibold text-white\">Clear History</h3><p class=\"text-xs text-gray-400\">Reset memory and context</p></div></div><p class=\"text-sm text-gray-300\">This will clear the chat history and agent output. The task will start fresh without any prior context.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" hx-on::after-request=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Clear</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template><!-- PR Confirmation --><template x-if=\"confirmAction === 'pr'\"><div class=\"space-y-4\" x-init=\"htmx.process($el)\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center\"><i class=\"fab fa-github text-purple-500\"></i></div><div><h3 class=\"font-semibold text-white\">Create Pull Request</h3><p class=\"text-xs text-gray-400\">Push changes to GitHub</p></div></div><p class=\"text-sm text-gray-300\">This will create a new pull request on GitHub with all the changes from this task.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var33 string
-		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/clear/%s", task.ID))
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 637, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 623, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Clear</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template><!-- PR Confirmation --><template x-if=\"confirmAction === 'pr'\"><div class=\"space-y-4\" x-init=\"htmx.process($el)\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center\"><i class=\"fab fa-github text-purple-500\"></i></div><div><h3 class=\"font-semibold text-white\">Create Pull Request</h3><p class=\"text-xs text-gray-400\">Push changes to GitHub</p></div></div><p class=\"text-sm text-gray-300\">This will create a new pull request on GitHub with all the changes from this task.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/pr/%s", task.ID))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 661, Col: 56}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -819,16 +773,29 @@ func TaskDetail(task *views.UITask, project views.UIProject) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
+		var templ_7745c5c3_Var34 string
+		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/merge/%s", task.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 686, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 648, Col: 59}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" hx-on::after-request=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Merge</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template><!-- Discard Confirmation --><template x-if=\"confirmAction === 'discard'\"><div class=\"space-y-4\" x-init=\"htmx.process($el)\"><div class=\"flex items-center gap-3\"><div class=\"w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center\"><i class=\"fas fa-trash text-red-500\"></i></div><div><h3 class=\"font-semibold text-white\">Discard Task</h3><p class=\"text-xs text-gray-400\">Permanently delete task</p></div></div><p class=\"text-sm text-gray-300\">This will permanently delete this task and all its data. This action cannot be undone.</p><div class=\"flex gap-2 pt-2\"><button @click=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors\">Cancel</button> <button hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var35 string
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/action/discard/%s", task.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 673, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" class=\"flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Merge</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template></div></div></template><!-- Default Buttons (always in layout to prevent shift) --><div :class=\"showChat ? 'invisible pointer-events-none' : ''\" class=\"space-y-3\"><!-- Secondary actions row --><div class=\"flex justify-center gap-1\"><button @click=\"confirmAction = 'retry'\" class=\"h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all\" aria-label=\"Retry task\"><i class=\"fas fa-arrow-rotate-left text-xs\"></i> <span>Retry</span></button> <span class=\"text-gray-700 self-center\">·</span> <button @click=\"confirmAction = 'clear'\" class=\"h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all\" aria-label=\"Clear history\"><i class=\"fas fa-eraser text-xs\"></i> <span>Clear</span></button> <span class=\"text-gray-700 self-center\">·</span> <button @click=\"confirmAction = 'pr'\" class=\"h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all\" aria-label=\"Create pull request\"><i class=\"fab fa-github text-xs\"></i> <span>Create PR</span></button></div><!-- Main action buttons --><div class=\"flex gap-2.5\"><!-- Chat button --><button @click=\"showChat = true\" class=\"flex-1 h-12 bg-[#21262d] hover:bg-[#2d333b] active:bg-[#3d434b] border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group\"><i class=\"fas fa-message text-sm text-purple-400 group-hover:text-purple-300 transition-colors\"></i> <span class=\"text-sm font-medium\">Chat</span><!-- Queue badge --><span x-show=\"messageQueue.length > 0\" x-text=\"messageQueue.length\" x-transition class=\"absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30\"></span></button><!-- Merge button --><button @click=\"confirmAction = 'merge'\" class=\"flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10\"><i class=\"fas fa-code-merge text-sm\"></i> <span class=\"text-sm font-medium\">Merge</span></button></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" hx-swap=\"none\" hx-disabled-elt=\"this\" hx-on::after-request=\"confirmAction = null\" class=\"flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors\"><span class=\"htmx-request:hidden\">Discard</span><i class=\"fas fa-spinner fa-spin hidden htmx-request:inline\"></i></button></div></div></template></div></div></template><!-- Default Buttons (always in layout to prevent shift) --><div :class=\"showChat ? 'invisible pointer-events-none' : ''\" class=\"space-y-3\"><!-- Secondary actions row --><div class=\"flex justify-center gap-1\"><button @click=\"confirmAction = 'retry'\" class=\"h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all\" aria-label=\"Retry task\"><i class=\"fas fa-arrow-rotate-left text-xs\"></i> <span>Retry</span></button> <span class=\"text-gray-700 self-center\">·</span> <button @click=\"confirmAction = 'clear'\" class=\"h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all\" aria-label=\"Clear history\"><i class=\"fas fa-eraser text-xs\"></i> <span>Clear</span></button> <span class=\"text-gray-700 self-center\">·</span> <button @click=\"confirmAction = 'pr'\" class=\"h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all\" aria-label=\"Create pull request\"><i class=\"fab fa-github text-xs\"></i> <span>Create PR</span></button></div><!-- Main action buttons --><div class=\"flex gap-2.5\"><!-- Chat button --><button @click=\"showChat = true\" class=\"flex-1 h-12 bg-[#21262d] hover:bg-[#2d333b] active:bg-[#3d434b] border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group\"><i class=\"fas fa-message text-sm text-purple-400 group-hover:text-purple-300 transition-colors\"></i> <span class=\"text-sm font-medium\">Chat</span></button><!-- Merge button --><button @click=\"confirmAction = 'merge'\" class=\"flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10\"><i class=\"fas fa-code-merge text-sm\"></i> <span class=\"text-sm font-medium\">Merge</span></button></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -913,125 +880,125 @@ func DiffView(diff string) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, file := range ParseDiff(diff) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<div class=\"diff-file-header\"><i class=\"fas fa-file-code mr-2 text-gray-500\"></i> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<div class=\"diff-file-header\"><i class=\"fas fa-file-code mr-2 text-gray-500\"></i> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(file.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 818, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 799, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</div><div class=\"diff-file-body\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</div><div class=\"diff-file-body\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, line := range file.Lines {
 				if line.Type == "hunk" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<div class=\"diff-hunk\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div class=\"diff-hunk\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var38 string
 					templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 823, Col: 42}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 804, Col: 42}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else if line.Type == "add" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<div class=\"diff-line diff-add\"><span class=\"diff-line-num\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div class=\"diff-line diff-add\"><span class=\"diff-line-num\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var39 string
 					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(line.LineNum)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 826, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 807, Col: 48}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</span> <span class=\"diff-line-content\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</span> <span class=\"diff-line-content\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var40 string
 					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 827, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 808, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</span></div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</span></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else if line.Type == "del" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<div class=\"diff-line diff-del\"><span class=\"diff-line-num\"></span> <span class=\"diff-line-content\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<div class=\"diff-line diff-del\"><span class=\"diff-line-num\"></span> <span class=\"diff-line-content\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var41 string
 					templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 832, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 813, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "</span></div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</span></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<div class=\"diff-line diff-context\"><span class=\"diff-line-num\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<div class=\"diff-line diff-context\"><span class=\"diff-line-num\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var42 string
 					templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(line.LineNum)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 836, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 817, Col: 48}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</span> <span class=\"diff-line-content\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</span> <span class=\"diff-line-content\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var43 string
 					templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(line.Content)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 837, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components/task_detail.templ`, Line: 818, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</span></div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</span></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

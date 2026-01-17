@@ -4,7 +4,6 @@
 .envrc.multi
 .envrc.single
 tmp
-app
 
 # Database
 *.db

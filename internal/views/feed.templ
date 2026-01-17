@@ -5,6 +5,12 @@ import "fmt"
 // Feed renders the main dashboard
 templ Feed(data FeedData) {
 	<div class="px-3 pt-20 pb-40">
+		<!-- Unified SSE Connection for feed updates -->
+		<!-- Listens to /events, filters for task status changes -->
+		<div hx-ext="sse" sse-connect="/events" class="hidden">
+			<!-- When receiving 'task' event, refresh reviews container -->
+			<div sse-swap="task" hx-trigger="sse:message" hx-target="#reviews-container" hx-get="/feed" hx-swap="innerHTML"></div>
+		</div>
 		<!-- NEEDS REVIEW (Target for OOB Swaps) -->
 		<div id="reviews-container">
 			@ReviewsSection(data)
@@ -12,7 +18,7 @@ templ Feed(data FeedData) {
 		<!-- IN PROGRESS (SSE streaming) -->
 		<div class="mb-6">
 			<h3 class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">In Progress</h3>
-			<div class="space-y-3" hx-ext="sse" sse-connect="/feed/stream" sse-swap="active-update" hx-swap="innerHTML">
+			<div class="space-y-3" hx-ext="sse" sse-connect="/events" sse-swap="active-update" hx-swap="innerHTML">
 				@ActiveRows(data.Active, data.Projects)
 			</div>
 		</div>
@@ -52,7 +58,7 @@ templ ActiveRows(tasks []*UITask, projects map[string]UIProject) {
 				</div>
 				<div class="flex items-center gap-2">
 					<span class="text-xs text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20">In Progress</span>
-					<span 
+					<span
 						class="text-xs text-orange-400/80 font-mono tabular-nums"
 						x-text="elapsed + 's'"
 					></span>
