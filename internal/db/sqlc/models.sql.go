@@ -33,6 +33,21 @@ type Project struct {
 	CreatedAt   int64  `json:"created_at"`
 }
 
+type RepoCache struct {
+	ID            string       `json:"id"`
+	Owner         string       `json:"owner"`
+	Name          string       `json:"name"`
+	DefaultBranch string       `json:"default_branch"`
+	LastFetchedAt sql.NullTime `json:"last_fetched_at"`
+	IsFavorite    sql.NullBool `json:"is_favorite"`
+	CreatedAt     sql.NullTime `json:"created_at"`
+}
+
+type SchemaVersion struct {
+	Version   int64        `json:"version"`
+	AppliedAt sql.NullTime `json:"applied_at"`
+}
+
 type Task struct {
 	ID             string         `json:"id"`
 	ProjectID      string         `json:"project_id"`

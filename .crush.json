@@ -19,6 +19,11 @@
       "type": "stdio",
       "command": "docker",
       "args": ["mcp", "gateway", "run", "--servers=context7"]
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/playwright"]
     }
   }
 }

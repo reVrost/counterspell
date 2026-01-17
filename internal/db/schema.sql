@@ -2,6 +2,12 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+-- 0. Schema Version: Track migrations per database file
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY,
+    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 1. Tasks: The core unit of work
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
@@ -62,3 +68,17 @@ CREATE TABLE IF NOT EXISTS user_settings (
     agent_backend TEXT DEFAULT 'native',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 6. Repo Cache: Metadata for GitHub repos
+CREATE TABLE IF NOT EXISTS repo_cache (
+    id TEXT PRIMARY KEY,
+    owner TEXT NOT NULL,
+    name TEXT NOT NULL,
+    default_branch TEXT NOT NULL DEFAULT 'main',
+    last_fetched_at DATETIME,
+    is_favorite BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_repo_cache_owner ON repo_cache(owner);
+CREATE INDEX IF NOT EXISTS idx_repo_cache_favorite ON repo_cache(is_favorite);

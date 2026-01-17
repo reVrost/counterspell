@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/revrost/code/counterspell/internal/auth"
+	"github.com/revrost/code/counterspell/internal/config"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/services"
 )
@@ -19,13 +20,14 @@ type Handlers struct {
 	auth          *auth.AuthService
 	settings      *services.SettingsService
 	transcription *services.TranscriptionService
+	cfg           *config.Config
 	clientID      string
 	clientSecret  string
 	redirectURI   string
 }
 
 // NewHandlers creates new HTTP handlers.
-func NewHandlers(tasks *services.TaskService, events *services.EventBus, database *db.DB, dataDir string) (*Handlers, error) {
+func NewHandlers(tasks *services.TaskService, events *services.EventBus, database *db.DB, cfg *config.Config) (*Handlers, error) {
 	clientID := os.Getenv("GITHUB_CLIENT_ID")
 	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
 	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
@@ -35,27 +37,29 @@ func NewHandlers(tasks *services.TaskService, events *services.EventBus, databas
 	transcriptionService := services.NewTranscriptionService()
 
 	// Create orchestrator
-	orchestrator, err := services.NewOrchestrator(tasks, githubService, events, settingsService, dataDir)
+	orchestrator, err := services.NewOrchestrator(tasks, githubService, events, settingsService, cfg.DataDir)
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize auth service
-	// authService, err := auth.NewAuthServiceFromEnv()
-	// if err != nil {
-	// 	fmt.Printf("Warning: Failed to initialize auth service: %v\n", err)
-	// 	authService = nil
-	// }
+	// Initialize auth service for multi-tenant mode
+	var authService *auth.AuthService
+	if cfg.MultiTenant {
+		authService, err = auth.NewAuthServiceFromEnv()
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &Handlers{
 		tasks:         tasks,
 		events:        events,
 		orchestrator:  orchestrator,
 		github:        githubService,
-		// Disable for now
-		auth:          nil,
+		auth:          authService,
 		settings:      settingsService,
 		transcription: transcriptionService,
+		cfg:           cfg,
 		clientID:      clientID,
 		clientSecret:  clientSecret,
 		redirectURI:   redirectURI,
