@@ -3,6 +3,7 @@
 	import { MODELS, type Project } from '$lib/types';
 	import { cn } from '$lib/utils';
 	import { tasksAPI, filesAPI } from '$lib/api';
+	import { dropdownPop, slide, DURATIONS } from '$lib/utils/transitions';
 	import { onMount } from 'svelte';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -220,6 +221,7 @@
 			<!-- File Menu Popover -->
 			{#if showFileMenu && files && files.length > 0}
 				<div
+					transition:dropdownPop|local
 					class="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto z-50"
 				>
 					<div
@@ -252,6 +254,7 @@
 			<!-- Empty State -->
 			{#if showFileMenu && files && files.length === 0}
 				<div
+					transition:dropdownPop|local
 					class="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50"
 				>
 					<div class="px-3 py-4 text-xs text-gray-500 text-center">
@@ -314,7 +317,8 @@
 
 						{#if appState.inputProjectMenuOpen}
 							<div
-								class="absolute bottom-full left-0 mb-3 w-72 bg-popover border border-gray-700 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col z-50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+								transition:dropdownPop|local
+								class="absolute bottom-full left-0 mb-3 w-72 bg-popover border border-gray-700 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col z-50"
 							>
 								<!-- Search Header -->
 								<div class="p-3 border-b border-gray-800 bg-gray-900/50">
@@ -415,6 +419,7 @@
 						</button>
 						{#if modelOpen}
 							<div
+								transition:dropdownPop|local
 								class="absolute bottom-full left-0 mb-3 w-52 bg-popover/95 border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 backdrop-blur-xl"
 							>
 								<div
@@ -474,6 +479,7 @@
 						</button>
 						{#if modelOpen}
 							<div
+								transition:dropdownPop|local
 								class="absolute bottom-full right-0 mb-3 w-52 bg-popover/95 border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 backdrop-blur-xl"
 							>
 								<div

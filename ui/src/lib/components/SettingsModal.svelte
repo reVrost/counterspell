@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { appState } from '$lib/stores/app.svelte';
 	import { cn } from '$lib/utils';
+	import { modalSlideUp, backdropFade, DURATIONS } from '$lib/utils/transitions';
 	import type { UserSettings } from '$lib/types';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -53,10 +54,19 @@
 
 {#if appState.settingsOpen}
 	<div
+		transition:backdropFade|global={{ duration: DURATIONS.normal }}
 		class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+		role="presentation"
+		aria-hidden="true"
+		onclick={(e) => e.target === e.currentTarget && appState.closeSettings()}
+		aria-label="Close settings"
 	>
 		<div
+			transition:modalSlideUp|global={{ duration: DURATIONS.normal }}
 			class="bg-popover border border-gray-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+			role="dialog"
+			aria-modal="true"
+			onclick={(e) => e.stopPropagation()}
 		>
 			<div
 				class="px-6 py-4 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-popover z-10"

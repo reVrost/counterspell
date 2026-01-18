@@ -45,7 +45,7 @@
 		{#if !loading}
 			<div>
 				<a
-					href="/api/v1/auth/oauth/github"
+					href="/api/v1/auth/oauth/github?redirect_url={window.location.origin + '/dashboard'}"
 					onclick={() => (loading = true)}
 					class="w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2"
 				>

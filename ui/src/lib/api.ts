@@ -97,6 +97,26 @@ async function postAction(path: string): Promise<APIResponse> {
 	return data as APIResponse;
 }
 
+// Helper for POST with JSON body that returns APIResponse
+async function postJsonWithResponse(path: string, body: object): Promise<APIResponse> {
+	const response = await fetch(`${API_BASE}${path}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body),
+		credentials: 'include'
+	});
+
+	const data = await response.json().catch(() => ({ status: 'error', message: 'Unknown error' }));
+
+	if (!response.ok) {
+		const errMsg = data.message || `API error: ${response.status}`;
+		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
+		throw new Error(errMsg);
+	}
+
+	return data as APIResponse;
+}
+
 // ==================== AUTH ====================
 
 export const authAPI = {
@@ -113,7 +133,7 @@ export const authAPI = {
 	},
 
 	async loginWithGitHub() {
-		window.location.href = '/api/v1/auth/oauth/github';
+		window.location.href = '/api/v1/auth/oauth/github?redirect_url=' + window.location.origin + '/dashboard';
 	},
 
 	async connectGitHub() {
@@ -177,47 +197,43 @@ export const tasksAPI = {
 
 	async get(id: string): Promise<{ task: Task; project: Project; messages: Message[]; logs: LogEntry[] }> {
 		return fetchAPI<{ task: Task; project: Project; messages: Message[]; logs: LogEntry[] }>(
-			`/api/task/${id}`
+			`/api/v1/task/${id}`
 		);
 	},
 
 	async create(intent: string, projectId: string, modelId: string): Promise<APIResponse> {
-		const formData = new FormData();
-		formData.append('voice_input', intent);
-		formData.append('project_id', projectId);
-		formData.append('model_id', modelId);
-
-		return postFormWithResponse('/api/v1/add-task', formData);
+		return postJsonWithResponse('/api/v1/add-task', {
+			voice_input: intent,
+			project_id: projectId,
+			model_id: modelId
+		});
 	},
 
 	async chat(taskId: string, message: string, modelId?: string): Promise<APIResponse> {
-		const formData = new FormData();
-		formData.append('message', message);
-		if (modelId) {
-			formData.append('model_id', modelId);
-		}
-
-		return postFormWithResponse(`/api/action/chat/${taskId}`, formData);
+		return postJsonWithResponse(`/api/v1/action/chat/${taskId}`, {
+			message,
+			model_id: modelId
+		});
 	},
 
 	async retry(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/action/retry/${taskId}`);
+		return postAction(`/api/v1/action/retry/${taskId}`);
 	},
 
 	async clear(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/action/clear/${taskId}`);
+		return postAction(`/api/v1/action/clear/${taskId}`);
 	},
 
 	async merge(taskId: string): Promise<APIResponse | ConflictResponse> {
-		return postAction(`/api/action/merge/${taskId}`);
+		return postAction(`/api/v1/action/merge/${taskId}`);
 	},
 
 	async createPR(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/action/pr/${taskId}`);
+		return postAction(`/api/v1/action/pr/${taskId}`);
 	},
 
 	async discard(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/action/discard/${taskId}`);
+		return postAction(`/api/v1/action/discard/${taskId}`);
 	},
 
 	async resolveConflict(taskId: string, filePath: string, choice: 'ours' | 'theirs'): Promise<APIResponse> {
@@ -225,15 +241,15 @@ export const tasksAPI = {
 		formData.append('file', filePath);
 		formData.append('choice', choice);
 
-		return postFormWithResponse(`/api/action/resolve-conflict/${taskId}`, formData);
+		return postFormWithResponse(`/api/v1/action/resolve-conflict/${taskId}`, formData);
 	},
 
 	async abortMerge(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/action/abort-merge/${taskId}`);
+		return postAction(`/api/v1/action/abort-merge/${taskId}`);
 	},
 
 	async completeMerge(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/action/complete-merge/${taskId}`);
+		return postAction(`/api/v1/action/complete-merge/${taskId}`);
 	}
 };
 
@@ -273,7 +289,7 @@ export const filesAPI = {
 			project_id: projectId,
 			q: query
 		});
-		return fetchAPI<string[]>(`/api/files/search?${params}`);
+		return fetchAPI<string[]>(`/api/v1/files/search?${params}`);
 	}
 };
 
@@ -284,7 +300,7 @@ export const transcribeAPI = {
 		const formData = new FormData();
 		formData.append('audio', audioFile);
 
-		const response = await fetch(`${API_BASE}/api/transcribe`, {
+		const response = await fetch(`${API_BASE}/api/v1/transcribe`, {
 			method: 'POST',
 			body: formData,
 			credentials: 'include'

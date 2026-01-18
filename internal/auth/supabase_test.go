@@ -12,10 +12,7 @@ func TestGetOAuthURL(t *testing.T) {
 
 	svc := &AuthService{supabaseURL: "https://example.supabase.co"}
 
-	url, err := svc.GetOAuthURL("github", "http://localhost:8710/auth/callback")
-	if err != nil {
-		t.Fatalf("GetOAuthURL error: %v", err)
-	}
+	url := svc.GetOAuthURL("github", "http://localhost:8710/auth/callback", "test-challenge", "")
 
 	assertContains(t, url, "https://example.supabase.co/auth/v1/authorize")
 	assertContains(t, url, "provider=github")

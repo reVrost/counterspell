@@ -31,6 +31,12 @@ type Task struct {
 	AssignedUserID  string `json:"assigned_user_id,omitempty"`
 }
 
+// TaskWithProject represents a task with its associated project info.
+type TaskWithProject struct {
+	Task    *Task
+	Project *Project
+}
+
 // AgentRunStatus represents the status of an agent run.
 type AgentRunStatus string
 

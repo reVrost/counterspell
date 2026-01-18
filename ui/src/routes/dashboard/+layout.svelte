@@ -4,10 +4,12 @@
 	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import ChatInput from '$lib/components/ChatInput.svelte';
 	import TaskDetail from '$lib/components/TaskDetail.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { appState } from '$lib/stores/app.svelte';
 	import { taskStore } from '$lib/stores/tasks.svelte';
 	import { tasksAPI } from '$lib/api';
 	import { createTaskSSE } from '$lib/utils/sse';
+	import { modalSlideUp, backdropFade, DURATIONS, prefersReducedMotion } from '$lib/utils/transitions';
 	import type { Project, Task, Message, LogEntry } from '$lib/types';
 	import { onDestroy, tick } from 'svelte';
 
@@ -23,76 +25,113 @@
 	let logContent = $state<string[]>([]);
 	let eventSource: EventSource | null = null;
 
-	async function loadTaskDetail(taskId: string) {
+	// Cache for loaded tasks
+	let taskCache = $state<Map<string, { task: Task; project: Project; messages: Message[]; logs: LogEntry[] }>>(new Map());
+
+	// Prefetch on hover
+	let prefetchTimeout: number | null = null;
+
+	function prefetchTask(taskId: string) {
+		if (taskCache.has(taskId) || prefetchTimeout !== null) return;
+
+		prefetchTimeout = window.setTimeout(() => {
+			loadTaskDetail(taskId, true);
+		}, 150); // Small delay to avoid fetching on quick passes
+	}
+
+	async function loadTaskDetail(taskId: string, isPrefetch = false) {
 		if (!taskId) return;
 
-		try {
-			loadingTask = true;
-			taskError = null;
-			agentContent = '';
-			diffContent = '';
-			logContent = [];
-
-			// Close existing SSE connection
-			if (eventSource) {
-				eventSource.close();
-				eventSource = null;
+		// Check cache first
+		if (taskCache.has(taskId)) {
+			const cached = taskCache.get(taskId)!;
+			if (!isPrefetch) {
+				currentTask = cached.task;
+				currentProject = cached.project;
+				agentContent = renderMessagesHTML(cached.messages, cached.task.status === 'in_progress');
+				diffContent = cached.task.gitDiff ? renderDiffHTML(cached.task.gitDiff) : '<div class="text-gray-500 italic">No changes made</div>';
+				logContent = cached.logs.map((log) => renderLogEntryHTML(log));
+				setupSSE(taskId);
 			}
-
-			const data = await tasksAPI.get(taskId);
-			currentTask = data.task;
-			currentProject = data.project;
-			taskStore.currentTask = data.task;
-
-			// Build initial agent content HTML from messages
-			if (data.messages && data.messages.length > 0) {
-				agentContent = renderMessagesHTML(data.messages, data.task.status === 'in_progress');
-			}
-
-			// Build initial diff content
-			if (data.task.status === 'in_progress') {
-				diffContent = renderLoadingDiff();
-			} else if (data.task.gitDiff) {
-				diffContent = renderDiffHTML(data.task.gitDiff);
-			} else {
-				diffContent = '<div class="text-gray-500 italic">No changes made</div>';
-			}
-
-			// Build logs
-			if (data.logs && data.logs.length > 0) {
-				logContent = data.logs.map((log) => renderLogEntryHTML(log));
-			}
-
-			// Set up SSE for real-time updates
-			eventSource = createTaskSSE(taskId, {
-				onAgentUpdate: (html: string) => {
-					agentContent = html;
-				},
-				onDiffUpdate: (html: string) => {
-					diffContent = html;
-				},
-				onLog: (html: string) => {
-					logContent = [...logContent, html];
-				},
-				onStatus: (html: string) => {
-					// Status indicator updated - could update task status
-				},
-				onComplete: (status: string) => {
-					// Task completed - reload task details
-					if (currentTask) {
-						currentTask.status = status as Task['status'];
-					}
-				},
-				onError: (error) => {
-					console.error('Task SSE error:', error);
-				}
-			});
-		} catch (err) {
-			taskError = err instanceof Error ? err.message : 'Failed to load task';
-			console.error('Task load error:', err);
-		} finally {
-			loadingTask = false;
+			return;
 		}
+
+		if (!isPrefetch) loadingTask = true;
+		taskError = null;
+
+		// Optimistic: use task from feed if available (no SSE yet)
+		if (!isPrefetch) {
+			const feedTask = taskStore.tasks.find(t => t.id === taskId);
+			if (feedTask) {
+				currentTask = feedTask;
+				const feedProject = taskStore.projects[feedTask.project_id];
+				if (feedProject) currentProject = feedProject;
+			}
+		}
+
+		try {
+			const data = await tasksAPI.get(taskId);
+
+			// Cache the result
+			taskCache.set(taskId, {
+				task: data.task,
+				project: data.project,
+				messages: data.messages || [],
+				logs: data.logs || []
+			});
+
+			if (!isPrefetch) {
+				currentTask = data.task;
+				currentProject = data.project;
+				taskStore.currentTask = data.task;
+				agentContent = renderMessagesHTML(data.messages, data.task.status === 'in_progress');
+				diffContent = data.task.gitDiff ? renderDiffHTML(data.task.gitDiff) : '<div class="text-gray-500 italic">No changes made</div>';
+				logContent = data.logs?.map((log) => renderLogEntryHTML(log)) || [];
+
+				// Set up SSE for real-time updates
+				setupSSE(taskId);
+			}
+		} catch (err) {
+			if (!isPrefetch) {
+				taskError = err instanceof Error ? err.message : 'Failed to load task';
+				console.error('Task load error:', err);
+			}
+		} finally {
+			if (!isPrefetch) loadingTask = false;
+		}
+	}
+
+	function setupSSE(taskId: string) {
+		// Close existing SSE connection
+		if (eventSource) {
+			eventSource.close();
+			eventSource = null;
+		}
+
+		// Set up SSE for real-time updates
+		eventSource = createTaskSSE(taskId, {
+			onAgentUpdate: (html: string) => {
+				agentContent = html;
+			},
+			onDiffUpdate: (html: string) => {
+				diffContent = html;
+			},
+			onLog: (html: string) => {
+				logContent = [...logContent, html];
+			},
+			onStatus: (html: string) => {
+				// Status indicator updated
+			},
+			onComplete: (status: string) => {
+				if (currentTask) {
+					currentTask = { ...currentTask, status: status as Task['status'] };
+					taskStore.currentTask = currentTask;
+				}
+			},
+			onError: (error) => {
+				console.error('Task SSE error:', error);
+			}
+		});
 	}
 
 	// Helper to render messages as HTML (matches Go backend rendering)
@@ -210,28 +249,20 @@
 			.replace(/'/g, '&#39;');
 	}
 
-	// Watch for modal open/close
 	$effect(() => {
-		if (appState.modalOpen && appState.modalTaskId) {
-			loadTaskDetail(appState.modalTaskId);
-		} else {
+		if (!appState.modalOpen || !appState.modalTaskId) {
 			// Close SSE when modal closes
 			if (eventSource) {
 				eventSource.close();
 				eventSource = null;
 			}
-			currentTask = null;
 			currentProject = null;
 			agentContent = '';
 			diffContent = '';
 			logContent = [];
-		}
-	});
-
-	$effect(() => {
-		// Sync task data from store
-		if (taskStore.currentTask && appState.modalTaskId === taskStore.currentTask.id) {
-			currentTask = { ...currentTask, ...taskStore.currentTask } as Task;
+			currentTask = null;
+		} else {
+			loadTaskDetail(appState.modalTaskId);
 		}
 	});
 
@@ -239,7 +270,15 @@
 		if (eventSource) {
 			eventSource.close();
 		}
+		if (prefetchTimeout) {
+			clearTimeout(prefetchTimeout);
+		}
 	});
+
+	// Expose prefetch function globally for TaskRow
+	if (typeof window !== 'undefined') {
+		(window as any).prefetchTask = prefetchTask;
+	}
 </script>
 
 <div class="h-screen flex flex-col overflow-hidden bg-background">
@@ -259,17 +298,64 @@
 	<!-- Task Detail Modal -->
 	{#if appState.modalOpen && appState.modalTaskId}
 		<div
-			class="fixed inset-0 z-50 bg-popover flex flex-col overflow-hidden transition-all duration-300"
-			class:translate-x-0={appState.modalOpen}
-			class:translate-x-full={!appState.modalOpen}
+			transition:backdropFade|global={{ duration: DURATIONS.normal }}
+			class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+			role="presentation"
+			aria-hidden="true"
+		></div>
+		<div
+			class="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none"
 		>
-			{#if loadingTask}
-				<div class="flex items-center justify-center h-full">
-					<div class="flex flex-col items-center gap-3">
-						<div class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-							<i class="fas fa-spinner fa-spin text-sm text-violet-400"></i>
+			<div
+				transition:modalSlideUp|global={{ duration: DURATIONS.normal }}
+				class="pointer-events-auto bg-popover flex flex-col overflow-hidden w-full h-full sm:h-auto sm:max-w-[600px] sm:max-h-[85vh] sm:rounded-2xl border border-white/10 shadow-2xl"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="modal-title"
+			>
+			{#if loadingTask && !currentTask}
+				<!-- Skeleton screens matching TaskDetail layout -->
+				<div class="flex flex-col h-full">
+					<!-- Header skeleton -->
+					<div class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0">
+						<div class="flex items-center gap-3">
+							<Skeleton variant="circular" class="w-11 h-11" />
+							<div class="w-40">
+								<Skeleton variant="text" class="w-32 mb-1" />
+								<Skeleton variant="text" class="w-24" />
+							</div>
 						</div>
-						<p class="text-xs text-gray-500">Loading task...</p>
+						<Skeleton variant="circular" class="w-11 h-11" />
+					</div>
+
+					<!-- Tabs skeleton -->
+					<div class="p-2 flex justify-between">
+						<Skeleton variant="circular" class="w-6 h-6" />
+						<div class="flex gap-2">
+							{#each [1, 2, 3] as _}
+								<Skeleton variant="rounded" class="h-8 w-16" />
+							{/each}
+						</div>
+						<Skeleton variant="circular" class="w-6 h-6" />
+					</div>
+
+					<!-- Content skeleton -->
+					<div class="flex-1 p-4 space-y-4">
+						{#each [1, 2, 3, 4] as _}
+							<div class="space-y-2">
+								<Skeleton variant="text" class="w-full" />
+								<Skeleton variant="text" class="w-5/6" />
+								<Skeleton variant="text" class="w-3/4" />
+							</div>
+						{/each}
+					</div>
+
+					<!-- Bottom actions skeleton -->
+					<div class="px-4 py-3 border-t border-white/5">
+						<div class="flex gap-2">
+							<Skeleton variant="rounded" class="flex-1 h-12" />
+							<Skeleton variant="rounded" class="flex-1 h-12" />
+						</div>
 					</div>
 				</div>
 			{:else if taskError}
@@ -294,5 +380,6 @@
 				/>
 			{/if}
 		</div>
+	</div>
 	{/if}
 </div>

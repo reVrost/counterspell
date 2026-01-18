@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,12 +10,30 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // SupabaseConfig holds Supabase configuration
 type SupabaseConfig struct {
-	URL    string
-	Key    string
+	URL string
+	Key string
+}
+
+// Session represents the Supabase auth session returned by the token exchange
+type Session struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	User         User   `json:"user"`
+	// This is the GitHub PAT we need!
+	ProviderToken string `json:"provider_token"`
+}
+
+type User struct {
+	ID    string         `json:"id"`
+	Email string         `json:"email"`
+	Data  map[string]any `json:"user_metadata"`
 }
 
 // AuthService handles authentication with Supabase
@@ -49,13 +68,53 @@ func NewAuthServiceFromEnv() (*AuthService, error) {
 	})
 }
 
+// ExchangeCode swaps the auth code and verifier for a full session
+func (s *AuthService) ExchangeCode(ctx context.Context, code, verifier string) (*Session, error) {
+	// 1. Use Form Data instead of JSON
+	data := url.Values{}
+	data.Set("grant_type", "pkce")
+	data.Set("code", code)
+	data.Set("code_verifier", verifier)
+
+	u := s.supabaseURL + "/auth/v1/token"
+
+	// 2. Create the request with the form-encoded string
+	req, err := http.NewRequestWithContext(ctx, "POST", u, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Set standard headers
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("apikey", s.anonKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("exchange failed: %s", string(body))
+	}
+
+	var session Session
+	json.Unmarshal(body, &session)
+	return &session, nil
+}
+
 // GetOAuthURL returns an OAuth URL for a provider (github, google)
-func (s *AuthService) GetOAuthURL(provider, redirectURL string) (string, error) {
+func (s *AuthService) GetOAuthURL(provider, redirectURL, codeChallenge, frontendRedirect string) string {
 	params := url.Values{}
 	params.Set("provider", provider)
 	params.Set("redirect_to", redirectURL)
-	params.Set("skip_http_redirect", "true")
-	
+	// params.Set("state", frontendRedirect)
+	params.Set("code_challenge", codeChallenge)
+	params.Set("code_challenge_method", "s256")
+	// params.Set("skip_http_redirect", "true")
+
 	// Request GitHub scopes to get provider_token for repo access
 	if provider == "github" {
 		params.Set("scopes", "repo,read:user,read:org")
@@ -65,7 +124,7 @@ func (s *AuthService) GetOAuthURL(provider, redirectURL string) (string, error) 
 
 	slog.Info("Generated OAuth URL", "provider", provider, "url", oauthURL)
 
-	return oauthURL, nil
+	return oauthURL
 }
 
 // GetSession retrieves the current session from the request
@@ -101,7 +160,7 @@ func (s *AuthService) SetSessionCookie(w http.ResponseWriter, token string) {
 // ClearSessionCookies clears all Supabase session cookies
 func (s *AuthService) ClearSessionCookies(w http.ResponseWriter) {
 	secure := os.Getenv("ENV") == "production"
-	
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sb-access-token",
 		Value:    "",
@@ -118,7 +177,7 @@ func (s *AuthService) ClearSessionCookies(w http.ResponseWriter) {
 		Secure:   secure,
 		HttpOnly: true,
 	})
-	
+
 	slog.Info("Supabase session cookies cleared")
 }
 

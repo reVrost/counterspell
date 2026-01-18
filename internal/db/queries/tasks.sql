@@ -6,6 +6,16 @@ RETURNING *;
 -- name: GetTask :one
 SELECT * FROM tasks WHERE id = $1 AND user_id = $2;
 
+-- name: GetTaskWithProject :one
+SELECT
+    t.id, t.user_id, t.project_id, t.title, t.intent, t.status, t.position,
+    t.current_step, t.assigned_agent_id, t.assigned_user_id, t.created_at, t.updated_at,
+    p.github_owner as project_owner,
+    p.github_repo as project_repo
+FROM tasks t
+LEFT JOIN projects p ON t.project_id = p.id
+WHERE t.id = $1 AND t.user_id = $2;
+
 -- name: ListTasks :many
 SELECT * FROM tasks
 WHERE user_id = $1

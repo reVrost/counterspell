@@ -128,20 +128,45 @@ func (h *Handlers) HandleActivateProject(w http.ResponseWriter, r *http.Request)
 	_ = render.Render(w, r, Success("Project activated"))
 }
 
-// HandleAPITask returns a single task as JSON
+// HandleAPITask returns a single task as JSON with project info
 func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	// Get task from DB
-	dbTask, err := h.taskService.Get(ctx, userID, taskID)
+	// Get task with project info in single query
+	taskWithProject, err := h.taskService.GetWithProject(ctx, userID, taskID)
 	if err != nil {
 		_ = render.Render(w, r, ErrNotFound("Task not found"))
 		return
 	}
 
-	render.JSON(w, r, dbTask)
+	// Build project map for frontend
+	project := map[string]string{
+		"id":    "",
+		"name":  "Unknown",
+		"icon":  "fa-github",
+		"color": "text-blue-400",
+	}
+	if taskWithProject.Project != nil {
+		project["id"] = taskWithProject.Project.ID
+		project["name"] = taskWithProject.Project.GitHubOwner + "/" + taskWithProject.Project.GitHubRepo
+	}
+
+	// Build response
+	response := struct {
+		Task     *models.Task      `json:"task"`
+		Project  map[string]string `json:"project"`
+		Messages []models.Message  `json:"messages"`
+		Logs     []any             `json:"logs"`
+	}{
+		Task:     taskWithProject.Task,
+		Project:  project,
+		Messages: []models.Message{},
+		Logs:     []any{},
+	}
+
+	render.JSON(w, r, response)
 }
 
 // HandleAPISession returns current session info as JSON
