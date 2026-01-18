@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/models"
@@ -15,13 +16,23 @@ func (h *Handlers) HandleGitHubAuthorize(w http.ResponseWriter, r *http.Request)
 	connType := r.URL.Query().Get("type")
 	fmt.Printf("GitHub authorize request - type: %s, clientID: %s\n", connType, h.clientID)
 
+	// Get redirect URL from query params (frontend tells us where to go after auth)
+	redirectURL := r.URL.Query().Get("redirect_url")
+
 	redirectURI := h.redirectURI
 	if redirectURI == "" {
 		redirectURI = "http://localhost:8710/api/v1/github/callback"
 	}
 
+	// Encode both connType and redirectURL into state parameter
+	state := connType
+	if redirectURL != "" {
+		// Simple format: connType|redirectURL
+		state = fmt.Sprintf("%s|%s", connType, redirectURL)
+	}
+
 	authURL := fmt.Sprintf("https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=repo,read:user,read:org&state=%s",
-		h.clientID, redirectURI, connType)
+		h.clientID, redirectURI, state)
 
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
@@ -30,11 +41,18 @@ func (h *Handlers) HandleGitHubAuthorize(w http.ResponseWriter, r *http.Request)
 func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	code := r.URL.Query().Get("code")
-	connType := r.URL.Query().Get("state")
+	state := r.URL.Query().Get("state")
 	userID := auth.UserIDFromContext(ctx)
 
-	if connType == "" {
-		connType = "user"
+	// Parse state to get connType and potentially redirectURL
+	connType := "user"
+	redirectURL := ""
+	if state != "" {
+		parts := strings.Split(state, "|")
+		connType = parts[0]
+		if len(parts) > 1 && parts[1] != "" {
+			redirectURL = parts[1]
+		}
 	}
 
 	if code == "" {
@@ -84,7 +102,10 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 		}
 	}()
 
-	redirectURL := getRedirectURL(r, "/dashboard")
+	// Use redirect URL from state parameter if available, otherwise use default
+	if redirectURL == "" {
+		redirectURL = "/dashboard"
+	}
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
@@ -112,6 +133,6 @@ func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("[DISCONNECT] Redirecting to landing page")
-	redirectURL := getRedirectURL(r, "/")
+	redirectURL := "/"
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }

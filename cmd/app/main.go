@@ -94,6 +94,7 @@ func main() {
 	}
 
 	// Setup router
+	slog.Info("Setting up router")
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -111,7 +112,7 @@ func main() {
 		})
 
 		// Auth routes (login page, OAuth callbacks)
-		r.Get("/api/v1/auth/oauth/{provider}", h.HandleOAuth)
+		// r.Get("/api/v1/auth/oauth/{provider}", h.HandleOAuthLogin)
 		r.Get("/api/v1/auth/callback", h.HandleAuthCallback)
 		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
 

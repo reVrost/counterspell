@@ -56,7 +56,7 @@ func (q *Queries) AssignUser(ctx context.Context, arg AssignUserParams) error {
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (id, user_id, project_id, title, intent, status, position, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id
+RETURNING id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step
 `
 
 type CreateTaskParams struct {
@@ -92,11 +92,11 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.Intent,
 		&i.Status,
 		&i.Position,
-		&i.CurrentStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AssignedAgentID,
 		&i.AssignedUserID,
+		&i.CurrentStep,
 	)
 	return i, err
 }
@@ -116,7 +116,7 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks WHERE id = $1 AND user_id = $2
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks WHERE id = $1 AND user_id = $2
 `
 
 type GetTaskParams struct {
@@ -135,17 +135,72 @@ func (q *Queries) GetTask(ctx context.Context, arg GetTaskParams) (Task, error) 
 		&i.Intent,
 		&i.Status,
 		&i.Position,
-		&i.CurrentStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AssignedAgentID,
 		&i.AssignedUserID,
+		&i.CurrentStep,
+	)
+	return i, err
+}
+
+const getTaskWithProject = `-- name: GetTaskWithProject :one
+SELECT
+    t.id, t.user_id, t.project_id, t.title, t.intent, t.status, t.position,
+    t.current_step, t.assigned_agent_id, t.assigned_user_id, t.created_at, t.updated_at,
+    p.github_owner as project_owner,
+    p.github_repo as project_repo
+FROM tasks t
+LEFT JOIN projects p ON t.project_id = p.id
+WHERE t.id = $1 AND t.user_id = $2
+`
+
+type GetTaskWithProjectParams struct {
+	ID     string `json:"id"`
+	UserID string `json:"user_id"`
+}
+
+type GetTaskWithProjectRow struct {
+	ID              string             `json:"id"`
+	UserID          string             `json:"user_id"`
+	ProjectID       string             `json:"project_id"`
+	Title           string             `json:"title"`
+	Intent          string             `json:"intent"`
+	Status          string             `json:"status"`
+	Position        pgtype.Int4        `json:"position"`
+	CurrentStep     pgtype.Text        `json:"current_step"`
+	AssignedAgentID pgtype.Text        `json:"assigned_agent_id"`
+	AssignedUserID  pgtype.Text        `json:"assigned_user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ProjectOwner    pgtype.Text        `json:"project_owner"`
+	ProjectRepo     pgtype.Text        `json:"project_repo"`
+}
+
+func (q *Queries) GetTaskWithProject(ctx context.Context, arg GetTaskWithProjectParams) (GetTaskWithProjectRow, error) {
+	row := q.db.QueryRow(ctx, getTaskWithProject, arg.ID, arg.UserID)
+	var i GetTaskWithProjectRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Intent,
+		&i.Status,
+		&i.Position,
+		&i.CurrentStep,
+		&i.AssignedAgentID,
+		&i.AssignedUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ProjectOwner,
+		&i.ProjectRepo,
 	)
 	return i, err
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
 WHERE user_id = $1
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -167,11 +222,11 @@ func (q *Queries) ListTasks(ctx context.Context, userID string) ([]Task, error) 
 			&i.Intent,
 			&i.Status,
 			&i.Position,
-			&i.CurrentStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignedAgentID,
 			&i.AssignedUserID,
+			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
@@ -184,7 +239,7 @@ func (q *Queries) ListTasks(ctx context.Context, userID string) ([]Task, error) 
 }
 
 const listTasksByAssignedAgent = `-- name: ListTasksByAssignedAgent :many
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
 WHERE assigned_agent_id = $1
 ORDER BY created_at DESC
 `
@@ -206,11 +261,11 @@ func (q *Queries) ListTasksByAssignedAgent(ctx context.Context, assignedAgentID 
 			&i.Intent,
 			&i.Status,
 			&i.Position,
-			&i.CurrentStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignedAgentID,
 			&i.AssignedUserID,
+			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
@@ -223,7 +278,7 @@ func (q *Queries) ListTasksByAssignedAgent(ctx context.Context, assignedAgentID 
 }
 
 const listTasksByAssignedUser = `-- name: ListTasksByAssignedUser :many
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
 WHERE assigned_user_id = $1
 ORDER BY created_at DESC
 `
@@ -245,11 +300,11 @@ func (q *Queries) ListTasksByAssignedUser(ctx context.Context, assignedUserID pg
 			&i.Intent,
 			&i.Status,
 			&i.Position,
-			&i.CurrentStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignedAgentID,
 			&i.AssignedUserID,
+			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
@@ -262,7 +317,7 @@ func (q *Queries) ListTasksByAssignedUser(ctx context.Context, assignedUserID pg
 }
 
 const listTasksByProject = `-- name: ListTasksByProject :many
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
 WHERE user_id = $1 AND project_id = $2
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -289,11 +344,11 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 			&i.Intent,
 			&i.Status,
 			&i.Position,
-			&i.CurrentStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignedAgentID,
 			&i.AssignedUserID,
+			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
@@ -306,7 +361,7 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
 WHERE user_id = $1 AND status = $2
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -333,11 +388,11 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 			&i.Intent,
 			&i.Status,
 			&i.Position,
-			&i.CurrentStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignedAgentID,
 			&i.AssignedUserID,
+			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
@@ -350,7 +405,7 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 }
 
 const listTasksByStatusAndProject = `-- name: ListTasksByStatusAndProject :many
-SELECT id, user_id, project_id, title, intent, status, position, current_step, created_at, updated_at, assigned_agent_id, assigned_user_id FROM tasks
+SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
 WHERE user_id = $1 AND status = $2 AND project_id = $3
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -378,11 +433,11 @@ func (q *Queries) ListTasksByStatusAndProject(ctx context.Context, arg ListTasks
 			&i.Intent,
 			&i.Status,
 			&i.Position,
-			&i.CurrentStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignedAgentID,
 			&i.AssignedUserID,
+			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}

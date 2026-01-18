@@ -237,12 +237,27 @@ func (s *GitHubService) SaveProject(ctx context.Context, userID, owner, repo str
 	return nil
 }
 
+// GetProject retrieves a single project by ID.
+func (s *GitHubService) GetProject(ctx context.Context, userID, projectID string) (*models.Project, error) {
+	p, err := s.db.Queries.GetProject(ctx, sqlc.GetProjectParams{
+		ID:     projectID,
+		UserID: userID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query project: %w", err)
+	}
+	return &models.Project{
+		ID:          p.ID,
+		GitHubOwner: p.GithubOwner,
+		GitHubRepo:  p.GithubRepo,
+		CreatedAt:   p.CreatedAt.Time.Unix(),
+	}, nil
+}
+
 // GetProjects retrieves all projects.
 func (s *GitHubService) GetProjects(ctx context.Context, userID string) ([]models.Project, error) {
-	fmt.Println("[GITHUB] GetProjects: querying database")
 	projects, err := s.db.Queries.GetProjects(ctx, userID)
 	if err != nil {
-		fmt.Printf("[GITHUB] GetProjects: query error=%v\n", err)
 		return nil, fmt.Errorf("failed to query projects: %w", err)
 	}
 
@@ -256,7 +271,6 @@ func (s *GitHubService) GetProjects(ctx context.Context, userID string) ([]model
 		}
 	}
 
-	fmt.Printf("[GITHUB] GetProjects: returning %d projects\n", len(result))
 	return result, nil
 }
 

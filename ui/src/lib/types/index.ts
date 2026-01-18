@@ -20,38 +20,24 @@ export interface GitHubRepo {
 
 export interface Task {
 	id: string;
-	projectId: string;
-	description: string;
+	project_id: string;
+	title: string;
+	intent: string;
 	status: TaskStatus;
-	agentOutput?: string;
+	position: number;
+	current_step?: string;
+	created_at: string;
+	updated_at: string;
+	assigned_agent_id?: string;
+	assigned_user_id?: string;
+	// Frontend-added fields (from API enrichment)
 	gitDiff?: string;
-	messages: Message[];
-	logs: LogEntry[];
-	createdAt: string;
-	updatedAt: string;
-	// Planning phase fields
-	frontendPlan?: string;      // Plan from frontend planning agent
-	backendPlan?: string;       // Plan from backend planning agent
-	detailedSpec?: string;      // Synthesized detailed spec with test cases
-	planningPhase?: PlanningPhase; // Current planning phase
-	// Review fields
-	reviewResult?: ReviewResult;   // Agent review outcome
+	messages?: Message[];
+	logs?: LogEntry[];
 }
 
-// Task Status Flow: planning → in_progress → agent_review → human_review → done
-export type TaskStatus = 'planning' | 'in_progress' | 'agent_review' | 'human_review' | 'done';
-
-// Planning phases within the planning status
-export type PlanningPhase = 'frontend' | 'backend' | 'synthesize';
-
-// Review result from agent review
-export interface ReviewResult {
-	confidence: number;      // 0-100 confidence score
-	issues: string[];        // Issues found during review
-	fixAttempts: number;     // Number of auto-fix attempts made
-	passedReview: boolean;   // Whether review passed (confidence >= 80)
-	reviewSummary: string;   // Summary of the review
-}
+// Task Status Flow: pending → in_progress → review → done (or failed)
+export type TaskStatus = 'pending' | 'in_progress' | 'review' | 'done' | 'failed';
 
 export interface Message {
 	role: 'user' | 'assistant';

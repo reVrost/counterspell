@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/go-chi/render"
 	"github.com/golang-jwt/jwt/v5"
@@ -15,191 +16,168 @@ import (
 )
 
 // getRedirectURL returns the appropriate redirect URL for the current environment.
-// In dev mode (Vite on :5173), uses Origin header or FRONTEND_URL env var.
-// In prod, uses PUBLIC_URL or the request host.
-func getRedirectURL(r *http.Request, path string) string {
-	// Check for explicit frontend URL (useful for dev mode)
-	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
-		return strings.TrimSuffix(frontendURL, "/") + path
+// Always returns a relative path to work with any frontend (ngrok, localhost, production).
+
+func (h *Handlers) HandleOAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if h.authService == nil {
+		// Direct GitHub OAuth for self host single tenant
+		h.HandleGitHubAuthorize(w, r)
 	}
 
-	// Check for PUBLIC_URL (production)
-	if publicURL := os.Getenv("PUBLIC_URL"); publicURL != "" {
-		return strings.TrimSuffix(publicURL, "/") + path
-	}
-
-	// Use Origin header (from frontend making requests)
-	if origin := r.Header.Get("Origin"); origin != "" {
-		return strings.TrimSuffix(origin, "/") + path
-	}
-
-	// Fall back to request host
+	// Use Supabase OAuth flow if auth service is configured
 	scheme := "http"
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s%s", scheme, r.Host, path)
-}
+	host := r.Host
 
-func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
-	// Use Supabase OAuth flow if auth service is configured
-	if h.authService != nil {
-		scheme := "http"
-		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-			scheme = "https"
-		}
-		host := r.Host
-		if envHost := os.Getenv("PUBLIC_URL"); envHost != "" {
-			host = envHost
-			scheme = ""
-		}
-
-		var callbackURL string
-		if scheme == "" {
-			callbackURL = host + "/api/v1/auth/callback"
-		} else {
-			callbackURL = fmt.Sprintf("%s://%s/api/v1/auth/callback", scheme, host)
-		}
-
-		oauthURL, err := h.authService.GetOAuthURL("github", callbackURL)
-		if err != nil {
-			slog.Error("Failed to get Supabase OAuth URL", "error", err)
-			_ = render.Render(w, r, ErrInternalServer("OAuth error", err))
-			return
-		}
-
-		slog.Info("Redirecting to Supabase OAuth", "url", oauthURL, "callback", callbackURL)
-		http.Redirect(w, r, oauthURL, http.StatusTemporaryRedirect)
-		return
+	var callbackURL string
+	if scheme == "" {
+		callbackURL = host + "/api/v1/auth/callback"
+	} else {
+		callbackURL = fmt.Sprintf("%s://%s/api/v1/auth/callback", scheme, host)
 	}
 
-	// Direct GitHub OAuth
-	h.HandleGitHubAuthorize(w, r)
+	// 1. Generate a random "Code Verifier" (save this in a secure cookie!)
+	codeVerifier := "arandomstring123" // TODO: Generate a random string
+	// 2. Hash it to create the "Code Challenge"
+	hash := sha256.Sum256([]byte(codeVerifier))
+	codeChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
+
+	// 3. Store the verifier in a cookie so we can use it in the callback
+	secure := os.Getenv("ENV") == "production"
+	slog.Info("am i secure?", "secure", secure)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sb-code-verifier",
+		Value:    codeVerifier,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure, // Set to false if testing locally without HTTPS
+	})
+
+	// // Get redirect URL from query params (frontend tells us where to go after auth)
+	// // Pass it as state parameter so it survives the OAuth round trip
+	// frontendRedirect := r.URL.Query().Get("redirect_url")
+	// if frontendRedirect == "" {
+	// 	frontendRedirect = "http://localhost:5173/dashboard"
+	// }
+	http.SetCookie(w, &http.Cookie{
+		Name:  "return_to",
+		Value: "http://localhost:5173/dashboard",
+		Path:  "/",
+	})
+
+	supabaseAuthURL := h.authService.GetOAuthURL("github", callbackURL, codeChallenge, "")
+
+	slog.Info("Redirecting to SupabaseAuthURL", "url", supabaseAuthURL, "callback", callbackURL)
+	http.Redirect(w, r, supabaseAuthURL, http.StatusTemporaryRedirect)
 }
 
 func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
-	// Handle Supabase callback if auth service is configured
-	if h.authService != nil {
-		if errCode := r.URL.Query().Get("error"); errCode != "" {
-			errDesc := r.URL.Query().Get("error_description")
-			slog.Error("Supabase OAuth error", "code", errCode, "description", errDesc)
-			http.Redirect(w, r, "/?error="+errCode+"&error_description="+errDesc, http.StatusTemporaryRedirect)
-			return
-		}
+	slog.Info("[AUTH] HandleAuthCallback called", "url", r.URL.String())
 
-		accessToken := r.URL.Query().Get("access_token")
-		refreshToken := r.URL.Query().Get("refresh_token")
-		providerToken := r.URL.Query().Get("provider_token")
-
-		slog.Info("Supabase callback received",
-			"has_access_token", accessToken != "",
-			"has_refresh_token", refreshToken != "",
-			"has_provider_token", providerToken != "")
-
-		if accessToken != "" {
-			h.authService.SetSessionCookie(w, accessToken)
-			if refreshToken != "" {
-				http.SetCookie(w, &http.Cookie{
-					Name:     "sb-refresh-token",
-					Value:    refreshToken,
-					Path:     "/",
-					MaxAge:   3600 * 24 * 7,
-					HttpOnly: true,
-					SameSite: http.SameSiteLaxMode,
-				})
-			}
-
-			userID := h.extractUserIDFromToken(accessToken)
-			if userID == "" {
-				slog.Error("Failed to extract user ID from token")
-				http.Redirect(w, r, "/?error=invalid_token", http.StatusTemporaryRedirect)
-				return
-			}
-
-			// If we have a GitHub provider token, save connection and fetch repos
-			if providerToken != "" {
-				login, avatarURL, err := h.githubService.GetUserInfo(r.Context(), providerToken)
-				if err != nil {
-					slog.Error("Failed to get GitHub user info", "error", err)
-				} else {
-					err = h.githubService.SaveConnection(r.Context(), userID, "user", login, avatarURL, providerToken, "repo,read:user,read:org")
-					if err != nil {
-						slog.Error("Failed to save GitHub connection", "error", err)
-					} else {
-						slog.Info("GitHub connection saved for user", "login", login, "user_id", userID)
-						// Sync repos in background
-						go func(token, uid, loginName string) {
-							bgCtx := context.Background()
-
-							// Sync to cache
-							if err := h.repoCache.SyncReposFromGitHub(bgCtx, uid, token); err != nil {
-								slog.Error("[OAuth] Failed to sync repos to cache", "error", err)
-							} else {
-								slog.Info("[OAuth] Repos synced to cache successfully")
-							}
-
-							// Also save to projects table
-							conn := &models.GitHubConnection{
-								Type:  "user",
-								Login: loginName,
-								Token: token,
-							}
-							if err := h.githubService.FetchAndSaveRepositories(bgCtx, uid, conn); err != nil {
-								slog.Error("[OAuth] Failed to save projects to DB", "error", err)
-							} else {
-								slog.Info("[OAuth] Projects saved to DB successfully")
-							}
-						}(providerToken, userID, login)
-					}
-				}
-			} else {
-				slog.Warn("No provider_token in Supabase callback - repos won't be fetched")
-			}
-
-			redirectURL := getRedirectURL(r, "/dashboard")
-			slog.Info("Supabase OAuth successful, redirecting", "url", redirectURL)
-			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
-			return
-		}
-
-		// No token - serve page that extracts fragment
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write([]byte(`<!DOCTYPE html>
-<html>
-<head><title>Completing login...</title></head>
-<body>
-<script>
-const hash = window.location.hash.substring(1);
-if (hash) {
-	const params = new URLSearchParams(hash);
-	const accessToken = params.get('access_token');
-	const refreshToken = params.get('refresh_token');
-	const providerToken = params.get('provider_token');
-	if (accessToken) {
-		let url = '/api/v1/auth/callback?access_token=' + encodeURIComponent(accessToken);
-		if (refreshToken) url += '&refresh_token=' + encodeURIComponent(refreshToken);
-		if (providerToken) url += '&provider_token=' + encodeURIComponent(providerToken);
-		window.location.href = url;
-	} else {
-		window.location.href = '/?error=no_token';
-	}
-} else {
-	const params = new URLSearchParams(window.location.search);
-	if (params.get('error')) {
-		window.location.href = '/?error=' + params.get('error') + '&error_description=' + (params.get('error_description') || '');
-	} else {
-		window.location.href = '/?error=invalid_callback';
-	}
-}
-</script>
-<p>Completing login...</p>
-</body>
-</html>`))
+	// 1. Check for standard OAuth error params from Supabase
+	if errCode := r.URL.Query().Get("error"); errCode != "" {
+		errDesc := r.URL.Query().Get("error_description")
+		slog.Error("Supabase OAuth error", "code", errCode, "description", errDesc)
+		http.Redirect(w, r, "/?error="+errCode, http.StatusTemporaryRedirect)
 		return
 	}
 
-	// Direct GitHub callback
-	h.HandleGitHubCallback(w, r)
+	// 2. Get the 'code' from the query string
+	authCode := r.URL.Query().Get("code")
+	if authCode == "" {
+		slog.Error("No auth code present in callback")
+		http.Redirect(w, r, "/?error=no_code", http.StatusTemporaryRedirect)
+		return
+	}
+	// Debug: Log all cookies to see what the browser sent
+	for _, c := range r.Cookies() {
+		slog.Info("Cookie received", "name", c.Name)
+	}
+
+	// 3. Retrieve the PKCE verifier we saved in the cookie during HandleOAuth
+	verifierCookie, err := r.Cookie("sb-code-verifier")
+	if err != nil {
+		slog.Error("PKCE verifier cookie missing", "error", err)
+		http.Redirect(w, r, "/?error=session_expired", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// 4. EXCHANGE the code for a session (This is the critical PKCE step)
+	// This call happens server-to-server. It returns the actual tokens.
+	slog.Info("Attempting exchange", "code", authCode, "verifier", verifierCookie.Value)
+	session, err := h.authService.ExchangeCode(r.Context(), authCode, verifierCookie.Value)
+	if err != nil {
+		slog.Error("Failed to exchange code for session", "error", err)
+		http.Redirect(w, r, "/?error=exchange_failed", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Cleanup the verifier cookie
+	http.SetCookie(w, &http.Cookie{Name: "sb-code-verifier", MaxAge: -1, Path: "/"})
+
+	// 5. Extract tokens from the session object returned by the exchange
+	accessToken := session.AccessToken
+	refreshToken := session.RefreshToken
+	providerToken := session.ProviderToken // This is the GitHub PAT we need
+	userID := session.User.ID              // Supabase Go SDK usually provides the user object here
+
+	slog.Info("Supabase exchange successful",
+		"user_id", userID,
+		"has_provider_token", providerToken != "")
+
+	// 6. Set your local session cookies
+	h.authService.SetSessionCookie(w, accessToken)
+	if refreshToken != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "sb-refresh-token",
+			Value:    refreshToken,
+			Path:     "/",
+			MaxAge:   3600 * 24 * 7,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
+
+	// 7. If we have the GitHub token, sync everything
+	if providerToken != "" {
+		login, avatarURL, err := h.githubService.GetUserInfo(r.Context(), providerToken)
+		if err != nil {
+			slog.Error("Failed to get GitHub user info", "error", err)
+		} else {
+			err = h.githubService.SaveConnection(r.Context(), userID, "user", login, avatarURL, providerToken, "repo,read:user,read:org")
+			if err != nil {
+				slog.Error("Failed to save GitHub connection", "error", err)
+			} else {
+				slog.Info("GitHub connection saved", "login", login)
+
+				// Sync repos in background
+				go func(token, uid, loginName string) {
+					bgCtx := context.Background()
+					if err := h.repoCache.SyncReposFromGitHub(bgCtx, uid, token); err != nil {
+						slog.Error("[OAuth] Cache sync failed", "error", err)
+					}
+
+					conn := &models.GitHubConnection{Type: "user", Login: loginName, Token: token}
+					if err := h.githubService.FetchAndSaveRepositories(bgCtx, uid, conn); err != nil {
+						slog.Error("[OAuth] DB save failed", "error", err)
+					}
+				}(providerToken, userID, login)
+			}
+		}
+	}
+
+	// 8. Final Redirect
+	redirectURL := "http://localhost:5173/dashboard" // Default
+	if c, err := r.Cookie("return_to"); err == nil {
+		redirectURL = c.Value
+		// Cleanup return_to cookie
+		http.SetCookie(w, &http.Cookie{Name: "return_to", MaxAge: -1, Path: "/"})
+	}
+
+	slog.Info("Authentication complete", "redirecting_to", redirectURL)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 // extractUserIDFromToken extracts the user ID (sub claim) from a Supabase JWT

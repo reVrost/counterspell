@@ -69,8 +69,10 @@
 	});
 
 	// Auth guard - handle authentication and GitHub OAuth flow
+	// Using a flag to prevent redirect loops
+	let hasRedirected = false;
 	$effect(() => {
-		if (!isInitialized || !browser) return;
+		if (!isInitialized || !browser || hasRedirected) return;
 
 		const path = $page.url.pathname;
 
@@ -80,6 +82,7 @@
 		if (path.startsWith('/dashboard')) {
 			if (!appState.isAuthenticated) {
 				console.log('🔒 Not authenticated, redirecting to home...');
+				hasRedirected = true;
 				window.location.href = '/';
 				return;
 			}
@@ -87,6 +90,7 @@
 			// User is authenticated via Supabase but needs GitHub OAuth
 			if (appState.needsGitHubAuth && !appState.githubConnected) {
 				console.log('🔗 Need GitHub auth, redirecting to GitHub OAuth...');
+				hasRedirected = true;
 				window.location.href = '/api/v1/github/authorize';
 				return;
 			}
@@ -96,6 +100,7 @@
 		if (path === '/') {
 			if (appState.isAuthenticated && appState.githubConnected) {
 				console.log('✅ Fully authenticated, redirecting to dashboard...');
+				hasRedirected = true;
 				window.location.href = '/dashboard';
 			}
 		}

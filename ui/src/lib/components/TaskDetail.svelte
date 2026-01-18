@@ -3,6 +3,7 @@
 	import { taskStore } from '$lib/stores/tasks.svelte';
 	import { tasksAPI } from '$lib/api';
 	import { cn } from '$lib/utils';
+	import { modalSlideUp, backdropFade, slide, DURATIONS } from '$lib/utils/transitions';
 	import type { Task, Project } from '$lib/types';
 	import ChatInput from './ChatInput.svelte';
 	import TodoIndicator from './TodoIndicator.svelte';
@@ -99,7 +100,7 @@
 					</span>
 					<span class="text-[10px] text-gray-600 font-mono">#{task.id}</span>
 				</div>
-				<h2 class="text-sm font-bold text-gray-200 line-clamp-1 w-48">{task.description}</h2>
+				<h2 class="text-sm font-bold text-gray-200 line-clamp-1 w-48">{task.title}</h2>
 			</div>
 		</div>
 		<button
@@ -119,26 +120,34 @@
 				<button
 					onclick={() => (activeTab = tab as typeof activeTab)}
 					class={cn(
-						'px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50',
+						'px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 relative overflow-hidden',
 						activeTab === tab ? 'bg-gray-800 text-white shadow' : 'text-gray-500'
 					)}
 				>
-					{tab === 'agent' ? 'Agent' : tab === 'diff' ? 'Diff' : 'Log'}
+					{#if activeTab === tab}
+						<span
+							class="absolute inset-0 bg-purple-500/10"
+							style:transition="opacity 200ms ease-out"
+						></span>
+					{/if}
+					<span class="relative z-10">
+						{tab === 'agent' ? 'Agent' : tab === 'diff' ? 'Diff' : 'Log'}
+					</span>
 				</button>
 			{/each}
 		</div>
 		<!-- Status Indicator -->
 		<div class="w-6 flex justify-end pr-2">
-			{#if task.status === 'planning'}
-				<div class="w-1.5 h-1.5 rounded-full bg-purple-400" title="Planning"></div>
+			{#if task.status === 'pending'}
+				<div class="w-1.5 h-1.5 rounded-full bg-gray-400" title="Pending"></div>
 			{:else if task.status === 'in_progress'}
 				<div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
-			{:else if task.status === 'agent_review'}
-				<div class="w-1.5 h-1.5 rounded-full bg-yellow-400" title="Agent Review"></div>
-			{:else if task.status === 'human_review'}
-				<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Human Review"></div>
+			{:else if task.status === 'review'}
+				<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Review"></div>
 			{:else if task.status === 'done'}
 				<div class="w-1.5 h-1.5 rounded-full bg-green-400" title="Done"></div>
+			{:else if task.status === 'failed'}
+				<div class="w-1.5 h-1.5 rounded-full bg-red-400" title="Failed"></div>
 			{/if}
 		</div>
 	</div>
@@ -193,7 +202,10 @@
 
 	<!-- Chat Input Overlay -->
 	{#if showChat}
-		<div class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3">
+		<div
+			class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3"
+			transition:slide|local={{ direction: 'up', duration: DURATIONS.quick }}
+		>
 			<div
 				class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
 			></div>
@@ -234,7 +246,7 @@
 				<EraserIcon class="w-3 h-3" />
 				<span>Clear</span>
 			</button>
-			{#if task.status === 'human_review'}
+			{#if task.status === 'review'}
 				<span class="text-gray-700 self-center">·</span>
 				<button
 					onclick={() => (confirmAction = 'pr')}
@@ -256,7 +268,7 @@
 				<MessageSquareIcon class="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
 				<span class="text-sm font-medium">Chat</span>
 			</button>
-			{#if task.status === 'human_review'}
+			{#if task.status === 'review'}
 				<button
 					onclick={() => (confirmAction = 'merge')}
 					class="flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
@@ -271,13 +283,18 @@
 	<!-- Confirmation Modal -->
 	{#if confirmAction}
 		<div
+			transition:backdropFade|local={{ duration: DURATIONS.normal }}
 			class="fixed inset-0 z-[200] flex items-start justify-center pt-[25vh] bg-black/60 backdrop-blur-sm"
 			role="button"
 			tabindex="-1"
 			onclick={(e) => e.target === e.currentTarget && (confirmAction = null)}
 			onkeydown={(e) => e.key === 'Escape' && (confirmAction = null)}
+			aria-label="Close confirmation dialog"
 		>
-			<div class="bg-popover border border-gray-700/50 rounded-xl p-5 w-[320px] shadow-2xl">
+			<div
+				transition:modalSlideUp|local={{ duration: DURATIONS.quick }}
+				class="bg-popover border border-gray-700/50 rounded-xl p-5 w-[320px] shadow-2xl"
+			>
 				{#if confirmAction === 'retry'}
 					<div class="space-y-4">
 						<div class="flex items-center gap-3">

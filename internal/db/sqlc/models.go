@@ -72,11 +72,11 @@ type Task struct {
 	Intent          string             `json:"intent"`
 	Status          string             `json:"status"`
 	Position        pgtype.Int4        `json:"position"`
-	CurrentStep     pgtype.Text        `json:"current_step"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	AssignedAgentID pgtype.Text        `json:"assigned_agent_id"`
 	AssignedUserID  pgtype.Text        `json:"assigned_user_id"`
+	CurrentStep     pgtype.Text        `json:"current_step"`
 }
 
 type UserSetting struct {

@@ -62,6 +62,54 @@ func (s *TaskService) Get(ctx context.Context, userID, id string) (*models.Task,
 	return sqlcTaskToModel(task), nil
 }
 
+// GetWithProject retrieves a task by ID with project info in one query.
+func (s *TaskService) GetWithProject(ctx context.Context, userID, id string) (*models.TaskWithProject, error) {
+	row, err := s.db.Queries.GetTaskWithProject(ctx, sqlc.GetTaskWithProjectParams{
+		ID:     id,
+		UserID: userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("task not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task with project: %w", err)
+	}
+
+	task := &models.Task{
+		ID:        row.ID,
+		ProjectID: row.ProjectID,
+		Title:     row.Title,
+		Intent:    row.Intent,
+		Status:    models.TaskStatus(row.Status),
+		Position:  int(row.Position.Int32),
+		CreatedAt: row.CreatedAt.Time,
+		UpdatedAt: row.UpdatedAt.Time,
+	}
+	if row.CurrentStep.Valid {
+		task.CurrentStep = row.CurrentStep.String
+	}
+	if row.AssignedAgentID.Valid {
+		task.AssignedAgentID = row.AssignedAgentID.String
+	}
+	if row.AssignedUserID.Valid {
+		task.AssignedUserID = row.AssignedUserID.String
+	}
+
+	var project *models.Project
+	if row.ProjectOwner.Valid && row.ProjectRepo.Valid {
+		project = &models.Project{
+			ID:          row.ProjectID,
+			GitHubOwner: row.ProjectOwner.String,
+			GitHubRepo:  row.ProjectRepo.String,
+		}
+	}
+
+	return &models.TaskWithProject{
+		Task:    task,
+		Project: project,
+	}, nil
+}
+
 // List returns all tasks, optionally filtered by status and/or project.
 func (s *TaskService) List(ctx context.Context, userID string, status *models.TaskStatus, projectID *string) ([]models.Task, error) {
 	var tasks []sqlc.Task

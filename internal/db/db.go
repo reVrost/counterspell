@@ -49,7 +49,7 @@ func Connect(ctx context.Context, databaseURL string) (*DB, error) {
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
 
-	slog.Info("Connected to PostgreSQL database")
+	slog.Info("Connected to PostgreSQL database, waiting for migration")
 
 	return &DB{
 		Pool:    pool,
