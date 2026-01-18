@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/revrost/code/counterspell/internal/auth"
+	"github.com/revrost/code/counterspell/internal/models"
 )
 
 // HandleGitHubAuthorize initiates GitHub OAuth flow.
@@ -16,7 +17,7 @@ func (h *Handlers) HandleGitHubAuthorize(w http.ResponseWriter, r *http.Request)
 
 	redirectURI := h.redirectURI
 	if redirectURI == "" {
-		redirectURI = "http://localhost:8710/github/callback"
+		redirectURI = "http://localhost:8710/api/v1/github/callback"
 	}
 
 	authURL := fmt.Sprintf("https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=repo,read:user,read:org&state=%s",
@@ -59,12 +60,27 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Sync repos to cache in background (not blocking the redirect)
+	// Sync repos in background (not blocking the redirect)
 	go func() {
-		if err := h.repoCache.SyncReposFromGitHub(context.Background(), userID, token); err != nil {
+		bgCtx := context.Background()
+
+		// Sync repos to cache
+		if err := h.repoCache.SyncReposFromGitHub(bgCtx, userID, token); err != nil {
 			slog.Error("[OAuth] Failed to sync repos to cache", "error", err)
 		} else {
 			slog.Info("[OAuth] Repos synced to cache successfully")
+		}
+
+		// Also save repos to projects table
+		conn := &models.GitHubConnection{
+			Type:  connType,
+			Login: login,
+			Token: token,
+		}
+		if err := h.githubService.FetchAndSaveRepositories(bgCtx, userID, conn); err != nil {
+			slog.Error("[OAuth] Failed to save projects to DB", "error", err)
+		} else {
+			slog.Info("[OAuth] Projects saved to DB successfully")
 		}
 	}()
 

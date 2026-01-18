@@ -49,6 +49,16 @@
 		@apply border-border;
 	}
 
+	/* Remove all focus rings globally */
+	*:focus,
+	*:focus-visible,
+	*:focus-within {
+		outline: none !important;
+		box-shadow: none !important;
+		--tw-ring-shadow: none !important;
+		--tw-ring-offset-shadow: none !important;
+	}
+
 	body {
 		@apply bg-background text-foreground;
 		-webkit-font-smoothing: antialiased;

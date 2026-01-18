@@ -6,6 +6,7 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { authAPI } from '$lib/api';
+	import { initGlobalErrorHandlers } from '$lib/utils/logger';
 
 	const queryClient = new QueryClient({
 		defaultOptions: {
@@ -48,6 +49,9 @@
 
 	// Initialize app state on mount
 	onMount(async () => {
+		// Initialize global error handlers first
+		initGlobalErrorHandlers();
+
 		console.log('🚀 App layout mounting...');
 		await appState.init();
 		isInitialized = true;
@@ -83,7 +87,7 @@
 			// User is authenticated via Supabase but needs GitHub OAuth
 			if (appState.needsGitHubAuth && !appState.githubConnected) {
 				console.log('🔗 Need GitHub auth, redirecting to GitHub OAuth...');
-				window.location.href = '/api/github/authorize';
+				window.location.href = '/api/v1/github/authorize';
 				return;
 			}
 		}

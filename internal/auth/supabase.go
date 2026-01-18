@@ -69,7 +69,7 @@ func (s *AuthService) GetOAuthURL(provider, redirectURL string) (string, error) 
 }
 
 // GetSession retrieves the current session from the request
-func (s *AuthService) GetSession(r *http.Request) (map[string]interface{}, error) {
+func (s *AuthService) GetSession(r *http.Request) (map[string]any, error) {
 	// Get session from cookie
 	cookie, err := r.Cookie("sb-access-token")
 
@@ -79,7 +79,7 @@ func (s *AuthService) GetSession(r *http.Request) (map[string]interface{}, error
 
 	// For now, we'll just check if token exists
 	// In production, validate with Supabase API
-	return map[string]interface{}{
+	return map[string]any{
 		"token": cookie.Value,
 		"valid": len(cookie.Value) > 0,
 	}, nil

@@ -37,11 +37,10 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Skip SSE, API, and non-GET requests
+  // Skip API and non-GET requests
   if (
     event.request.method !== "GET" ||
-    url.pathname.includes("/events") ||
-    url.pathname.startsWith("/api/")
+    url.pathname.startsWith("/api/v1/")
   ) {
     return;
   }

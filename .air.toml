@@ -44,7 +44,7 @@ tmp_dir = "tmp"
   keep_scroll = true
 
 [server]
-  cmd = ";set -o allexport && source .envrc && set +o allexport; ./counterspell -addr :8710 -db ./data/counterspell.db"
+  cmd = ";set -o allexport && source .envrc && set +o allexport; ./counterspell -addr :8710 -log server.log"
   delay = 1000
   exclude_dir = []
   exclude_file = []

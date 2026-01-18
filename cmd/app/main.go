@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,15 +20,29 @@ import (
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/handlers"
 	"github.com/revrost/code/counterspell/internal/services"
+	"github.com/revrost/code/counterspell/ui"
 )
 
 func main() {
 	// Parse flags
 	addr := flag.String("addr", ":8710", "Server address")
+	logFile := flag.String("log", "", "Log file path (writes to both stdout and file)")
 	flag.Parse()
 
+	// Setup log output (stdout + optional file)
+	var logOutput io.Writer = os.Stdout
+	if *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			slog.Error("Failed to open log file", "path", *logFile, "error", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		logOutput = io.MultiWriter(os.Stdout, f)
+	}
+
 	// Setup logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	logger := slog.New(slog.NewTextHandler(logOutput, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
@@ -95,24 +112,14 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
 		})
-		// Static files
-		r.Handle("/static/*", http.StripPrefix("/static", http.FileServer(http.Dir("static"))))
-		r.HandleFunc("/static/manifest.json", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/manifest+json")
-			http.ServeFile(w, r, "static/manifest.json")
-		})
-		r.HandleFunc("/static/sw.js", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/javascript")
-			w.Header().Set("Service-Worker-Allowed", "/")
-			http.ServeFile(w, r, "static/sw.js")
-		})
 
-		// Landing page (public home)
-		r.Get("/", h.HandleHome)
 		// Auth routes (login page, OAuth callbacks)
-		r.Get("/auth/oauth/{provider}", h.HandleOAuth)
-		r.Get("/auth/callback", h.HandleAuthCallback)
-		r.Get("/github/callback", h.HandleGitHubCallback)
+		r.Get("/api/v1/auth/oauth/{provider}", h.HandleOAuth)
+		r.Get("/api/v1/auth/callback", h.HandleAuthCallback)
+		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
+
+		// UI logging - no auth required so errors can be logged even when auth fails
+		r.Post("/api/v1/log", h.HandleUILog)
 	})
 
 	// Protected routes (auth required)
@@ -121,42 +128,50 @@ func main() {
 		r.Use(authMiddleware.RequireAuth)
 
 		// Unified SSE endpoint
-		r.Get("/events", h.HandleSSE)
+		r.Get("/api/v1/events", h.HandleSSE)
 
 		// Actions
-		r.Post("/api/add-task", h.HandleAddTask)
-		r.Post("/api/action/clear/{id}", h.HandleActionClear)
-		r.Post("/api/action/retry/{id}", h.HandleActionRetry)
-		r.Post("/api/action/merge/{id}", h.HandleActionMerge)
-		r.Post("/api/action/pr/{id}", h.HandleActionPR)
-		r.Post("/api/action/discard/{id}", h.HandleActionDiscard)
-		r.Post("/api/action/chat/{id}", h.HandleActionChat)
+		r.Post("/api/v1/add-task", h.HandleAddTask)
+		r.Post("/api/v1/action/clear/{id}", h.HandleActionClear)
+		r.Post("/api/v1/action/retry/{id}", h.HandleActionRetry)
+		r.Post("/api/v1/action/merge/{id}", h.HandleActionMerge)
+		r.Post("/api/v1/action/pr/{id}", h.HandleActionPR)
+		r.Post("/api/v1/action/discard/{id}", h.HandleActionDiscard)
+		r.Post("/api/v1/action/chat/{id}", h.HandleActionChat)
 
 		// Merge
-		r.Post("/api/action/resolve-conflict/{id}", h.HandleResolveConflict)
-		r.Post("/api/action/abort-merge/{id}", h.HandleAbortMerge)
-		r.Post("/api/action/complete-merge/{id}", h.HandleCompleteMerge)
+		r.Post("/api/v1/action/resolve-conflict/{id}", h.HandleResolveConflict)
+		r.Post("/api/v1/action/abort-merge/{id}", h.HandleAbortMerge)
+		r.Post("/api/v1/action/complete-merge/{id}", h.HandleCompleteMerge)
 
 		// JSON API endpoints (for SvelteKit SPA)
-		r.Get("/api/feed", h.HandleAPIFeed)
-		r.Get("/api/task/{id}", h.HandleAPITask)
-		r.Get("/api/session", h.HandleAPISession)
-		r.Get("/api/settings", h.HandleAPISettings)
-		r.Get("/api/files/search", h.HandleFileSearch)
-		r.Get("/api/github/repos", h.HandleGitHubRepos)
-		r.Post("/api/project/activate", h.HandleActivateProject)
+		r.Get("/api/v1/tasks", h.HandleAPITasks)
+		r.Get("/api/v1/task/{id}", h.HandleAPITask)
+		r.Get("/api/v1/session", h.HandleAPISession)
+		r.Get("/api/v1/settings", h.HandleAPISettings)
+		r.Get("/api/v1/files/search", h.HandleFileSearch)
+		r.Get("/api/v1/github/repos", h.HandleGitHubRepos)
+		r.Post("/api/v1/github/sync", h.HandleSyncRepos)
+		r.Post("/api/v1/project/activate", h.HandleActivateProject)
 
 		// Settings and transcription
-		r.Post("/api/settings", h.HandleSaveSettings)
-		r.Post("/api/transcribe", h.HandleTranscribe)
+		r.Post("/api/v1/settings", h.HandleSaveSettings)
+		r.Post("/api/v1/transcribe", h.HandleTranscribe)
+
+		// Logging (for agent debugging)
+		r.Get("/api/v1/logs", h.HandleReadLogs)
 
 		// Auth management
-		r.Post("/api/logout", h.HandleLogout)
-		r.Post("/api/disconnect", h.HandleDisconnect)
+		r.Post("/api/v1/logout", h.HandleLogout)
+		r.Post("/api/v1/disconnect", h.HandleDisconnect)
 
 		// GitHub OAuth (for users already authenticated via Supabase)
-		r.Get("/api/github/authorize", h.HandleGitHubAuthorize)
+		r.Get("/api/v1/github/authorize", h.HandleGitHubAuthorize)
 	})
+
+	// Serve SvelteKit SPA from embedded filesystem
+	// This must come after API routes - it's a catch-all for the SPA
+	r.Get("/*", spaHandler(ui.DistDirFs))
 
 	// Start server
 	server := &http.Server{
@@ -204,4 +219,44 @@ func maskDatabaseURL(url string) string {
 		return url[:20] + "..."
 	}
 	return url[:10] + "..."
+}
+
+// spaHandler serves the SvelteKit SPA from an embedded filesystem.
+// It serves static assets directly and falls back to index.html for client-side routing.
+func spaHandler(fsys fs.FS) http.HandlerFunc {
+	fileServer := http.FileServer(http.FS(fsys))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+
+		// Try to serve the file directly
+		f, err := fsys.Open(path)
+		if err == nil {
+			f.Close()
+			// File exists - serve it with caching for immutable assets
+			if strings.HasPrefix(path, "_app/immutable/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// File not found - serve index.html for SPA routing
+		indexFile, err := fsys.Open("index.html")
+		if err != nil {
+			http.Error(w, "index.html not found", http.StatusInternalServerError)
+			return
+		}
+		defer indexFile.Close()
+
+		stat, err := indexFile.Stat()
+		if err != nil {
+			http.Error(w, "Failed to stat index.html", http.StatusInternalServerError)
+			return
+		}
+
+		// Serve index.html
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeContent(w, r, "index.html", stat.ModTime(), indexFile.(io.ReadSeeker))
+	}
 }

@@ -46,7 +46,7 @@ func TestClaims_GithubUsername(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		metadata map[string]interface{}
+		metadata map[string]any
 		want     string
 	}{
 		{
@@ -56,17 +56,17 @@ func TestClaims_GithubUsername(t *testing.T) {
 		},
 		{
 			name:     "user_name present",
-			metadata: map[string]interface{}{"user_name": "reVrost"},
+			metadata: map[string]any{"user_name": "reVrost"},
 			want:     "reVrost",
 		},
 		{
 			name:     "preferred_username fallback",
-			metadata: map[string]interface{}{"preferred_username": "reVrost"},
+			metadata: map[string]any{"preferred_username": "reVrost"},
 			want:     "reVrost",
 		},
 		{
 			name:     "user_name takes priority",
-			metadata: map[string]interface{}{"user_name": "primary", "preferred_username": "fallback"},
+			metadata: map[string]any{"user_name": "primary", "preferred_username": "fallback"},
 			want:     "primary",
 		},
 	}
@@ -88,7 +88,7 @@ func TestClaims_AvatarURL(t *testing.T) {
 	t.Run("with avatar", func(t *testing.T) {
 		t.Parallel()
 		claims := &Claims{
-			UserMetadata: map[string]interface{}{
+			UserMetadata: map[string]any{
 				"avatar_url": "https://avatars.githubusercontent.com/u/1558599?v=4",
 			},
 		}
