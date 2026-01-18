@@ -96,3 +96,23 @@ export const MODELS: Model[] = [
 	{ id: 'o#openai/gpt-5.1-codex-max', name: 'GPT 5.1 Codex Max' },
 	{ id: 'zai#glm-4.7', name: 'GLM 4.7' }
 ];
+
+// API Response Types
+export interface APIResponse {
+	status: 'success' | 'error' | 'conflict';
+	message?: string;
+	pr_url?: string;
+}
+
+export interface ConflictFile {
+	path: string;
+	content: string;
+}
+
+export interface ConflictResponse {
+	status: 'conflict';
+	task_id: string;
+	conflicts: ConflictFile[];
+}
+
+export type ToastType = 'success' | 'error' | 'info';

@@ -32,9 +32,13 @@
 	async function handleChatSubmit(message: string, modelId: string) {
 		showChat = false;
 		try {
-			await tasksAPI.chat(task.id, message, modelId);
+			const response = await tasksAPI.chat(task.id, message, modelId);
+			if (response.message) {
+				appState.showToast(response.message, 'success');
+			}
 		} catch (err) {
 			console.error('Failed to send message:', err);
+			appState.showToast(err instanceof Error ? err.message : 'Failed to send message', 'error');
 		}
 	}
 
@@ -42,19 +46,34 @@
 		confirmAction = null;
 		try {
 			if (action === 'retry') {
-				await tasksAPI.retry(task.id);
+				const response = await tasksAPI.retry(task.id);
+				appState.showToast(response.message || 'Task retry started', 'success');
 			} else if (action === 'clear') {
-				await tasksAPI.clear(task.id);
+				const response = await tasksAPI.clear(task.id);
+				appState.showToast(response.message || 'History cleared', 'success');
 			} else if (action === 'pr') {
-				await tasksAPI.createPR(task.id);
+				const response = await tasksAPI.createPR(task.id);
+				if (response.pr_url) {
+					appState.showToast('Pull request created!', 'success');
+					window.open(response.pr_url, '_blank');
+				} else {
+					appState.showToast(response.message || 'Pull request created', 'success');
+				}
 			} else if (action === 'merge') {
-				await tasksAPI.merge(task.id);
+				const response = await tasksAPI.merge(task.id);
+				if (response.status === 'conflict') {
+					appState.showToast('Merge has conflicts - resolve them to continue', 'info');
+				} else {
+					appState.showToast(response.message || 'Changes merged', 'success');
+				}
 			} else if (action === 'discard') {
-				await tasksAPI.discard(task.id);
+				const response = await tasksAPI.discard(task.id);
+				appState.showToast(response.message || 'Task discarded', 'success');
 				appState.closeModal();
 			}
 		} catch (err) {
 			console.error(`Failed to ${action}:`, err);
+			appState.showToast(err instanceof Error ? err.message : `Failed to ${action}`, 'error');
 		}
 	}
 </script>
