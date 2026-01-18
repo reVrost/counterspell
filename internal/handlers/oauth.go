@@ -68,7 +68,8 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 		}
 	}()
 
-	http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
+	redirectURL := getRedirectURL(r, "/dashboard")
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -95,5 +96,6 @@ func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("[DISCONNECT] Redirecting to landing page")
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	redirectURL := getRedirectURL(r, "/")
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }

@@ -156,10 +156,10 @@ func (c *RepoCache) CacheRepo(ctx context.Context, userID string, repo GitHubRep
 	_, err := c.database.Pool.Exec(ctx, `
 		INSERT INTO repo_cache (id, user_id, owner, name, default_branch, last_fetched_at, is_favorite)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT(id, user_id) DO UPDATE SET
+		ON CONFLICT(user_id, owner, name) DO UPDATE SET
 			default_branch = EXCLUDED.default_branch,
 			last_fetched_at = EXCLUDED.last_fetched_at
-	`, fmt.Sprintf("%d", repo.ID), userID, repo.Owner, repo.Name, repo.DefaultBranch, time.Now().Unix(), repo.IsFavorite)
+	`, fmt.Sprintf("%d", repo.ID), userID, repo.Owner, repo.Name, repo.DefaultBranch, time.Now(), repo.IsFavorite)
 	return err
 }
 
@@ -192,14 +192,14 @@ func (c *RepoCache) GetCachedRepos(ctx context.Context, userID string) ([]GitHub
 
 // IsCacheStale checks if the cache needs refreshing for a user.
 func (c *RepoCache) IsCacheStale(ctx context.Context, userID string) bool {
-	var lastFetched int64
+	var lastFetched *time.Time
 	err := c.database.Pool.QueryRow(ctx, `
-		SELECT COALESCE(MAX(last_fetched_at), 0) FROM repo_cache WHERE user_id = $1
+		SELECT MAX(last_fetched_at) FROM repo_cache WHERE user_id = $1
 	`, userID).Scan(&lastFetched)
-	if err != nil || lastFetched == 0 {
+	if err != nil || lastFetched == nil {
 		return true // No cache or error, consider stale
 	}
-	return time.Since(time.Unix(lastFetched, 0)) > CacheTTL
+	return time.Since(*lastFetched) > CacheTTL
 }
 
 // CacheCount returns the number of cached repos for a user.

@@ -1,1 +1,0 @@
-import{f as a,a as t}from"../chunks/DR9TkfTq.js";import"../chunks/DT8pZ-Is.js";var n=a("<noscript></noscript>");function s(o){window.location.href="/dashboard";var r=n();t(o,r)}export{s as component};

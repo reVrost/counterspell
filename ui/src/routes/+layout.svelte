@@ -52,6 +52,16 @@
 		await appState.init();
 		isInitialized = true;
 		console.log('✅ App state initialized, isAuth:', appState.isAuthenticated);
+
+		// Register service worker for PWA
+		if ('serviceWorker' in navigator) {
+			try {
+				const registration = await navigator.serviceWorker.register('/sw.js');
+				console.log('✅ Service worker registered:', registration.scope);
+			} catch (err) {
+				console.warn('Service worker registration failed:', err);
+			}
+		}
 	});
 
 	// Auth guard - handle authentication and GitHub OAuth flow

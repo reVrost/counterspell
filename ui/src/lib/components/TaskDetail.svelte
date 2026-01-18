@@ -245,7 +245,10 @@
 	{#if confirmAction}
 		<div
 			class="fixed inset-0 z-[200] flex items-start justify-center pt-[25vh] bg-black/60 backdrop-blur-sm"
+			role="button"
+			tabindex="-1"
 			onclick={(e) => e.target === e.currentTarget && (confirmAction = null)}
+			onkeydown={(e) => e.key === 'Escape' && (confirmAction = null)}
 		>
 			<div class="bg-popover border border-gray-700/50 rounded-xl p-5 w-[320px] shadow-2xl">
 				{#if confirmAction === 'retry'}

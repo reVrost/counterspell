@@ -65,7 +65,10 @@
 {#if showTodos}
 	<div
 		class="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm"
+		role="button"
+		tabindex="-1"
 		onclick={(e) => e.target === e.currentTarget && (showTodos = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showTodos = false)}
 	>
 		<div
 			class="bg-popover border border-white/[0.08] rounded-2xl w-[380px] max-h-[60vh] shadow-2xl shadow-black/50 overflow-hidden flex flex-col"

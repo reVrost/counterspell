@@ -7,9 +7,37 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// getRedirectURL returns the appropriate redirect URL for the current environment.
+// In dev mode (Vite on :5173), uses Origin header or FRONTEND_URL env var.
+// In prod, uses PUBLIC_URL or the request host.
+func getRedirectURL(r *http.Request, path string) string {
+	// Check for explicit frontend URL (useful for dev mode)
+	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
+		return strings.TrimSuffix(frontendURL, "/") + path
+	}
+
+	// Check for PUBLIC_URL (production)
+	if publicURL := os.Getenv("PUBLIC_URL"); publicURL != "" {
+		return strings.TrimSuffix(publicURL, "/") + path
+	}
+
+	// Use Origin header (from frontend making requests)
+	if origin := r.Header.Get("Origin"); origin != "" {
+		return strings.TrimSuffix(origin, "/") + path
+	}
+
+	// Fall back to request host
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s%s", scheme, r.Host, path)
+}
 
 func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
 	// Use Supabase OAuth flow if auth service is configured
@@ -111,8 +139,9 @@ func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("No provider_token in Supabase callback - repos won't be fetched")
 			}
 
-			slog.Info("Supabase OAuth successful, redirecting to app")
-			http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
+			redirectURL := getRedirectURL(r, "/dashboard")
+			slog.Info("Supabase OAuth successful, redirecting", "url", redirectURL)
+			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 			return
 		}
 

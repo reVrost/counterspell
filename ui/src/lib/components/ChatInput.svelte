@@ -3,6 +3,7 @@
 	import { MODELS, type Project } from '$lib/types';
 	import { cn } from '$lib/utils';
 	import { tasksAPI, filesAPI } from '$lib/api';
+	import { onMount } from 'svelte';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import PaperclipIcon from '@lucide/svelte/icons/paperclip';
@@ -32,6 +33,24 @@
 	let files = $state<string[]>([]);
 	let selectedIndex = $state(0);
 	let projectSearch = $state('');
+	let projectMenuRef = $state<HTMLDivElement | null>(null);
+	let modelMenuRef = $state<HTMLDivElement | null>(null);
+
+	// Click outside handler for dropdowns
+	function handleClickOutside(event: MouseEvent) {
+		const target = event.target as Node;
+		if (appState.inputProjectMenuOpen && projectMenuRef && !projectMenuRef.contains(target)) {
+			appState.inputProjectMenuOpen = false;
+		}
+		if (modelOpen && modelMenuRef && !modelMenuRef.contains(target)) {
+			modelOpen = false;
+		}
+	}
+
+	onMount(() => {
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	});
 
 	function resize() {
 		if (!inputRef) return;
@@ -257,7 +276,7 @@
 			<div class="flex items-center gap-1">
 				{#if mode === 'create'}
 					<!-- Project Selector -->
-					<div class="relative">
+					<div class="relative" bind:this={projectMenuRef}>
 						<button
 							type="button"
 							onclick={() => (appState.inputProjectMenuOpen = !appState.inputProjectMenuOpen)}
@@ -381,7 +400,7 @@
 						<PaperclipIcon class="w-4 h-4" />
 					</button>
 					<!-- Model Selector (chat mode inline) -->
-					<div class="relative">
+					<div class="relative" bind:this={modelMenuRef}>
 						<button
 							type="button"
 							onclick={() => (modelOpen = !modelOpen)}
@@ -440,7 +459,7 @@
 						<PaperclipIcon class="w-4 h-4" />
 					</button>
 					<!-- Model Selector (create mode) -->
-					<div class="relative">
+					<div class="relative" bind:this={modelMenuRef}>
 						<button
 							type="button"
 							onclick={() => (modelOpen = !modelOpen)}
