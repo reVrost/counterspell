@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -63,7 +64,7 @@ func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
 		oauthURL, err := h.authService.GetOAuthURL("github", callbackURL)
 		if err != nil {
 			slog.Error("Failed to get Supabase OAuth URL", "error", err)
-			_ = render.Render(w, r, ErrInternalServer("OAuth error"))
+			_ = render.Render(w, r, ErrInternalServer("OAuth error", err))
 			return
 		}
 
@@ -236,7 +237,7 @@ func (h *Handlers) HandleLogout(w http.ResponseWriter, r *http.Request) {
 // HandleTokenRefresh refreshes an expired JWT using the refresh token
 func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if h.authService == nil {
-		_ = render.Render(w, r, ErrInternalServer("Auth not configured"))
+		_ = render.Render(w, r, ErrInternalServer("Auth not configured", errors.New("Auth not configured")))
 		return
 	}
 	slog.Info("[AUTH] HandleTokenRefresh called")

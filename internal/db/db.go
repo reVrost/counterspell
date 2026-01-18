@@ -4,16 +4,21 @@ package db
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/revrost/code/counterspell/internal/db/sqlc"
 )
 
-//go:embed schema.sql
-var schemaFS embed.FS
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 // DB wraps pgxpool and sqlc queries.
 type DB struct {
@@ -52,19 +57,49 @@ func Connect(ctx context.Context, databaseURL string) (*DB, error) {
 	}, nil
 }
 
-// RunMigrations executes the schema.sql file against the database.
+// RunMigrations executes all pending migrations.
 func (db *DB) RunMigrations(ctx context.Context) error {
-	schema, err := schemaFS.ReadFile("schema.sql")
+	// Create source from embedded filesystem
+	source, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("failed to read schema: %w", err)
+		return fmt.Errorf("failed to create migration source: %w", err)
 	}
 
-	_, err = db.Pool.Exec(ctx, string(schema))
+	// Get stdlib connection from pgxpool for migrate driver
+	conn, err := db.Pool.Acquire(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to execute schema: %w", err)
+		return fmt.Errorf("failed to acquire connection: %w", err)
+	}
+	defer conn.Release()
+
+	// Convert pgx conn to stdlib *sql.DB
+	sqlDB := stdlib.OpenDBFromPool(db.Pool)
+	defer sqlDB.Close()
+
+	// Create postgres driver
+	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to create postgres driver: %w", err)
 	}
 
-	slog.Info("Database migrations completed")
+	// Create migrate instance
+	m, err := migrate.NewWithInstance("iofs", source, "postgres", driver)
+	if err != nil {
+		return fmt.Errorf("failed to create migrate instance: %w", err)
+	}
+
+	// Run migrations
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	version, dirty, _ := m.Version()
+	if dirty {
+		slog.Warn("Database migration state is dirty", "version", version)
+	} else {
+		slog.Info("Database migrations completed", "version", version)
+	}
+
 	return nil
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,7 +35,7 @@ func (s *TaskService) Create(ctx context.Context, userID, projectID, title, inte
 		ProjectID: projectID,
 		Title:     title,
 		Intent:    intent,
-		Status:    string(models.StatusTodo),
+		Status:    string(models.StatusPending),
 		Position:  pgtype.Int4{Int32: 0, Valid: true},
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -114,6 +113,35 @@ func (s *TaskService) UpdateStatus(ctx context.Context, userID, id string, statu
 	return nil
 }
 
+// UpdateStep updates a task's current step.
+func (s *TaskService) UpdateStep(ctx context.Context, userID, id, step string) error {
+	err := s.db.Queries.UpdateTaskStep(ctx, sqlc.UpdateTaskStepParams{
+		CurrentStep: pgtype.Text{String: step, Valid: step != ""},
+		UpdatedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ID:          id,
+		UserID:      userID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update task step: %w", err)
+	}
+	return nil
+}
+
+// UpdateStatusAndStep updates both status and current step.
+func (s *TaskService) UpdateStatusAndStep(ctx context.Context, userID, id string, status models.TaskStatus, step string) error {
+	err := s.db.Queries.UpdateTaskStatusAndStep(ctx, sqlc.UpdateTaskStatusAndStepParams{
+		Status:      string(status),
+		CurrentStep: pgtype.Text{String: step, Valid: step != ""},
+		UpdatedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ID:          id,
+		UserID:      userID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update task status and step: %w", err)
+	}
+	return nil
+}
+
 // Move updates a task's position within its status column.
 func (s *TaskService) Move(ctx context.Context, userID, id string, newPosition int) error {
 	err := s.db.Queries.UpdateTaskPosition(ctx, sqlc.UpdateTaskPositionParams{
@@ -155,106 +183,6 @@ func (s *TaskService) Delete(ctx context.Context, userID, id string) error {
 	return nil
 }
 
-// UpdateWithResult updates a task's status, agent output, git diff, and message history.
-func (s *TaskService) UpdateWithResult(ctx context.Context, userID, id string, status models.TaskStatus, agentOutput, gitDiff, messageHistory string) error {
-	err := s.db.Queries.UpdateTaskResult(ctx, sqlc.UpdateTaskResultParams{
-		Status:         string(status),
-		AgentOutput:    pgtype.Text{String: agentOutput, Valid: agentOutput != ""},
-		GitDiff:        pgtype.Text{String: gitDiff, Valid: gitDiff != ""},
-		MessageHistory: pgtype.Text{String: messageHistory, Valid: messageHistory != ""},
-		UpdatedAt:      pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		ID:             id,
-		UserID:         userID,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to update task result: %w", err)
-	}
-	return nil
-}
-
-// ClearHistory clears a task's message history and agent output.
-func (s *TaskService) ClearHistory(ctx context.Context, userID, id string) error {
-	err := s.db.Queries.ClearTaskHistory(ctx, sqlc.ClearTaskHistoryParams{
-		UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		ID:        id,
-		UserID:    userID,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to clear task history: %w", err)
-	}
-	return nil
-}
-
-// ResetInProgress resets tasks stuck in in_progress back to appropriate status.
-// This is called on server startup for recovery.
-// - Tasks with agent_output go to review (they completed but server restarted)
-// - Tasks without output go to todo (they were interrupted)
-func (s *TaskService) ResetInProgress(ctx context.Context, userID string) error {
-	// Tasks that have output should go to review, not todo
-	result, err := s.db.Queries.ResetCompletedInProgressTasks(ctx, sqlc.ResetCompletedInProgressTasksParams{
-		Status:    string(models.StatusReview),
-		UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		UserID:    userID,
-		Status_2:  string(models.StatusInProgress),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to reset completed in-progress tasks: %w", err)
-	}
-	rows := result.RowsAffected()
-	if rows > 0 {
-		slog.Info("Reset completed tasks to review", "count", rows, "user_id", userID)
-	}
-
-	// Tasks without output should go back to todo
-	result, err = s.db.Queries.ResetStuckInProgressTasks(ctx, sqlc.ResetStuckInProgressTasksParams{
-		Status:    string(models.StatusTodo),
-		UpdatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		UserID:    userID,
-		Status_2:  string(models.StatusInProgress),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to reset stuck in-progress tasks: %w", err)
-	}
-	rows = result.RowsAffected()
-	if rows > 0 {
-		slog.Info("Reset stuck tasks to todo", "count", rows, "user_id", userID)
-	}
-	return nil
-}
-
-// AddLog adds a log entry for a task.
-func (s *TaskService) AddLog(ctx context.Context, taskID, level, message string) error {
-	err := s.db.Queries.CreateAgentLog(ctx, sqlc.CreateAgentLogParams{
-		TaskID:  taskID,
-		Level:   pgtype.Text{String: level, Valid: level != ""},
-		Message: message,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to add log: %w", err)
-	}
-	return nil
-}
-
-// GetLogs retrieves logs for a task.
-func (s *TaskService) GetLogs(ctx context.Context, taskID string) ([]*models.AgentLog, error) {
-	logs, err := s.db.Queries.GetAgentLogsByTask(ctx, taskID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get logs: %w", err)
-	}
-
-	result := make([]*models.AgentLog, len(logs))
-	for i, log := range logs {
-		result[i] = &models.AgentLog{
-			ID:        int64(log.ID),
-			TaskID:    log.TaskID,
-			Level:     models.LogLevel(log.Level.String),
-			Message:   log.Message,
-			CreatedAt: log.CreatedAt.Time,
-		}
-	}
-	return result, nil
-}
-
 // sqlcTaskToModel converts a sqlc Task to a models.Task
 func sqlcTaskToModel(t sqlc.Task) *models.Task {
 	task := &models.Task{
@@ -267,14 +195,14 @@ func sqlcTaskToModel(t sqlc.Task) *models.Task {
 		CreatedAt: t.CreatedAt.Time,
 		UpdatedAt: t.UpdatedAt.Time,
 	}
-	if t.AgentOutput.Valid {
-		task.AgentOutput = t.AgentOutput.String
+	if t.CurrentStep.Valid {
+		task.CurrentStep = t.CurrentStep.String
 	}
-	if t.GitDiff.Valid {
-		task.GitDiff = t.GitDiff.String
+	if t.AssignedAgentID.Valid {
+		task.AssignedAgentID = t.AssignedAgentID.String
 	}
-	if t.MessageHistory.Valid {
-		task.MessageHistory = t.MessageHistory.String
+	if t.AssignedUserID.Valid {
+		task.AssignedUserID = t.AssignedUserID.String
 	}
 	return task
 }

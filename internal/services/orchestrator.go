@@ -11,9 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/panjf2000/ants/v2"
 	"github.com/revrost/code/counterspell/internal/agent"
+	"github.com/revrost/code/counterspell/internal/db"
+	"github.com/revrost/code/counterspell/internal/db/sqlc"
 	"github.com/revrost/code/counterspell/internal/llm"
 	"github.com/revrost/code/counterspell/internal/models"
 )
@@ -22,30 +27,32 @@ import (
 type TaskResult struct {
 	TaskID         string
 	UserID         string
+	RunID          string
 	Success        bool
-	AgentOutput    string
+	Output         string
 	GitDiff        string
 	MessageHistory string
+	ArtifactPath   string
 	Error          string
 }
 
 // TaskJob represents a job submitted to the worker pool.
 type TaskJob struct {
-	TaskID         string
-	UserID         string
-	ProjectID      string
-	Intent         string
-	ModelID        string
-	Owner          string
-	Repo           string
-	Token          string
-	MessageHistory string // For continuations
-	IsContinuation bool
-	ResultCh       chan<- TaskResult
+	TaskID    string
+	UserID    string
+	ProjectID string
+	Intent    string
+	ModelID   string
+	Owner     string
+	Repo      string
+	Token     string
+	RunID     string // Current agent run ID
+	ResultCh  chan<- TaskResult
 }
 
 // Orchestrator manages task execution with agents.
 type Orchestrator struct {
+	db         *db.DB
 	tasks      *TaskService
 	github     *GitHubService
 	repos      *RepoManager
@@ -61,6 +68,7 @@ type Orchestrator struct {
 
 // NewOrchestrator creates a new orchestrator.
 func NewOrchestrator(
+	database *db.DB,
 	tasks *TaskService,
 	github *GitHubService,
 	events *EventBus,
@@ -76,6 +84,7 @@ func NewOrchestrator(
 	}
 
 	orch := &Orchestrator{
+		db:         database,
 		tasks:      tasks,
 		github:     github,
 		events:     events,
@@ -205,19 +214,32 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		slog.Info("[AGENT LOOP] executeTask finished", "task_id", job.TaskID)
 	}()
 
-	// Update status to in_progress
+	// Create agent run record
+	runID := shortuuid.New()
+	job.RunID = runID
+	now := time.Now()
+	if err := o.createAgentRun(ctx, runID, job.TaskID, "execution", job.Intent, now); err != nil {
+		slog.Error("[AGENT LOOP] Failed to create agent run", "task_id", job.TaskID, "error", err)
+	}
+
+	// Update task status to in_progress
 	slog.Info("[AGENT LOOP] Updating task status to in_progress", "task_id", job.TaskID)
-	if err := o.tasks.UpdateStatus(ctx, job.UserID, job.TaskID, models.StatusInProgress); err != nil {
+	if err := o.tasks.UpdateStatusAndStep(ctx, job.UserID, job.TaskID, models.StatusInProgress, "execution"); err != nil {
 		slog.Error("[AGENT LOOP] Failed to update task status", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to update status")
+		o.failAgentRun(ctx, runID, "Failed to update status", "", now)
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
 			UserID:  job.UserID,
+			RunID:   runID,
 			Success: false,
 			Error:   "Failed to update status",
 		}
 		return
 	}
+
+	// Update run status to running
+	_ = o.updateAgentRunStatus(ctx, runID, models.RunStatusRunning, now)
 
 	o.emit(job.TaskID, "plan", "Starting task execution...")
 	o.emit(job.TaskID, "info", fmt.Sprintf("Preparing %s/%s...", job.Owner, job.Repo))
@@ -228,9 +250,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	if err != nil {
 		slog.Error("[AGENT LOOP] Failed to prepare repo", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to prepare repo: "+err.Error())
+		o.failAgentRun(ctx, runID, "Failed to prepare repo: "+err.Error(), "", time.Now())
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
 			UserID:  job.UserID,
+			RunID:   runID,
 			Success: false,
 			Error:   "Failed to prepare repo: " + err.Error(),
 		}
@@ -247,9 +271,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	if err != nil {
 		slog.Error("[AGENT LOOP] Failed to create worktree", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to create worktree: "+err.Error())
+		o.failAgentRun(ctx, runID, "Failed to create worktree: "+err.Error(), "", time.Now())
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
 			UserID:  job.UserID,
+			RunID:   runID,
 			Success: false,
 			Error:   "Failed to create worktree: " + err.Error(),
 		}
@@ -265,9 +291,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	if err != nil {
 		slog.Error("[AGENT LOOP] Failed to get settings", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to get settings")
+		o.failAgentRun(ctx, runID, "Failed to get settings", "", time.Now())
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
 			UserID:  job.UserID,
+			RunID:   runID,
 			Success: false,
 			Error:   "Failed to get settings",
 		}
@@ -344,9 +372,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		if err != nil {
 			slog.Error("[AGENT LOOP] Failed to create Claude Code backend", "task_id", job.TaskID, "error", err)
 			o.emitError(job.TaskID, "Claude Code not available: "+err.Error())
+			o.failAgentRun(ctx, runID, "Claude Code not available: "+err.Error(), "", time.Now())
 			job.ResultCh <- TaskResult{
 				TaskID:  job.TaskID,
 				UserID:  job.UserID,
+				RunID:   runID,
 				Success: false,
 				Error:   "Claude Code not available: " + err.Error(),
 			}
@@ -364,9 +394,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		case "openrouter", "o":
 			if settings.OpenRouterKey == "" {
 				o.emitError(job.TaskID, "OpenRouter API key not configured")
+				o.failAgentRun(ctx, runID, "OpenRouter API key not configured", "", time.Now())
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
 					UserID:  job.UserID,
+					RunID:   runID,
 					Success: false,
 					Error:   "OpenRouter API key not configured",
 				}
@@ -377,9 +409,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 			if settings.ZaiKey == "" {
 				slog.Error("[AGENT LOOP] Z.ai API key not configured", "task_id", job.TaskID, "zai_key_len", len(settings.ZaiKey))
 				o.emitError(job.TaskID, "Z.ai API key not configured")
+				o.failAgentRun(ctx, runID, "Z.ai API key not configured", "", time.Now())
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
 					UserID:  job.UserID,
+					RunID:   runID,
 					Success: false,
 					Error:   "Z.ai API key not configured",
 				}
@@ -390,9 +424,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		case "anthropic":
 			if settings.AnthropicKey == "" {
 				o.emitError(job.TaskID, "Anthropic API key not configured")
+				o.failAgentRun(ctx, runID, "Anthropic API key not configured", "", time.Now())
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
 					UserID:  job.UserID,
+					RunID:   runID,
 					Success: false,
 					Error:   "Anthropic API key not configured",
 				}
@@ -409,9 +445,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 				provider = llm.NewAnthropicProvider(settings.AnthropicKey)
 			} else {
 				o.emitError(job.TaskID, "No API key configured. Add OpenRouter, Z.ai, or Anthropic key in Settings.")
+				o.failAgentRun(ctx, runID, "No API key configured", "", time.Now())
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
 					UserID:  job.UserID,
+					RunID:   runID,
 					Success: false,
 					Error:   "No API key configured",
 				}
@@ -427,11 +465,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		finalModel := provider.Model()
 		slog.Info("[AGENT LOOP] Provider configured", "task_id", job.TaskID, "final_model", finalModel)
 
-		if job.IsContinuation {
-			o.emit(job.TaskID, "plan", fmt.Sprintf("Continuing with model: %s...", finalModel))
-		} else {
-			o.emit(job.TaskID, "plan", fmt.Sprintf("Starting Counterspell agent with model: %s...", finalModel))
-		}
+		o.emit(job.TaskID, "plan", fmt.Sprintf("Starting Counterspell agent with model: %s...", finalModel))
 
 		nativeBackend, err := agent.NewNativeBackend(
 			agent.WithProvider(provider),
@@ -441,9 +475,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		if err != nil {
 			slog.Error("[AGENT LOOP] Failed to create native backend", "task_id", job.TaskID, "error", err)
 			o.emitError(job.TaskID, "Failed to create agent: "+err.Error())
+			o.failAgentRun(ctx, runID, "Failed to create agent: "+err.Error(), "", time.Now())
 			job.ResultCh <- TaskResult{
 				TaskID:  job.TaskID,
 				UserID:  job.UserID,
+				RunID:   runID,
 				Success: false,
 				Error:   "Failed to create agent: " + err.Error(),
 			}
@@ -453,23 +489,9 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		defer func() { _ = nativeBackend.Close() }()
 	}
 
-	// Load message history for continuations
-	if job.IsContinuation && job.MessageHistory != "" {
-		if err := backend.RestoreState(job.MessageHistory); err != nil {
-			slog.Warn("[AGENT LOOP] Failed to load message history", "task_id", job.TaskID, "error", err)
-		} else {
-			slog.Info("[AGENT LOOP] Loaded message history", "task_id", job.TaskID)
-		}
-	}
-
-	// Run the agent (Run for new tasks, Send for continuations)
-	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation, "backend", agentBackend)
-	var runErr error
-	if job.IsContinuation {
-		runErr = backend.Send(ctx, job.Intent)
-	} else {
-		runErr = backend.Run(ctx, job.Intent)
-	}
+	// Run the agent
+	slog.Info("[AGENT LOOP] Starting agent execution", "task_id", job.TaskID, "backend", agentBackend)
+	runErr := backend.Run(ctx, job.Intent)
 	if runErr != nil {
 		slog.Error("[AGENT LOOP] Agent execution failed", "task_id", job.TaskID, "error", runErr)
 		if ctx.Err() != nil {
@@ -477,9 +499,11 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		} else {
 			o.emitError(job.TaskID, "Agent failed: "+runErr.Error())
 		}
+		o.failAgentRun(ctx, runID, "Agent failed: "+runErr.Error(), backend.GetState(), time.Now())
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
 			UserID:  job.UserID,
+			RunID:   runID,
 			Success: false,
 			Error:   "Agent failed: " + runErr.Error(),
 		}
@@ -512,8 +536,9 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	job.ResultCh <- TaskResult{
 		TaskID:         job.TaskID,
 		UserID:         job.UserID,
+		RunID:          runID,
 		Success:        true,
-		AgentOutput:    agentOutput,
+		Output:         agentOutput,
 		GitDiff:        gitDiff,
 		MessageHistory: messageHistory,
 	}
@@ -528,15 +553,22 @@ func (o *Orchestrator) processResults() {
 		slog.Info("[ORCHESTRATOR] Received result from worker", "task_id", result.TaskID, "success", result.Success)
 		ctx := context.Background()
 
-		// Update task with result
+		// Update task status - after execution, moves to review
 		status := models.StatusReview
 		if !result.Success {
-			status = models.StatusReview // Keep review status so user can see the error
+			status = models.StatusFailed
 		}
 
-		if err := o.tasks.UpdateWithResult(ctx, result.UserID, result.TaskID, status, result.AgentOutput, result.GitDiff, result.MessageHistory); err != nil {
-			slog.Error("Failed to update task with result", "task_id", result.TaskID, "error", err)
+		if err := o.tasks.UpdateStatus(ctx, result.UserID, result.TaskID, status); err != nil {
+			slog.Error("Failed to update task status", "task_id", result.TaskID, "error", err)
 			continue
+		}
+
+		// Complete the agent run
+		if result.RunID != "" {
+			if result.Success {
+				_ = o.completeAgentRun(ctx, result.RunID, result.Output, result.MessageHistory, "", time.Now())
+			}
 		}
 
 		if result.Success {
@@ -545,7 +577,7 @@ func (o *Orchestrator) processResults() {
 			o.emitError(result.TaskID, result.Error)
 		}
 
-		// Emit status_change event to trigger SSE updates for diff/agent tabs
+		// Emit status_change event to trigger SSE updates
 		o.events.Publish(models.Event{
 			TaskID: result.TaskID,
 			Type:   models.EventTypeStatusChange,
@@ -597,6 +629,17 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 		return fmt.Errorf("task not found: %w", err)
 	}
 
+	// Get the latest agent run to retrieve message history
+	latestRun, err := o.getLatestAgentRun(ctx, taskID, "execution")
+	if err != nil {
+		slog.Warn("[CHAT] No previous run found", "task_id", taskID, "error", err)
+	}
+
+	var messageHistory string
+	if latestRun != nil {
+		messageHistory = string(latestRun.MessageHistory)
+	}
+
 	// Get project info
 	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
@@ -631,7 +674,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	}
 
 	// Immediately emit agent_update with user message appended so it shows right away
-	updatedHistory := appendUserMessage(task.MessageHistory, followUpMessage)
+	updatedHistory := appendUserMessage(messageHistory, followUpMessage)
 	slog.Info("[CHAT] Publishing agent_update with user message", "task_id", taskID, "history_len", len(updatedHistory))
 	o.events.Publish(models.Event{
 		TaskID: taskID,
@@ -648,19 +691,17 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 
 	slog.Info("[CHAT] Events published, submitting to worker pool", "task_id", taskID, "follow_up", followUpMessage)
 
-	// Submit job to worker pool
+	// Submit job to worker pool - for now, treat as new execution
 	job := &TaskJob{
-		TaskID:         taskID,
-		UserID:         o.userID,
-		ProjectID:      task.ProjectID,
-		Intent:         followUpMessage,
-		ModelID:        modelID,
-		Owner:          owner,
-		Repo:           repo,
-		Token:          conn.Token,
-		MessageHistory: task.MessageHistory,
-		IsContinuation: true,
-		ResultCh:       o.resultCh,
+		TaskID:    taskID,
+		UserID:    o.userID,
+		ProjectID: task.ProjectID,
+		Intent:    followUpMessage,
+		ModelID:   modelID,
+		Owner:     owner,
+		Repo:      repo,
+		Token:     conn.Token,
+		ResultCh:  o.resultCh,
 	}
 
 	if err := o.workerPool.Submit(func() {
@@ -674,7 +715,6 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 }
 
 // MergeTask merges a task's branch to main and marks it done.
-// If there's a merge conflict, returns ErrMergeConflict for the handler to show conflict UI.
 func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	// Get task to find project info
 	task, err := o.tasks.Get(ctx, o.userID, taskID)
@@ -972,14 +1012,8 @@ func (o *Orchestrator) CleanupTask(taskID string) error {
 	return o.repos.RemoveWorktree(taskID)
 }
 
-// emit sends an event to the UI and stores it in DB.
+// emit sends an event to the UI.
 func (o *Orchestrator) emit(taskID, level, message string) {
-	// Store log in DB for persistence
-	ctx := context.Background()
-	if err := o.tasks.AddLog(ctx, taskID, level, message); err != nil {
-		slog.Error("Failed to store log", "task_id", taskID, "level", level, "message", message, "error", err)
-	}
-
 	payload := map[string]string{
 		"level":   level,
 		"message": message,
@@ -1005,7 +1039,6 @@ func truncate(s string, maxLen int) string {
 }
 
 // SearchProjectFiles searches for files in a project using fuzzy matching.
-// Returns a list of file paths relative to the repo root, sorted by match score.
 func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query string, limit int) ([]string, error) {
 	if limit <= 0 {
 		limit = 20
@@ -1111,7 +1144,6 @@ func fuzzySearch(files []string, query string, limit int) []string {
 }
 
 // fuzzyScore computes a simple fuzzy match score.
-// Higher score = better match. 0 = no match.
 func fuzzyScore(text, pattern string) int {
 	if len(pattern) == 0 {
 		return 1
@@ -1180,4 +1212,57 @@ func appendUserMessage(historyJSON, message string) string {
 		return historyJSON
 	}
 	return string(result)
+}
+
+// Agent run helper methods
+
+func (o *Orchestrator) createAgentRun(ctx context.Context, id, taskID, step, input string, now time.Time) error {
+	_, err := o.db.Queries.CreateAgentRun(ctx, sqlc.CreateAgentRunParams{
+		ID:        id,
+		TaskID:    taskID,
+		Step:      step,
+		AgentID:   pgtype.Text{},
+		Status:    string(models.RunStatusPending),
+		Input:     pgtype.Text{String: input, Valid: input != ""},
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	return err
+}
+
+func (o *Orchestrator) updateAgentRunStatus(ctx context.Context, id string, status models.AgentRunStatus, startedAt time.Time) error {
+	return o.db.Queries.UpdateAgentRunStatus(ctx, sqlc.UpdateAgentRunStatusParams{
+		Status:    string(status),
+		StartedAt: pgtype.Timestamptz{Time: startedAt, Valid: true},
+		ID:        id,
+	})
+}
+
+func (o *Orchestrator) completeAgentRun(ctx context.Context, id, output, messageHistory, artifactPath string, completedAt time.Time) error {
+	return o.db.Queries.CompleteAgentRun(ctx, sqlc.CompleteAgentRunParams{
+		Output:         pgtype.Text{String: output, Valid: output != ""},
+		MessageHistory: []byte(messageHistory),
+		ArtifactPath:   pgtype.Text{String: artifactPath, Valid: artifactPath != ""},
+		CompletedAt:    pgtype.Timestamptz{Time: completedAt, Valid: true},
+		ID:             id,
+	})
+}
+
+func (o *Orchestrator) failAgentRun(ctx context.Context, id, errMsg, messageHistory string, completedAt time.Time) error {
+	return o.db.Queries.FailAgentRun(ctx, sqlc.FailAgentRunParams{
+		Error:          pgtype.Text{String: errMsg, Valid: errMsg != ""},
+		MessageHistory: []byte(messageHistory),
+		CompletedAt:    pgtype.Timestamptz{Time: completedAt, Valid: true},
+		ID:             id,
+	})
+}
+
+func (o *Orchestrator) getLatestAgentRun(ctx context.Context, taskID, step string) (*sqlc.AgentRun, error) {
+	run, err := o.db.Queries.GetLatestRunForStep(ctx, sqlc.GetLatestRunForStepParams{
+		TaskID: taskID,
+		Step:   step,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &run, nil
 }

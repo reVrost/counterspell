@@ -3,48 +3,66 @@ package models
 import "time"
 
 // TaskStatus represents the status of a task in the workflow.
+// Flow: pending → in_progress → review → done
 type TaskStatus string
 
 const (
-	StatusTodo       TaskStatus = "todo"
-	StatusInProgress TaskStatus = "in_progress"
-	StatusReview     TaskStatus = "review"
-	StatusDone       TaskStatus = "done"
+	StatusPending    TaskStatus = "pending"     // Task created, not yet started
+	StatusInProgress TaskStatus = "in_progress" // Agents are working on the task
+	StatusReview     TaskStatus = "review"      // Ready for human review
+	StatusDone       TaskStatus = "done"        // Complete
+	StatusFailed     TaskStatus = "failed"      // Task failed
 )
 
 // Task represents a work item in the system.
 type Task struct {
-	ID             string     `json:"id"`
-	ProjectID      string     `json:"project_id"`
-	Title          string     `json:"title"`
-	Intent         string     `json:"intent"`
-	Status         TaskStatus `json:"status"`
-	Position       int        `json:"position"`
-	AgentOutput    string     `json:"agent_output,omitempty"`
-	GitDiff        string     `json:"git_diff,omitempty"`
-	MessageHistory string     `json:"message_history,omitempty"` // JSON serialized agent message history
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID          string     `json:"id"`
+	ProjectID   string     `json:"project_id"`
+	Title       string     `json:"title"`
+	Intent      string     `json:"intent"`
+	Status      TaskStatus `json:"status"`
+	Position    int        `json:"position"`
+	CurrentStep string     `json:"current_step,omitempty"` // Current workflow step
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+
+	// Assignment fields
+	AssignedAgentID string `json:"assigned_agent_id,omitempty"`
+	AssignedUserID  string `json:"assigned_user_id,omitempty"`
 }
 
-// LogLevel represents the severity level of an agent log entry.
-type LogLevel string
+// AgentRunStatus represents the status of an agent run.
+type AgentRunStatus string
 
 const (
-	LogInfo    LogLevel = "info"
-	LogPlan    LogLevel = "plan"
-	LogCode    LogLevel = "code"
-	LogError   LogLevel = "error"
-	LogSuccess LogLevel = "success"
+	RunStatusPending   AgentRunStatus = "pending"
+	RunStatusRunning   AgentRunStatus = "running"
+	RunStatusCompleted AgentRunStatus = "completed"
+	RunStatusFailed    AgentRunStatus = "failed"
 )
 
-// AgentLog represents a log entry from agent execution.
-type AgentLog struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id"`
-	Level     LogLevel  `json:"level"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+// AgentRun represents one execution of an agent within a task.
+type AgentRun struct {
+	ID             string         `json:"id"`
+	TaskID         string         `json:"task_id"`
+	Step           string         `json:"step"`
+	AgentID        string         `json:"agent_id,omitempty"`
+	Status         AgentRunStatus `json:"status"`
+	Input          string         `json:"input,omitempty"`
+	Output         string         `json:"output,omitempty"`
+	MessageHistory []Message      `json:"message_history,omitempty"`
+	ArtifactPath   string         `json:"artifact_path,omitempty"`
+	Error          string         `json:"error,omitempty"`
+	StartedAt      *time.Time     `json:"started_at,omitempty"`
+	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+}
+
+// Message represents a single message in agent conversation.
+type Message struct {
+	Role      string    `json:"role"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp,omitempty"`
 }
 
 // EventType represents the type of server-sent event.
@@ -61,12 +79,13 @@ const (
 	EventTypeProjectCreated EventType = "project_created"
 	EventTypeProjectUpdated EventType = "project_updated"
 	EventTypeProjectDeleted EventType = "project_deleted"
+	EventTypeRunUpdate      EventType = "run_update"
 )
 
 // Event represents a server-sent event for real-time updates.
 type Event struct {
-	ID     int64     `json:"id"` // Sequence number for deduplication
+	ID     int64     `json:"id"`
 	TaskID string    `json:"task_id"`
 	Type   EventType `json:"type"`
-	Data   string    `json:"data"` // JSON serialized payload
+	Data   string    `json:"data"`
 }

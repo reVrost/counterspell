@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/render"
@@ -150,7 +151,8 @@ func ErrNotFound(msg string) render.Renderer {
 }
 
 // ErrInternalServer returns a 500 Internal Server Error.
-func ErrInternalServer(msg string) render.Renderer {
+func ErrInternalServer(msg string, err error) render.Renderer {
+	slog.Error(msg, "error", err)
 	return &ErrResponse{
 		HTTPStatusCode: http.StatusInternalServerError,
 		Status:         "error",

@@ -40,7 +40,7 @@ func (h *Handlers) HandleUILog(w http.ResponseWriter, r *http.Request) {
 
 	// Build slog attributes
 	attrs := []any{
-		"source", "ui",
+		"origin", "ui",
 		"user_id", userID,
 		"component", entry.Component,
 		"url", entry.URL,

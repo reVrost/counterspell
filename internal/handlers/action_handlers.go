@@ -14,15 +14,14 @@ func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
 	_ = render.Render(w, r, Success("Task restarting..."))
 }
 
-// HandleActionClear clears a task's chat history and context
+// HandleActionClear clears a task's agent runs (history/context)
 func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	taskID := chi.URLParam(r, "id")
-	userID := auth.UserIDFromContext(ctx)
 
-	if err := h.taskService.ClearHistory(ctx, userID, taskID); err != nil {
+	if err := h.db.Queries.DeleteAgentRunsByTask(ctx, taskID); err != nil {
 		slog.Error("Failed to clear task history", "error", err, "task_id", taskID)
-		_ = render.Render(w, r, ErrInternalServer("Failed to clear history"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to clear history", err))
 		return
 	}
 
@@ -37,7 +36,7 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
@@ -50,7 +49,7 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 			conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, conflictErr.ConflictedFiles)
 			if err != nil {
 				slog.Error("Failed to get conflict details", "error", err)
-				_ = render.Render(w, r, ErrInternalServer("Failed to load conflict details"))
+				_ = render.Render(w, r, ErrInternalServer("Failed to load conflict details", err))
 				return
 			}
 
@@ -59,7 +58,7 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 		}
 
 		slog.Error("Failed to merge task", "task_id", taskID, "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error()))
+		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error(), err))
 		return
 	}
 
@@ -80,13 +79,13 @@ func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request)
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
 	conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, []string{data.File})
 	if err != nil || len(conflicts) == 0 {
-		_ = render.Render(w, r, ErrInternalServer("Failed to get conflict"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to get conflict", err))
 		return
 	}
 
@@ -100,7 +99,7 @@ func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request)
 
 	if err := orchestrator.ResolveConflict(ctx, taskID, data.File, resolution); err != nil {
 		slog.Error("Failed to resolve conflict", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to resolve conflict"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to resolve conflict", err))
 		return
 	}
 
@@ -115,13 +114,13 @@ func (h *Handlers) HandleAbortMerge(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
 	if err := orchestrator.AbortMerge(ctx, taskID); err != nil {
 		slog.Error("Failed to abort merge", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to abort merge"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to abort merge", err))
 		return
 	}
 
@@ -136,13 +135,13 @@ func (h *Handlers) HandleCompleteMerge(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
 	if err := orchestrator.CompleteMergeResolution(ctx, taskID); err != nil {
 		slog.Error("Failed to complete merge", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error()))
+		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error(), err))
 		return
 	}
 
@@ -157,14 +156,14 @@ func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
 	prURL, err := orchestrator.CreatePR(ctx, taskID)
 	if err != nil {
 		slog.Error("Failed to create PR", "task_id", taskID, "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to create PR: "+err.Error()))
+		_ = render.Render(w, r, ErrInternalServer("Failed to create PR: "+err.Error(), err))
 		return
 	}
 
@@ -179,7 +178,7 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
@@ -189,7 +188,7 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.taskService.Delete(ctx, userID, id); err != nil {
-		_ = render.Render(w, r, ErrInternalServer(err.Error()))
+		_ = render.Render(w, r, ErrInternalServer(err.Error(), err))
 		return
 	}
 
@@ -214,13 +213,13 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error"))
+		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
 		return
 	}
 
 	if err := orchestrator.ContinueTask(ctx, taskID, data.Message, data.ModelID); err != nil {
 		slog.Error("Failed to continue task", "task_id", taskID, "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to continue task"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to continue task", err))
 		return
 	}
 

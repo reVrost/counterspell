@@ -18,7 +18,7 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 	// Get tasks from DB
 	dbTasks, err := h.taskService.List(ctx, userID, nil, nil)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks", err))
 		return
 	}
 
@@ -54,11 +54,11 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 
 	for _, t := range dbTasks {
 		switch t.Status {
-		case models.StatusTodo, models.StatusInProgress:
+		case models.StatusPending, models.StatusInProgress:
 			feed.Active = append(feed.Active, t)
 		case models.StatusReview:
 			feed.Reviews = append(feed.Reviews, t)
-		case models.StatusDone:
+		case models.StatusDone, models.StatusFailed:
 			feed.Done = append(feed.Done, t)
 		}
 	}
@@ -73,7 +73,7 @@ func (h *Handlers) HandleGitHubRepos(w http.ResponseWriter, r *http.Request) {
 
 	repos, err := h.repoCache.GetCachedRepos(ctx, userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Failed to load repos"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to load repos", err))
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *Handlers) HandleSyncRepos(w http.ResponseWriter, r *http.Request) {
 	// Sync to projects table
 	if err := h.githubService.FetchAndSaveRepositories(ctx, userID, conn); err != nil {
 		slog.Error("[SyncRepos] Failed to save projects", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to sync repositories"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to sync repositories", err))
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *Handlers) HandleActivateProject(w http.ResponseWriter, r *http.Request)
 
 	// Save project to DB
 	if err := h.githubService.SaveProject(ctx, userID, data.Owner, data.Repo); err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Failed to save project"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to save project", err))
 		return
 	}
 
@@ -200,9 +200,146 @@ func (h *Handlers) HandleAPISettings(w http.ResponseWriter, r *http.Request) {
 
 	settings, err := h.settingsService.GetSettings(ctx, userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Failed to load settings"))
+		_ = render.Render(w, r, ErrInternalServer("Failed to load settings", err))
 		return
 	}
 
 	render.JSON(w, r, settings)
+}
+
+// HandleHome returns a JSON object with app metadata
+func (h *Handlers) HandleHome(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, r, map[string]string{
+		"name":        "Counterspell",
+		"version":     "2.1.0",
+		"description": "Mobile-first, hosted AI agent Kanban.",
+	})
+}
+
+// HandleTaskDetailUI returns task details as JSON (alias to HandleAPITask)
+func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
+	h.HandleAPITask(w, r)
+}
+
+// HandleAddTask creates a new task and starts execution.
+func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	data := &AddTaskRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	slog.Info("Adding task", "intent", data.VoiceInput)
+
+	orchestrator, err := h.getOrchestrator(userID)
+	if err != nil {
+		slog.Error("Failed to get orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get orchestrator", err))
+		return
+	}
+
+	_, err = orchestrator.StartTask(ctx, data.ProjectID, data.VoiceInput, data.ModelID)
+	if err != nil {
+		slog.Error("Failed to start task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to start task: "+err.Error(), err))
+		return
+	}
+
+	render.Status(r, http.StatusCreated)
+	_ = render.Render(w, r, Success("Task started"))
+}
+
+// HandleSaveSettings saves user settings
+func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	data := &SaveSettingsRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	if userID == "" {
+		userID = "default"
+	}
+
+	settings := &models.UserSettings{
+		UserID:        userID,
+		OpenRouterKey: data.OpenRouterKey,
+		ZaiKey:        data.ZaiKey,
+		AnthropicKey:  data.AnthropicKey,
+		OpenAIKey:     data.OpenAIKey,
+		AgentBackend:  data.AgentBackend,
+	}
+
+	if err := h.settingsService.UpdateSettings(ctx, userID, settings); err != nil {
+		_ = render.Render(w, r, ErrInternalServer("Failed to save settings: "+err.Error(), err))
+		return
+	}
+
+	_ = render.Render(w, r, Success("Settings saved successfully"))
+}
+
+// HandleFileSearch searches for files in a project using fuzzy matching.
+func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+	projectID := r.URL.Query().Get("project_id")
+	query := r.URL.Query().Get("q")
+
+	if projectID == "" {
+		_ = render.Render(w, r, ErrInvalidRequest(nil))
+		return
+	}
+
+	orchestrator, err := h.getOrchestrator(userID)
+	if err != nil {
+		render.JSON(w, r, []string{})
+		return
+	}
+
+	files, err := orchestrator.SearchProjectFiles(ctx, projectID, query, 20)
+	if err != nil {
+		slog.Error("File search failed", "error", err)
+		render.JSON(w, r, []string{})
+		return
+	}
+
+	if files == nil {
+		files = []string{}
+	}
+
+	render.JSON(w, r, files)
+}
+
+// HandleTranscribe transcribes uploaded audio to text.
+func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	contentType := header.Header.Get("Content-Type")
+
+	text, err := h.transcription.TranscribeAudio(ctx, file, contentType)
+	if err != nil {
+		slog.Error("Transcription failed", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Transcription failed: "+err.Error(), err))
+		return
+	}
+
+	render.PlainText(w, r, text)
 }
