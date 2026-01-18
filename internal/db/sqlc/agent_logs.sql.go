@@ -7,30 +7,31 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createAgentLog = `-- name: CreateAgentLog :exec
-INSERT INTO agent_logs (task_id, level, message) VALUES (?, ?, ?)
+INSERT INTO agent_logs (task_id, level, message) VALUES ($1, $2, $3)
 `
 
 type CreateAgentLogParams struct {
-	TaskID  string         `json:"task_id"`
-	Level   sql.NullString `json:"level"`
-	Message string         `json:"message"`
+	TaskID  string      `json:"task_id"`
+	Level   pgtype.Text `json:"level"`
+	Message string      `json:"message"`
 }
 
 func (q *Queries) CreateAgentLog(ctx context.Context, arg CreateAgentLogParams) error {
-	_, err := q.db.ExecContext(ctx, createAgentLog, arg.TaskID, arg.Level, arg.Message)
+	_, err := q.db.Exec(ctx, createAgentLog, arg.TaskID, arg.Level, arg.Message)
 	return err
 }
 
 const getAgentLogsByTask = `-- name: GetAgentLogsByTask :many
-SELECT id, task_id, level, message, created_at FROM agent_logs WHERE task_id = ? ORDER BY id ASC
+SELECT id, task_id, level, message, created_at FROM agent_logs WHERE task_id = $1 ORDER BY id ASC
 `
 
 func (q *Queries) GetAgentLogsByTask(ctx context.Context, taskID string) ([]AgentLog, error) {
-	rows, err := q.db.QueryContext(ctx, getAgentLogsByTask, taskID)
+	rows, err := q.db.Query(ctx, getAgentLogsByTask, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,9 +49,6 @@ func (q *Queries) GetAgentLogsByTask(ctx context.Context, taskID string) ([]Agen
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

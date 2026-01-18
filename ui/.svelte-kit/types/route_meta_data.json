@@ -1,0 +1,11 @@
+{
+	"/": [
+		"src/routes/+page.ts"
+	],
+	"/app": [],
+	"/auth/callback": [],
+	"/dashboard": [],
+	"/disconnect": [],
+	"/login": [],
+	"/logout": []
+}

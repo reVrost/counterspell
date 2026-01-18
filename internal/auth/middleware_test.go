@@ -9,11 +9,12 @@ import (
 	"github.com/revrost/code/counterspell/internal/config"
 )
 
-func TestMiddleware_SinglePlayerMode(t *testing.T) {
+func TestMiddleware_NoSupabase(t *testing.T) {
 	t.Parallel()
 
-	cfg := &config.Config{MultiTenant: false}
-	m := NewMiddleware(cfg, nil)
+	// When no Supabase is configured, middleware allows all requests with "default" userID
+	cfg := &config.Config{}
+	m := NewMiddleware(cfg)
 
 	handler := m.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := UserIDFromContext(r.Context())
@@ -33,14 +34,14 @@ func TestMiddleware_SinglePlayerMode(t *testing.T) {
 	}
 }
 
-func TestMiddleware_MultiTenantNoToken(t *testing.T) {
+func TestMiddleware_WithSupabaseNoToken(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.Config{
-		MultiTenant: true,
-		SupabaseURL: "https://example.supabase.co",
+		SupabaseURL:       "https://example.supabase.co",
+		SupabaseJWTSecret: "test-secret-key-at-least-32-chars-long",
 	}
-	m := NewMiddleware(cfg, nil)
+	m := NewMiddleware(cfg)
 
 	handler := m.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called without token")
@@ -76,11 +77,11 @@ func TestUserIDFromContext(t *testing.T) {
 	})
 }
 
-func TestOptionalAuth_SinglePlayer(t *testing.T) {
+func TestOptionalAuth_NoSupabase(t *testing.T) {
 	t.Parallel()
 
-	cfg := &config.Config{MultiTenant: false}
-	m := NewMiddleware(cfg, nil)
+	cfg := &config.Config{}
+	m := NewMiddleware(cfg)
 
 	handler := m.OptionalAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := UserIDFromContext(r.Context())
@@ -100,14 +101,14 @@ func TestOptionalAuth_SinglePlayer(t *testing.T) {
 	}
 }
 
-func TestOptionalAuth_MultiTenantNoToken(t *testing.T) {
+func TestOptionalAuth_WithSupabaseNoToken(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.Config{
-		MultiTenant: true,
-		SupabaseURL: "https://example.supabase.co",
+		SupabaseURL:       "https://example.supabase.co",
+		SupabaseJWTSecret: "test-secret-key-at-least-32-chars-long",
 	}
-	m := NewMiddleware(cfg, nil)
+	m := NewMiddleware(cfg)
 
 	handler := m.OptionalAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := UserIDFromContext(r.Context())

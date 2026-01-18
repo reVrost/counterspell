@@ -66,8 +66,7 @@ func FetchUserRepos(ctx context.Context, token string, params RepoListParams) (*
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -82,10 +81,10 @@ func FetchUserRepos(ctx context.Context, token string, params RepoListParams) (*
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API failed (%d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("GitHub API error: %s", string(body))
 	}
 
-	type repoResponse struct {
+	type apiRepo struct {
 		ID            int64  `json:"id"`
 		Name          string `json:"name"`
 		FullName      string `json:"full_name"`
@@ -99,18 +98,17 @@ func FetchUserRepos(ctx context.Context, token string, params RepoListParams) (*
 		} `json:"owner"`
 	}
 
-	var repos []repoResponse
+	var repos []apiRepo
 	if err := json.Unmarshal(body, &repos); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to parse repos: %w", err)
 	}
 
-	// Convert to our type
 	result := &RepoListResult{
 		Repos: make([]GitHubRepo, 0, len(repos)),
 	}
 
 	for _, r := range repos {
-		// Filter by search if provided
+		// Filter by search term if provided
 		if params.Search != "" {
 			searchLower := strings.ToLower(params.Search)
 			if !strings.Contains(strings.ToLower(r.Name), searchLower) &&
@@ -143,7 +141,7 @@ func FetchUserRepos(ctx context.Context, token string, params RepoListParams) (*
 // CacheTTL is how long cached repos are valid before requiring refresh.
 const CacheTTL = 1 * time.Hour
 
-// RepoCache handles caching repo metadata in SQLite.
+// RepoCache handles caching repo metadata in PostgreSQL.
 type RepoCache struct {
 	database *db.DB
 }
@@ -154,28 +152,29 @@ func NewRepoCache(database *db.DB) *RepoCache {
 }
 
 // CacheRepo caches repo metadata.
-func (c *RepoCache) CacheRepo(ctx context.Context, repo GitHubRepo) error {
-	_, err := c.database.Exec(`
-		INSERT INTO repo_cache (id, owner, name, default_branch, last_fetched_at, is_favorite)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			default_branch = excluded.default_branch,
-			last_fetched_at = excluded.last_fetched_at
-	`, fmt.Sprintf("%d", repo.ID), repo.Owner, repo.Name, repo.DefaultBranch, time.Now().Unix(), repo.IsFavorite)
+func (c *RepoCache) CacheRepo(ctx context.Context, userID string, repo GitHubRepo) error {
+	_, err := c.database.Pool.Exec(ctx, `
+		INSERT INTO repo_cache (id, user_id, owner, name, default_branch, last_fetched_at, is_favorite)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT(id, user_id) DO UPDATE SET
+			default_branch = EXCLUDED.default_branch,
+			last_fetched_at = EXCLUDED.last_fetched_at
+	`, fmt.Sprintf("%d", repo.ID), userID, repo.Owner, repo.Name, repo.DefaultBranch, time.Now().Unix(), repo.IsFavorite)
 	return err
 }
 
-// GetCachedRepos returns cached repos.
-func (c *RepoCache) GetCachedRepos(ctx context.Context) ([]GitHubRepo, error) {
-	rows, err := c.database.Query(`
+// GetCachedRepos returns cached repos for a user.
+func (c *RepoCache) GetCachedRepos(ctx context.Context, userID string) ([]GitHubRepo, error) {
+	rows, err := c.database.Pool.Query(ctx, `
 		SELECT id, owner, name, default_branch, is_favorite
 		FROM repo_cache
+		WHERE user_id = $1
 		ORDER BY is_favorite DESC, name ASC
-	`)
+	`, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 
 	var repos []GitHubRepo
 	for rows.Next() {
@@ -191,45 +190,45 @@ func (c *RepoCache) GetCachedRepos(ctx context.Context) ([]GitHubRepo, error) {
 	return repos, nil
 }
 
-// IsCacheStale checks if the cache needs refreshing.
-func (c *RepoCache) IsCacheStale(ctx context.Context) bool {
+// IsCacheStale checks if the cache needs refreshing for a user.
+func (c *RepoCache) IsCacheStale(ctx context.Context, userID string) bool {
 	var lastFetched int64
-	err := c.database.QueryRow(`
-		SELECT COALESCE(MAX(last_fetched_at), 0) FROM repo_cache
-	`).Scan(&lastFetched)
+	err := c.database.Pool.QueryRow(ctx, `
+		SELECT COALESCE(MAX(last_fetched_at), 0) FROM repo_cache WHERE user_id = $1
+	`, userID).Scan(&lastFetched)
 	if err != nil || lastFetched == 0 {
 		return true // No cache or error, consider stale
 	}
 	return time.Since(time.Unix(lastFetched, 0)) > CacheTTL
 }
 
-// CacheCount returns the number of cached repos.
-func (c *RepoCache) CacheCount(ctx context.Context) int {
+// CacheCount returns the number of cached repos for a user.
+func (c *RepoCache) CacheCount(ctx context.Context, userID string) int {
 	var count int
-	_ = c.database.QueryRow(`SELECT COUNT(*) FROM repo_cache`).Scan(&count)
+	_ = c.database.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM repo_cache WHERE user_id = $1`, userID).Scan(&count)
 	return count
 }
 
-// SetFavorite marks a repo as favorite.
-func (c *RepoCache) SetFavorite(ctx context.Context, owner, name string, favorite bool) error {
-	_, err := c.database.Exec(`
-		UPDATE repo_cache SET is_favorite = ? WHERE owner = ? AND name = ?
-	`, favorite, owner, name)
+// SetFavorite marks a repo as favorite for a user.
+func (c *RepoCache) SetFavorite(ctx context.Context, userID, owner, name string, favorite bool) error {
+	_, err := c.database.Pool.Exec(ctx, `
+		UPDATE repo_cache SET is_favorite = $1 WHERE user_id = $2 AND owner = $3 AND name = $4
+	`, favorite, userID, owner, name)
 	return err
 }
 
-// GetFavorites returns favorite repos.
-func (c *RepoCache) GetFavorites(ctx context.Context) ([]GitHubRepo, error) {
-	rows, err := c.database.Query(`
+// GetFavorites returns favorite repos for a user.
+func (c *RepoCache) GetFavorites(ctx context.Context, userID string) ([]GitHubRepo, error) {
+	rows, err := c.database.Pool.Query(ctx, `
 		SELECT id, owner, name, default_branch, is_favorite
 		FROM repo_cache
-		WHERE is_favorite = 1
+		WHERE user_id = $1 AND is_favorite = true
 		ORDER BY name ASC
-	`)
+	`, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 
 	var repos []GitHubRepo
 	for rows.Next() {
@@ -245,9 +244,9 @@ func (c *RepoCache) GetFavorites(ctx context.Context) ([]GitHubRepo, error) {
 	return repos, nil
 }
 
-// SyncReposFromGitHub fetches repos from GitHub and caches them.
-func (c *RepoCache) SyncReposFromGitHub(ctx context.Context, token string) error {
-	slog.Info("[GITHUB] Syncing repos from GitHub")
+// SyncReposFromGitHub fetches repos from GitHub and caches them for a user.
+func (c *RepoCache) SyncReposFromGitHub(ctx context.Context, userID, token string) error {
+	slog.Info("[GITHUB] Syncing repos from GitHub", "user_id", userID)
 
 	// Fetch all pages
 	page := 1
@@ -262,7 +261,7 @@ func (c *RepoCache) SyncReposFromGitHub(ctx context.Context, token string) error
 		}
 
 		for _, repo := range result.Repos {
-			if err := c.CacheRepo(ctx, repo); err != nil {
+			if err := c.CacheRepo(ctx, userID, repo); err != nil {
 				slog.Warn("Failed to cache repo", "repo", repo.FullName, "error", err)
 			}
 		}
@@ -273,6 +272,6 @@ func (c *RepoCache) SyncReposFromGitHub(ctx context.Context, token string) error
 		page++
 	}
 
-	slog.Info("[GITHUB] Repo sync complete")
+	slog.Info("[GITHUB] Repo sync complete", "user_id", userID)
 	return nil
 }

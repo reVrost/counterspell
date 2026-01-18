@@ -6,8 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/services"
+	"github.com/revrost/code/counterspell/internal/auth"
 )
 
 // HandleGitHubAuthorize initiates GitHub OAuth flow.
@@ -31,6 +30,7 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	code := r.URL.Query().Get("code")
 	connType := r.URL.Query().Get("state")
+	userID := auth.UserIDFromContext(ctx)
 
 	if connType == "" {
 		connType = "user"
@@ -41,25 +41,19 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := h.getServices(ctx)
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
-
-	token, err := svc.GitHub.ExchangeCodeForToken(ctx, code)
+	token, err := h.githubService.ExchangeCodeForToken(ctx, code)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to exchange token: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	login, avatarURL, err := svc.GitHub.GetUserInfo(ctx, token)
+	login, avatarURL, err := h.githubService.GetUserInfo(ctx, token)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to get user info: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	err = svc.GitHub.SaveConnection(ctx, connType, login, avatarURL, token, "repo,read:user,read:org")
+	err = h.githubService.SaveConnection(ctx, userID, connType, login, avatarURL, token, "repo,read:user,read:org")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save connection: %v", err), http.StatusInternalServerError)
 		return
@@ -67,13 +61,7 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 
 	// Sync repos to cache in background (not blocking the redirect)
 	go func() {
-		userDB := db.DBFromContext(ctx)
-		if userDB == nil {
-			slog.Error("[OAuth] No database in context for repo sync")
-			return
-		}
-		cache := services.NewRepoCache(userDB)
-		if err := cache.SyncReposFromGitHub(context.Background(), token); err != nil {
+		if err := h.repoCache.SyncReposFromGitHub(context.Background(), userID, token); err != nil {
 			slog.Error("[OAuth] Failed to sync repos to cache", "error", err)
 		} else {
 			slog.Info("[OAuth] Repos synced to cache successfully")
@@ -85,29 +73,25 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handlers) HandleDisconnect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
 	slog.Info("[DISCONNECT] HandleDisconnect called", "method", r.Method, "url", r.URL.String())
 
-	// Multi-tenant: clear Supabase session cookies
-	if h.cfg != nil && h.cfg.MultiTenant && h.auth != nil {
-		h.auth.ClearSessionCookies(w)
-		slog.Info("[DISCONNECT] Cleared Supabase session")
+	// Clear auth session cookies
+	if h.authService != nil {
+		h.authService.ClearSessionCookies(w)
+		slog.Info("[DISCONNECT] Cleared auth session")
 	}
 
-	svc, err := h.getServices(ctx)
-	if err != nil {
-		slog.Error("[DISCONNECT] Failed to get services", "error", err)
+	if err := h.githubService.DeleteConnection(ctx, userID); err != nil {
+		slog.Error("[DISCONNECT] Failed to delete connection", "error", err)
 	} else {
-		if err := svc.GitHub.DeleteConnection(ctx); err != nil {
-			slog.Error("[DISCONNECT] Failed to delete connection", "error", err)
-		} else {
-			slog.Info("[DISCONNECT] Successfully deleted connection")
-		}
+		slog.Info("[DISCONNECT] Successfully deleted connection")
+	}
 
-		if err := svc.GitHub.DeleteAllProjects(ctx); err != nil {
-			slog.Error("[DISCONNECT] Failed to delete projects", "error", err)
-		} else {
-			slog.Info("[DISCONNECT] Successfully deleted projects")
-		}
+	if err := h.githubService.DeleteAllProjects(ctx, userID); err != nil {
+		slog.Error("[DISCONNECT] Failed to delete projects", "error", err)
+	} else {
+		slog.Info("[DISCONNECT] Successfully deleted projects")
 	}
 
 	slog.Info("[DISCONNECT] Redirecting to landing page")

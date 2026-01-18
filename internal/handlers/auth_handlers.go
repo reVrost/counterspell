@@ -2,19 +2,18 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/services"
 )
 
 func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
-	// Multi-tenant: use Supabase OAuth flow
-	if h.cfg != nil && h.cfg.MultiTenant && h.auth != nil {
+	// Use Supabase OAuth flow if auth service is configured
+	if h.authService != nil {
 		scheme := "http"
 		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 			scheme = "https"
@@ -32,7 +31,7 @@ func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
 			callbackURL = fmt.Sprintf("%s://%s/auth/callback", scheme, host)
 		}
 
-		oauthURL, err := h.auth.GetOAuthURL("github", callbackURL)
+		oauthURL, err := h.authService.GetOAuthURL("github", callbackURL)
 		if err != nil {
 			slog.Error("Failed to get Supabase OAuth URL", "error", err)
 			http.Error(w, "OAuth error", http.StatusInternalServerError)
@@ -44,13 +43,13 @@ func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Single-player: direct GitHub OAuth
+	// Direct GitHub OAuth
 	h.HandleGitHubAuthorize(w, r)
 }
 
 func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
-	// Multi-tenant: handle Supabase callback
-	if h.cfg != nil && h.cfg.MultiTenant && h.auth != nil {
+	// Handle Supabase callback if auth service is configured
+	if h.authService != nil {
 		if errCode := r.URL.Query().Get("error"); errCode != "" {
 			errDesc := r.URL.Query().Get("error_description")
 			slog.Error("Supabase OAuth error", "code", errCode, "description", errDesc)
@@ -68,7 +67,7 @@ func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
 			"has_provider_token", providerToken != "")
 
 		if accessToken != "" {
-			h.auth.SetSessionCookie(w, accessToken)
+			h.authService.SetSessionCookie(w, accessToken)
 			if refreshToken != "" {
 				http.SetCookie(w, &http.Cookie{
 					Name:     "sb-refresh-token",
@@ -87,38 +86,25 @@ func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Get user manager and services
-			um, err := h.registry.Get(r.Context(), userID)
-			if err != nil {
-				slog.Error("Failed to get user manager", "error", err, "user_id", userID)
-				http.Redirect(w, r, "/?error=db_error", http.StatusTemporaryRedirect)
-				return
-			}
-
-			// Create services with user's DB
-			userDB := um.DB()
-			githubSvc := services.NewGitHubService(h.clientID, h.clientSecret, h.redirectURI, userDB)
-
 			// If we have a GitHub provider token, save connection and fetch repos
 			if providerToken != "" {
-				login, avatarURL, err := githubSvc.GetUserInfo(r.Context(), providerToken)
+				login, avatarURL, err := h.githubService.GetUserInfo(r.Context(), providerToken)
 				if err != nil {
 					slog.Error("Failed to get GitHub user info", "error", err)
 				} else {
-					err = githubSvc.SaveConnection(r.Context(), "user", login, avatarURL, providerToken, "repo,read:user,read:org")
+					err = h.githubService.SaveConnection(r.Context(), userID, "user", login, avatarURL, providerToken, "repo,read:user,read:org")
 					if err != nil {
 						slog.Error("Failed to save GitHub connection", "error", err)
 					} else {
-						slog.Info("GitHub connection saved for multi-tenant user", "login", login, "user_id", userID)
+						slog.Info("GitHub connection saved for user", "login", login, "user_id", userID)
 						// Sync repos to cache in background
-						go func(token string, userDB *db.DB) {
-							cache := services.NewRepoCache(userDB)
-							if err := cache.SyncReposFromGitHub(context.Background(), token); err != nil {
+						go func(token, uid string) {
+							if err := h.repoCache.SyncReposFromGitHub(context.Background(), uid, token); err != nil {
 								slog.Error("[OAuth] Failed to sync repos to cache", "error", err)
 							} else {
 								slog.Info("[OAuth] Repos synced to cache successfully")
 							}
-						}(providerToken, userDB)
+						}(providerToken, userID)
 					}
 				}
 			} else {
@@ -166,7 +152,7 @@ if (hash) {
 		return
 	}
 
-	// Single-player: direct GitHub callback
+	// Direct GitHub callback
 	h.HandleGitHubCallback(w, r)
 }
 
@@ -191,12 +177,24 @@ func (h *Handlers) extractUserIDFromToken(tokenString string) string {
 }
 
 func (h *Handlers) HandleLogout(w http.ResponseWriter, r *http.Request) {
-	h.HandleDisconnect(w, r)
+	slog.Info("[AUTH] HandleLogout called")
+
+	// Clear auth session cookies
+	if h.authService != nil {
+		h.authService.ClearSessionCookies(w)
+		slog.Info("[AUTH] Cleared auth session")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "Logged out successfully",
+	})
 }
 
 // HandleTokenRefresh refreshes an expired JWT using the refresh token
 func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
-	if h.auth == nil {
+	if h.authService == nil {
 		http.Error(w, "Auth not configured", http.StatusServiceUnavailable)
 		return
 	}
@@ -211,7 +209,7 @@ func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call Supabase to refresh
-	tokens, err := h.auth.RefreshToken(cookie.Value)
+	tokens, err := h.authService.RefreshToken(cookie.Value)
 	if err != nil {
 		slog.Error("Token refresh failed", "error", err)
 		http.Error(w, "Refresh failed", http.StatusUnauthorized)

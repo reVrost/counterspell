@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/db/sqlc"
 	"github.com/revrost/code/counterspell/internal/models"
@@ -22,11 +24,11 @@ func NewSettingsService(db *db.DB) *SettingsService {
 }
 
 // GetSettings retrieves the user settings.
-func (s *SettingsService) GetSettings(ctx context.Context) (*models.UserSettings, error) {
-	row, err := s.db.Queries.GetUserSettings(ctx)
-	if err == sql.ErrNoRows {
+func (s *SettingsService) GetSettings(ctx context.Context, userID string) (*models.UserSettings, error) {
+	row, err := s.db.Queries.GetUserSettings(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Return empty settings with default backend
-		return &models.UserSettings{UserID: "default", AgentBackend: models.AgentBackendNative}, nil
+		return &models.UserSettings{UserID: userID, AgentBackend: models.AgentBackendNative}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get settings: %w", err)
@@ -46,14 +48,15 @@ func (s *SettingsService) GetSettings(ctx context.Context) (*models.UserSettings
 }
 
 // UpdateSettings updates the user settings.
-func (s *SettingsService) UpdateSettings(ctx context.Context, settings *models.UserSettings) error {
+func (s *SettingsService) UpdateSettings(ctx context.Context, userID string, settings *models.UserSettings) error {
 	err := s.db.Queries.UpsertUserSettings(ctx, sqlc.UpsertUserSettingsParams{
-		OpenrouterKey: sql.NullString{String: settings.OpenRouterKey, Valid: settings.OpenRouterKey != ""},
-		ZaiKey:        sql.NullString{String: settings.ZaiKey, Valid: settings.ZaiKey != ""},
-		AnthropicKey:  sql.NullString{String: settings.AnthropicKey, Valid: settings.AnthropicKey != ""},
-		OpenaiKey:     sql.NullString{String: settings.OpenAIKey, Valid: settings.OpenAIKey != ""},
-		AgentBackend:  sql.NullString{String: settings.GetAgentBackend(), Valid: true},
-		UpdatedAt:     sql.NullTime{Time: time.Now(), Valid: true},
+		UserID:        userID,
+		OpenrouterKey: pgtype.Text{String: settings.OpenRouterKey, Valid: settings.OpenRouterKey != ""},
+		ZaiKey:        pgtype.Text{String: settings.ZaiKey, Valid: settings.ZaiKey != ""},
+		AnthropicKey:  pgtype.Text{String: settings.AnthropicKey, Valid: settings.AnthropicKey != ""},
+		OpenaiKey:     pgtype.Text{String: settings.OpenAIKey, Valid: settings.OpenAIKey != ""},
+		AgentBackend:  pgtype.Text{String: settings.GetAgentBackend(), Valid: true},
+		UpdatedAt:     pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update settings: %w", err)

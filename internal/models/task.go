@@ -65,8 +65,8 @@ const (
 
 // Event represents a server-sent event for real-time updates.
 type Event struct {
-	ID          int64     `json:"id"`           // Sequence number for deduplication
-	TaskID      string    `json:"task_id"`
-	Type        EventType `json:"type"`
-	HTMLPayload string    `json:"html_payload"`
+	ID     int64     `json:"id"` // Sequence number for deduplication
+	TaskID string    `json:"task_id"`
+	Type   EventType `json:"type"`
+	Data   string    `json:"data"` // JSON serialized payload
 }
