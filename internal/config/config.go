@@ -3,6 +3,7 @@ package config
 
 import (
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -10,10 +11,10 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	// Multi-tenant mode
-	MultiTenant bool
+	// Database
+	DatabaseURL string
 
-	// Supabase configuration (required when MultiTenant=true)
+	// Supabase configuration (for auth)
 	SupabaseURL       string
 	SupabaseAnonKey   string
 	SupabaseJWTSecret string
@@ -24,21 +25,20 @@ type Config struct {
 	// Worker pool configuration
 	WorkerPoolSize  int
 	MaxTasksPerUser int
-	UserManagerTTL  time.Duration
 
 	// Sandbox configuration
 	SandboxTimeout     time.Duration
 	SandboxOutputLimit int64
 
-	// Data directories
+	// Data directories (for repos and workspaces)
 	DataDir string
 }
 
 // Load loads configuration from environment variables.
 func Load() *Config {
 	cfg := &Config{
-		// Multi-tenant mode (default: false for backward compatibility)
-		MultiTenant: getEnvBool("MULTI_TENANT", false),
+		// Database
+		DatabaseURL: os.Getenv("DATABASE_URL"),
 
 		// Supabase
 		SupabaseURL:       os.Getenv("SUPABASE_URL"),
@@ -53,7 +53,6 @@ func Load() *Config {
 		// Worker pool
 		WorkerPoolSize:  getEnvInt("WORKER_POOL_SIZE", 20),
 		MaxTasksPerUser: getEnvInt("MAX_TASKS_PER_USER", 5),
-		UserManagerTTL:  getEnvDuration("USER_MANAGER_TTL", 2*time.Hour),
 
 		// Sandbox
 		SandboxTimeout:     getEnvDuration("SANDBOX_TIMEOUT", 10*time.Minute),
@@ -68,16 +67,11 @@ func Load() *Config {
 
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
-	if c.MultiTenant {
-		if c.SupabaseURL == "" {
-			return &ConfigError{Field: "SUPABASE_URL", Message: "required when MULTI_TENANT=true"}
-		}
-		if c.SupabaseAnonKey == "" {
-			return &ConfigError{Field: "SUPABASE_ANON_KEY", Message: "required when MULTI_TENANT=true"}
-		}
-		if c.SupabaseJWTSecret == "" {
-			return &ConfigError{Field: "SUPABASE_JWT_SECRET", Message: "required when MULTI_TENANT=true"}
-		}
+	if c.DatabaseURL == "" {
+		return &ConfigError{Field: "DATABASE_URL", Message: "required"}
+	}
+	if c.SupabaseJWTSecret == "" {
+		return &ConfigError{Field: "SUPABASE_JWT_SECRET", Message: "required for auth"}
 	}
 	return nil
 }
@@ -93,18 +87,6 @@ func (e *ConfigError) Error() string {
 }
 
 // Helper functions
-
-func getEnvBool(key string, defaultVal bool) bool {
-	val := os.Getenv(key)
-	if val == "" {
-		return defaultVal
-	}
-	b, err := strconv.ParseBool(val)
-	if err != nil {
-		return defaultVal
-	}
-	return b
-}
 
 func getEnvInt(key string, defaultVal int) int {
 	val := os.Getenv(key)
@@ -168,21 +150,7 @@ func getEnvStringSlice(key string, defaultVal []string) []string {
 
 // IsCommandAllowed checks if a command is in the native allowlist.
 func (c *Config) IsCommandAllowed(cmd string) bool {
-	for _, allowed := range c.NativeAllowlist {
-		if cmd == allowed {
-			return true
-		}
-	}
-	return false
-}
-
-// DBPath returns the database path for a user.
-// In single-player mode, returns path for "default" user.
-func (c *Config) DBPath(userID string) string {
-	if !c.MultiTenant {
-		userID = "default"
-	}
-	return c.DataDir + "/db/" + userID + ".db"
+	return slices.Contains(c.NativeAllowlist, cmd)
 }
 
 // ReposPath returns the shared repos directory.
@@ -192,8 +160,5 @@ func (c *Config) ReposPath() string {
 
 // WorkspacesPath returns the workspaces directory for a user.
 func (c *Config) WorkspacesPath(userID string) string {
-	if !c.MultiTenant {
-		userID = "default"
-	}
 	return c.DataDir + "/workspaces/" + userID
 }

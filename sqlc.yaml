@@ -1,19 +1,12 @@
 version: "2"
 sql:
-  - engine: "sqlite"
+  - engine: "postgresql"
     queries: "internal/db/queries/"
     schema: "internal/db/schema.sql"
     gen:
       go:
         package: "sqlc"
-        output_models_file_name: "models.sql.go"
-        output_db_file_name: "db.sql.go"
         out: "internal/db/sqlc"
         emit_json_tags: true
         emit_empty_slices: true
-        overrides:
-          # Projects and GitHub connections store timestamps as unix int64
-          - column: "projects.created_at"
-            go_type: "int64"
-          - column: "github_connections.created_at"
-            go_type: "int64"
+        sql_package: "pgx/v5"

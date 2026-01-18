@@ -4,6 +4,8 @@
 .envrc.multi
 .envrc.single
 tmp
+node_modules
+dist
 
 # Database
 *.db

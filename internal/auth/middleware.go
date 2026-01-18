@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/revrost/code/counterspell/internal/config"
-	"github.com/revrost/code/counterspell/internal/db"
 )
 
 // contextKey is used for storing values in context.
@@ -23,46 +22,45 @@ const (
 type Middleware struct {
 	cfg       *config.Config
 	validator *JWTValidator
-	dbManager *db.DBManager
 }
 
 // NewMiddleware creates a new auth middleware.
-func NewMiddleware(cfg *config.Config, dbManager *db.DBManager) *Middleware {
+func NewMiddleware(cfg *config.Config) *Middleware {
 	var validator *JWTValidator
-	if cfg.MultiTenant && cfg.SupabaseURL != "" {
+	// If no Supabase URL, validator is not set indicating local dev mode
+	// No auth is required in this case
+	if cfg.SupabaseURL != "" {
 		// Use JWKS-based validation for ES256 tokens
 		validator = NewJWTValidatorWithURL(cfg.SupabaseURL, cfg.SupabaseAnonKey)
 	}
 	return &Middleware{
 		cfg:       cfg,
 		validator: validator,
-		dbManager: dbManager,
 	}
 }
 
 // RequireAuth is middleware that requires a valid JWT.
-// In single-player mode (MULTI_TENANT=false), it sets userID to "default".
+// If no Supabase is configured (validator is nil), uses "default" user ID.
 func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Single-player mode: skip auth, use default user
-		if !m.cfg.MultiTenant {
+		// If no validator configured, use default user (local dev mode)
+		if m.validator == nil {
 			ctx = context.WithValue(ctx, UserIDKey, "default")
-			// Inject default user's DB into context
-			if m.dbManager != nil {
-				if userDB, err := m.dbManager.GetDB("default"); err == nil {
-					ctx = db.ContextWithDB(ctx, userDB)
-				}
-			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
-		// Multi-tenant mode: validate JWT
+		// Validate JWT
 		userID, claims, err := m.validateRequest(r)
 		if err != nil {
-			slog.Debug("Auth failed", "error", err, "path", r.URL.Path)
+			slog.Warn("Auth failed: unauthorized request",
+				"error", err,
+				"path", r.URL.Path,
+				"remote_addr", r.RemoteAddr,
+				"auth_header_present", r.Header.Get("Authorization") != "",
+				"cookie_present", func() bool { _, err := r.Cookie("sb-access-token"); return err == nil }())
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -72,54 +70,31 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		if claims != nil {
 			ctx = context.WithValue(ctx, ClaimsKey, claims)
 		}
-		
-		// Inject user's DB into context
-		if m.dbManager != nil {
-			userDB, err := m.dbManager.GetDB(userID)
-			if err != nil {
-				slog.Error("Failed to get user database", "error", err, "user_id", userID)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			ctx = db.ContextWithDB(ctx, userDB)
-		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 // OptionalAuth is middleware that validates JWT if present, but doesn't require it.
-// In single-player mode, it sets userID to "default".
-// In multi-tenant mode without a valid token, userID is empty.
+// If no Supabase is configured (validator is nil), uses "default" user ID.
+// Without a valid token and with Supabase configured, userID is empty.
 func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Single-player mode: always use default user
-		if !m.cfg.MultiTenant {
+		// If no validator configured, use default user (local dev mode)
+		if m.validator == nil {
 			ctx = context.WithValue(ctx, UserIDKey, "default")
-			// Inject default user's DB into context
-			if m.dbManager != nil {
-				if userDB, err := m.dbManager.GetDB("default"); err == nil {
-					ctx = db.ContextWithDB(ctx, userDB)
-				}
-			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
-		// Multi-tenant mode: try to validate, but don't fail if missing
+		// Try to validate, but don't fail if missing
 		userID, claims, err := m.validateRequest(r)
 		if err == nil && userID != "" {
 			ctx = context.WithValue(ctx, UserIDKey, userID)
 			if claims != nil {
 				ctx = context.WithValue(ctx, ClaimsKey, claims)
-			}
-			// Inject user's DB into context
-			if m.dbManager != nil {
-				if userDB, err := m.dbManager.GetDB(userID); err == nil {
-					ctx = db.ContextWithDB(ctx, userDB)
-				}
 			}
 		}
 

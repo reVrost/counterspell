@@ -1,0 +1,128 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+	darkMode: ['class', 'class'],
+	content: ['./src/**/*.{html,js,svelte,ts}'],
+	theme: {
+    	container: {
+    		center: true,
+    		padding: '2rem',
+    		screens: {
+    			'2xl': '1400px'
+    		}
+    	},
+    	fontFamily: {
+    		sans: [
+    			'Inter',
+    			'system-ui',
+    			'sans-serif'
+    		],
+    		mono: [
+    			'JetBrains Mono',
+    			'Menlo',
+    			'monospace'
+    		]
+    	},
+    	extend: {
+    		colors: {
+    			gray: {
+    				'850': '#1A1D24',
+    				'900': '#111318',
+    				'950': '#0C0E12'
+    			},
+    			linear: {
+    				border: '#2E323A',
+    				text: '#EBEBEB',
+    				sub: '#8A8F98'
+    			},
+    			border: 'hsl(var(--border))',
+    			input: 'hsl(var(--input))',
+    			ring: 'hsl(var(--ring))',
+    			background: 'hsl(var(--background))',
+    			foreground: 'hsl(var(--foreground))',
+    			primary: {
+    				DEFAULT: 'hsl(var(--primary))',
+    				foreground: 'hsl(var(--primary-foreground))'
+    			},
+    			secondary: {
+    				DEFAULT: 'hsl(var(--secondary))',
+    				foreground: 'hsl(var(--secondary-foreground))'
+    			},
+    			destructive: {
+    				DEFAULT: 'hsl(var(--destructive))',
+    				foreground: 'hsl(var(--destructive-foreground))'
+    			},
+    			muted: {
+    				DEFAULT: 'hsl(var(--muted))',
+    				foreground: 'hsl(var(--muted-foreground))'
+    			},
+    			accent: {
+    				DEFAULT: 'hsl(var(--accent))',
+    				foreground: 'hsl(var(--accent-foreground))'
+    			},
+    			popover: {
+    				DEFAULT: 'hsl(var(--popover))',
+    				foreground: 'hsl(var(--popover-foreground))'
+    			},
+    			card: {
+    				DEFAULT: 'hsl(var(--card))',
+    				foreground: 'hsl(var(--card-foreground))'
+    			},
+    			diff: {
+    				add: {
+    					bg: 'rgba(63, 185, 80, 0.15)',
+    					bgNum: 'rgba(63, 185, 80, 0.2)',
+    					text: '#aff5b4',
+    					num: '#3fb950'
+    				},
+    				del: {
+    					bg: 'rgba(248, 81, 73, 0.15)',
+    					bgNum: 'rgba(248, 81, 73, 0.2)',
+    					text: '#ffa198',
+    					num: '#f85149'
+    				},
+    				hunk: {
+    					bg: 'rgba(56, 139, 253, 0.15)',
+    					text: '#79c0ff'
+    				}
+    			},
+    			chart: {
+    				'1': 'hsl(var(--chart-1))',
+    				'2': 'hsl(var(--chart-2))',
+    				'3': 'hsl(var(--chart-3))',
+    				'4': 'hsl(var(--chart-4))',
+    				'5': 'hsl(var(--chart-5))'
+    			}
+    		},
+    		borderRadius: {
+    			lg: 'var(--radius)',
+    			md: 'calc(var(--radius) - 2px)',
+    			sm: 'calc(var(--radius) - 4px)'
+    		},
+    		keyframes: {
+    			shimmer: {
+    				'0%': {
+    					backgroundPosition: '200% center'
+    				},
+    				'100%': {
+    					backgroundPosition: '-200% center'
+    				}
+    			},
+    			'pulse-glow': {
+    				'0%, 100%': {
+    					opacity: '0.5',
+    					filter: 'drop-shadow(0 0 2px #8B5CF6)'
+    				},
+    				'50%': {
+    					opacity: '1',
+    					filter: 'drop-shadow(0 0 8px #8B5CF6)'
+    				}
+    			}
+    		},
+    		animation: {
+    			shimmer: 'shimmer 1.5s linear infinite',
+    			'pulse-glow': 'pulse-glow 2s ease-in-out infinite'
+    		}
+    	}
+    },
+	plugins: [require("tailwindcss-animate")]
+};

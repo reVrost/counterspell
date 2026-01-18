@@ -1,9 +1,9 @@
 -- name: CreateGitHubConnection :exec
-INSERT INTO github_connections (id, type, login, avatar_url, token, scope, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO github_connections (id, user_id, type, login, avatar_url, token, scope, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
 -- name: GetActiveGitHubConnection :one
-SELECT * FROM github_connections ORDER BY created_at DESC LIMIT 1;
+SELECT * FROM github_connections WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1;
 
 -- name: DeleteAllGitHubConnections :execresult
-DELETE FROM github_connections;
+DELETE FROM github_connections WHERE user_id = $1;

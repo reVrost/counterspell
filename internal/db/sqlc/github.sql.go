@@ -7,27 +7,31 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createGitHubConnection = `-- name: CreateGitHubConnection :exec
-INSERT INTO github_connections (id, type, login, avatar_url, token, scope, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO github_connections (id, user_id, type, login, avatar_url, token, scope, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type CreateGitHubConnectionParams struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Login     string         `json:"login"`
-	AvatarUrl sql.NullString `json:"avatar_url"`
-	Token     string         `json:"token"`
-	Scope     sql.NullString `json:"scope"`
-	CreatedAt int64          `json:"created_at"`
+	ID        string             `json:"id"`
+	UserID    string             `json:"user_id"`
+	Type      string             `json:"type"`
+	Login     string             `json:"login"`
+	AvatarUrl pgtype.Text        `json:"avatar_url"`
+	Token     string             `json:"token"`
+	Scope     pgtype.Text        `json:"scope"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 func (q *Queries) CreateGitHubConnection(ctx context.Context, arg CreateGitHubConnectionParams) error {
-	_, err := q.db.ExecContext(ctx, createGitHubConnection,
+	_, err := q.db.Exec(ctx, createGitHubConnection,
 		arg.ID,
+		arg.UserID,
 		arg.Type,
 		arg.Login,
 		arg.AvatarUrl,
@@ -39,22 +43,23 @@ func (q *Queries) CreateGitHubConnection(ctx context.Context, arg CreateGitHubCo
 }
 
 const deleteAllGitHubConnections = `-- name: DeleteAllGitHubConnections :execresult
-DELETE FROM github_connections
+DELETE FROM github_connections WHERE user_id = $1
 `
 
-func (q *Queries) DeleteAllGitHubConnections(ctx context.Context) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteAllGitHubConnections)
+func (q *Queries) DeleteAllGitHubConnections(ctx context.Context, userID string) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteAllGitHubConnections, userID)
 }
 
 const getActiveGitHubConnection = `-- name: GetActiveGitHubConnection :one
-SELECT id, type, login, avatar_url, token, scope, created_at FROM github_connections ORDER BY created_at DESC LIMIT 1
+SELECT id, user_id, type, login, avatar_url, token, scope, created_at FROM github_connections WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
 `
 
-func (q *Queries) GetActiveGitHubConnection(ctx context.Context) (GithubConnection, error) {
-	row := q.db.QueryRowContext(ctx, getActiveGitHubConnection)
+func (q *Queries) GetActiveGitHubConnection(ctx context.Context, userID string) (GithubConnection, error) {
+	row := q.db.QueryRow(ctx, getActiveGitHubConnection, userID)
 	var i GithubConnection
 	err := row.Scan(
 		&i.ID,
+		&i.UserID,
 		&i.Type,
 		&i.Login,
 		&i.AvatarUrl,

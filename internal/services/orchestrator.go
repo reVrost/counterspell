@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -22,6 +21,7 @@ import (
 // TaskResult represents the result of a completed task.
 type TaskResult struct {
 	TaskID         string
+	UserID         string
 	Success        bool
 	AgentOutput    string
 	GitDiff        string
@@ -32,6 +32,7 @@ type TaskResult struct {
 // TaskJob represents a job submitted to the worker pool.
 type TaskJob struct {
 	TaskID         string
+	UserID         string
 	ProjectID      string
 	Intent         string
 	ModelID        string
@@ -51,6 +52,7 @@ type Orchestrator struct {
 	events     *EventBus
 	settings   *SettingsService
 	dataDir    string
+	userID     string
 	workerPool *ants.Pool
 	resultCh   chan TaskResult
 	running    map[string]context.CancelFunc
@@ -64,8 +66,9 @@ func NewOrchestrator(
 	events *EventBus,
 	settings *SettingsService,
 	dataDir string,
+	userID string,
 ) (*Orchestrator, error) {
-	slog.Info("[ORCHESTRATOR] Creating new orchestrator", "data_dir", dataDir)
+	slog.Info("[ORCHESTRATOR] Creating new orchestrator", "data_dir", dataDir, "user_id", userID)
 	// Create worker pool with 5 workers
 	pool, err := ants.NewPool(5, ants.WithPreAlloc(false))
 	if err != nil {
@@ -79,6 +82,7 @@ func NewOrchestrator(
 		settings:   settings,
 		repos:      NewRepoManager(dataDir),
 		dataDir:    dataDir,
+		userID:     userID,
 		workerPool: pool,
 		resultCh:   make(chan TaskResult, 100),
 		running:    make(map[string]context.CancelFunc),
@@ -104,7 +108,7 @@ func (o *Orchestrator) Shutdown() {
 // StartTask creates a task and begins execution.
 func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID string) (*models.Task, error) {
 	// First, verify project exists
-	projects, err := o.github.GetProjects(ctx)
+	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get projects: %w", err)
 	}
@@ -126,9 +130,12 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	}
 
 	// Get GitHub token
-	conn, err := o.github.GetActiveConnection(ctx)
+	conn, err := o.github.GetActiveConnection(ctx, o.userID)
 	if err != nil {
 		return nil, fmt.Errorf("no GitHub connection: %w", err)
+	}
+	if conn == nil {
+		return nil, fmt.Errorf("no GitHub connection found")
 	}
 	tokenLen := len(conn.Token)
 	slog.Info("GitHub token retrieved", "token_length", tokenLen, "has_token", tokenLen > 0)
@@ -138,7 +145,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	}
 
 	// Create task in DB (after validating project exists)
-	task, err := o.tasks.Create(ctx, projectID, intent, intent)
+	task, err := o.tasks.Create(ctx, o.userID, projectID, intent, intent)
 	if err != nil {
 		slog.Error("Failed to create task in database", "project_id", projectID, "error", err)
 		return nil, fmt.Errorf("failed to create task: %w", err)
@@ -157,6 +164,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	// Submit job to worker pool
 	job := &TaskJob{
 		TaskID:    task.ID,
+		UserID:    o.userID,
 		ProjectID: projectID,
 		Intent:    intent,
 		ModelID:   modelID,
@@ -199,11 +207,12 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 
 	// Update status to in_progress
 	slog.Info("[AGENT LOOP] Updating task status to in_progress", "task_id", job.TaskID)
-	if err := o.tasks.UpdateStatus(ctx, job.TaskID, models.StatusInProgress); err != nil {
+	if err := o.tasks.UpdateStatus(ctx, job.UserID, job.TaskID, models.StatusInProgress); err != nil {
 		slog.Error("[AGENT LOOP] Failed to update task status", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to update status")
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
+			UserID:  job.UserID,
 			Success: false,
 			Error:   "Failed to update status",
 		}
@@ -221,6 +230,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		o.emitError(job.TaskID, "Failed to prepare repo: "+err.Error())
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
+			UserID:  job.UserID,
 			Success: false,
 			Error:   "Failed to prepare repo: " + err.Error(),
 		}
@@ -239,6 +249,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		o.emitError(job.TaskID, "Failed to create worktree: "+err.Error())
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
+			UserID:  job.UserID,
 			Success: false,
 			Error:   "Failed to create worktree: " + err.Error(),
 		}
@@ -250,12 +261,13 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 
 	// Get API key and create provider
 	slog.Info("[AGENT LOOP] Getting settings", "task_id", job.TaskID)
-	settings, err := o.settings.GetSettings(ctx)
+	settings, err := o.settings.GetSettings(ctx, job.UserID)
 	if err != nil {
 		slog.Error("[AGENT LOOP] Failed to get settings", "task_id", job.TaskID, "error", err)
 		o.emitError(job.TaskID, "Failed to get settings")
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
+			UserID:  job.UserID,
 			Success: false,
 			Error:   "Failed to get settings",
 		}
@@ -334,6 +346,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 			o.emitError(job.TaskID, "Claude Code not available: "+err.Error())
 			job.ResultCh <- TaskResult{
 				TaskID:  job.TaskID,
+				UserID:  job.UserID,
 				Success: false,
 				Error:   "Claude Code not available: " + err.Error(),
 			}
@@ -353,6 +366,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 				o.emitError(job.TaskID, "OpenRouter API key not configured")
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
+					UserID:  job.UserID,
 					Success: false,
 					Error:   "OpenRouter API key not configured",
 				}
@@ -365,6 +379,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 				o.emitError(job.TaskID, "Z.ai API key not configured")
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
+					UserID:  job.UserID,
 					Success: false,
 					Error:   "Z.ai API key not configured",
 				}
@@ -377,6 +392,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 				o.emitError(job.TaskID, "Anthropic API key not configured")
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
+					UserID:  job.UserID,
 					Success: false,
 					Error:   "Anthropic API key not configured",
 				}
@@ -395,6 +411,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 				o.emitError(job.TaskID, "No API key configured. Add OpenRouter, Z.ai, or Anthropic key in Settings.")
 				job.ResultCh <- TaskResult{
 					TaskID:  job.TaskID,
+					UserID:  job.UserID,
 					Success: false,
 					Error:   "No API key configured",
 				}
@@ -426,6 +443,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 			o.emitError(job.TaskID, "Failed to create agent: "+err.Error())
 			job.ResultCh <- TaskResult{
 				TaskID:  job.TaskID,
+				UserID:  job.UserID,
 				Success: false,
 				Error:   "Failed to create agent: " + err.Error(),
 			}
@@ -461,6 +479,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 		}
 		job.ResultCh <- TaskResult{
 			TaskID:  job.TaskID,
+			UserID:  job.UserID,
 			Success: false,
 			Error:   "Agent failed: " + runErr.Error(),
 		}
@@ -492,6 +511,7 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	// Send result to channel for processing
 	job.ResultCh <- TaskResult{
 		TaskID:         job.TaskID,
+		UserID:         job.UserID,
 		Success:        true,
 		AgentOutput:    agentOutput,
 		GitDiff:        gitDiff,
@@ -502,7 +522,6 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 }
 
 // processResults processes task results from the channel.
-// This runs in a single goroutine to ensure SQLite concurrency safety.
 func (o *Orchestrator) processResults() {
 	slog.Info("[ORCHESTRATOR] processResults goroutine started")
 	for result := range o.resultCh {
@@ -515,7 +534,7 @@ func (o *Orchestrator) processResults() {
 			status = models.StatusReview // Keep review status so user can see the error
 		}
 
-		if err := o.tasks.UpdateWithResult(ctx, result.TaskID, status, result.AgentOutput, result.GitDiff, result.MessageHistory); err != nil {
+		if err := o.tasks.UpdateWithResult(ctx, result.UserID, result.TaskID, status, result.AgentOutput, result.GitDiff, result.MessageHistory); err != nil {
 			slog.Error("Failed to update task with result", "task_id", result.TaskID, "error", err)
 			continue
 		}
@@ -556,16 +575,16 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 	case agent.EventMessages:
 		// Publish message history for live agent panel updates
 		o.events.Publish(models.Event{
-			TaskID:      taskID,
-			Type:        models.EventTypeAgentUpdate,
-			HTMLPayload: event.Messages, // JSON message history
+			TaskID: taskID,
+			Type:   models.EventTypeAgentUpdate,
+			Data:   event.Messages, // JSON message history
 		})
 	case agent.EventTodo:
 		// Publish todo list for live todo panel updates
 		o.events.Publish(models.Event{
-			TaskID:      taskID,
-			Type:        models.EventTypeTodo,
-			HTMLPayload: event.Content, // JSON todo list
+			TaskID: taskID,
+			Type:   models.EventTypeTodo,
+			Data:   event.Content, // JSON todo list
 		})
 	}
 }
@@ -573,13 +592,13 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 // ContinueTask continues an existing task with a follow-up message.
 func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage, modelID string) error {
 	// Get existing task
-	task, err := o.tasks.Get(ctx, taskID)
+	task, err := o.tasks.Get(ctx, o.userID, taskID)
 	if err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
 	// Get project info
-	projects, err := o.github.GetProjects(ctx)
+	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
 		return fmt.Errorf("failed to get projects: %w", err)
 	}
@@ -598,27 +617,26 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	}
 
 	// Get GitHub token
-	conn, err := o.github.GetActiveConnection(ctx)
+	conn, err := o.github.GetActiveConnection(ctx, o.userID)
 	if err != nil {
 		return fmt.Errorf("no GitHub connection: %w", err)
 	}
+	if conn == nil {
+		return fmt.Errorf("no GitHub connection found")
+	}
 
 	// Update task status back to in_progress
-	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusInProgress); err != nil {
+	if err := o.tasks.UpdateStatus(ctx, o.userID, taskID, models.StatusInProgress); err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
 
 	// Immediately emit agent_update with user message appended so it shows right away
-	// This MUST come BEFORE task_created because:
-	// 1. agent_update caches the history in EventBus.lastAgentState
-	// 2. task_created triggers sendAgent() which calls GetLiveHistory()
-	// 3. If agent_update comes second, GetLiveHistory() returns empty (race condition)
 	updatedHistory := appendUserMessage(task.MessageHistory, followUpMessage)
 	slog.Info("[CHAT] Publishing agent_update with user message", "task_id", taskID, "history_len", len(updatedHistory))
 	o.events.Publish(models.Event{
-		TaskID:      taskID,
-		Type:        models.EventTypeAgentUpdate,
-		HTMLPayload: updatedHistory,
+		TaskID: taskID,
+		Type:   models.EventTypeAgentUpdate,
+		Data:   updatedHistory,
 	})
 
 	// Emit task_created event to trigger feed refresh (after agent_update is cached)
@@ -633,6 +651,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	// Submit job to worker pool
 	job := &TaskJob{
 		TaskID:         taskID,
+		UserID:         o.userID,
 		ProjectID:      task.ProjectID,
 		Intent:         followUpMessage,
 		ModelID:        modelID,
@@ -658,13 +677,13 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 // If there's a merge conflict, returns ErrMergeConflict for the handler to show conflict UI.
 func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	// Get task to find project info
-	task, err := o.tasks.Get(ctx, taskID)
+	task, err := o.tasks.Get(ctx, o.userID, taskID)
 	if err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
 	// Get project info
-	projects, err := o.github.GetProjects(ctx)
+	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
 		return fmt.Errorf("failed to get projects: %w", err)
 	}
@@ -707,7 +726,7 @@ func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	slog.Info("[ORCHESTRATOR] Merged task to main", "task_id", taskID, "branch", branchName)
 
 	// Update task status to done
-	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusDone); err != nil {
+	if err := o.tasks.UpdateStatus(ctx, o.userID, taskID, models.StatusDone); err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
 
@@ -824,13 +843,13 @@ func (o *Orchestrator) AbortMerge(ctx context.Context, taskID string) error {
 // CompleteMergeResolution finishes the merge after all conflicts are resolved.
 func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID string) error {
 	// Get task info
-	task, err := o.tasks.Get(ctx, taskID)
+	task, err := o.tasks.Get(ctx, o.userID, taskID)
 	if err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
 	// Get project info
-	projects, err := o.github.GetProjects(ctx)
+	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
 		return fmt.Errorf("failed to get projects: %w", err)
 	}
@@ -858,7 +877,7 @@ func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID strin
 	slog.Info("[ORCHESTRATOR] Merged task to main after conflict resolution", "task_id", taskID, "branch", branchName)
 
 	// Update task status to done
-	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusDone); err != nil {
+	if err := o.tasks.UpdateStatus(ctx, o.userID, taskID, models.StatusDone); err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
 
@@ -879,13 +898,13 @@ func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID strin
 // CreatePR creates a GitHub Pull Request for a task and marks it done.
 func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, error) {
 	// Get task info
-	task, err := o.tasks.Get(ctx, taskID)
+	task, err := o.tasks.Get(ctx, o.userID, taskID)
 	if err != nil {
 		return "", fmt.Errorf("task not found: %w", err)
 	}
 
 	// Get project info
-	projects, err := o.github.GetProjects(ctx)
+	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get projects: %w", err)
 	}
@@ -916,7 +935,7 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 	}
 
 	// Create the PR - use Title for both title and body
-	prURL, err := o.github.CreatePullRequest(ctx, owner, repo, branchName, task.Title, task.Intent)
+	prURL, err := o.github.CreatePullRequest(ctx, o.userID, owner, repo, branchName, task.Title, task.Intent)
 	if err != nil {
 		return "", fmt.Errorf("failed to create PR: %w", err)
 	}
@@ -924,7 +943,7 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 	slog.Info("[ORCHESTRATOR] Created PR", "task_id", taskID, "pr_url", prURL)
 
 	// Update task status to done
-	if err := o.tasks.UpdateStatus(ctx, taskID, models.StatusDone); err != nil {
+	if err := o.tasks.UpdateStatus(ctx, o.userID, taskID, models.StatusDone); err != nil {
 		return prURL, fmt.Errorf("PR created but failed to update task status: %w", err)
 	}
 
@@ -961,26 +980,16 @@ func (o *Orchestrator) emit(taskID, level, message string) {
 		slog.Error("Failed to store log", "task_id", taskID, "level", level, "message", message, "error", err)
 	}
 
-	colorClass := "text-gray-400"
-	switch level {
-	case "plan":
-		colorClass = "text-yellow-400"
-	case "code":
-		colorClass = "text-purple-400"
-	case "info":
-		colorClass = "text-blue-400"
-	case "success":
-		colorClass = "text-green-400"
-	case "error":
-		colorClass = "text-red-400"
+	payload := map[string]string{
+		"level":   level,
+		"message": message,
 	}
-
-	htmlPayload := fmt.Sprintf(`<span class="%s">[%s]</span> %s`, colorClass, level, html.EscapeString(message))
+	data, _ := json.Marshal(payload)
 
 	o.events.Publish(models.Event{
-		TaskID:      taskID,
-		Type:        models.EventTypeLog,
-		HTMLPayload: htmlPayload,
+		TaskID: taskID,
+		Type:   models.EventTypeLog,
+		Data:   string(data),
 	})
 }
 
@@ -1003,7 +1012,7 @@ func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query 
 	}
 
 	// Get project info
-	projects, err := o.github.GetProjects(ctx)
+	projects, err := o.github.GetProjects(ctx, o.userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get projects: %w", err)
 	}

@@ -5,9 +5,9 @@ tmp_dir = "tmp"
 [build]
   args_bin = []
   bin = "./counterspell"
-  cmd = "make generate; go build -o ./counterspell ./cmd/app"
+  cmd = "go build -o ./counterspell ./cmd/app"
   delay = 0
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "local", "worktree-*", "data"]
+  exclude_dir = ["ui", "assets", "tmp", "vendor", "testdata", "local", "worktree-*", "data", "node_modules", "ui/node_modules"]
   exclude_file = []
   exclude_regex = ["_test\\.go", "_templ\\.go", "\\.sql\\.go"]
   exclude_unchanged = false

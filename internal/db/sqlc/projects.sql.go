@@ -7,48 +7,104 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createProject = `-- name: CreateProject :exec
-INSERT INTO projects (id, github_owner, github_repo, created_at)
-VALUES (?, ?, ?, ?)
+const createProject = `-- name: CreateProject :one
+INSERT INTO projects (id, user_id, github_owner, github_repo, created_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (user_id, github_owner, github_repo) DO UPDATE SET github_owner = EXCLUDED.github_owner
+RETURNING id, user_id, github_owner, github_repo, created_at
 `
 
 type CreateProjectParams struct {
-	ID          string `json:"id"`
-	GithubOwner string `json:"github_owner"`
-	GithubRepo  string `json:"github_repo"`
-	CreatedAt   int64  `json:"created_at"`
+	ID          string             `json:"id"`
+	UserID      string             `json:"user_id"`
+	GithubOwner string             `json:"github_owner"`
+	GithubRepo  string             `json:"github_repo"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
-func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) error {
-	_, err := q.db.ExecContext(ctx, createProject,
+func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, createProject,
 		arg.ID,
+		arg.UserID,
 		arg.GithubOwner,
 		arg.GithubRepo,
 		arg.CreatedAt,
 	)
-	return err
-}
-
-const deleteAllProjects = `-- name: DeleteAllProjects :execresult
-DELETE FROM projects
-`
-
-func (q *Queries) DeleteAllProjects(ctx context.Context) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteAllProjects)
-}
-
-const getProjectByRepo = `-- name: GetProjectByRepo :one
-SELECT id, github_owner, github_repo, created_at FROM projects WHERE github_repo = ? LIMIT 1
-`
-
-func (q *Queries) GetProjectByRepo(ctx context.Context, githubRepo string) (Project, error) {
-	row := q.db.QueryRowContext(ctx, getProjectByRepo, githubRepo)
 	var i Project
 	err := row.Scan(
 		&i.ID,
+		&i.UserID,
+		&i.GithubOwner,
+		&i.GithubRepo,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteAllProjects = `-- name: DeleteAllProjects :execresult
+DELETE FROM projects WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllProjects(ctx context.Context, userID string) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteAllProjects, userID)
+}
+
+const deleteProject = `-- name: DeleteProject :exec
+DELETE FROM projects WHERE id = $1 AND user_id = $2
+`
+
+type DeleteProjectParams struct {
+	ID     string `json:"id"`
+	UserID string `json:"user_id"`
+}
+
+func (q *Queries) DeleteProject(ctx context.Context, arg DeleteProjectParams) error {
+	_, err := q.db.Exec(ctx, deleteProject, arg.ID, arg.UserID)
+	return err
+}
+
+const getProject = `-- name: GetProject :one
+SELECT id, user_id, github_owner, github_repo, created_at FROM projects WHERE id = $1 AND user_id = $2
+`
+
+type GetProjectParams struct {
+	ID     string `json:"id"`
+	UserID string `json:"user_id"`
+}
+
+func (q *Queries) GetProject(ctx context.Context, arg GetProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, getProject, arg.ID, arg.UserID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.GithubOwner,
+		&i.GithubRepo,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getProjectByRepo = `-- name: GetProjectByRepo :one
+SELECT id, user_id, github_owner, github_repo, created_at FROM projects WHERE user_id = $1 AND github_repo = $2 LIMIT 1
+`
+
+type GetProjectByRepoParams struct {
+	UserID     string `json:"user_id"`
+	GithubRepo string `json:"github_repo"`
+}
+
+func (q *Queries) GetProjectByRepo(ctx context.Context, arg GetProjectByRepoParams) (Project, error) {
+	row := q.db.QueryRow(ctx, getProjectByRepo, arg.UserID, arg.GithubRepo)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
 		&i.GithubOwner,
 		&i.GithubRepo,
 		&i.CreatedAt,
@@ -57,11 +113,11 @@ func (q *Queries) GetProjectByRepo(ctx context.Context, githubRepo string) (Proj
 }
 
 const getProjects = `-- name: GetProjects :many
-SELECT id, github_owner, github_repo, created_at FROM projects ORDER BY created_at DESC
+SELECT id, user_id, github_owner, github_repo, created_at FROM projects WHERE user_id = $1 ORDER BY created_at DESC
 `
 
-func (q *Queries) GetProjects(ctx context.Context) ([]Project, error) {
-	rows, err := q.db.QueryContext(ctx, getProjects)
+func (q *Queries) GetProjects(ctx context.Context, userID string) ([]Project, error) {
+	rows, err := q.db.Query(ctx, getProjects, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +127,7 @@ func (q *Queries) GetProjects(ctx context.Context) ([]Project, error) {
 		var i Project
 		if err := rows.Scan(
 			&i.ID,
+			&i.UserID,
 			&i.GithubOwner,
 			&i.GithubRepo,
 			&i.CreatedAt,
@@ -78,9 +135,6 @@ func (q *Queries) GetProjects(ctx context.Context) ([]Project, error) {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -89,11 +143,11 @@ func (q *Queries) GetProjects(ctx context.Context) ([]Project, error) {
 }
 
 const getRecentProjects = `-- name: GetRecentProjects :many
-SELECT id, github_owner, github_repo, created_at FROM projects ORDER BY created_at DESC LIMIT 5
+SELECT id, user_id, github_owner, github_repo, created_at FROM projects WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5
 `
 
-func (q *Queries) GetRecentProjects(ctx context.Context) ([]Project, error) {
-	rows, err := q.db.QueryContext(ctx, getRecentProjects)
+func (q *Queries) GetRecentProjects(ctx context.Context, userID string) ([]Project, error) {
+	rows, err := q.db.Query(ctx, getRecentProjects, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +157,7 @@ func (q *Queries) GetRecentProjects(ctx context.Context) ([]Project, error) {
 		var i Project
 		if err := rows.Scan(
 			&i.ID,
+			&i.UserID,
 			&i.GithubOwner,
 			&i.GithubRepo,
 			&i.CreatedAt,
@@ -111,9 +166,6 @@ func (q *Queries) GetRecentProjects(ctx context.Context) ([]Project, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -121,17 +173,18 @@ func (q *Queries) GetRecentProjects(ctx context.Context) ([]Project, error) {
 }
 
 const projectExists = `-- name: ProjectExists :one
-SELECT EXISTS(SELECT 1 FROM projects WHERE github_owner = ? AND github_repo = ?)
+SELECT EXISTS(SELECT 1 FROM projects WHERE user_id = $1 AND github_owner = $2 AND github_repo = $3)
 `
 
 type ProjectExistsParams struct {
+	UserID      string `json:"user_id"`
 	GithubOwner string `json:"github_owner"`
 	GithubRepo  string `json:"github_repo"`
 }
 
-func (q *Queries) ProjectExists(ctx context.Context, arg ProjectExistsParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, projectExists, arg.GithubOwner, arg.GithubRepo)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+func (q *Queries) ProjectExists(ctx context.Context, arg ProjectExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, projectExists, arg.UserID, arg.GithubOwner, arg.GithubRepo)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

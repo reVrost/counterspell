@@ -86,7 +86,7 @@ func (b *EventBus) Publish(event models.Event) {
 	// Cache agent_update for quick state recovery
 	if event.Type == "agent_update" && event.TaskID != "" {
 		b.lastAgentStateMu.Lock()
-		b.lastAgentState[event.TaskID] = event.HTMLPayload
+		b.lastAgentState[event.TaskID] = event.Data
 		b.lastAgentStateMu.Unlock()
 	}
 

@@ -37,18 +37,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Log startup mode
-	if cfg.MultiTenant {
-		logger.Info("Starting in MULTI-TENANT mode",
-			"supabase_url", cfg.SupabaseURL,
-			"worker_pool_size", cfg.WorkerPoolSize,
-			"max_tasks_per_user", cfg.MaxTasksPerUser,
-		)
-	} else {
-		logger.Info("Starting in SINGLE-PLAYER mode",
-			"data_dir", cfg.DataDir,
-		)
-	}
+	logger.Info("Starting server",
+		"database_url", maskDatabaseURL(cfg.DatabaseURL),
+		"data_dir", cfg.DataDir,
+		"worker_pool_size", cfg.WorkerPoolSize,
+		"max_tasks_per_user", cfg.MaxTasksPerUser,
+	)
 
 	// Ensure directory structure
 	if err := config.EnsureDirectories(cfg); err != nil {
@@ -56,37 +50,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	// In single-player mode, migrate from old structure
-	if !cfg.MultiTenant {
-		if err := config.MigrateFromSingleUser(cfg); err != nil {
-			logger.Warn("Migration from single-user failed (may be first run)", "error", err)
-		}
+	// Connect to PostgreSQL
+	ctx := context.Background()
+	database, err := db.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer database.Close()
+
+	// Run migrations
+	if err := database.RunMigrations(ctx); err != nil {
+		logger.Error("Failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 
-	// Create DB manager (handles per-user databases)
-	dbManager := db.NewDBManager(cfg)
-	userRegistry := services.NewUserManagerRegistry(cfg, dbManager)
+	// Create event bus
 	eventBus := services.NewEventBus()
 
-	// Reset stuck tasks on startup for default user (single-player mode)
-	if !cfg.MultiTenant {
-		defaultDB, err := dbManager.GetDB("default")
-		if err != nil {
-			logger.Error("Failed to open default database", "error", err)
-			os.Exit(1)
-		}
-		taskSvc := services.NewTaskService(defaultDB)
-		ctx := context.Background()
-		if err := taskSvc.ResetInProgress(ctx); err != nil {
-			logger.Error("Failed to reset in-progress tasks", "error", err)
-		}
-	}
-
 	// Create auth middleware
-	authMiddleware := auth.NewMiddleware(cfg, dbManager)
+	authMiddleware := auth.NewMiddleware(cfg)
 
-	// Create handlers with user registry for per-user service creation
-	h, err := handlers.NewHandlers(userRegistry, eventBus, cfg)
+	// Create handlers with shared database
+	h, err := handlers.NewHandlers(database, eventBus, cfg)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)
@@ -129,44 +115,47 @@ func main() {
 		r.Get("/github/callback", h.HandleGitHubCallback)
 	})
 
-	// Protected routes (auth required in multi-tenant mode)
+	// Protected routes (auth required)
 	r.Group(func(r chi.Router) {
-		// Apply auth middleware - in single-player mode this sets userID to "default"
+		// Apply auth middleware - sets userID from JWT or defaults to "default"
 		r.Use(authMiddleware.RequireAuth)
-
-		// Main app routes (authenticated users go to /app or /feed)
-		r.Get("/app", h.RenderApp)
-		r.Get("/feed", h.HandleFeed)
-		r.Get("/task/{id}", h.HandleTaskDetailUI)
 
 		// Unified SSE endpoint
 		r.Get("/events", h.HandleSSE)
 
 		// Actions
-		r.Post("/add-task", h.HandleAddTask)
-		r.Post("/action/retry/{id}", h.HandleActionRetry)
-		r.Post("/action/clear/{id}", h.HandleActionClear)
-		r.Post("/action/merge/{id}", h.HandleActionMerge)
-		r.Post("/action/pr/{id}", h.HandleActionPR)
-		r.Post("/action/discard/{id}", h.HandleActionDiscard)
-		r.Post("/action/chat/{id}", h.HandleActionChat)
+		r.Post("/api/add-task", h.HandleAddTask)
+		r.Post("/api/action/clear/{id}", h.HandleActionClear)
+		r.Post("/api/action/retry/{id}", h.HandleActionRetry)
+		r.Post("/api/action/merge/{id}", h.HandleActionMerge)
+		r.Post("/api/action/pr/{id}", h.HandleActionPR)
+		r.Post("/api/action/discard/{id}", h.HandleActionDiscard)
+		r.Post("/api/action/chat/{id}", h.HandleActionChat)
 
 		// Merge
-		r.Post("/action/resolve-conflict/{id}", h.HandleResolveConflict)
-		r.Post("/action/abort-merge/{id}", h.HandleAbortMerge)
-		r.Post("/action/complete-merge/{id}", h.HandleCompleteMerge)
+		r.Post("/api/action/resolve-conflict/{id}", h.HandleResolveConflict)
+		r.Post("/api/action/abort-merge/{id}", h.HandleAbortMerge)
+		r.Post("/api/action/complete-merge/{id}", h.HandleCompleteMerge)
+
+		// JSON API endpoints (for SvelteKit SPA)
+		r.Get("/api/feed", h.HandleAPIFeed)
+		r.Get("/api/task/{id}", h.HandleAPITask)
+		r.Get("/api/session", h.HandleAPISession)
+		r.Get("/api/settings", h.HandleAPISettings)
+		r.Get("/api/files/search", h.HandleFileSearch)
+		r.Get("/api/github/repos", h.HandleGitHubRepos)
+		r.Post("/api/project/activate", h.HandleActivateProject)
 
 		// Settings and transcription
-		r.Post("/settings", h.HandleSaveSettings)
-		r.Post("/transcribe", h.HandleTranscribe)
-		r.Get("/api/files/search", h.HandleFileSearch)
+		r.Post("/api/settings", h.HandleSaveSettings)
+		r.Post("/api/transcribe", h.HandleTranscribe)
 
 		// Auth management
-		r.Post("/auth/logout", h.HandleLogout)
+		r.Post("/api/logout", h.HandleLogout)
+		r.Post("/api/disconnect", h.HandleDisconnect)
 
-		// GitHub OAuth
-		r.Get("/github/authorize", h.HandleGitHubAuthorize)
-		r.Post("/disconnect", h.HandleDisconnect)
+		// GitHub OAuth (for users already authenticated via Supabase)
+		r.Get("/api/github/authorize", h.HandleGitHubAuthorize)
 	})
 
 	// Start server
@@ -202,10 +191,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	userRegistry.Shutdown()
-	if err := dbManager.CloseAll(); err != nil {
-		logger.Error("Failed to close databases", "error", err)
-	}
-
 	logger.Info("Server stopped")
+}
+
+// maskDatabaseURL masks the password in a database URL for logging
+func maskDatabaseURL(url string) string {
+	if url == "" {
+		return "(not set)"
+	}
+	// Simple masking - just show the host part
+	if len(url) > 30 {
+		return url[:20] + "..."
+	}
+	return url[:10] + "..."
 }
