@@ -127,7 +127,7 @@
 	async function submit() {
 		if (!text.trim()) return;
 		if (mode === 'create' && !appState.activeProjectId) {
-			appState.showToast('Select a project first');
+			appState.showToast('Select a project first', 'error');
 			return;
 		}
 
@@ -140,18 +140,22 @@
 		} else if (mode === 'create') {
 			// Handle task creation
 			try {
-				await tasksAPI.create(msg, appState.activeProjectId, appState.activeModelId);
+				const response = await tasksAPI.create(msg, appState.activeProjectId, appState.activeModelId);
+				appState.showToast(response.message || 'Task created', 'success');
 			} catch (e) {
 				console.error('Failed to create task:', e);
-				appState.showToast('Failed to create task');
+				appState.showToast(e instanceof Error ? e.message : 'Failed to create task', 'error');
 			}
 		} else if (mode === 'chat' && taskId) {
 			// Handle chat submission
 			try {
-				await tasksAPI.chat(taskId, msg, appState.activeModelId);
+				const response = await tasksAPI.chat(taskId, msg, appState.activeModelId);
+				if (response.message) {
+					appState.showToast(response.message, 'success');
+				}
 			} catch (e) {
 				console.error('Failed to send message:', e);
-				appState.showToast('Failed to send message');
+				appState.showToast(e instanceof Error ? e.message : 'Failed to send message', 'error');
 			}
 		}
 

@@ -1,4 +1,4 @@
-import type { Project, Task, FeedData, UserSettings, Message, LogEntry, GitHubRepo, SessionInfo } from '$lib/types';
+import type { Project, Task, FeedData, UserSettings, Message, LogEntry, GitHubRepo, SessionInfo, APIResponse, ConflictResponse } from '$lib/types';
 import { logError } from '$lib/utils/logger';
 
 // API base URL - uses proxy in dev, relative path in prod
@@ -57,6 +57,44 @@ async function postFormNoResponse(path: string, formData: FormData): Promise<voi
 		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
 		throw new Error(errMsg);
 	}
+}
+
+// Helper for POST that returns structured APIResponse
+async function postFormWithResponse(path: string, formData: FormData): Promise<APIResponse> {
+	const response = await fetch(`${API_BASE}${path}`, {
+		method: 'POST',
+		body: formData,
+		credentials: 'include'
+	});
+
+	const data = await response.json().catch(() => ({ status: 'error', message: 'Unknown error' }));
+
+	if (!response.ok) {
+		const errMsg = data.message || `API error: ${response.status}`;
+		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
+		throw new Error(errMsg);
+	}
+
+	return data as APIResponse;
+}
+
+// Helper for POST action that returns APIResponse (no form data)
+async function postAction(path: string): Promise<APIResponse> {
+	const response = await fetch(`${API_BASE}${path}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		credentials: 'include'
+	});
+
+	const data = await response.json().catch(() => ({ status: 'error', message: 'Unknown error' }));
+
+	if (!response.ok) {
+		const errMsg = data.message || `API error: ${response.status}`;
+		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
+		throw new Error(errMsg);
+	}
+
+	return data as APIResponse;
 }
 
 // ==================== AUTH ====================
@@ -143,59 +181,59 @@ export const tasksAPI = {
 		);
 	},
 
-	async create(intent: string, projectId: string, modelId: string): Promise<void> {
+	async create(intent: string, projectId: string, modelId: string): Promise<APIResponse> {
 		const formData = new FormData();
 		formData.append('voice_input', intent);
 		formData.append('project_id', projectId);
 		formData.append('model_id', modelId);
 
-		await postFormNoResponse('/api/v1/add-task', formData);
+		return postFormWithResponse('/api/v1/add-task', formData);
 	},
 
-	async chat(taskId: string, message: string, modelId?: string): Promise<void> {
+	async chat(taskId: string, message: string, modelId?: string): Promise<APIResponse> {
 		const formData = new FormData();
 		formData.append('message', message);
 		if (modelId) {
 			formData.append('model_id', modelId);
 		}
 
-		await postFormNoResponse(`/api/action/chat/${taskId}`, formData);
+		return postFormWithResponse(`/api/action/chat/${taskId}`, formData);
 	},
 
-	async retry(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/retry/${taskId}`, { method: 'POST' });
+	async retry(taskId: string): Promise<APIResponse> {
+		return postAction(`/api/action/retry/${taskId}`);
 	},
 
-	async clear(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/clear/${taskId}`, { method: 'POST' });
+	async clear(taskId: string): Promise<APIResponse> {
+		return postAction(`/api/action/clear/${taskId}`);
 	},
 
-	async merge(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/merge/${taskId}`, { method: 'POST' });
+	async merge(taskId: string): Promise<APIResponse | ConflictResponse> {
+		return postAction(`/api/action/merge/${taskId}`);
 	},
 
-	async createPR(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/pr/${taskId}`, { method: 'POST' });
+	async createPR(taskId: string): Promise<APIResponse> {
+		return postAction(`/api/action/pr/${taskId}`);
 	},
 
-	async discard(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/discard/${taskId}`, { method: 'POST' });
+	async discard(taskId: string): Promise<APIResponse> {
+		return postAction(`/api/action/discard/${taskId}`);
 	},
 
-	async resolveConflict(taskId: string, filePath: string, choice: 'ours' | 'theirs'): Promise<void> {
+	async resolveConflict(taskId: string, filePath: string, choice: 'ours' | 'theirs'): Promise<APIResponse> {
 		const formData = new FormData();
 		formData.append('file', filePath);
 		formData.append('choice', choice);
 
-		await postFormNoResponse(`/api/action/resolve-conflict/${taskId}`, formData);
+		return postFormWithResponse(`/api/action/resolve-conflict/${taskId}`, formData);
 	},
 
-	async abortMerge(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/abort-merge/${taskId}`, { method: 'POST' });
+	async abortMerge(taskId: string): Promise<APIResponse> {
+		return postAction(`/api/action/abort-merge/${taskId}`);
 	},
 
-	async completeMerge(taskId: string): Promise<void> {
-		await fetchAPI(`/api/action/complete-merge/${taskId}`, { method: 'POST' });
+	async completeMerge(taskId: string): Promise<APIResponse> {
+		return postAction(`/api/action/complete-merge/${taskId}`);
 	}
 };
 

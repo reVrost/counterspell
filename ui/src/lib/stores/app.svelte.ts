@@ -1,4 +1,4 @@
-import { MODELS, type Model, type Project, type UserSettings, type GitHubRepo } from '$lib/types';
+import { MODELS, type Model, type Project, type UserSettings, type GitHubRepo, type ToastType } from '$lib/types';
 import { authAPI, projectsAPI, settingsAPI, githubAPI } from '$lib/api';
 
 // Reactive app state using Svelte 5 runes
@@ -13,6 +13,7 @@ class AppState {
 	// Toast
 	toastOpen = $state(false);
 	toastMsg = $state('');
+	toastType = $state<ToastType>('success');
 
 	// Project State
 	activeProjectId = $state('');
@@ -129,7 +130,7 @@ class AppState {
 					}
 				} catch (err) {
 					console.error('Failed to activate project:', err);
-					this.showToast('Failed to activate project');
+					this.showToast('Failed to activate project', 'error');
 					return;
 				}
 			}
@@ -148,12 +149,13 @@ class AppState {
 		localStorage.setItem('counterspell_model', id);
 	}
 
-	showToast(msg: string) {
+	showToast(msg: string, type: ToastType = 'success') {
 		this.toastMsg = msg;
+		this.toastType = type;
 		this.toastOpen = true;
 		setTimeout(() => {
 			this.toastOpen = false;
-		}, 3000);
+		}, type === 'error' ? 5000 : 3000);
 	}
 
 	closeModal() {
@@ -243,7 +245,7 @@ class AppState {
 			await authAPI.disconnect();
 		} catch (err) {
 			console.error('Failed to disconnect:', err);
-			this.showToast('Failed to disconnect properly');
+			this.showToast('Failed to disconnect properly', 'error');
 		}
 	}
 
@@ -265,7 +267,7 @@ class AppState {
 			this.showToast('Settings saved');
 		} catch (err) {
 			console.error('Failed to save settings:', err);
-			this.showToast('Failed to save settings');
+			this.showToast('Failed to save settings', 'error');
 		}
 	}
 }
