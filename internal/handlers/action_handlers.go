@@ -1,21 +1,17 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/services"
 )
 
 func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Task restarting...",
-	})
+	_ = render.Render(w, r, Success("Task restarting..."))
 }
 
 // HandleActionClear clears a task's chat history and context
@@ -26,15 +22,11 @@ func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.taskService.ClearHistory(ctx, userID, taskID); err != nil {
 		slog.Error("Failed to clear task history", "error", err, "task_id", taskID)
-		http.Error(w, "Failed to clear history", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to clear history"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Chat history cleared",
-	})
+	_ = render.Render(w, r, Success("Chat history cleared"))
 }
 
 // HandleActionMerge merges a task's branch to main and pushes
@@ -45,7 +37,7 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
@@ -58,29 +50,20 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 			conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, conflictErr.ConflictedFiles)
 			if err != nil {
 				slog.Error("Failed to get conflict details", "error", err)
-				http.Error(w, "Failed to load conflict details", http.StatusInternalServerError)
+				_ = render.Render(w, r, ErrInternalServer("Failed to load conflict details"))
 				return
 			}
 
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"status":    "conflict",
-				"task_id":   taskID,
-				"conflicts": conflicts,
-			})
+			_ = render.Render(w, r, Conflict(taskID, conflicts))
 			return
 		}
 
 		slog.Error("Failed to merge task", "task_id", taskID, "error", err)
-		http.Error(w, "Merge failed: "+err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Merged to main and pushed!",
-	})
+	_ = render.Render(w, r, Success("Merged to main and pushed!"))
 }
 
 // HandleResolveConflict resolves a single file conflict
@@ -89,48 +72,39 @@ func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request)
 	taskID := chi.URLParam(r, "id")
 	userID := auth.UserIDFromContext(ctx)
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+	data := &ResolveConflictRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
-
-	filePath := r.FormValue("file")
-	choice := r.FormValue("choice")
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
-	conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, []string{filePath})
+	conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, []string{data.File})
 	if err != nil || len(conflicts) == 0 {
-		http.Error(w, "Failed to get conflict", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get conflict"))
 		return
 	}
 
 	var resolution string
-	switch choice {
+	switch data.Choice {
 	case "ours":
 		resolution = conflicts[0].Ours
 	case "theirs":
 		resolution = conflicts[0].Theirs
-	default:
-		http.Error(w, "Invalid choice", http.StatusBadRequest)
-		return
 	}
 
-	if err := orchestrator.ResolveConflict(ctx, taskID, filePath, resolution); err != nil {
+	if err := orchestrator.ResolveConflict(ctx, taskID, data.File, resolution); err != nil {
 		slog.Error("Failed to resolve conflict", "error", err)
-		http.Error(w, "Failed to resolve conflict", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to resolve conflict"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Resolved " + filePath,
-	})
+	_ = render.Render(w, r, Success("Resolved "+data.File))
 }
 
 // HandleAbortMerge aborts the current merge
@@ -141,22 +115,17 @@ func (h *Handlers) HandleAbortMerge(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		w.WriteHeader(http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
 	if err := orchestrator.AbortMerge(ctx, taskID); err != nil {
 		slog.Error("Failed to abort merge", "error", err)
-		http.Error(w, "Failed to abort merge", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to abort merge"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Merge aborted",
-	})
+	_ = render.Render(w, r, Success("Merge aborted"))
 }
 
 // HandleCompleteMerge completes the merge after conflicts are resolved
@@ -167,22 +136,17 @@ func (h *Handlers) HandleCompleteMerge(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		w.WriteHeader(http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
 	if err := orchestrator.CompleteMergeResolution(ctx, taskID); err != nil {
 		slog.Error("Failed to complete merge", "error", err)
-		http.Error(w, "Merge failed: "+err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Merged to main!",
-	})
+	_ = render.Render(w, r, Success("Merged to main!"))
 }
 
 // HandleActionPR creates a GitHub Pull Request for the task
@@ -193,24 +157,18 @@ func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error"}`)
-		w.WriteHeader(http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
 	prURL, err := orchestrator.CreatePR(ctx, taskID)
 	if err != nil {
 		slog.Error("Failed to create PR", "task_id", taskID, "error", err)
-		http.Error(w, "Failed to create PR: "+err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to create PR: "+err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "PR created!",
-		"pr_url":  prURL,
-	})
+	_ = render.Render(w, r, SuccessWithPR("PR created!", prURL))
 }
 
 // HandleActionDiscard deletes a task and cleans up its worktree
@@ -221,7 +179,7 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
@@ -231,15 +189,11 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.taskService.Delete(ctx, userID, id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer(err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Task discarded",
-	})
+	_ = render.Render(w, r, Success("Task discarded"))
 }
 
 // HandleActionChat continues a task with a follow-up message.
@@ -249,40 +203,26 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(ctx)
 	slog.Info("[CHAT] HandleActionChat called", "task_id", taskID)
 
-	if err := r.ParseForm(); err != nil {
-		slog.Error("[CHAT] ParseForm failed", "error", err)
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+	data := &ChatRequest{}
+	if err := render.Bind(r, data); err != nil {
+		slog.Error("[CHAT] Bind failed", "error", err)
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
-	message := r.FormValue("message")
-	slog.Info("[CHAT] Got message", "message", message)
-	if message == "" {
-		slog.Warn("[CHAT] Empty message")
-		http.Error(w, "Message required", http.StatusBadRequest)
-		return
-	}
-
-	modelID := r.FormValue("model_id")
-	if modelID == "" {
-		modelID = "o#anthropic/claude-sonnet-4"
-	}
+	slog.Info("[CHAT] Got message", "message", data.Message)
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Internal error"))
 		return
 	}
 
-	if err := orchestrator.ContinueTask(ctx, taskID, message, modelID); err != nil {
+	if err := orchestrator.ContinueTask(ctx, taskID, data.Message, data.ModelID); err != nil {
 		slog.Error("Failed to continue task", "task_id", taskID, "error", err)
-		http.Error(w, "Failed to continue task", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to continue task"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Message sent",
-	})
+	_ = render.Render(w, r, Success("Message sent"))
 }

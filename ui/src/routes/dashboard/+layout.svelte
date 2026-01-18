@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Header from '$lib/components/Header.svelte';
 	import Toast from '$lib/components/Toast.svelte';
+	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import ChatInput from '$lib/components/ChatInput.svelte';
 	import TaskDetail from '$lib/components/TaskDetail.svelte';
 	import { appState } from '$lib/stores/app.svelte';
@@ -243,6 +244,7 @@
 
 <div class="h-screen flex flex-col overflow-hidden bg-background">
 	<Toast />
+	<SettingsModal />
 	<Header />
 
 	<main class="flex-1 overflow-y-auto bg-background relative pt-14" id="feed-container">

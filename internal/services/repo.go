@@ -225,11 +225,11 @@ func (m *RepoManager) CleanupWorktree(owner, repo, taskID string) error {
 	return nil
 }
 
-// CommitAndPush commits changes and pushes the branch.
-func (m *RepoManager) CommitAndPush(taskID, message string) error {
+// Commit stages and commits changes without pushing.
+func (m *RepoManager) Commit(taskID, message string) error {
 	worktreePath := m.worktreePath(taskID)
 
-	slog.Info("[GIT] CommitAndPush called", "task_id", taskID, "worktree_path", worktreePath)
+	slog.Info("[GIT] Commit called", "task_id", taskID, "worktree_path", worktreePath)
 
 	// Stage all changes
 	cmd := exec.Command("git", "add", "-A")
@@ -257,19 +257,17 @@ func (m *RepoManager) CommitAndPush(taskID, message string) error {
 		slog.Error("[GIT] git commit failed", "error", err, "output", string(output))
 		return fmt.Errorf("git commit failed: %w\nOutput: %s", err, string(output))
 	}
-	slog.Info("[GIT] git commit successful")
 
-	// Push
-	cmd = exec.Command("git", "push", "-u", "origin", "HEAD")
-	cmd.Dir = worktreePath
-	slog.Info("[GIT] Executing: git push -u origin HEAD", "dir", worktreePath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		slog.Error("[GIT] git push failed", "error", err, "output", string(output))
-		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
-	}
-
-	slog.Info("[GIT] Committed and pushed successfully", "task_id", taskID)
+	slog.Info("[GIT] Committed successfully", "task_id", taskID)
 	return nil
+}
+
+// CommitAndPush commits changes and pushes the branch.
+func (m *RepoManager) CommitAndPush(taskID, message string) error {
+	if err := m.Commit(taskID, message); err != nil {
+		return err
+	}
+	return m.PushBranch(taskID)
 }
 
 // PushBranch pushes the current branch to remote without committing.

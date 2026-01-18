@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
+	"github.com/go-chi/render"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/revrost/code/counterspell/internal/models"
 )
@@ -63,7 +63,7 @@ func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
 		oauthURL, err := h.authService.GetOAuthURL("github", callbackURL)
 		if err != nil {
 			slog.Error("Failed to get Supabase OAuth URL", "error", err)
-			http.Error(w, "OAuth error", http.StatusInternalServerError)
+			_ = render.Render(w, r, ErrInternalServer("OAuth error"))
 			return
 		}
 
@@ -230,17 +230,13 @@ func (h *Handlers) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		slog.Info("[AUTH] Cleared auth session")
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"status":  "success",
-		"message": "Logged out successfully",
-	})
+	_ = render.Render(w, r, Success("Logged out successfully"))
 }
 
 // HandleTokenRefresh refreshes an expired JWT using the refresh token
 func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if h.authService == nil {
-		http.Error(w, "Auth not configured", http.StatusServiceUnavailable)
+		_ = render.Render(w, r, ErrInternalServer("Auth not configured"))
 		return
 	}
 	slog.Info("[AUTH] HandleTokenRefresh called")
@@ -249,7 +245,7 @@ func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("sb-refresh-token")
 	if err != nil || cookie.Value == "" {
 		slog.Warn("Token refresh failed: no refresh token")
-		http.Error(w, "No refresh token", http.StatusUnauthorized)
+		_ = render.Render(w, r, ErrUnauthorized("No refresh token"))
 		return
 	}
 
@@ -257,7 +253,7 @@ func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	tokens, err := h.authService.RefreshToken(cookie.Value)
 	if err != nil {
 		slog.Error("Token refresh failed", "error", err)
-		http.Error(w, "Refresh failed", http.StatusUnauthorized)
+		_ = render.Render(w, r, ErrUnauthorized("Refresh failed"))
 		return
 	}
 
@@ -283,5 +279,5 @@ func (h *Handlers) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	})
 
 	slog.Info("Token refreshed via endpoint", "expires_in", tokens.ExpiresIn)
-	w.WriteHeader(http.StatusOK)
+	render.NoContent(w, r)
 }

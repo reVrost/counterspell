@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/auth"
 )
 
@@ -20,29 +20,21 @@ type UILogEntry struct {
 	Extra     map[string]any `json:"extra"`     // Additional context
 }
 
+func (u *UILogEntry) Bind(r *http.Request) error {
+	return nil
+}
+
 // HandleUILog receives log entries from the UI and writes them to server log via slog.
 func (h *Handlers) HandleUILog(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	// userID may be empty if auth failed - that's OK for logging
 	userID := auth.UserIDFromContext(r.Context())
 	if userID == "" {
 		userID = "anonymous"
 	}
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read body", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	var entry UILogEntry
-	if err := json.Unmarshal(body, &entry); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	entry := &UILogEntry{}
+	if err := render.Bind(r, entry); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
@@ -72,17 +64,18 @@ func (h *Handlers) HandleUILog(w http.ResponseWriter, r *http.Request) {
 		slog.Info(entry.Message, attrs...)
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	render.NoContent(w, r)
 }
 
 // HandleReadLogs returns server.log contents for agent debugging.
 func (h *Handlers) HandleReadLogs(w http.ResponseWriter, r *http.Request) {
-	data, err := os.ReadFile("server.log")
+	f, err := os.Open("server.log")
 	if err != nil {
-		http.Error(w, "Log file not found", http.StatusNotFound)
+		_ = render.Render(w, r, ErrNotFound("Log file not found"))
 		return
 	}
+	defer f.Close()
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write(data)
+	_, _ = io.Copy(w, f)
 }

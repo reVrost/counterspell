@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/models"
 )
@@ -18,7 +18,7 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 	// Get tasks from DB
 	dbTasks, err := h.taskService.List(ctx, userID, nil, nil)
 	if err != nil {
-		http.Error(w, "Failed to load tasks", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks"))
 		return
 	}
 
@@ -63,10 +63,7 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(feed); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	render.JSON(w, r, feed)
 }
 
 // HandleGitHubRepos returns all cached GitHub repositories
@@ -76,14 +73,11 @@ func (h *Handlers) HandleGitHubRepos(w http.ResponseWriter, r *http.Request) {
 
 	repos, err := h.repoCache.GetCachedRepos(ctx, userID)
 	if err != nil {
-		http.Error(w, "Failed to load repos", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to load repos"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(repos); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	render.JSON(w, r, repos)
 }
 
 // HandleSyncRepos manually triggers a sync of GitHub repos to both cache and projects table
@@ -94,7 +88,7 @@ func (h *Handlers) HandleSyncRepos(w http.ResponseWriter, r *http.Request) {
 	// Get GitHub connection
 	conn, err := h.githubService.GetActiveConnection(ctx, userID)
 	if err != nil || conn == nil {
-		http.Error(w, "No GitHub connection found", http.StatusBadRequest)
+		_ = render.Render(w, r, ErrInvalidRequest(nil))
 		return
 	}
 
@@ -106,13 +100,12 @@ func (h *Handlers) HandleSyncRepos(w http.ResponseWriter, r *http.Request) {
 	// Sync to projects table
 	if err := h.githubService.FetchAndSaveRepositories(ctx, userID, conn); err != nil {
 		slog.Error("[SyncRepos] Failed to save projects", "error", err)
-		http.Error(w, "Failed to sync repositories", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to sync repositories"))
 		return
 	}
 
 	slog.Info("[SyncRepos] Sync completed", "user_id", userID)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = render.Render(w, r, Success("Sync completed"))
 }
 
 // HandleActivateProject adds a repo to projects list
@@ -120,27 +113,19 @@ func (h *Handlers) HandleActivateProject(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-
-	owner := r.FormValue("owner")
-	repo := r.FormValue("repo")
-
-	if owner == "" || repo == "" {
-		http.Error(w, "Owner and Repo are required", http.StatusBadRequest)
+	data := &ActivateProjectRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
 	// Save project to DB
-	if err := h.githubService.SaveProject(ctx, userID, owner, repo); err != nil {
-		http.Error(w, "Failed to save project", http.StatusInternalServerError)
+	if err := h.githubService.SaveProject(ctx, userID, data.Owner, data.Repo); err != nil {
+		_ = render.Render(w, r, ErrInternalServer("Failed to save project"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	_ = render.Render(w, r, Success("Project activated"))
 }
 
 // HandleAPITask returns a single task as JSON
@@ -152,14 +137,11 @@ func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
 	// Get task from DB
 	dbTask, err := h.taskService.Get(ctx, userID, taskID)
 	if err != nil {
-		http.Error(w, "Task not found", http.StatusNotFound)
+		_ = render.Render(w, r, ErrNotFound("Task not found"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(dbTask); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	render.JSON(w, r, dbTask)
 }
 
 // HandleAPISession returns current session info as JSON
@@ -208,10 +190,7 @@ func (h *Handlers) HandleAPISession(w http.ResponseWriter, r *http.Request) {
 		response.Authenticated = true
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	render.JSON(w, r, response)
 }
 
 // HandleAPISettings returns user settings as JSON
@@ -221,12 +200,9 @@ func (h *Handlers) HandleAPISettings(w http.ResponseWriter, r *http.Request) {
 
 	settings, err := h.settingsService.GetSettings(ctx, userID)
 	if err != nil {
-		http.Error(w, "Failed to load settings", http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to load settings"))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(settings); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	render.JSON(w, r, settings)
 }
