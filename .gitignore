@@ -6,8 +6,8 @@
 tmp
 node_modules
 dist
-# .svelte-kit
-# ui/.svelte-kit
+.svelte-kit
+ui/.svelte-kit
 
 # Database
 *.db
