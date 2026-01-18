@@ -491,14 +491,14 @@ func (o *Orchestrator) executeTask(job *TaskJob) {
 	agentOutput = backend.FinalMessage()
 	messageHistory = backend.GetState()
 
-	// Commit and push changes
+	// Commit changes (push happens on merge/PR action)
 	o.emit(job.TaskID, "info", "Committing changes...")
 
 	commitMsg := fmt.Sprintf("feat: %s\n\nTask ID: %s", job.Intent, job.TaskID)
-	if err := o.repos.CommitAndPush(job.TaskID, commitMsg); err != nil {
-		o.emit(job.TaskID, "info", "No changes to commit or push failed: "+err.Error())
+	if err := o.repos.Commit(job.TaskID, commitMsg); err != nil {
+		o.emit(job.TaskID, "info", "No changes to commit: "+err.Error())
 	} else {
-		o.emit(job.TaskID, "success", fmt.Sprintf("Pushed to branch: %s", branchName))
+		o.emit(job.TaskID, "success", fmt.Sprintf("Changes committed to branch: %s", branchName))
 	}
 
 	// Get git diff

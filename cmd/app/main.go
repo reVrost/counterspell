@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/config"
 	"github.com/revrost/code/counterspell/internal/db"
@@ -109,8 +110,7 @@ func main() {
 	r.Group(func(r chi.Router) {
 		// Health check
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"status":"ok"}`))
+			render.JSON(w, r, map[string]string{"status": "ok"})
 		})
 
 		// Auth routes (login page, OAuth callbacks)

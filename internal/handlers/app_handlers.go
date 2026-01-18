@@ -2,28 +2,21 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
 // HandleHome returns a JSON object with app metadata
 func (h *Handlers) HandleHome(w http.ResponseWriter, r *http.Request) {
-	response := struct {
-		Name        string `json:"name"`
-		Version     string `json:"version"`
-		Description string `json:"description"`
-	}{
-		Name:        "Counterspell",
-		Version:     "2.1.0",
-		Description: "Mobile-first, hosted AI agent Kanban.",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	render.JSON(w, r, map[string]string{
+		"name":        "Counterspell",
+		"version":     "2.1.0",
+		"description": "Mobile-first, hosted AI agent Kanban.",
+	})
 }
 
 // HandleTaskDetailUI returns task details as JSON (alias to HandleAPITask)
@@ -31,48 +24,35 @@ func (h *Handlers) HandleTaskDetailUI(w http.ResponseWriter, r *http.Request) {
 	h.HandleAPITask(w, r)
 }
 
-// HandleActionRetry mocks retry action
-
 // HandleAddTask creates a new task and starts execution.
 func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	data := &AddTaskRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
-	intent := r.FormValue("voice_input")
-	projectID := r.FormValue("project_id")
-	modelID := r.FormValue("model_id")
-
-	if intent == "" {
-		// h.HandleFeed(w, r)
-		return
-	}
-
-	if projectID == "" {
-		w.Header().Set("HX-Trigger", `{"toast": "Select a project first", "taskCreated": "false"}`)
-		return
-	}
+	slog.Info("Adding task", "intent", data.VoiceInput)
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
 		slog.Error("Failed to get orchestrator", "error", err)
-		w.Header().Set("HX-Trigger", `{"toast": "Internal error", "taskCreated": "false"}`)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get orchestrator"))
 		return
 	}
 
-	_, err = orchestrator.StartTask(ctx, projectID, intent, modelID)
+	_, err = orchestrator.StartTask(ctx, data.ProjectID, data.VoiceInput, data.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
-		http.Error(w, "Failed to start task: "+err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to start task: "+err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "message": "Task started"})
+	render.Status(r, http.StatusCreated)
+	_ = render.Render(w, r, Success("Task started"))
 }
 
 // HandleSaveSettings saves user settings
@@ -80,8 +60,9 @@ func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	data := &SaveSettingsRequest{}
+	if err := render.Bind(r, data); err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
@@ -91,20 +72,19 @@ func (h *Handlers) HandleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 	settings := &models.UserSettings{
 		UserID:        userID,
-		OpenRouterKey: r.FormValue("openrouter_key"),
-		ZaiKey:        r.FormValue("zai_key"),
-		AnthropicKey:  r.FormValue("anthropic_key"),
-		OpenAIKey:     r.FormValue("openai_key"),
-		AgentBackend:  r.FormValue("agent_backend"),
+		OpenRouterKey: data.OpenRouterKey,
+		ZaiKey:        data.ZaiKey,
+		AnthropicKey:  data.AnthropicKey,
+		OpenAIKey:     data.OpenAIKey,
+		AgentBackend:  data.AgentBackend,
 	}
 
 	if err := h.settingsService.UpdateSettings(ctx, userID, settings); err != nil {
-		http.Error(w, "Failed to save settings: "+err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Failed to save settings: "+err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "message": "Settings saved successfully"})
+	_ = render.Render(w, r, Success("Settings saved successfully"))
 }
 
 // HandleFileSearch searches for files in a project using fuzzy matching.
@@ -115,22 +95,20 @@ func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 
 	if projectID == "" {
-		http.Error(w, "project_id required", http.StatusBadRequest)
+		_ = render.Render(w, r, ErrInvalidRequest(nil))
 		return
 	}
 
 	orchestrator, err := h.getOrchestrator(userID)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte("[]"))
+		render.JSON(w, r, []string{})
 		return
 	}
 
 	files, err := orchestrator.SearchProjectFiles(ctx, projectID, query, 20)
 	if err != nil {
 		slog.Error("File search failed", "error", err)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte("[]"))
+		render.JSON(w, r, []string{})
 		return
 	}
 
@@ -138,10 +116,7 @@ func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
 		files = []string{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(files); err != nil {
-		slog.Error("Failed to encode file search results", "error", err)
-	}
+	render.JSON(w, r, files)
 }
 
 // HandleTranscribe transcribes uploaded audio to text.
@@ -149,13 +124,13 @@ func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		http.Error(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
 	file, header, err := r.FormFile("audio")
 	if err != nil {
-		http.Error(w, "No audio file provided", http.StatusBadRequest)
+		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 	defer func() { _ = file.Close() }()
@@ -165,11 +140,9 @@ func (h *Handlers) HandleTranscribe(w http.ResponseWriter, r *http.Request) {
 	text, err := h.transcription.TranscribeAudio(ctx, file, contentType)
 	if err != nil {
 		slog.Error("Transcription failed", "error", err)
-		http.Error(w, "Transcription failed: "+err.Error(), http.StatusInternalServerError)
+		_ = render.Render(w, r, ErrInternalServer("Transcription failed: "+err.Error()))
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	//nolint:errcheck
-	w.Write([]byte(text))
+	render.PlainText(w, r, text)
 }

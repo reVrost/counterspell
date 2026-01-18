@@ -102,6 +102,25 @@ go build ./...                   # Build Go backend
 LOG_LEVEL=debug go run ./cmd/app # Run with debug logging
 ```
 
+## Debugging
+
+**Server logs are written to `server.log` in the project root.** Use this file to:
+- Debug reported bugs
+- Trace request/response flows
+- Investigate errors and panics
+- Review agent execution logs
+
+```bash
+# Tail logs in real-time
+tail -f server.log
+
+# Search for errors
+grep -i error server.log
+
+# Filter by task ID
+grep "task_id=abc123" server.log
+```
+
 ---
 
 ## Code Style
