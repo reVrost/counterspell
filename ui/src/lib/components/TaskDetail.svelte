@@ -129,10 +129,14 @@
 		</div>
 		<!-- Status Indicator -->
 		<div class="w-6 flex justify-end pr-2">
-			{#if task.status === 'in_progress'}
+			{#if task.status === 'planning'}
+				<div class="w-1.5 h-1.5 rounded-full bg-purple-400" title="Planning"></div>
+			{:else if task.status === 'in_progress'}
 				<div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
-			{:else if task.status === 'review'}
-				<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Needs Review"></div>
+			{:else if task.status === 'agent_review'}
+				<div class="w-1.5 h-1.5 rounded-full bg-yellow-400" title="Agent Review"></div>
+			{:else if task.status === 'human_review'}
+				<div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Human Review"></div>
 			{:else if task.status === 'done'}
 				<div class="w-1.5 h-1.5 rounded-full bg-green-400" title="Done"></div>
 			{/if}
@@ -230,15 +234,17 @@
 				<EraserIcon class="w-3 h-3" />
 				<span>Clear</span>
 			</button>
-			<span class="text-gray-700 self-center">·</span>
-			<button
-				onclick={() => (confirmAction = 'pr')}
-				class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
-				aria-label="Create pull request"
-			>
-				<GithubIcon class="w-3 h-3" />
-				<span>Create PR</span>
-			</button>
+			{#if task.status === 'human_review'}
+				<span class="text-gray-700 self-center">·</span>
+				<button
+					onclick={() => (confirmAction = 'pr')}
+					class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
+					aria-label="Create pull request"
+				>
+					<GithubIcon class="w-3 h-3" />
+					<span>Create PR</span>
+				</button>
+			{/if}
 		</div>
 
 		<!-- Main action buttons -->
@@ -250,13 +256,15 @@
 				<MessageSquareIcon class="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
 				<span class="text-sm font-medium">Chat</span>
 			</button>
-			<button
-				onclick={() => (confirmAction = 'merge')}
-				class="flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
-			>
-				<GitMergeIcon class="w-4 h-4" />
-				<span class="text-sm font-medium">Merge</span>
-			</button>
+			{#if task.status === 'human_review'}
+				<button
+					onclick={() => (confirmAction = 'merge')}
+					class="flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
+				>
+					<GitMergeIcon class="w-4 h-4" />
+					<span class="text-sm font-medium">Merge</span>
+				</button>
+			{/if}
 		</div>
 	</div>
 

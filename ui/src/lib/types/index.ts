@@ -29,9 +29,29 @@ export interface Task {
 	logs: LogEntry[];
 	createdAt: string;
 	updatedAt: string;
+	// Planning phase fields
+	frontendPlan?: string;      // Plan from frontend planning agent
+	backendPlan?: string;       // Plan from backend planning agent
+	detailedSpec?: string;      // Synthesized detailed spec with test cases
+	planningPhase?: PlanningPhase; // Current planning phase
+	// Review fields
+	reviewResult?: ReviewResult;   // Agent review outcome
 }
 
-export type TaskStatus = 'pending' | 'in_progress' | 'review' | 'done' | 'failed';
+// Task Status Flow: planning → in_progress → agent_review → human_review → done
+export type TaskStatus = 'planning' | 'in_progress' | 'agent_review' | 'human_review' | 'done';
+
+// Planning phases within the planning status
+export type PlanningPhase = 'frontend' | 'backend' | 'synthesize';
+
+// Review result from agent review
+export interface ReviewResult {
+	confidence: number;      // 0-100 confidence score
+	issues: string[];        // Issues found during review
+	fixAttempts: number;     // Number of auto-fix attempts made
+	passedReview: boolean;   // Whether review passed (confidence >= 80)
+	reviewSummary: string;   // Summary of the review
+}
 
 export interface Message {
 	role: 'user' | 'assistant';

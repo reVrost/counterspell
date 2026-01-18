@@ -8,12 +8,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type AgentLog struct {
-	ID        int32              `json:"id"`
-	TaskID    string             `json:"task_id"`
-	Level     pgtype.Text        `json:"level"`
-	Message   string             `json:"message"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+type Agent struct {
+	ID           string             `json:"id"`
+	UserID       string             `json:"user_id"`
+	Name         string             `json:"name"`
+	SystemPrompt string             `json:"system_prompt"`
+	Tools        []string           `json:"tools"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgentRun struct {
+	ID             string             `json:"id"`
+	TaskID         string             `json:"task_id"`
+	Step           string             `json:"step"`
+	AgentID        pgtype.Text        `json:"agent_id"`
+	Status         string             `json:"status"`
+	Input          pgtype.Text        `json:"input"`
+	Output         pgtype.Text        `json:"output"`
+	MessageHistory []byte             `json:"message_history"`
+	ArtifactPath   pgtype.Text        `json:"artifact_path"`
+	Error          pgtype.Text        `json:"error"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type GithubConnection struct {
@@ -47,18 +65,18 @@ type RepoCache struct {
 }
 
 type Task struct {
-	ID             string             `json:"id"`
-	UserID         string             `json:"user_id"`
-	ProjectID      string             `json:"project_id"`
-	Title          string             `json:"title"`
-	Intent         string             `json:"intent"`
-	Status         string             `json:"status"`
-	Position       pgtype.Int4        `json:"position"`
-	AgentOutput    pgtype.Text        `json:"agent_output"`
-	GitDiff        pgtype.Text        `json:"git_diff"`
-	MessageHistory pgtype.Text        `json:"message_history"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ID              string             `json:"id"`
+	UserID          string             `json:"user_id"`
+	ProjectID       string             `json:"project_id"`
+	Title           string             `json:"title"`
+	Intent          string             `json:"intent"`
+	Status          string             `json:"status"`
+	Position        pgtype.Int4        `json:"position"`
+	CurrentStep     pgtype.Text        `json:"current_step"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	AssignedAgentID pgtype.Text        `json:"assigned_agent_id"`
+	AssignedUserID  pgtype.Text        `json:"assigned_user_id"`
 }
 
 type UserSetting struct {

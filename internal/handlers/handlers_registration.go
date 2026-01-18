@@ -63,6 +63,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 // getOrchestrator creates an orchestrator for a task execution.
 func (h *Handlers) getOrchestrator(userID string) (*services.Orchestrator, error) {
 	return services.NewOrchestrator(
+		h.db,
 		h.taskService,
 		h.githubService,
 		h.events,

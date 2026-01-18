@@ -27,24 +27,21 @@ import (
 func main() {
 	// Parse flags
 	addr := flag.String("addr", ":8710", "Server address")
-	logFile := flag.String("log", "", "Log file path (writes to both stdout and file)")
 	flag.Parse()
 
-	// Setup log output (stdout + optional file)
-	var logOutput io.Writer = os.Stdout
-	if *logFile != "" {
-		f, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			slog.Error("Failed to open log file", "path", *logFile, "error", err)
-			os.Exit(1)
-		}
-		defer f.Close()
-		logOutput = io.MultiWriter(os.Stdout, f)
+	// Setup log output: always write to both stdout and server.log
+	logFile, err := os.OpenFile("server.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		slog.Error("Failed to open log file", "error", err)
+		os.Exit(1)
 	}
+	defer logFile.Close()
+	logOutput := io.MultiWriter(os.Stdout, logFile)
 
 	// Setup logger
 	logger := slog.New(slog.NewTextHandler(logOutput, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level:     slog.LevelInfo,
+		AddSource: true,
 	}))
 	slog.SetDefault(logger)
 

@@ -1,6 +1,5 @@
 -- PostgreSQL Schema for Counterspell
--- This file is used by sqlc for code generation.
--- Migrations are in migrations/ directory.
+-- All user-scoped tables include user_id for multi-tenancy
 
 -- Projects (connected GitHub repos)
 CREATE TABLE IF NOT EXISTS projects (
@@ -12,51 +11,28 @@ CREATE TABLE IF NOT EXISTS projects (
     UNIQUE(user_id, github_owner, github_repo)
 );
 
--- Agents: System-wide agent configurations
-CREATE TABLE IF NOT EXISTS agents (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL DEFAULT 'system',
-    name TEXT NOT NULL UNIQUE,
-    system_prompt TEXT NOT NULL,
-    tools TEXT[] NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT valid_tools CHECK (
-        tools <@ ARRAY['bash', 'edit', 'glob', 'grep', 'ls', 'multiedit', 'read', 'todo', 'write']::TEXT[]
-    )
-);
-
 -- Tasks: Core unit of work
--- Status flow: pending → in_progress → review → done
+-- Status flow: planning → in_progress → agent_review → human_review → done
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending', 'in_progress', 'review', 'done', 'failed')),
+    status TEXT NOT NULL CHECK(status IN ('planning', 'in_progress', 'agent_review', 'human_review', 'done')),
     position INTEGER DEFAULT 0,
-    current_step TEXT,
-    assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-    assigned_user_id TEXT,
+    agent_output TEXT,
+    git_diff TEXT,
+    message_history TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Agent Runs: One row per agent execution within a task
-CREATE TABLE IF NOT EXISTS agent_runs (
-    id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS agent_logs (
+    id SERIAL PRIMARY KEY,
     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    step TEXT NOT NULL,
-    agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'completed', 'failed')),
-    input TEXT,
-    output TEXT,
-    message_history JSONB DEFAULT '[]',
-    artifact_path TEXT,
-    error TEXT,
-    started_at TIMESTAMPTZ,
-    completed_at TIMESTAMPTZ,
+    level TEXT CHECK(level IN ('info', 'plan', 'code', 'error', 'success')),
+    message TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -96,17 +72,12 @@ CREATE TABLE IF NOT EXISTS repo_cache (
     UNIQUE(user_id, owner, name)
 );
 
--- Indices
+-- Indices (always filter by user_id first)
 CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_project ON tasks(user_id, project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent ON tasks(assigned_agent_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_assigned_user ON tasks(assigned_user_id);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_task_step ON agent_runs(task_id, step);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id);
 CREATE INDEX IF NOT EXISTS idx_github_connections_user ON github_connections(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_repo_cache_user ON repo_cache(user_id);
 CREATE INDEX IF NOT EXISTS idx_repo_cache_favorite ON repo_cache(user_id, is_favorite);
-CREATE INDEX IF NOT EXISTS idx_agents_user ON agents(user_id);
