@@ -6,6 +6,7 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import DownloadIcon from '@lucide/svelte/icons/download';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -24,6 +25,22 @@
 
 	async function handleSettings() {
 		appState.openSettings();
+	}
+
+	let syncing = $state(false);
+	async function handleSyncRepos() {
+		syncing = true;
+		try {
+			const res = await fetch('/api/v1/github/sync', { method: 'POST' });
+			if (res.ok) {
+				// Refresh the feed to get updated projects
+				await appState.fetchFeed();
+			}
+		} catch (e) {
+			console.error('Failed to sync repos:', e);
+		} finally {
+			syncing = false;
+		}
 	}
 </script>
 
@@ -139,6 +156,13 @@
 					class="w-full px-2 py-1.5 hover:bg-white/5 rounded text-xs text-gray-400 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none"
 				>
 					<SettingsIcon class="w-4 h-4" /> Settings
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					onSelect={handleSyncRepos}
+					disabled={syncing}
+					class="w-full px-2 py-1.5 hover:bg-white/5 rounded text-xs text-gray-400 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none disabled:opacity-50"
+				>
+					<RefreshCwIcon class="w-4 h-4 {syncing ? 'animate-spin' : ''}" /> {syncing ? 'Syncing...' : 'Sync Repos'}
 				</DropdownMenu.Item>
 				{#if appState.canInstallPWA}
 					<DropdownMenu.Item

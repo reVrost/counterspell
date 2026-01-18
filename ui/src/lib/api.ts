@@ -1,4 +1,5 @@
 import type { Project, Task, FeedData, UserSettings, Message, LogEntry, GitHubRepo, SessionInfo } from '$lib/types';
+import { logError } from '$lib/utils/logger';
 
 // API base URL - uses proxy in dev, relative path in prod
 const API_BASE = import.meta.env.DEV ? '' : '';
@@ -16,7 +17,9 @@ async function fetchAPI<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 	if (!response.ok) {
 		const error = await response.text().catch(() => 'Unknown error');
-		throw new Error(`API error: ${response.status} - ${error}`);
+		const errMsg = `API error: ${response.status} - ${error}`;
+		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
+		throw new Error(errMsg);
 	}
 
 	return response.json();
@@ -32,7 +35,9 @@ async function postForm<T>(path: string, formData: FormData): Promise<T> {
 
 	if (!response.ok) {
 		const error = await response.text().catch(() => 'Unknown error');
-		throw new Error(`API error: ${response.status} - ${error}`);
+		const errMsg = `API error: ${response.status} - ${error}`;
+		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
+		throw new Error(errMsg);
 	}
 
 	return response.json().catch(() => ({} as T));
@@ -48,7 +53,9 @@ async function postFormNoResponse(path: string, formData: FormData): Promise<voi
 
 	if (!response.ok) {
 		const error = await response.text().catch(() => 'Unknown error');
-		throw new Error(`API error: ${response.status} - ${error}`);
+		const errMsg = `API error: ${response.status} - ${error}`;
+		logError(errMsg, { component: 'api', extra: { path, status: response.status } });
+		throw new Error(errMsg);
 	}
 }
 
@@ -57,7 +64,7 @@ async function postFormNoResponse(path: string, formData: FormData): Promise<voi
 export const authAPI = {
 	async checkSession(): Promise<SessionInfo> {
 		try {
-			return await fetchAPI<SessionInfo>('/api/session');
+			return await fetchAPI<SessionInfo>('/api/v1/session');
 		} catch (e) {
 			return {
 				authenticated: false,
@@ -68,16 +75,16 @@ export const authAPI = {
 	},
 
 	async loginWithGitHub() {
-		window.location.href = '/auth/oauth/github';
+		window.location.href = '/api/v1/auth/oauth/github';
 	},
 
 	async connectGitHub() {
-		window.location.href = '/api/github/authorize';
+		window.location.href = '/api/v1/github/authorize';
 	},
 
 	async logout() {
 		try {
-			await fetchAPI('/api/logout', { method: 'POST' });
+			await fetchAPI('/api/v1/logout', { method: 'POST' });
 		} catch (e) {
 			console.error('Logout error (ignoring):', e);
 		}
@@ -86,7 +93,7 @@ export const authAPI = {
 
 	async disconnect() {
 		try {
-			await fetchAPI('/api/disconnect', { method: 'POST' });
+			await fetchAPI('/api/v1/disconnect', { method: 'POST' });
 		} catch (e) {
 			console.error('Disconnect error:', e);
 			throw e;
@@ -99,19 +106,19 @@ export const authAPI = {
 
 export const projectsAPI = {
 	async list(): Promise<Project[]> {
-		const feedData = await fetchAPI<{ projects: Record<string, Project> }>('/api/feed');
+		const feedData = await fetchAPI<{ projects: Record<string, Project> }>('/api/v1/tasks');
 		return Object.values(feedData.projects || {});
 	},
 
 	async getMap(): Promise<Record<string, Project>> {
-		const feedData = await fetchAPI<{ projects: Record<string, Project> }>('/api/feed');
+		const feedData = await fetchAPI<{ projects: Record<string, Project> }>('/api/v1/tasks');
 		return feedData.projects || {};
 	},
 	async activate(owner: string, repo: string): Promise<void> {
 		const formData = new FormData();
 		formData.append('owner', owner);
 		formData.append('repo', repo);
-		await postFormNoResponse('/api/project/activate', formData);
+		await postFormNoResponse('/api/v1/project/activate', formData);
 	}
 };
 
@@ -119,7 +126,7 @@ export const projectsAPI = {
 
 export const githubAPI = {
 	async listRepos(): Promise<GitHubRepo[]> {
-		return fetchAPI<GitHubRepo[]>('/api/github/repos');
+		return fetchAPI<GitHubRepo[]>('/api/v1/github/repos');
 	}
 };
 
@@ -127,7 +134,7 @@ export const githubAPI = {
 
 export const tasksAPI = {
 	async getFeed(): Promise<FeedData> {
-		return fetchAPI<FeedData>('/api/feed');
+		return fetchAPI<FeedData>('/api/v1/tasks');
 	},
 
 	async get(id: string): Promise<{ task: Task; project: Project; messages: Message[]; logs: LogEntry[] }> {
@@ -142,7 +149,7 @@ export const tasksAPI = {
 		formData.append('project_id', projectId);
 		formData.append('model_id', modelId);
 
-		await postFormNoResponse('/api/add-task', formData);
+		await postFormNoResponse('/api/v1/add-task', formData);
 	},
 
 	async chat(taskId: string, message: string, modelId?: string): Promise<void> {
@@ -196,7 +203,7 @@ export const tasksAPI = {
 
 export const settingsAPI = {
 	async get(): Promise<UserSettings> {
-		return fetchAPI<UserSettings>('/api/settings');
+		return fetchAPI<UserSettings>('/api/v1/settings');
 	},
 
 	async save(settings: UserSettings): Promise<void> {
@@ -215,7 +222,7 @@ export const settingsAPI = {
 			formData.append('openai_key', settings.openAiKey);
 		}
 
-		await postFormNoResponse('/api/settings', formData);
+		await postFormNoResponse('/api/v1/settings', formData);
 	}
 };
 

@@ -166,7 +166,7 @@ class TaskStore {
     activeTasks = $derived(this.tasks.filter(t => t.status === 'active'));
     
     async fetchTasks() {
-        const response = await api.get('/api/feed');
+        const response = await api.get('/api/tasks');
         this.tasks = response.active;
     }
 }

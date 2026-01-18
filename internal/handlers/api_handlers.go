@@ -10,8 +10,8 @@ import (
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
-// HandleAPIFeed returns feed data as JSON
-func (h *Handlers) HandleAPIFeed(w http.ResponseWriter, r *http.Request) {
+// HandleAPITasks returns tasks data as JSON
+func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
@@ -29,7 +29,7 @@ func (h *Handlers) HandleAPIFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert projects to map for frontend
-	projectMap := make(map[string]interface{})
+	projectMap := make(map[string]any)
 	for _, p := range dbProjects {
 		projectMap[p.ID] = map[string]string{
 			"id":    p.ID,
@@ -41,10 +41,10 @@ func (h *Handlers) HandleAPIFeed(w http.ResponseWriter, r *http.Request) {
 
 	// Organize tasks into categories
 	feed := struct {
-		Active   []models.Task          `json:"active"`
-		Reviews  []models.Task          `json:"reviews"`
-		Done     []models.Task          `json:"done"`
-		Projects map[string]interface{} `json:"projects"`
+		Active   []models.Task  `json:"active"`
+		Reviews  []models.Task  `json:"reviews"`
+		Done     []models.Task  `json:"done"`
+		Projects map[string]any `json:"projects"`
 	}{
 		Active:   []models.Task{},
 		Reviews:  []models.Task{},
@@ -84,6 +84,35 @@ func (h *Handlers) HandleGitHubRepos(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(repos); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+// HandleSyncRepos manually triggers a sync of GitHub repos to both cache and projects table
+func (h *Handlers) HandleSyncRepos(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	// Get GitHub connection
+	conn, err := h.githubService.GetActiveConnection(ctx, userID)
+	if err != nil || conn == nil {
+		http.Error(w, "No GitHub connection found", http.StatusBadRequest)
+		return
+	}
+
+	// Sync to cache
+	if err := h.repoCache.SyncReposFromGitHub(ctx, userID, conn.Token); err != nil {
+		slog.Error("[SyncRepos] Failed to sync to cache", "error", err)
+	}
+
+	// Sync to projects table
+	if err := h.githubService.FetchAndSaveRepositories(ctx, userID, conn); err != nil {
+		slog.Error("[SyncRepos] Failed to save projects", "error", err)
+		http.Error(w, "Failed to sync repositories", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("[SyncRepos] Sync completed", "user_id", userID)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 // HandleActivateProject adds a repo to projects list

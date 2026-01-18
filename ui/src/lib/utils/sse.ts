@@ -13,7 +13,7 @@ export interface SSECallbacks {
 }
 
 export function createTaskSSE(taskId: string, callbacks: SSECallbacks = {}): EventSource {
-	const eventSource = new EventSource(`/events?task_id=${taskId}`);
+	const eventSource = new EventSource(`/api/v1/events?task_id=${taskId}`);
 
 	eventSource.addEventListener('agent_update', (event) => {
 		callbacks.onAgentUpdate?.(event.data);
@@ -61,7 +61,7 @@ export function createTaskSSE(taskId: string, callbacks: SSECallbacks = {}): Eve
 }
 
 export function createFeedSSE(onUpdate: () => void, onError?: (error: Event) => void): EventSource {
-	const eventSource = new EventSource('/events');
+	const eventSource = new EventSource('/api/v1/events');
 
 	eventSource.addEventListener('task', (event) => {
 		console.log('Feed task event:', event.data);

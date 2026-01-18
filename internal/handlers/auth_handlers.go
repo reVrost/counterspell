@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/revrost/code/counterspell/internal/models"
 )
 
 // getRedirectURL returns the appropriate redirect URL for the current environment.
@@ -54,9 +55,9 @@ func (h *Handlers) HandleOAuth(w http.ResponseWriter, r *http.Request) {
 
 		var callbackURL string
 		if scheme == "" {
-			callbackURL = host + "/auth/callback"
+			callbackURL = host + "/api/v1/auth/callback"
 		} else {
-			callbackURL = fmt.Sprintf("%s://%s/auth/callback", scheme, host)
+			callbackURL = fmt.Sprintf("%s://%s/api/v1/auth/callback", scheme, host)
 		}
 
 		oauthURL, err := h.authService.GetOAuthURL("github", callbackURL)
@@ -125,14 +126,29 @@ func (h *Handlers) HandleAuthCallback(w http.ResponseWriter, r *http.Request) {
 						slog.Error("Failed to save GitHub connection", "error", err)
 					} else {
 						slog.Info("GitHub connection saved for user", "login", login, "user_id", userID)
-						// Sync repos to cache in background
-						go func(token, uid string) {
-							if err := h.repoCache.SyncReposFromGitHub(context.Background(), uid, token); err != nil {
+						// Sync repos in background
+						go func(token, uid, loginName string) {
+							bgCtx := context.Background()
+
+							// Sync to cache
+							if err := h.repoCache.SyncReposFromGitHub(bgCtx, uid, token); err != nil {
 								slog.Error("[OAuth] Failed to sync repos to cache", "error", err)
 							} else {
 								slog.Info("[OAuth] Repos synced to cache successfully")
 							}
-						}(providerToken, userID)
+
+							// Also save to projects table
+							conn := &models.GitHubConnection{
+								Type:  "user",
+								Login: loginName,
+								Token: token,
+							}
+							if err := h.githubService.FetchAndSaveRepositories(bgCtx, uid, conn); err != nil {
+								slog.Error("[OAuth] Failed to save projects to DB", "error", err)
+							} else {
+								slog.Info("[OAuth] Projects saved to DB successfully")
+							}
+						}(providerToken, userID, login)
 					}
 				}
 			} else {
@@ -159,7 +175,7 @@ if (hash) {
 	const refreshToken = params.get('refresh_token');
 	const providerToken = params.get('provider_token');
 	if (accessToken) {
-		let url = '/auth/callback?access_token=' + encodeURIComponent(accessToken);
+		let url = '/api/v1/auth/callback?access_token=' + encodeURIComponent(accessToken);
 		if (refreshToken) url += '&refresh_token=' + encodeURIComponent(refreshToken);
 		if (providerToken) url += '&provider_token=' + encodeURIComponent(providerToken);
 		window.location.href = url;
