@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"slices"
 	"strconv"
@@ -61,6 +62,15 @@ func Load() *Config {
 		// Data directory
 		DataDir: getEnvString("DATA_DIR", "./data"),
 	}
+
+	log.Printf("Config loaded: DATABASE_URL=%d, SUPABASE_URL=%d, SUPABASE_ANON_KEY=%d, SUPABASE_JWT_SECRET=%d, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",
+		len(cfg.DatabaseURL),
+		len(cfg.SupabaseURL),
+		len(cfg.SupabaseAnonKey),
+		len(cfg.SupabaseJWTSecret),
+		len(cfg.NativeAllowlist),
+		len(cfg.DataDir),
+	)
 
 	return cfg
 }

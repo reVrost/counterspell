@@ -43,10 +43,11 @@
 			<span class="font-semibold text-sm tracking-tight text-gray-200">All Projects</span>
 			<ChevronDownIcon class="w-2.5 h-2.5 text-gray-600" />
 		</DropdownMenu.Trigger>
-		<DropdownMenu.Content
-			class="w-72 bg-popover border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col mt-2"
-			sideOffset={8}
-		>
+		<DropdownMenu.Portal>
+			<DropdownMenu.Content
+				class="w-72 bg-popover border border-gray-700 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col mt-2 z-50"
+				sideOffset={8}
+			>
 			<!-- Search Header -->
 			<div class="p-3 border-b border-gray-700 bg-popover">
 				<div class="relative">
@@ -109,6 +110,7 @@
 				</button>
 			</div>
 		</DropdownMenu.Content>
+		</DropdownMenu.Portal>
 	</DropdownMenu.Root>
 
 	<!-- User Menu -->
@@ -121,11 +123,12 @@
 				{emailInitial(appState.userEmail)}
 			</div>
 		</DropdownMenu.Trigger>
-		<DropdownMenu.Content
-			class="w-56 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1"
-			align="end"
-			sideOffset={8}
-		>
+		<DropdownMenu.Portal>
+			<DropdownMenu.Content
+				class="w-56 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden py-1 z-50"
+				align="end"
+				sideOffset={8}
+			>
 			<div class="px-4 py-3 border-b border-gray-800 mb-1">
 				<p class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Signed in as</p>
 				<p class="text-xs font-medium text-gray-200 mt-1 truncate">{appState.userEmail}</p>
@@ -156,5 +159,6 @@
 				</DropdownMenu.Item>
 			</DropdownMenu.Group>
 		</DropdownMenu.Content>
+		</DropdownMenu.Portal>
 	</DropdownMenu.Root>
 </header>

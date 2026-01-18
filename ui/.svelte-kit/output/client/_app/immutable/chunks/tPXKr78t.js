@@ -1,1 +1,0 @@
-import{D as e,v as u,t as o,F as c,w as a}from"./BipdXalV.js";function l(n){o===null&&e(),c&&o.l!==null?s(o).m.push(n):u(()=>{const t=a(n);if(typeof t=="function")return t})}function i(n){o===null&&e(),l(()=>()=>a(n))}function s(n){var t=n.l;return t.u??(t.u={a:[],b:[],m:[]})}export{i as a,l as o};
