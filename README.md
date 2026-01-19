@@ -94,15 +94,19 @@ go build -o counterspell ./cmd/app
 # Required
 DATABASE_URL=postgres://user:pass@localhost:5432/counterspell?sslmode=disable
 
+# Supabase Auth (required for multi-user OAuth)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_JWT_SECRET=your-jwt-secret
+
+# Frontend Supabase config (required for OAuth)
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+
 # GitHub OAuth (for repo access)
 GITHUB_CLIENT_ID=xxx
 GITHUB_CLIENT_SECRET=xxx
 GITHUB_REDIRECT_URI=http://localhost:8710/github/callback
-
-# Optional: Supabase auth (for multi-user)
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=eyJ...
-SUPABASE_JWT_SECRET=your-jwt-secret
 
 # Optional: AI provider keys
 OPENROUTER_API_KEY=sk-or-...

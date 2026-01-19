@@ -13,18 +13,13 @@ import (
 // Config holds all application configuration.
 type Config struct {
 	// Database
-	DatabaseURL string
-
-	// Supabase configuration (for auth)
-	SupabaseURL       string
-	SupabaseAnonKey   string
-	SupabaseJWTSecret string
+	DatabasePath string
 
 	// Native backend allowlist (comma-separated commands)
 	NativeAllowlist []string
 
 	// Worker pool configuration
-	WorkerPoolSize  int
+	WorkerPoolSize int
 	MaxTasksPerUser int
 
 	// Sandbox configuration
@@ -39,12 +34,7 @@ type Config struct {
 func Load() *Config {
 	cfg := &Config{
 		// Database
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-
-		// Supabase
-		SupabaseURL:       os.Getenv("SUPABASE_URL"),
-		SupabaseAnonKey:   os.Getenv("SUPABASE_ANON_KEY"),
-		SupabaseJWTSecret: os.Getenv("SUPABASE_JWT_SECRET"),
+		DatabasePath: getEnvString("DATABASE_PATH", "./data/counterspell.db"),
 
 		// Native allowlist
 		NativeAllowlist: getEnvStringSlice("NATIVE_ALLOWLIST", []string{
@@ -63,11 +53,8 @@ func Load() *Config {
 		DataDir: getEnvString("DATA_DIR", "./data"),
 	}
 
-	log.Printf("Config loaded: DATABASE_URL=%d, SUPABASE_URL=%d, SUPABASE_ANON_KEY=%d, SUPABASE_JWT_SECRET=%d, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",
-		len(cfg.DatabaseURL),
-		len(cfg.SupabaseURL),
-		len(cfg.SupabaseAnonKey),
-		len(cfg.SupabaseJWTSecret),
+	log.Printf("Config loaded: DATABASE_PATH=%s, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",
+		cfg.DatabasePath,
 		len(cfg.NativeAllowlist),
 		len(cfg.DataDir),
 	)
@@ -77,11 +64,8 @@ func Load() *Config {
 
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
-	if c.DatabaseURL == "" {
-		return &ConfigError{Field: "DATABASE_URL", Message: "required"}
-	}
-	if c.SupabaseJWTSecret == "" {
-		return &ConfigError{Field: "SUPABASE_JWT_SECRET", Message: "required for auth"}
+	if c.DatabasePath == "" {
+		return &ConfigError{Field: "DATABASE_PATH", Message: "required"}
 	}
 	return nil
 }
@@ -169,6 +153,6 @@ func (c *Config) ReposPath() string {
 }
 
 // WorkspacesPath returns the workspaces directory for a user.
-func (c *Config) WorkspacesPath(userID string) string {
-	return c.DataDir + "/workspaces/" + userID
+func (c *Config) WorkspacesPath(machineID string) string {
+	return c.DataDir + "/workspaces/" + machineID
 }

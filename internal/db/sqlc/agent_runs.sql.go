@@ -7,42 +7,25 @@ package sqlc
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"database/sql"
 )
 
-const appendMessageHistory = `-- name: AppendMessageHistory :exec
-UPDATE agent_runs 
-SET message_history = message_history || $1::jsonb
-WHERE id = $2
-`
-
-type AppendMessageHistoryParams struct {
-	Column1 []byte `json:"column_1"`
-	ID      string `json:"id"`
-}
-
-func (q *Queries) AppendMessageHistory(ctx context.Context, arg AppendMessageHistoryParams) error {
-	_, err := q.db.Exec(ctx, appendMessageHistory, arg.Column1, arg.ID)
-	return err
-}
-
 const completeAgentRun = `-- name: CompleteAgentRun :exec
-UPDATE agent_runs 
-SET status = 'completed', output = $1, message_history = $2, artifact_path = $3, completed_at = $4
-WHERE id = $5
+UPDATE agent_runs
+SET status = 'completed', output = ?, message_history = ?, artifact_path = ?, completed_at = ?
+WHERE id = ?
 `
 
 type CompleteAgentRunParams struct {
-	Output         pgtype.Text        `json:"output"`
-	MessageHistory []byte             `json:"message_history"`
-	ArtifactPath   pgtype.Text        `json:"artifact_path"`
-	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
-	ID             string             `json:"id"`
+	Output         sql.NullString `json:"output"`
+	MessageHistory sql.NullString `json:"message_history"`
+	ArtifactPath   sql.NullString `json:"artifact_path"`
+	CompletedAt    sql.NullTime   `json:"completed_at"`
+	ID             string         `json:"id"`
 }
 
 func (q *Queries) CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error {
-	_, err := q.db.Exec(ctx, completeAgentRun,
+	_, err := q.db.ExecContext(ctx, completeAgentRun,
 		arg.Output,
 		arg.MessageHistory,
 		arg.ArtifactPath,
@@ -52,24 +35,23 @@ func (q *Queries) CompleteAgentRun(ctx context.Context, arg CompleteAgentRunPara
 	return err
 }
 
-const createAgentRun = `-- name: CreateAgentRun :one
+const createAgentRun = `-- name: CreateAgentRun :exec
 INSERT INTO agent_runs (id, task_id, step, agent_id, status, input, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, task_id, step, agent_id, status, input, output, message_history, artifact_path, error, started_at, completed_at, created_at
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAgentRunParams struct {
-	ID        string             `json:"id"`
-	TaskID    string             `json:"task_id"`
-	Step      string             `json:"step"`
-	AgentID   pgtype.Text        `json:"agent_id"`
-	Status    string             `json:"status"`
-	Input     pgtype.Text        `json:"input"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID        string         `json:"id"`
+	TaskID    string         `json:"task_id"`
+	Step      string         `json:"step"`
+	AgentID   sql.NullString `json:"agent_id"`
+	Status    string         `json:"status"`
+	Input     sql.NullString `json:"input"`
+	CreatedAt sql.NullTime   `json:"created_at"`
 }
 
-func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) (AgentRun, error) {
-	row := q.db.QueryRow(ctx, createAgentRun,
+func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) error {
+	_, err := q.db.ExecContext(ctx, createAgentRun,
 		arg.ID,
 		arg.TaskID,
 		arg.Step,
@@ -78,49 +60,33 @@ func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) 
 		arg.Input,
 		arg.CreatedAt,
 	)
-	var i AgentRun
-	err := row.Scan(
-		&i.ID,
-		&i.TaskID,
-		&i.Step,
-		&i.AgentID,
-		&i.Status,
-		&i.Input,
-		&i.Output,
-		&i.MessageHistory,
-		&i.ArtifactPath,
-		&i.Error,
-		&i.StartedAt,
-		&i.CompletedAt,
-		&i.CreatedAt,
-	)
-	return i, err
+	return err
 }
 
 const deleteAgentRunsByTask = `-- name: DeleteAgentRunsByTask :exec
-DELETE FROM agent_runs WHERE task_id = $1
+DELETE FROM agent_runs WHERE task_id = ?
 `
 
 func (q *Queries) DeleteAgentRunsByTask(ctx context.Context, taskID string) error {
-	_, err := q.db.Exec(ctx, deleteAgentRunsByTask, taskID)
+	_, err := q.db.ExecContext(ctx, deleteAgentRunsByTask, taskID)
 	return err
 }
 
 const failAgentRun = `-- name: FailAgentRun :exec
-UPDATE agent_runs 
-SET status = 'failed', error = $1, message_history = $2, completed_at = $3
-WHERE id = $4
+UPDATE agent_runs
+SET status = 'failed', error = ?, message_history = ?, completed_at = ?
+WHERE id = ?
 `
 
 type FailAgentRunParams struct {
-	Error          pgtype.Text        `json:"error"`
-	MessageHistory []byte             `json:"message_history"`
-	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
-	ID             string             `json:"id"`
+	Error          sql.NullString `json:"error"`
+	MessageHistory sql.NullString `json:"message_history"`
+	CompletedAt    sql.NullTime   `json:"completed_at"`
+	ID             string         `json:"id"`
 }
 
 func (q *Queries) FailAgentRun(ctx context.Context, arg FailAgentRunParams) error {
-	_, err := q.db.Exec(ctx, failAgentRun,
+	_, err := q.db.ExecContext(ctx, failAgentRun,
 		arg.Error,
 		arg.MessageHistory,
 		arg.CompletedAt,
@@ -130,11 +96,11 @@ func (q *Queries) FailAgentRun(ctx context.Context, arg FailAgentRunParams) erro
 }
 
 const getAgentRun = `-- name: GetAgentRun :one
-SELECT id, task_id, step, agent_id, status, input, output, message_history, artifact_path, error, started_at, completed_at, created_at FROM agent_runs WHERE id = $1
+SELECT id, task_id, step, agent_id, status, input, output, message_history, artifact_path, error, started_at, completed_at, created_at FROM agent_runs WHERE id = ?
 `
 
 func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) {
-	row := q.db.QueryRow(ctx, getAgentRun, id)
+	row := q.db.QueryRowContext(ctx, getAgentRun, id)
 	var i AgentRun
 	err := row.Scan(
 		&i.ID,
@@ -156,7 +122,7 @@ func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) 
 
 const getLatestRunForStep = `-- name: GetLatestRunForStep :one
 SELECT id, task_id, step, agent_id, status, input, output, message_history, artifact_path, error, started_at, completed_at, created_at FROM agent_runs
-WHERE task_id = $1 AND step = $2
+WHERE task_id = ? AND step = ?
 ORDER BY created_at DESC
 LIMIT 1
 `
@@ -167,7 +133,7 @@ type GetLatestRunForStepParams struct {
 }
 
 func (q *Queries) GetLatestRunForStep(ctx context.Context, arg GetLatestRunForStepParams) (AgentRun, error) {
-	row := q.db.QueryRow(ctx, getLatestRunForStep, arg.TaskID, arg.Step)
+	row := q.db.QueryRowContext(ctx, getLatestRunForStep, arg.TaskID, arg.Step)
 	var i AgentRun
 	err := row.Scan(
 		&i.ID,
@@ -189,12 +155,12 @@ func (q *Queries) GetLatestRunForStep(ctx context.Context, arg GetLatestRunForSt
 
 const listAgentRunsByTask = `-- name: ListAgentRunsByTask :many
 SELECT id, task_id, step, agent_id, status, input, output, message_history, artifact_path, error, started_at, completed_at, created_at FROM agent_runs
-WHERE task_id = $1
+WHERE task_id = ?
 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListAgentRunsByTask(ctx context.Context, taskID string) ([]AgentRun, error) {
-	rows, err := q.db.Query(ctx, listAgentRunsByTask, taskID)
+	rows, err := q.db.QueryContext(ctx, listAgentRunsByTask, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +186,9 @@ func (q *Queries) ListAgentRunsByTask(ctx context.Context, taskID string) ([]Age
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -229,7 +198,7 @@ func (q *Queries) ListAgentRunsByTask(ctx context.Context, taskID string) ([]Age
 
 const listAgentRunsByTaskAndStep = `-- name: ListAgentRunsByTaskAndStep :many
 SELECT id, task_id, step, agent_id, status, input, output, message_history, artifact_path, error, started_at, completed_at, created_at FROM agent_runs
-WHERE task_id = $1 AND step = $2
+WHERE task_id = ? AND step = ?
 ORDER BY created_at ASC
 `
 
@@ -239,7 +208,7 @@ type ListAgentRunsByTaskAndStepParams struct {
 }
 
 func (q *Queries) ListAgentRunsByTaskAndStep(ctx context.Context, arg ListAgentRunsByTaskAndStepParams) ([]AgentRun, error) {
-	rows, err := q.db.Query(ctx, listAgentRunsByTaskAndStep, arg.TaskID, arg.Step)
+	rows, err := q.db.QueryContext(ctx, listAgentRunsByTaskAndStep, arg.TaskID, arg.Step)
 	if err != nil {
 		return nil, err
 	}
@@ -266,6 +235,9 @@ func (q *Queries) ListAgentRunsByTaskAndStep(ctx context.Context, arg ListAgentR
 		}
 		items = append(items, i)
 	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -273,18 +245,18 @@ func (q *Queries) ListAgentRunsByTaskAndStep(ctx context.Context, arg ListAgentR
 }
 
 const updateAgentRunStatus = `-- name: UpdateAgentRunStatus :exec
-UPDATE agent_runs 
-SET status = $1, started_at = $2
-WHERE id = $3
+UPDATE agent_runs
+SET status = ?, started_at = ?
+WHERE id = ?
 `
 
 type UpdateAgentRunStatusParams struct {
-	Status    string             `json:"status"`
-	StartedAt pgtype.Timestamptz `json:"started_at"`
-	ID        string             `json:"id"`
+	Status    string       `json:"status"`
+	StartedAt sql.NullTime `json:"started_at"`
+	ID        string       `json:"id"`
 }
 
 func (q *Queries) UpdateAgentRunStatus(ctx context.Context, arg UpdateAgentRunStatusParams) error {
-	_, err := q.db.Exec(ctx, updateAgentRunStatus, arg.Status, arg.StartedAt, arg.ID)
+	_, err := q.db.ExecContext(ctx, updateAgentRunStatus, arg.Status, arg.StartedAt, arg.ID)
 	return err
 }

@@ -2,96 +2,73 @@ package models
 
 import "time"
 
-// TaskStatus represents the status of a task in the workflow.
-// Flow: pending → in_progress → review → done
+// TaskStatus represents the status of a task.
 type TaskStatus string
 
 const (
-	StatusPending    TaskStatus = "pending"     // Task created, not yet started
-	StatusInProgress TaskStatus = "in_progress" // Agents are working on the task
-	StatusReview     TaskStatus = "review"      // Ready for human review
-	StatusDone       TaskStatus = "done"        // Complete
-	StatusFailed     TaskStatus = "failed"      // Task failed
+	StatusPending    TaskStatus = "pending"
+	StatusInProgress TaskStatus = "in_progress"
+	StatusReview     TaskStatus = "review"
+	StatusDone       TaskStatus = "done"
+	StatusFailed     TaskStatus = "failed"
 )
 
-// Task represents a work item in the system.
+// Task represents a work item.
 type Task struct {
-	ID          string     `json:"id"`
-	ProjectID   string     `json:"project_id"`
-	Title       string     `json:"title"`
-	Intent      string     `json:"intent"`
-	Status      TaskStatus `json:"status"`
-	Position    int        `json:"position"`
-	CurrentStep string     `json:"current_step,omitempty"` // Current workflow step
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-
-	// Assignment fields
-	AssignedAgentID string `json:"assigned_agent_id,omitempty"`
-	AssignedUserID  string `json:"assigned_user_id,omitempty"`
+	ID             string     `json:"id"`
+	MachineID      string     `json:"machine_id"`
+	Title          string     `json:"title"`
+	Intent         string     `json:"intent"`
+	Status         string     `json:"status"`
+	Position       int64      `json:"position"`
+	CurrentStep    string     `json:"current_step,omitempty"`
+	AssignedAgentID string     `json:"assigned_agent_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
-// TaskWithProject represents a task with its associated project info.
-type TaskWithProject struct {
-	Task    *Task
-	Project *Project
+// Machine represents a worker instance.
+type Machine struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Mode         string `json:"mode"` // "local" or "cloud"
+	Capabilities string `json:"capabilities,omitempty"` // JSON string
+	LastSeenAt  time.Time `json:"last_seen_at"`
 }
 
-// AgentRunStatus represents the status of an agent run.
-type AgentRunStatus string
+// Agent represents an agent configuration.
+type Agent struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	SystemPrompt string    `json:"system_prompt"`
+	Tools        string    `json:"tools"` // JSON string
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
 
-const (
-	RunStatusPending   AgentRunStatus = "pending"
-	RunStatusRunning   AgentRunStatus = "running"
-	RunStatusCompleted AgentRunStatus = "completed"
-	RunStatusFailed    AgentRunStatus = "failed"
-)
-
-// AgentRun represents one execution of an agent within a task.
+// AgentRun represents an execution of an agent.
 type AgentRun struct {
-	ID             string         `json:"id"`
-	TaskID         string         `json:"task_id"`
-	Step           string         `json:"step"`
-	AgentID        string         `json:"agent_id,omitempty"`
-	Status         AgentRunStatus `json:"status"`
-	Input          string         `json:"input,omitempty"`
-	Output         string         `json:"output,omitempty"`
-	MessageHistory []Message      `json:"message_history,omitempty"`
-	ArtifactPath   string         `json:"artifact_path,omitempty"`
-	Error          string         `json:"error,omitempty"`
-	StartedAt      *time.Time     `json:"started_at,omitempty"`
-	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
+	ID             string    `json:"id"`
+	TaskID         string    `json:"task_id"`
+	Step           string    `json:"step"`
+	AgentID        string    `json:"agent_id,omitempty"`
+	Status         string    `json:"status"` // pending, running, completed, failed
+	Input          string    `json:"input,omitempty"`
+	Output         string    `json:"output,omitempty"`
+	MessageHistory string    `json:"message_history,omitempty"` // JSON string
+	ArtifactPath   string    `json:"artifact_path,omitempty"`
+	Error          string    `json:"error,omitempty"`
+	StartedAt      time.Time `json:"started_at,omitempty"`
+	CompletedAt    time.Time `json:"completed_at,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
-// Message represents a single message in agent conversation.
-type Message struct {
-	Role      string    `json:"role"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp,omitempty"`
-}
-
-// EventType represents the type of server-sent event.
-type EventType string
-
-const (
-	EventTypeLog            EventType = "log"
-	EventTypeStatus         EventType = "status"
-	EventTypeStatusChange   EventType = "status_change"
-	EventTypeError          EventType = "error"
-	EventTypeAgentUpdate    EventType = "agent_update"
-	EventTypeTodo           EventType = "todo"
-	EventTypeTaskCreated    EventType = "task_created"
-	EventTypeProjectCreated EventType = "project_created"
-	EventTypeProjectUpdated EventType = "project_updated"
-	EventTypeProjectDeleted EventType = "project_deleted"
-	EventTypeRunUpdate      EventType = "run_update"
-)
-
-// Event represents a server-sent event for real-time updates.
-type Event struct {
-	ID     int64     `json:"id"`
-	TaskID string    `json:"task_id"`
-	Type   EventType `json:"type"`
-	Data   string    `json:"data"`
+// Settings represents application settings.
+type Settings struct {
+	OpenRouterKey string `json:"openrouter_key,omitempty"`
+	ZaiKey        string `json:"zai_key,omitempty"`
+	AnthropicKey  string `json:"anthropic_key,omitempty"`
+	OpenAIKey     string `json:"openai_key,omitempty"`
+	AgentBackend  string `json:"agent_backend"` // "native", "openai", "anthropic", "openrouter", "zai"
+	UpdatedAt     time.Time `json:"updated_at"`
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/config"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/handlers"
@@ -53,7 +52,7 @@ func main() {
 	}
 
 	logger.Info("Starting server",
-		"database_url", maskDatabaseURL(cfg.DatabaseURL),
+		"database_path", cfg.DatabasePath,
 		"data_dir", cfg.DataDir,
 		"worker_pool_size", cfg.WorkerPoolSize,
 		"max_tasks_per_user", cfg.MaxTasksPerUser,
@@ -65,9 +64,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Connect to PostgreSQL
+	// Connect to SQLite
 	ctx := context.Background()
-	database, err := db.Connect(ctx, cfg.DatabaseURL)
+	database, err := db.Connect(ctx, cfg.DatabasePath)
 	if err != nil {
 		logger.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
@@ -82,9 +81,6 @@ func main() {
 
 	// Create event bus
 	eventBus := services.NewEventBus()
-
-	// Create auth middleware
-	authMiddleware := auth.NewMiddleware(cfg)
 
 	// Create handlers with shared database
 	h, err := handlers.NewHandlers(database, eventBus, cfg)
@@ -111,20 +107,12 @@ func main() {
 			render.JSON(w, r, map[string]string{"status": "ok"})
 		})
 
-		// Auth routes (login page, OAuth callbacks)
-		// r.Get("/api/v1/auth/oauth/{provider}", h.HandleOAuthLogin)
-		r.Get("/api/v1/auth/callback", h.HandleAuthCallback)
-		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
-
 		// UI logging - no auth required so errors can be logged even when auth fails
 		r.Post("/api/v1/log", h.HandleUILog)
 	})
 
-	// Protected routes (auth required)
+	// Protected routes (auth not required for local-first)
 	r.Group(func(r chi.Router) {
-		// Apply auth middleware - sets userID from JWT or defaults to "default"
-		r.Use(authMiddleware.RequireAuth)
-
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)
 
@@ -148,9 +136,6 @@ func main() {
 		r.Get("/api/v1/session", h.HandleAPISession)
 		r.Get("/api/v1/settings", h.HandleAPISettings)
 		r.Get("/api/v1/files/search", h.HandleFileSearch)
-		r.Get("/api/v1/github/repos", h.HandleGitHubRepos)
-		r.Post("/api/v1/github/sync", h.HandleSyncRepos)
-		r.Post("/api/v1/project/activate", h.HandleActivateProject)
 
 		// Settings and transcription
 		r.Post("/api/v1/settings", h.HandleSaveSettings)
@@ -158,13 +143,6 @@ func main() {
 
 		// Logging (for agent debugging)
 		r.Get("/api/v1/logs", h.HandleReadLogs)
-
-		// Auth management
-		r.Post("/api/v1/logout", h.HandleLogout)
-		r.Post("/api/v1/disconnect", h.HandleDisconnect)
-
-		// GitHub OAuth (for users already authenticated via Supabase)
-		r.Get("/api/v1/github/authorize", h.HandleGitHubAuthorize)
 	})
 
 	// Serve SvelteKit SPA from embedded filesystem
@@ -205,18 +183,6 @@ func main() {
 	}
 
 	logger.Info("Server stopped")
-}
-
-// maskDatabaseURL masks the password in a database URL for logging
-func maskDatabaseURL(url string) string {
-	if url == "" {
-		return "(not set)"
-	}
-	// Simple masking - just show the host part
-	if len(url) > 30 {
-		return url[:20] + "..."
-	}
-	return url[:10] + "..."
 }
 
 // spaHandler serves the SvelteKit SPA from an embedded filesystem.
