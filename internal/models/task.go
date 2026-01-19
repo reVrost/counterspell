@@ -17,7 +17,7 @@ const (
 // Task represents a work item.
 type Task struct {
 	ID              string    `json:"id"`
-	RepositoryID    *string   `json:"repository_id,omitempty"`
+	ProjectID       *string   `json:"project_id,omitempty"`
 	MachineID       string    `json:"machine_id"`
 	Title           string    `json:"title"`
 	Intent          string    `json:"intent"`

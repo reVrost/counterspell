@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/services"
 )
 
@@ -18,7 +19,43 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks", err))
 		return
 	}
-	render.JSON(w, r, tasks)
+
+	repos, err := h.githubService.GetRepos(ctx)
+	if err != nil {
+		slog.Warn("Failed to fetch repos for feed", "error", err)
+		// Don't fail the whole request if repos can't be fetched
+		repos = nil
+	}
+
+	feed := &FeedData{
+		Active:   []*models.Task{},
+		Reviews:  []*models.Task{},
+		Done:     []*models.Task{},
+		Todo:     []*models.Task{},
+		Projects: make(map[string]ProjectResponse),
+	}
+
+	for _, t := range tasks {
+		switch t.Status {
+		case "pending", "in_progress":
+			feed.Active = append(feed.Active, t)
+		case "review":
+			feed.Reviews = append(feed.Reviews, t)
+		case "done", "failed":
+			feed.Done = append(feed.Done, t)
+		}
+	}
+
+	for _, repo := range repos {
+		feed.Projects[repo.ID] = ProjectResponse{
+			ID:    repo.ID,
+			Name:  repo.FullName,
+			Icon:  "fas fa-code-branch",
+			Color: "violet",
+		}
+	}
+
+	render.Render(w, r, feed)
 }
 
 // HandleAPITask returns a single task.
