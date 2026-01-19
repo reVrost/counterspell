@@ -1,6 +1,7 @@
 <script lang="ts">
     import { cn } from "$lib/utils";
     import InboxIcon from "@lucide/svelte/icons/inbox";
+    import {SquarePen} from "@lucide/svelte";
     import FolderIcon from "@lucide/svelte/icons/folder";
     import FocusIcon from "@lucide/svelte/icons/focus";
     import LayersIcon from "@lucide/svelte/icons/layers";
@@ -32,7 +33,7 @@
                 type="button"
                 onclick={() => handleTabClick("inbox")}
                 class={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+                    "w-12 h-10 rounded-full flex items-center justify-center transition-all duration-200",
                     activeTab === "inbox"
                         ? "bg-[#2a2a2a] text-white shadow-lg"
                         : "text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]",
@@ -50,7 +51,7 @@
                 type="button"
                 onclick={() => handleTabClick("projects")}
                 class={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+                    "w-12 h-10 rounded-full flex items-center justify-center transition-all duration-200",
                     activeTab === "projects"
                         ? "bg-[#2a2a2a] text-white shadow-lg"
                         : "text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]",
@@ -66,19 +67,11 @@
             <!-- Focus -->
             <button
                 type="button"
-                onclick={() => handleTabClick("focus")}
-                class={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
-                    activeTab === "focus"
-                        ? "bg-[#2a2a2a] text-white shadow-lg"
-                        : "text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]",
-                )}
-                aria-label="Focus"
+                onclick={onSearch}
+                class="w-12 h-10 rounded-full bg-[#1a1a1a] flex items-center justify-center text-gray-500 hover:text-gray-300 hover:bg-[#222] transition-all duration-200"
+                aria-label="Search"
             >
-                <FocusIcon
-                    class="w-5 h-5"
-                    strokeWidth={activeTab === "focus" ? 2.5 : 2}
-                />
+                <SearchIcon class="w-5 h-5" strokeWidth={2} />
             </button>
 
             <!-- Layers -->
@@ -86,7 +79,7 @@
                 type="button"
                 onclick={() => handleTabClick("layers")}
                 class={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+                    "w-12 h-10 rounded-full flex items-center justify-center transition-all duration-200",
                     activeTab === "layers"
                         ? "bg-[#2a2a2a] text-white shadow-lg"
                         : "text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]",
@@ -105,9 +98,9 @@
     <button
         type="button"
         onclick={onSearch}
-        class="w-14 h-14 rounded-full bg-[#1a1a1a] border border-white/[0.06] flex items-center justify-center text-gray-500 hover:text-gray-300 hover:bg-[#222] transition-all duration-200"
+        class="w-12 h-12 rounded-full bg-[#1a1a1a] border border-white/[0.06] flex items-center justify-center text-gray-500 hover:text-gray-300 hover:bg-[#222] transition-all duration-200"
         aria-label="Search"
     >
-        <SearchIcon class="w-5 h-5" strokeWidth={2} />
+        <SquarePen class="w-5 h-5" strokeWidth={2} />
     </button>
 </div>
