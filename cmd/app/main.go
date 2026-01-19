@@ -124,8 +124,8 @@ func main() {
 		// Home page actions, tasks are like inbox
 		r.Get("/api/v1/tasks", h.HandleAPITasks)
 		r.Post("/api/v1/tasks", h.HandleAddTask)
-		r.Get("/api/v1/task/{id}", h.HandleAPITask)
 		r.Get("/api/v1/session", h.HandleAPISession)
+		r.Get("/api/v1/task/{id}", h.HandleAPITask)
 		r.Get("/api/v1/settings", h.HandleAPISettings)
 		r.Get("/api/v1/files/search", h.HandleFileSearch)
 

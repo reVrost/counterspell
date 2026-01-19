@@ -13,13 +13,22 @@ import (
 func (h *Handlers) HandleGitHubLogin(w http.ResponseWriter, r *http.Request) {
 	redirectURL := r.URL.Query().Get("redirect_url")
 	if redirectURL == "" {
-		redirectURL = h.cfg.DataDir + "/dashboard" // Fallback
+		redirectURL = "/dashboard"
 	}
 
+	// Build the callback URL - this is where GitHub will redirect after auth
+	// In dev, this needs to go through the proxy, so we use the request host
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	callbackURL := fmt.Sprintf("%s://%s/api/v1/github/callback", scheme, r.Host)
+
 	scope := "repo,user"
-	githubURL := fmt.Sprintf("https://github.com/login/oauth/authorize?client_id=%s&scope=%s&state=%s",
+	githubURL := fmt.Sprintf("https://github.com/login/oauth/authorize?client_id=%s&scope=%s&redirect_uri=%s&state=%s",
 		h.cfg.GitHubClientID,
 		scope,
+		url.QueryEscape(callbackURL),
 		url.QueryEscape(redirectURL),
 	)
 

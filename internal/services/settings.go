@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -36,6 +37,9 @@ func NewSettingsService(db *db.DB) *SettingsService {
 func (s *SettingsService) GetSettings(ctx context.Context) (*Settings, error) {
 	row, err := s.db.Queries.GetSettings(ctx)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to get settings: %w", err)
 	}
 

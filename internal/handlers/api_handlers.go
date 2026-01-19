@@ -57,11 +57,28 @@ func (h *Handlers) HandleAPIMessages(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, messages)
 }
 
-// HandleAPISession returns session info.
+// HandleAPISession returns session info based on GitHub connection status.
 func (h *Handlers) HandleAPISession(w http.ResponseWriter, r *http.Request) {
-	userID := "default"
+	ctx := r.Context()
+
+	// Check if there's a GitHub connection
+	conn, err := h.githubService.GetConnection(ctx)
+	if err != nil {
+		// No connection found - not authenticated
+		render.JSON(w, r, map[string]any{
+			"authenticated":   false,
+			"githubConnected": false,
+			"needsGitHubAuth": true,
+		})
+		return
+	}
+
+	// User is authenticated via GitHub
 	render.JSON(w, r, map[string]any{
-		"user_id": userID,
+		"authenticated":   true,
+		"githubConnected": true,
+		"githubLogin":     conn.Username,
+		"needsGitHubAuth": false,
 	})
 }
 
