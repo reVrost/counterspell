@@ -5,6 +5,9 @@
 import type { TransitionConfig } from 'svelte/transition';
 import { prefersReducedMotion } from './animations';
 
+// Re-export for convenience
+export { prefersReducedMotion };
+
 // Duration constants
 export const DURATIONS = {
 	fast: 150,
@@ -29,7 +32,7 @@ export function fade(node: Element, { duration = 200, delay = 0 }: { duration?: 
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
@@ -52,7 +55,7 @@ export function slide(
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
@@ -88,7 +91,7 @@ export function scale(node: Element, { duration = 200, delay = 0, startScale = 0
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
@@ -110,7 +113,7 @@ export function modalSlideUp(node: Element, { duration = 300, delay = 0 }: { dur
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
@@ -132,7 +135,7 @@ export function backdropFade(node: Element, { duration = 300, delay = 0 }: { dur
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
@@ -153,7 +156,7 @@ export function dropdownPop(node: Element, { duration = 200, delay = 0 }: { dura
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
@@ -175,7 +178,7 @@ export function listItem(node: Element, { duration = 300, delay = 0 }: { duratio
 	if (prefersReducedMotion()) {
 		return {
 			duration: 0,
-			tick: () => {}
+			tick: () => { }
 		};
 	}
 
