@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/go-chi/render"
-	"github.com/revrost/code/counterspell/internal/auth"
 )
 
 // UILogEntry represents a log entry from the UI.
@@ -25,9 +24,10 @@ func (u *UILogEntry) Bind(r *http.Request) error {
 }
 
 // HandleUILog receives log entries from the UI and writes them to server log via slog.
+// Lets not use this for now
 func (h *Handlers) HandleUILog(w http.ResponseWriter, r *http.Request) {
 	// userID may be empty if auth failed - that's OK for logging
-	userID := auth.UserIDFromContext(r.Context())
+	userID := "default"
 	if userID == "" {
 		userID = "anonymous"
 	}
@@ -74,7 +74,7 @@ func (h *Handlers) HandleReadLogs(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ErrNotFound("Log file not found"))
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	w.Header().Set("Content-Type", "text/plain")
 	_, _ = io.Copy(w, f)

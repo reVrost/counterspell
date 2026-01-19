@@ -34,7 +34,7 @@ func main() {
 		slog.Error("Failed to open log file", "error", err)
 		os.Exit(1)
 	}
-	defer logFile.Close()
+	defer func() { _ = logFile.Close() }()
 	logOutput := io.MultiWriter(os.Stdout, logFile)
 
 	// Setup logger
@@ -108,30 +108,19 @@ func main() {
 		})
 
 		// UI logging - no auth required so errors can be logged even when auth fails
-		r.Post("/api/v1/log", h.HandleUILog)
+		// r.Post("/api/v1/log", h.HandleUILog)
 	})
 
 	// Protected routes (auth not required for local-first)
 	r.Group(func(r chi.Router) {
+		// We need Github oauth callback stuff endpoint
+
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)
 
-		// Actions
-		r.Post("/api/v1/add-task", h.HandleAddTask)
-		r.Post("/api/v1/action/clear/{id}", h.HandleActionClear)
-		r.Post("/api/v1/action/retry/{id}", h.HandleActionRetry)
-		r.Post("/api/v1/action/merge/{id}", h.HandleActionMerge)
-		r.Post("/api/v1/action/pr/{id}", h.HandleActionPR)
-		r.Post("/api/v1/action/discard/{id}", h.HandleActionDiscard)
-		r.Post("/api/v1/action/chat/{id}", h.HandleActionChat)
-
-		// Merge
-		r.Post("/api/v1/action/resolve-conflict/{id}", h.HandleResolveConflict)
-		r.Post("/api/v1/action/abort-merge/{id}", h.HandleAbortMerge)
-		r.Post("/api/v1/action/complete-merge/{id}", h.HandleCompleteMerge)
-
-		// JSON API endpoints (for SvelteKit SPA)
+		// Home page actions, tasks are like inbox
 		r.Get("/api/v1/tasks", h.HandleAPITasks)
+		r.Post("/api/v1/tasks", h.HandleAddTask)
 		r.Get("/api/v1/task/{id}", h.HandleAPITask)
 		r.Get("/api/v1/session", h.HandleAPISession)
 		r.Get("/api/v1/settings", h.HandleAPISettings)
@@ -141,8 +130,16 @@ func main() {
 		r.Post("/api/v1/settings", h.HandleSaveSettings)
 		r.Post("/api/v1/transcribe", h.HandleTranscribe)
 
-		// Logging (for agent debugging)
-		r.Get("/api/v1/logs", h.HandleReadLogs)
+		// Task Actions
+		r.Post("/api/v1/tasks/{id}/clear", h.HandleActionClear)
+		r.Post("/api/v1/tasks/{id}/retry", h.HandleActionRetry)
+		r.Post("/api/v1/tasks/{id}/merge", h.HandleActionMerge)
+		r.Post("/api/v1/tasks/{id}/pr", h.HandleActionPR)
+		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
+
+		// Task messages
+		r.Get("/api/v1/task/{id}/messages", h.HandleAPIMessages)
+
 	})
 
 	// Serve SvelteKit SPA from embedded filesystem
@@ -196,7 +193,7 @@ func spaHandler(fsys fs.FS) http.HandlerFunc {
 		// Try to serve the file directly
 		f, err := fsys.Open(path)
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			// File exists - serve it with caching for immutable assets
 			if strings.HasPrefix(path, "_app/immutable/") {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -211,7 +208,7 @@ func spaHandler(fsys fs.FS) http.HandlerFunc {
 			http.Error(w, "index.html not found", http.StatusInternalServerError)
 			return
 		}
-		defer indexFile.Close()
+		defer func() { _ = indexFile.Close() }()
 
 		stat, err := indexFile.Stat()
 		if err != nil {

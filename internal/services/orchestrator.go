@@ -51,6 +51,7 @@ type Orchestrator struct {
 	repos      *RepoManager
 	events     *EventBus
 	settings   *SettingsService
+
 	dataDir    string
 	userID     string
 	workerPool *ants.Pool
@@ -67,8 +68,8 @@ func NewOrchestrator(
 	events *EventBus,
 	settings *SettingsService,
 	dataDir string,
-	userID string,
 ) (*Orchestrator, error) {
+	userID := "default" // Hardcoded for local-first single-tenant mode
 	slog.Info("[ORCHESTRATOR] Creating new orchestrator", "data_dir", dataDir, "user_id", userID)
 	// Create worker pool with 5 workers
 	pool, err := ants.NewPool(5, ants.WithPreAlloc(false))
@@ -164,7 +165,7 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	slog.Info("[ORCHESTRATOR] Task execution started", "task_id", job.TaskID)
 
 	// Update task to in_progress
-	o.tasks.UpdateStatus(ctx, job.TaskID, "in_progress")
+	_ = o.tasks.UpdateStatus(ctx, job.TaskID, "in_progress")
 
 	// TODO: Implement actual agent execution here
 	// For now, just mark as done after a short delay

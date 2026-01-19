@@ -16,7 +16,11 @@ type Handlers struct {
 	// Shared services (created once at startup)
 	taskService     *services.TaskService
 	settingsService *services.SettingsService
-	repoManager    *services.RepoManager
+	repoManager     *services.RepoManager
+	fileService     *services.FileService
+	toolService     *services.ToolService
+	messageService  *services.MessageService
+	gitService      *services.GitService
 }
 
 // NewHandlers creates new HTTP handlers.
@@ -32,12 +36,17 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		// Create shared services
 		taskService:     services.NewTaskService(database),
 		settingsService: services.NewSettingsService(database),
-		repoManager:    services.NewRepoManager(cfg.DataDir),
+		repoManager:     services.NewRepoManager(cfg.DataDir),
+		fileService:     services.NewFileService(cfg.DataDir),
+		toolService:     services.NewToolService(cfg.DataDir),
+		messageService:  services.NewMessageService(database),
+		gitService:      services.NewGitService(cfg.DataDir),
 	}, nil
 }
 
 // getOrchestrator creates an orchestrator for a task execution.
-func (h *Handlers) getOrchestrator(machineID string) (*services.Orchestrator, error) {
+// For local-first single-tenant mode, we use a fixed userID "default".
+func (h *Handlers) getOrchestrator() (*services.Orchestrator, error) {
 	return services.NewOrchestrator(
 		h.db,
 		h.taskService,
@@ -45,6 +54,5 @@ func (h *Handlers) getOrchestrator(machineID string) (*services.Orchestrator, er
 		h.events,
 		h.settingsService,
 		h.cfg.DataDir,
-		machineID,
 	)
 }

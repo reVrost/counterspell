@@ -2,7 +2,8 @@ package services
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/lithammer/shortuuid/v4"
@@ -21,20 +22,23 @@ func NewTaskService(database *db.DB) *TaskService {
 	return &TaskService{db: database}
 }
 
-// Create creates a new task.
-func (s *TaskService) Create(ctx context.Context, machineID, title, intent string) (*models.Task, error) {
+// Create creates a new task with validation.
+func (s *TaskService) Create(ctx context.Context, machineID, projectID, intent string) (*models.Task, error) {
 	id := shortuuid.New()
-	now := time.Now()
+	// Validate input
+	if machineID == "" {
+		return nil, fmt.Errorf("machine_id is required")
+	}
+	if intent == "" {
+		return nil, fmt.Errorf("intent is required")
+	}
 
 	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
 		ID:        id,
-		MachineID: machineID,
-		Title:     title,
+		Title:     intent, // Use intent as title for now
 		Intent:    intent,
 		Status:    "pending",
-		Position:   sql.NullInt64{Int64: 0, Valid: true},
-		CreatedAt: sql.NullTime{Time: now, Valid: true},
-		UpdatedAt: sql.NullTime{Time: now, Valid: true},
+		CreatedAt: time.Now().UnixMilli(),
 	}); err != nil {
 		return nil, err
 	}
@@ -79,26 +83,17 @@ func (s *TaskService) ListByStatus(ctx context.Context, status string) ([]*model
 	return result, nil
 }
 
-// UpdateStatus updates task status.
+// UpdateStatus updates task status with validation.
 func (s *TaskService) UpdateStatus(ctx context.Context, id, status string) error {
-	now := time.Now()
-	if err := s.db.Queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
-		Status:    status,
-		UpdatedAt: sql.NullTime{Time: now, Valid: true},
-		ID:        id,
-	}); err != nil {
-		return err
+	// Validate status
+	validStatuses := []string{"pending", "in_progress", "review", "done", "failed"}
+	if !slices.Contains(validStatuses, status) {
+		return fmt.Errorf("invalid status: %s", status)
 	}
-	return nil
-}
 
-// UpdateStep updates current step of a task.
-func (s *TaskService) UpdateStep(ctx context.Context, id, step string) error {
-	now := time.Now()
-	if err := s.db.Queries.UpdateTaskStep(ctx, sqlc.UpdateTaskStepParams{
-		CurrentStep: sql.NullString{String: step, Valid: step != ""},
-		UpdatedAt:   sql.NullTime{Time: now, Valid: true},
-		ID:          id,
+	if err := s.db.Queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
+		Status: status,
+		ID:     id,
 	}); err != nil {
 		return err
 	}
@@ -113,17 +108,24 @@ func (s *TaskService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// GetPendingTasks retrieves all pending tasks for execution.
+func (s *TaskService) GetPendingTasks(ctx context.Context) ([]*models.Task, error) {
+	return s.ListByStatus(ctx, "pending")
+}
+
+// GetInProgressTasks retrieves all in-progress tasks.
+func (s *TaskService) GetInProgressTasks(ctx context.Context) ([]*models.Task, error) {
+	return s.ListByStatus(ctx, "in_progress")
+}
+
 // sqlcTaskToModel converts sqlc task to model.
 func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 	return &models.Task{
-		ID:             task.ID,
-		MachineID:      task.MachineID,
-		Title:          task.Title,
-		Intent:         task.Intent,
-		Status:         task.Status,
-		CurrentStep:    task.CurrentStep.String,
-		AssignedAgentID: task.AssignedAgentID.String,
-		CreatedAt:      task.CreatedAt.Time,
-		UpdatedAt:      task.UpdatedAt.Time,
+		ID:        task.ID,
+		Title:     task.Title,
+		Intent:    task.Intent,
+		Status:    task.Status,
+		Position:  task.Position.Int64,
+		CreatedAt: time.UnixMilli(task.CreatedAt),
 	}
 }
