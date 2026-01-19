@@ -1,6 +1,6 @@
 -- name: CreateTask :exec
-INSERT INTO tasks (id, title, intent, status, created_at)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO tasks (id, repository_id, title, intent, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetTask :one
 SELECT * FROM tasks WHERE id = ?;

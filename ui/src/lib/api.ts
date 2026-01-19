@@ -236,21 +236,6 @@ export const tasksAPI = {
 		return postAction(`/api/v1/tasks/${taskId}/discard`);
 	},
 
-	async resolveConflict(taskId: string, filePath: string, choice: 'ours' | 'theirs'): Promise<APIResponse> {
-		const formData = new FormData();
-		formData.append('file', filePath);
-		formData.append('choice', choice);
-
-		return postFormWithResponse(`/api/v1/action/resolve-conflict/${taskId}`, formData);
-	},
-
-	async abortMerge(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/v1/action/abort-merge/${taskId}`);
-	},
-
-	async completeMerge(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/v1/action/complete-merge/${taskId}`);
-	}
 };
 
 // ==================== SETTINGS ====================

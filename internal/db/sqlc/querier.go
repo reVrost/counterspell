@@ -11,22 +11,31 @@ import (
 
 type Querier interface {
 	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) error
+	CreateGithubConnection(ctx context.Context, arg CreateGithubConnectionParams) (GithubConnection, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) error
+	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) error
 	DeleteAgentRunsByTask(ctx context.Context, taskID string) error
+	DeleteGithubConnection(ctx context.Context, id string) error
 	DeleteMessagesByTask(ctx context.Context, taskID string) error
+	DeleteRepositoriesByConnection(ctx context.Context, connectionID string) error
 	DeleteTask(ctx context.Context, id string) error
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
+	GetGithubConnection(ctx context.Context) (GithubConnection, error)
+	GetGithubConnectionByID(ctx context.Context, id string) (GithubConnection, error)
 	GetLatestRun(ctx context.Context, taskID string) (AgentRun, error)
 	GetMessage(ctx context.Context, id string) (Message, error)
 	GetMessagesByRun(ctx context.Context, runID sql.NullString) ([]Message, error)
 	GetMessagesByTask(ctx context.Context, taskID string) ([]Message, error)
 	GetRecentMessages(ctx context.Context, arg GetRecentMessagesParams) ([]Message, error)
+	GetRepository(ctx context.Context, id string) (Repository, error)
 	GetSettings(ctx context.Context) (GetSettingsRow, error)
 	GetTask(ctx context.Context, id string) (Task, error)
 	ListAgentRunsByTask(ctx context.Context, taskID string) ([]AgentRun, error)
+	ListRepositories(ctx context.Context, connectionID string) ([]Repository, error)
 	ListTasks(ctx context.Context) ([]Task, error)
 	ListTasksByStatus(ctx context.Context, status string) ([]Task, error)
+	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)
 	UpdateTaskPosition(ctx context.Context, arg UpdateTaskPositionParams) error
 	UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error

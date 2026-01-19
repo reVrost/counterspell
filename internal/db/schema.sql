@@ -5,9 +5,10 @@
 -- Status flow: planning -> in_progress -> review -> done | failed
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
+    repository_id TEXT REFERENCES repositories(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('planning', 'in_progress', 'review', 'done', 'failed')),
+    status TEXT NOT NULL CHECK(status IN ('pending', 'planning', 'in_progress', 'review', 'done', 'failed')),
     position INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
     updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
@@ -119,6 +120,46 @@ UPDATE settings SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
 
+-- GitHub Connections: Store OAuth tokens (single connection for now)
+CREATE TABLE IF NOT EXISTS github_connections (
+    id TEXT PRIMARY KEY,
+    github_user_id TEXT UNIQUE NOT NULL,
+    access_token TEXT NOT NULL,
+    username TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL  -- Unix ms
+);
+
+CREATE TRIGGER IF NOT EXISTS update_github_connections_updated_at
+AFTER UPDATE ON github_connections
+BEGIN
+UPDATE github_connections SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Repositories: Available repos for selection
+CREATE TABLE IF NOT EXISTS repositories (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    is_private BOOLEAN NOT NULL,
+    html_url TEXT NOT NULL,
+    clone_url TEXT NOT NULL,
+    local_path TEXT,
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL  -- Unix ms
+);
+
+CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at
+AFTER UPDATE ON repositories
+BEGIN
+UPDATE repositories SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
 -- Insert default settings row
 INSERT OR IGNORE INTO settings (id, agent_backend) VALUES (1, 'native');
 
@@ -130,3 +171,4 @@ CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id);
 CREATE INDEX IF NOT EXISTS idx_runs_created_at ON agent_runs (created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
 CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts (created_at);
+CREATE INDEX IF NOT EXISTS idx_repos_connection ON repositories(connection_id);

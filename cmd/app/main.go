@@ -113,7 +113,10 @@ func main() {
 
 	// Protected routes (auth not required for local-first)
 	r.Group(func(r chi.Router) {
-		// We need Github oauth callback stuff endpoint
+		// GitHub OAuth routes
+		r.Get("/api/v1/github/authorize", h.HandleGitHubLogin)
+		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
+		r.Get("/api/v1/github/repos", h.HandleGitHubRepos)
 
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)

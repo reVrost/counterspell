@@ -33,6 +33,16 @@ type Artifact struct {
 	UpdatedAt int64  `json:"updated_at"`
 }
 
+type GithubConnection struct {
+	ID           string         `json:"id"`
+	GithubUserID string         `json:"github_user_id"`
+	AccessToken  string         `json:"access_token"`
+	Username     string         `json:"username"`
+	AvatarUrl    sql.NullString `json:"avatar_url"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
+}
+
 type Message struct {
 	ID         string         `json:"id"`
 	TaskID     string         `json:"task_id"`
@@ -48,6 +58,20 @@ type Message struct {
 	FinishedAt sql.NullInt64  `json:"finished_at"`
 }
 
+type Repository struct {
+	ID           string         `json:"id"`
+	ConnectionID string         `json:"connection_id"`
+	Name         string         `json:"name"`
+	FullName     string         `json:"full_name"`
+	Owner        string         `json:"owner"`
+	IsPrivate    bool           `json:"is_private"`
+	HtmlUrl      string         `json:"html_url"`
+	CloneUrl     string         `json:"clone_url"`
+	LocalPath    sql.NullString `json:"local_path"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
+}
+
 type Setting struct {
 	ID            int64          `json:"id"`
 	OpenrouterKey sql.NullString `json:"openrouter_key"`
@@ -59,11 +83,12 @@ type Setting struct {
 }
 
 type Task struct {
-	ID        string        `json:"id"`
-	Title     string        `json:"title"`
-	Intent    string        `json:"intent"`
-	Status    string        `json:"status"`
-	Position  sql.NullInt64 `json:"position"`
-	CreatedAt int64         `json:"created_at"`
-	UpdatedAt int64         `json:"updated_at"`
+	ID           string         `json:"id"`
+	RepositoryID sql.NullString `json:"repository_id"`
+	Title        string         `json:"title"`
+	Intent       string         `json:"intent"`
+	Status       string         `json:"status"`
+	Position     sql.NullInt64  `json:"position"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
 }

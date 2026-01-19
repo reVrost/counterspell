@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"slices"
 	"time"
@@ -33,12 +34,15 @@ func (s *TaskService) Create(ctx context.Context, machineID, projectID, intent s
 		return nil, fmt.Errorf("intent is required")
 	}
 
+	now := time.Now().UnixMilli()
 	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
-		ID:        id,
-		Title:     intent, // Use intent as title for now
-		Intent:    intent,
-		Status:    "pending",
-		CreatedAt: time.Now().UnixMilli(),
+		ID:           id,
+		RepositoryID: sql.NullString{String: projectID, Valid: projectID != ""},
+		Title:        intent, // Use intent as title for now
+		Intent:       intent,
+		Status:       "pending",
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}); err != nil {
 		return nil, err
 	}
@@ -120,12 +124,18 @@ func (s *TaskService) GetInProgressTasks(ctx context.Context) ([]*models.Task, e
 
 // sqlcTaskToModel converts sqlc task to model.
 func sqlcTaskToModel(task *sqlc.Task) *models.Task {
+	var repoID *string
+	if task.RepositoryID.Valid {
+		repoID = &task.RepositoryID.String
+	}
 	return &models.Task{
-		ID:        task.ID,
-		Title:     task.Title,
-		Intent:    task.Intent,
-		Status:    task.Status,
-		Position:  task.Position.Int64,
-		CreatedAt: time.UnixMilli(task.CreatedAt),
+		ID:           task.ID,
+		RepositoryID: repoID,
+		Title:        task.Title,
+		Intent:       task.Intent,
+		Status:       task.Status,
+		Position:     task.Position.Int64,
+		CreatedAt:    time.UnixMilli(task.CreatedAt),
+		UpdatedAt:    time.UnixMilli(task.UpdatedAt),
 	}
 }

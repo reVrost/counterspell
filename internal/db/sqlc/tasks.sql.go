@@ -11,25 +11,29 @@ import (
 )
 
 const createTask = `-- name: CreateTask :exec
-INSERT INTO tasks (id, title, intent, status, created_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO tasks (id, repository_id, title, intent, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Intent    string `json:"intent"`
-	Status    string `json:"status"`
-	CreatedAt int64  `json:"created_at"`
+	ID           string         `json:"id"`
+	RepositoryID sql.NullString `json:"repository_id"`
+	Title        string         `json:"title"`
+	Intent       string         `json:"intent"`
+	Status       string         `json:"status"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) error {
 	_, err := q.db.ExecContext(ctx, createTask,
 		arg.ID,
+		arg.RepositoryID,
 		arg.Title,
 		arg.Intent,
 		arg.Status,
 		arg.CreatedAt,
+		arg.UpdatedAt,
 	)
 	return err
 }
@@ -44,7 +48,7 @@ func (q *Queries) DeleteTask(ctx context.Context, id string) error {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, title, intent, status, position, created_at, updated_at FROM tasks WHERE id = ?
+SELECT id, repository_id, title, intent, status, position, created_at, updated_at FROM tasks WHERE id = ?
 `
 
 func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
@@ -52,6 +56,7 @@ func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
 	var i Task
 	err := row.Scan(
 		&i.ID,
+		&i.RepositoryID,
 		&i.Title,
 		&i.Intent,
 		&i.Status,
@@ -63,7 +68,7 @@ func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, title, intent, status, position, created_at, updated_at FROM tasks
+SELECT id, repository_id, title, intent, status, position, created_at, updated_at FROM tasks
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
@@ -78,6 +83,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
+			&i.RepositoryID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
@@ -99,7 +105,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, title, intent, status, position, created_at, updated_at FROM tasks
+SELECT id, repository_id, title, intent, status, position, created_at, updated_at FROM tasks
 WHERE status = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -115,6 +121,7 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
+			&i.RepositoryID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,

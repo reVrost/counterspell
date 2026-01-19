@@ -21,6 +21,7 @@ type Handlers struct {
 	toolService     *services.ToolService
 	messageService  *services.MessageService
 	gitService      *services.GitService
+	githubService   *services.GitHubService
 }
 
 // NewHandlers creates new HTTP handlers.
@@ -41,6 +42,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		toolService:     services.NewToolService(cfg.DataDir),
 		messageService:  services.NewMessageService(database),
 		gitService:      services.NewGitService(cfg.DataDir),
+		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
 	}, nil
 }
 
@@ -53,6 +55,7 @@ func (h *Handlers) getOrchestrator() (*services.Orchestrator, error) {
 		h.repoManager,
 		h.events,
 		h.settingsService,
+		h.githubService,
 		h.cfg.DataDir,
 	)
 }
