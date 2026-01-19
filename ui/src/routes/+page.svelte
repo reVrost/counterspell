@@ -3,7 +3,6 @@
 	import { page } from '$app/stores';
 	import { authAPI } from '$lib/api';
 	import { appState } from '$lib/stores/app.svelte';
-	import { signInWithGitHub } from '$lib/supabase';
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { browser } from '$app/environment';

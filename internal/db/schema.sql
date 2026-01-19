@@ -1,56 +1,105 @@
 -- SQLite Schema for Counterspell (Local-First Data Plane)
--- This is the consolidated schema - no migrations needed
-
--- Machines: Track local and cloud worker instances
-CREATE TABLE IF NOT EXISTS machines (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,  -- e.g., "Alice's MacBook Pro", "Fly Agent #1"
-    mode TEXT CHECK(mode IN ('local', 'cloud')) NOT NULL,
-    capabilities TEXT,  -- JSON: {"os": "darwin", "cpus": 8}
-    last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Agents: System-wide agent configurations (no user_id - single-tenant)
-CREATE TABLE IF NOT EXISTS agents (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    system_prompt TEXT NOT NULL,
-    tools TEXT NOT NULL DEFAULT '{}',  -- JSON array
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+-- This is consolidated schema - no migrations needed
 
 -- Tasks: Core unit of work
--- Status flow: pending -> in_progress -> review -> done | failed
+-- Status flow: planning -> in_progress -> review -> done | failed
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
-    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending', 'in_progress', 'review', 'done', 'failed')),
+    status TEXT NOT NULL CHECK(status IN ('planning', 'in_progress', 'review', 'done', 'failed')),
     position INTEGER DEFAULT 0,
-    current_step TEXT,
-    assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
+
+CREATE TRIGGER IF NOT EXISTS update_tasks_updated_at
+AFTER UPDATE ON tasks
+BEGIN
+UPDATE tasks SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
 
 -- Agent Runs: One row per agent execution within a task
 CREATE TABLE IF NOT EXISTS agent_runs (
     id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    step TEXT NOT NULL,
-    agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'completed', 'failed')),
-    input TEXT,
-    output TEXT,
-    message_history TEXT,  -- JSON
-    artifact_path TEXT,
-    error TEXT,
-    started_at DATETIME,
+    prompt TEXT NOT NULL,
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    summary_message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,
+    cost REAL NOT NULL DEFAULT 0.0 CHECK (cost >= 0.0),
+    message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
+    prompt_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),
+    completion_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (completion_tokens>= 0),
     completed_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
+
+CREATE TRIGGER IF NOT EXISTS update_agent_runs_updated_at
+AFTER UPDATE ON agent_runs
+BEGIN
+UPDATE agent_runs SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Artifacts: Files uploaded by agents
+CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    content TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    updated_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    UNIQUE(path, run_id, version)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_artifacts_updated_at
+AFTER UPDATE ON artifacts
+BEGIN
+UPDATE artifacts SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Messages: Chat messages for agent conversation history
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    run_id TEXT REFERENCES agent_runs(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('system', 'user', 'assistant', 'tool')),
+    parts TEXT NOT NULL default '[]',
+    model TEXT,
+    provider TEXT,
+    content TEXT NOT NULL,
+    tool_id TEXT,  -- For tool messages: which tool was called
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    finished_at INTEGER
+);
+
+CREATE TRIGGER IF NOT EXISTS update_messages_updated_at
+AFTER UPDATE ON messages
+BEGIN
+UPDATE messages SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_insert
+AFTER INSERT ON messages
+BEGIN
+UPDATE agent_runs SET
+    message_count = message_count + 1
+WHERE id = new.run_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_delete
+AFTER DELETE ON messages
+BEGIN
+UPDATE agent_runs SET
+    message_count = message_count - 1
+WHERE id = old.run_id;
+END;
 
 -- Settings: API keys and configuration (no user_id - single-tenant)
 CREATE TABLE IF NOT EXISTS settings (
@@ -59,18 +108,25 @@ CREATE TABLE IF NOT EXISTS settings (
     zai_key TEXT,
     anthropic_key TEXT,
     openai_key TEXT,
-    agent_backend TEXT DEFAULT 'native',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
+
+CREATE TRIGGER IF NOT EXISTS update_settings_updated_at
+AFTER UPDATE ON settings
+BEGIN
+UPDATE settings SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
 
 -- Insert default settings row
 INSERT OR IGNORE INTO settings (id, agent_backend) VALUES (1, 'native');
 
 -- Indices (optimize for common query patterns)
-CREATE INDEX IF NOT EXISTS idx_tasks_machine_status ON tasks(machine_id, status);
-CREATE INDEX IF NOT EXISTS idx_tasks_machine ON tasks(machine_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_task_step ON agent_runs(task_id, step);
-CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
-CREATE INDEX IF NOT EXISTS idx_machines_mode ON machines(mode);
+CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);
+CREATE INDEX IF NOT EXISTS idx_messages_task_created ON messages(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id);
+CREATE INDEX IF NOT EXISTS idx_runs_created_at ON agent_runs (created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
+CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts (created_at);

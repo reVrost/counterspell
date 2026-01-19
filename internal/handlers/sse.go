@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
@@ -16,7 +15,7 @@ import (
 func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := r.URL.Query().Get("task_id")
 	ctx := r.Context()
-	_ = auth.UserIDFromContext(ctx)
+	// Auth removed for local-first mode
 
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")

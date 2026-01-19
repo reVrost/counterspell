@@ -22,7 +22,7 @@ type GetSettingsRow struct {
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
 	AgentBackend  string         `json:"agent_backend"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
+	UpdatedAt     int64          `json:"updated_at"`
 }
 
 func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
@@ -55,8 +55,8 @@ type UpsertSettingsParams struct {
 	ZaiKey        sql.NullString `json:"zai_key"`
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
-	AgentBackend  sql.NullString `json:"agent_backend"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
+	AgentBackend  string         `json:"agent_backend"`
+	UpdatedAt     int64          `json:"updated_at"`
 }
 
 func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) error {

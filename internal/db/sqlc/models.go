@@ -8,37 +8,44 @@ import (
 	"database/sql"
 )
 
-type Agent struct {
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	SystemPrompt string       `json:"system_prompt"`
-	Tools        string       `json:"tools"`
-	CreatedAt    sql.NullTime `json:"created_at"`
-	UpdatedAt    sql.NullTime `json:"updated_at"`
-}
-
 type AgentRun struct {
-	ID             string         `json:"id"`
-	TaskID         string         `json:"task_id"`
-	Step           string         `json:"step"`
-	AgentID        sql.NullString `json:"agent_id"`
-	Status         string         `json:"status"`
-	Input          sql.NullString `json:"input"`
-	Output         sql.NullString `json:"output"`
-	MessageHistory sql.NullString `json:"message_history"`
-	ArtifactPath   sql.NullString `json:"artifact_path"`
-	Error          sql.NullString `json:"error"`
-	StartedAt      sql.NullTime   `json:"started_at"`
-	CompletedAt    sql.NullTime   `json:"completed_at"`
-	CreatedAt      sql.NullTime   `json:"created_at"`
+	ID               string         `json:"id"`
+	TaskID           string         `json:"task_id"`
+	Prompt           string         `json:"prompt"`
+	AgentBackend     string         `json:"agent_backend"`
+	SummaryMessageID sql.NullString `json:"summary_message_id"`
+	Cost             float64        `json:"cost"`
+	MessageCount     int64          `json:"message_count"`
+	PromptTokens     int64          `json:"prompt_tokens"`
+	CompletionTokens int64          `json:"completion_tokens"`
+	CompletedAt      sql.NullTime   `json:"completed_at"`
+	CreatedAt        int64          `json:"created_at"`
+	UpdatedAt        int64          `json:"updated_at"`
 }
 
-type Machine struct {
-	ID           string         `json:"id"`
-	Name         string         `json:"name"`
-	Mode         string         `json:"mode"`
-	Capabilities sql.NullString `json:"capabilities"`
-	LastSeenAt   sql.NullTime   `json:"last_seen_at"`
+type Artifact struct {
+	ID        string `json:"id"`
+	RunID     string `json:"run_id"`
+	Path      string `json:"path"`
+	Content   string `json:"content"`
+	Version   int64  `json:"version"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
+type Message struct {
+	ID         string         `json:"id"`
+	TaskID     string         `json:"task_id"`
+	RunID      sql.NullString `json:"run_id"`
+	Role       string         `json:"role"`
+	Parts      string         `json:"parts"`
+	Model      sql.NullString `json:"model"`
+	Provider   sql.NullString `json:"provider"`
+	Content    string         `json:"content"`
+	ToolID     sql.NullString `json:"tool_id"`
+	CreatedAt  int64          `json:"created_at"`
+	UpdatedAt  int64          `json:"updated_at"`
+	FinishedAt sql.NullInt64  `json:"finished_at"`
 }
 
 type Setting struct {
@@ -47,19 +54,16 @@ type Setting struct {
 	ZaiKey        sql.NullString `json:"zai_key"`
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
-	AgentBackend  sql.NullString `json:"agent_backend"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
+	AgentBackend  string         `json:"agent_backend"`
+	UpdatedAt     int64          `json:"updated_at"`
 }
 
 type Task struct {
-	ID              string         `json:"id"`
-	MachineID       string         `json:"machine_id"`
-	Title           string         `json:"title"`
-	Intent          string         `json:"intent"`
-	Status          string         `json:"status"`
-	Position        sql.NullInt64  `json:"position"`
-	CurrentStep     sql.NullString `json:"current_step"`
-	AssignedAgentID sql.NullString `json:"assigned_agent_id"`
-	CreatedAt       sql.NullTime   `json:"created_at"`
-	UpdatedAt       sql.NullTime   `json:"updated_at"`
+	ID        string        `json:"id"`
+	Title     string        `json:"title"`
+	Intent    string        `json:"intent"`
+	Status    string        `json:"status"`
+	Position  sql.NullInt64 `json:"position"`
+	CreatedAt int64         `json:"created_at"`
+	UpdatedAt int64         `json:"updated_at"`
 }
