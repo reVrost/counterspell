@@ -22,13 +22,13 @@ func NewGitService(dataDir string) *GitService {
 
 // GitStatus represents git status.
 type GitStatus struct {
-	Branch         string            `json:"branch"`
-	Staged         []string          `json:"staged"`
-	Modified       []string          `json:"modified"`
-	Untracked      []string          `json:"untracked"`
-	AheadCommits   int               `json:"ahead_commits"`
-	BehindCommits  int               `json:"behind_commits"`
-	CurrentCommit  string            `json:"current_commit"`
+	Branch        string   `json:"branch"`
+	Staged        []string `json:"staged"`
+	Modified      []string `json:"modified"`
+	Untracked     []string `json:"untracked"`
+	AheadCommits  int      `json:"ahead_commits"`
+	BehindCommits int      `json:"behind_commits"`
+	CurrentCommit string   `json:"current_commit"`
 }
 
 // GitBranch represents a git branch.
@@ -56,27 +56,27 @@ type GitDiff struct {
 func (s *GitService) Init(ctx context.Context, path string) error {
 	slog.Info("[GIT] Initializing repository", "path", path)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "init")
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git init failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
 // Clone clones a git repository.
 func (s *GitService) Clone(ctx context.Context, url, targetPath string) (string, error) {
 	slog.Info("[GIT] Cloning repository", "url", url, "target", targetPath)
-	
+
 	fullPath := filepath.Join(s.dataDir, targetPath)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "clone", url, fullPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return fullPath, nil
 }
 
@@ -84,7 +84,7 @@ func (s *GitService) Clone(ctx context.Context, url, targetPath string) (string,
 func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error) {
 	slog.Info("[GIT] Getting status", "path", path)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	// Get branch name
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = fullPath
@@ -93,7 +93,7 @@ func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error
 	if err != nil {
 		return nil, fmt.Errorf("git branch failed: %w", err)
 	}
-	
+
 	// Get current commit
 	cmd = exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
 	cmd.Dir = fullPath
@@ -102,7 +102,7 @@ func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error
 	if err != nil {
 		return nil, fmt.Errorf("git rev-parse failed: %w", err)
 	}
-	
+
 	// Get ahead/behind
 	cmd = exec.CommandContext(ctx, "git", "rev-list", "--count", "--left-right", "@{u}...HEAD")
 	cmd.Dir = fullPath
@@ -115,7 +115,7 @@ func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error
 			_, _ = fmt.Sscanf(parts[1], "%d", &ahead)
 		}
 	}
-	
+
 	// Get status --porcelain
 	cmd = exec.CommandContext(ctx, "git", "status", "--porcelain")
 	cmd.Dir = fullPath
@@ -123,20 +123,20 @@ func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error
 	if err != nil {
 		return nil, fmt.Errorf("git status failed: %w", err)
 	}
-	
+
 	var staged, modified, untracked []string
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
 		if len(line) < 2 {
 			continue
 		}
-		
+
 		status := line[:2]
 		filename := strings.TrimSpace(line[2:])
-		
+
 		switch {
 		case status[0] == 'M' || status[0] == 'A' || status[0] == 'D':
 			staged = append(staged, filename)
@@ -146,15 +146,15 @@ func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error
 			untracked = append(untracked, filename)
 		}
 	}
-	
+
 	return &GitStatus{
-		Branch:         branch,
-		Staged:         staged,
-		Modified:       modified,
-		Untracked:      untracked,
-		AheadCommits:   ahead,
-		BehindCommits:  behind,
-		CurrentCommit:  currentCommit,
+		Branch:        branch,
+		Staged:        staged,
+		Modified:      modified,
+		Untracked:     untracked,
+		AheadCommits:  ahead,
+		BehindCommits: behind,
+		CurrentCommit: currentCommit,
 	}, nil
 }
 
@@ -162,32 +162,32 @@ func (s *GitService) Status(ctx context.Context, path string) (*GitStatus, error
 func (s *GitService) Branches(ctx context.Context, path string) ([]*GitBranch, error) {
 	slog.Info("[GIT] Listing branches", "path", path)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "branch", "-a")
 	cmd.Dir = fullPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git branch failed: %w", err)
 	}
-	
+
 	var branches []*GitBranch
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		isHEAD := strings.HasPrefix(line, "*")
 		name := strings.TrimPrefix(line, "*")
 		name = strings.TrimSpace(name)
-		
+
 		branches = append(branches, &GitBranch{
 			Name:   name,
 			IsHEAD: isHEAD,
 		})
 	}
-	
+
 	return branches, nil
 }
 
@@ -195,13 +195,13 @@ func (s *GitService) Branches(ctx context.Context, path string) ([]*GitBranch, e
 func (s *GitService) CreateBranch(ctx context.Context, path, branchName string) error {
 	slog.Info("[GIT] Creating branch", "path", path, "branch", branchName)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "branch", branchName)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git branch failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -209,13 +209,13 @@ func (s *GitService) CreateBranch(ctx context.Context, path, branchName string) 
 func (s *GitService) CheckoutBranch(ctx context.Context, path, branchName string) error {
 	slog.Info("[GIT] Checking out branch", "path", path, "branch", branchName)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "checkout", branchName)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git checkout failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -223,13 +223,13 @@ func (s *GitService) CheckoutBranch(ctx context.Context, path, branchName string
 func (s *GitService) CheckoutBranchAndCreate(ctx context.Context, path, branchName string) error {
 	slog.Info("[GIT] Creating and checking out branch", "path", path, "branch", branchName)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "checkout", "-b", branchName)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git checkout -b failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -237,13 +237,13 @@ func (s *GitService) CheckoutBranchAndCreate(ctx context.Context, path, branchNa
 func (s *GitService) Add(ctx context.Context, path, files string) error {
 	slog.Info("[GIT] Staging files", "path", path, "files", files)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "add", files)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -251,13 +251,13 @@ func (s *GitService) Add(ctx context.Context, path, files string) error {
 func (s *GitService) Commit(ctx context.Context, path, message string) error {
 	slog.Info("[GIT] Creating commit", "path", path, "message", message)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "commit", "-m", message)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -265,7 +265,7 @@ func (s *GitService) Commit(ctx context.Context, path, message string) error {
 func (s *GitService) Diff(ctx context.Context, path, from, to string) ([]*GitDiff, error) {
 	slog.Info("[GIT] Getting diff", "path", path, "from", from, "to", to)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	args := []string{"diff"}
 	if from != "" {
 		args = append(args, from)
@@ -274,14 +274,14 @@ func (s *GitService) Diff(ctx context.Context, path, from, to string) ([]*GitDif
 		args = append(args, to)
 	}
 	args = append(args, "--name-status")
-	
+
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = fullPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
-	
+
 	var diffs []*GitDiff
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -289,17 +289,17 @@ func (s *GitService) Diff(ctx context.Context, path, from, to string) ([]*GitDif
 		if len(parts) < 2 {
 			continue
 		}
-		
+
 		status := parts[0]
 		filename := parts[1]
-		
+
 		diffs = append(diffs, &GitDiff{
 			From:    filename,
 			To:      filename,
 			Changes: status,
 		})
 	}
-	
+
 	return diffs, nil
 }
 
@@ -307,26 +307,26 @@ func (s *GitService) Diff(ctx context.Context, path, from, to string) ([]*GitDif
 func (s *GitService) Log(ctx context.Context, path string, limit int) ([]*GitCommit, error) {
 	slog.Info("[GIT] Getting log", "path", path, "limit", limit)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "log", "-n", fmt.Sprintf("%d", limit), "--format=%H|%an|%s|%ci")
 	cmd.Dir = fullPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git log failed: %w", err)
 	}
-	
+
 	var commits []*GitCommit
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
-		
+
 		parts := strings.SplitN(line, "|", 4)
 		if len(parts) < 4 {
 			continue
 		}
-		
+
 		commits = append(commits, &GitCommit{
 			Hash:      parts[0],
 			Author:    parts[1],
@@ -334,7 +334,7 @@ func (s *GitService) Log(ctx context.Context, path string, limit int) ([]*GitCom
 			Timestamp: parts[3],
 		})
 	}
-	
+
 	return commits, nil
 }
 
@@ -342,13 +342,13 @@ func (s *GitService) Log(ctx context.Context, path string, limit int) ([]*GitCom
 func (s *GitService) Merge(ctx context.Context, path, branchName string) error {
 	slog.Info("[GIT] Merging branch", "path", path, "branch", branchName)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "merge", branchName)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git merge failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -356,13 +356,13 @@ func (s *GitService) Merge(ctx context.Context, path, branchName string) error {
 func (s *GitService) Pull(ctx context.Context, path string) error {
 	slog.Info("[GIT] Pulling changes", "path", path)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "pull")
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git pull failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -370,18 +370,18 @@ func (s *GitService) Pull(ctx context.Context, path string) error {
 func (s *GitService) Push(ctx context.Context, path, branch string) error {
 	slog.Info("[GIT] Pushing changes", "path", path, "branch", branch)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	args := []string{"push"}
 	if branch != "" {
 		args = append(args, "origin", branch)
 	}
-	
+
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -389,13 +389,13 @@ func (s *GitService) Push(ctx context.Context, path, branch string) error {
 func (s *GitService) Rebase(ctx context.Context, path, onto string) error {
 	slog.Info("[GIT] Rebasing", "path", path, "onto", onto)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "rebase", onto)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git rebase failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -403,13 +403,13 @@ func (s *GitService) Rebase(ctx context.Context, path, onto string) error {
 func (s *GitService) RebaseContinue(ctx context.Context, path string) error {
 	slog.Info("[GIT] Continuing rebase", "path", path)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "rebase", "--continue")
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git rebase --continue failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -417,13 +417,13 @@ func (s *GitService) RebaseContinue(ctx context.Context, path string) error {
 func (s *GitService) RebaseAbort(ctx context.Context, path string) error {
 	slog.Info("[GIT] Aborting rebase", "path", path)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	cmd := exec.CommandContext(ctx, "git", "rebase", "--abort")
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git rebase --abort failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -431,19 +431,19 @@ func (s *GitService) RebaseAbort(ctx context.Context, path string) error {
 func (s *GitService) Reset(ctx context.Context, path, commit string, hard bool) error {
 	slog.Info("[GIT] Resetting", "path", path, "commit", commit, "hard", hard)
 	fullPath := filepath.Join(s.dataDir, path)
-	
+
 	args := []string{"reset"}
 	if hard {
 		args = append(args, "--hard")
 	}
 	args = append(args, commit)
-	
+
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = fullPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git reset failed: %w\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
