@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { authAPI } from '$lib/api';
 	import { appState } from '$lib/stores/app.svelte';
+	import { signInWithGitHub } from '$lib/supabase';
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { browser } from '$app/environment';
@@ -17,7 +18,7 @@
 		loading = true;
 		showError = false;
 		try {
-			await authAPI.loginWithGitHub();
+			await signInWithGitHub();
 		} catch (err) {
 			console.error('Login failed:', err);
 			loading = false;

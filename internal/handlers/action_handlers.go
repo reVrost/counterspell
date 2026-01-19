@@ -7,221 +7,262 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/auth"
-	"github.com/revrost/code/counterspell/internal/services"
 )
 
-func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
-	_ = render.Render(w, r, Success("Task restarting..."))
+// HandleAddTask creates a new task from frontend.
+func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	var req struct {
+		Intent    string `json:"intent"`
+		ProjectID string `json:"project_id"`
+		ModelID   string `json:"model_id"`
+	}
+	if err := render.DecodeJSON(r.Body, &req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Intent == "" {
+		http.Error(w, "Intent required", http.StatusBadRequest)
+		return
+	}
+
+	orch, err := h.getOrchestrator(userID)
+	if err != nil {
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to create task", err))
+		return
+	}
+
+	taskID, err := orch.StartTask(ctx, req.ProjectID, req.Intent, req.ModelID)
+	if err != nil {
+		slog.Error("Failed to start task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]string{"task_id": taskID})
 }
 
-// HandleActionClear clears a task's agent runs (history/context)
+// HandleActionClear clears a task.
 func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
 
-	if err := h.db.Queries.DeleteAgentRunsByTask(ctx, taskID); err != nil {
-		slog.Error("Failed to clear task history", "error", err, "task_id", taskID)
-		_ = render.Render(w, r, ErrInternalServer("Failed to clear history", err))
+	orch, err := h.getOrchestrator(userID)
+	if err != nil {
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to clear task", err))
 		return
 	}
 
-	_ = render.Render(w, r, Success("Chat history cleared"))
+	if err := orch.CleanupTask(ctx, taskID); err != nil {
+		slog.Error("Failed to clear task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to clear task", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]string{"status": "ok"})
 }
 
-// HandleActionMerge merges a task's branch to main and pushes
+// HandleActionRetry retries a failed task.
+func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	orch, err := h.getOrchestrator(userID)
+	if err != nil {
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to retry task", err))
+		return
+	}
+
+	// For retry, we just start a new task with same intent
+	task, err := h.taskService.Get(ctx, taskID)
+	if err != nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	newTaskID, err := orch.StartTask(ctx, task.MachineID, task.Intent, "")
+	if err != nil {
+		slog.Error("Failed to retry task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to retry task", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]string{"task_id": newTaskID})
+}
+
+// HandleActionMerge attempts to merge task changes.
 func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	orchestrator, err := h.getOrchestrator(userID)
+	orch, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to merge task", err))
 		return
 	}
 
-	err = orchestrator.MergeTask(ctx, taskID)
-	if err != nil {
-		// Check if it's a merge conflict
-		if conflictErr, ok := err.(*services.ErrMergeConflict); ok {
-			slog.Info("Merge conflict detected", "task_id", taskID, "files", conflictErr.ConflictedFiles)
-
-			conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, conflictErr.ConflictedFiles)
-			if err != nil {
-				slog.Error("Failed to get conflict details", "error", err)
-				_ = render.Render(w, r, ErrInternalServer("Failed to load conflict details", err))
-				return
-			}
-
-			_ = render.Render(w, r, Conflict(taskID, conflicts))
-			return
-		}
-
-		slog.Error("Failed to merge task", "task_id", taskID, "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error(), err))
+	if err := orch.MergeTask(ctx, taskID); err != nil {
+		slog.Error("Failed to merge task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to merge task", err))
 		return
 	}
 
-	_ = render.Render(w, r, Success("Merged to main and pushed!"))
+	render.JSON(w, r, map[string]string{"status": "ok"})
 }
 
-// HandleResolveConflict resolves a single file conflict
-func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+// HandleActionPR creates a pull request for task changes.
+func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	data := &ResolveConflictRequest{}
-	if err := render.Bind(r, data); err != nil {
-		_ = render.Render(w, r, ErrInvalidRequest(err))
+	var req struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}
+	if err := render.DecodeJSON(r.Body, &req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	orchestrator, err := h.getOrchestrator(userID)
+	orch, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to create PR", err))
 		return
 	}
 
-	conflicts, err := orchestrator.GetConflictDetails(ctx, taskID, []string{data.File})
-	if err != nil || len(conflicts) == 0 {
-		_ = render.Render(w, r, ErrInternalServer("Failed to get conflict", err))
+	if err := orch.CreatePR(ctx, taskID, req.Title, req.Body); err != nil {
+		slog.Error("Failed to create PR", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to create PR", err))
 		return
 	}
 
-	var resolution string
-	switch data.Choice {
-	case "ours":
-		resolution = conflicts[0].Ours
-	case "theirs":
-		resolution = conflicts[0].Theirs
+	render.JSON(w, r, map[string]string{"status": "ok"})
+}
+
+// HandleActionDiscard discards task changes.
+func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	orch, err := h.getOrchestrator(userID)
+	if err != nil {
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to discard task", err))
+		return
 	}
 
-	if err := orchestrator.ResolveConflict(ctx, taskID, data.File, resolution); err != nil {
+	if err := orch.CleanupTask(ctx, taskID); err != nil {
+		slog.Error("Failed to discard task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to discard task", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]string{"status": "ok"})
+}
+
+// HandleActionChat sends a chat message to agent.
+func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := render.DecodeJSON(r.Body, &req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Implement chat functionality
+	// For now, just acknowledge message
+	slog.Info("Chat message received", "task_id", taskID, "message", req.Message)
+
+	render.JSON(w, r, map[string]string{"status": "message received"})
+}
+
+// HandleResolveConflict resolves a merge conflict.
+func (h *Handlers) HandleResolveConflict(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
+	userID := auth.UserIDFromContext(ctx)
+
+	var req struct {
+		File       string `json:"file"`
+		Resolution string `json:"resolution"`
+	}
+	if err := render.DecodeJSON(r.Body, &req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	orch, err := h.getOrchestrator(userID)
+	if err != nil {
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to resolve conflict", err))
+		return
+	}
+
+	if err := orch.ResolveConflict(ctx, taskID, req.File, req.Resolution); err != nil {
 		slog.Error("Failed to resolve conflict", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to resolve conflict", err))
 		return
 	}
 
-	_ = render.Render(w, r, Success("Resolved "+data.File))
+	render.JSON(w, r, map[string]string{"status": "ok"})
 }
 
-// HandleAbortMerge aborts the current merge
+// HandleAbortMerge aborts an in-progress merge.
 func (h *Handlers) HandleAbortMerge(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	orchestrator, err := h.getOrchestrator(userID)
+	orch, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to abort merge", err))
 		return
 	}
 
-	if err := orchestrator.AbortMerge(ctx, taskID); err != nil {
+	if err := orch.AbortMerge(ctx, taskID); err != nil {
 		slog.Error("Failed to abort merge", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to abort merge", err))
 		return
 	}
 
-	_ = render.Render(w, r, Success("Merge aborted"))
+	render.JSON(w, r, map[string]string{"status": "ok"})
 }
 
-// HandleCompleteMerge completes the merge after conflicts are resolved
+// HandleCompleteMergeResolution completes a merge conflict resolution.
 func (h *Handlers) HandleCompleteMerge(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	taskID := chi.URLParam(r, "id")
+	ctx := r.Context()
 	userID := auth.UserIDFromContext(ctx)
 
-	orchestrator, err := h.getOrchestrator(userID)
+	orch, err := h.getOrchestrator(userID)
 	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to complete merge", err))
 		return
 	}
 
-	if err := orchestrator.CompleteMergeResolution(ctx, taskID); err != nil {
+	if err := orch.CompleteMergeResolution(ctx, taskID); err != nil {
 		slog.Error("Failed to complete merge", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Merge failed: "+err.Error(), err))
+		_ = render.Render(w, r, ErrInternalServer("Failed to complete merge", err))
 		return
 	}
 
-	_ = render.Render(w, r, Success("Merged to main!"))
-}
-
-// HandleActionPR creates a GitHub Pull Request for the task
-func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-	userID := auth.UserIDFromContext(ctx)
-
-	orchestrator, err := h.getOrchestrator(userID)
-	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
-		return
-	}
-
-	prURL, err := orchestrator.CreatePR(ctx, taskID)
-	if err != nil {
-		slog.Error("Failed to create PR", "task_id", taskID, "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to create PR: "+err.Error(), err))
-		return
-	}
-
-	_ = render.Render(w, r, SuccessWithPR("PR created!", prURL))
-}
-
-// HandleActionDiscard deletes a task and cleans up its worktree
-func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
-	userID := auth.UserIDFromContext(ctx)
-
-	orchestrator, err := h.getOrchestrator(userID)
-	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
-		return
-	}
-
-	// Clean up worktree first
-	if err := orchestrator.CleanupTask(id); err != nil {
-		slog.Error("Failed to cleanup worktree", "task_id", id, "error", err)
-	}
-
-	if err := h.taskService.Delete(ctx, userID, id); err != nil {
-		_ = render.Render(w, r, ErrInternalServer(err.Error(), err))
-		return
-	}
-
-	_ = render.Render(w, r, Success("Task discarded"))
-}
-
-// HandleActionChat continues a task with a follow-up message.
-func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	taskID := chi.URLParam(r, "id")
-	userID := auth.UserIDFromContext(ctx)
-	slog.Info("[CHAT] HandleActionChat called", "task_id", taskID)
-
-	data := &ChatRequest{}
-	if err := render.Bind(r, data); err != nil {
-		slog.Error("[CHAT] Bind failed", "error", err)
-		_ = render.Render(w, r, ErrInvalidRequest(err))
-		return
-	}
-
-	slog.Info("[CHAT] Got message", "message", data.Message)
-
-	orchestrator, err := h.getOrchestrator(userID)
-	if err != nil {
-		_ = render.Render(w, r, ErrInternalServer("Internal error", err))
-		return
-	}
-
-	if err := orchestrator.ContinueTask(ctx, taskID, data.Message, data.ModelID); err != nil {
-		slog.Error("Failed to continue task", "task_id", taskID, "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to continue task", err))
-		return
-	}
-
-	_ = render.Render(w, r, Success("Message sent"))
+	render.JSON(w, r, map[string]string{"status": "ok"})
 }

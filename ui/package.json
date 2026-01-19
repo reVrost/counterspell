@@ -26,6 +26,7 @@
   "dependencies": {
     "@lucide/svelte": "^0.562.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@supabase/supabase-js": "^2.90.1",
     "@tanstack/svelte-query": "^5.0.0",
     "bits-ui": "^1.0.0",
     "class-variance-authority": "^0.7.1",

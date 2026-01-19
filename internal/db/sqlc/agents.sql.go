@@ -7,68 +7,53 @@ package sqlc
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"database/sql"
 )
 
-const createAgent = `-- name: CreateAgent :one
-INSERT INTO agents (id, user_id, name, system_prompt, tools, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, name, system_prompt, tools, created_at, updated_at
+const createAgent = `-- name: CreateAgent :exec
+INSERT INTO agents (id, name, system_prompt, tools, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreateAgentParams struct {
-	ID           string             `json:"id"`
-	UserID       string             `json:"user_id"`
-	Name         string             `json:"name"`
-	SystemPrompt string             `json:"system_prompt"`
-	Tools        []string           `json:"tools"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	SystemPrompt string       `json:"system_prompt"`
+	Tools        string       `json:"tools"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
 }
 
-func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error) {
-	row := q.db.QueryRow(ctx, createAgent,
+func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) error {
+	_, err := q.db.ExecContext(ctx, createAgent,
 		arg.ID,
-		arg.UserID,
 		arg.Name,
 		arg.SystemPrompt,
 		arg.Tools,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i Agent
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.SystemPrompt,
-		&i.Tools,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+	return err
 }
 
 const deleteAgent = `-- name: DeleteAgent :exec
-DELETE FROM agents WHERE id = $1
+DELETE FROM agents WHERE id = ?
 `
 
 func (q *Queries) DeleteAgent(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteAgent, id)
+	_, err := q.db.ExecContext(ctx, deleteAgent, id)
 	return err
 }
 
 const getAgent = `-- name: GetAgent :one
-SELECT id, user_id, name, system_prompt, tools, created_at, updated_at FROM agents WHERE id = $1
+SELECT id, name, system_prompt, tools, created_at, updated_at FROM agents WHERE id = ?
 `
 
 func (q *Queries) GetAgent(ctx context.Context, id string) (Agent, error) {
-	row := q.db.QueryRow(ctx, getAgent, id)
+	row := q.db.QueryRowContext(ctx, getAgent, id)
 	var i Agent
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
 		&i.Name,
 		&i.SystemPrompt,
 		&i.Tools,
@@ -79,15 +64,14 @@ func (q *Queries) GetAgent(ctx context.Context, id string) (Agent, error) {
 }
 
 const getAgentByName = `-- name: GetAgentByName :one
-SELECT id, user_id, name, system_prompt, tools, created_at, updated_at FROM agents WHERE name = $1
+SELECT id, name, system_prompt, tools, created_at, updated_at FROM agents WHERE name = ?
 `
 
 func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error) {
-	row := q.db.QueryRow(ctx, getAgentByName, name)
+	row := q.db.QueryRowContext(ctx, getAgentByName, name)
 	var i Agent
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
 		&i.Name,
 		&i.SystemPrompt,
 		&i.Tools,
@@ -98,12 +82,12 @@ func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error
 }
 
 const listAgents = `-- name: ListAgents :many
-SELECT id, user_id, name, system_prompt, tools, created_at, updated_at FROM agents
+SELECT id, name, system_prompt, tools, created_at, updated_at FROM agents
 ORDER BY name ASC
 `
 
 func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
-	rows, err := q.db.Query(ctx, listAgents)
+	rows, err := q.db.QueryContext(ctx, listAgents)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +97,6 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 		var i Agent
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
 			&i.Name,
 			&i.SystemPrompt,
 			&i.Tools,
@@ -124,39 +107,8 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Err(); err != nil {
+	if err := rows.Close(); err != nil {
 		return nil, err
-	}
-	return items, nil
-}
-
-const listAgentsByUser = `-- name: ListAgentsByUser :many
-SELECT id, user_id, name, system_prompt, tools, created_at, updated_at FROM agents
-WHERE user_id = $1
-ORDER BY name ASC
-`
-
-func (q *Queries) ListAgentsByUser(ctx context.Context, userID string) ([]Agent, error) {
-	rows, err := q.db.Query(ctx, listAgentsByUser, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Agent{}
-	for rows.Next() {
-		var i Agent
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.SystemPrompt,
-			&i.Tools,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -165,21 +117,21 @@ func (q *Queries) ListAgentsByUser(ctx context.Context, userID string) ([]Agent,
 }
 
 const updateAgent = `-- name: UpdateAgent :exec
-UPDATE agents 
-SET name = $1, system_prompt = $2, tools = $3, updated_at = $4 
-WHERE id = $5
+UPDATE agents
+SET name = ?, system_prompt = ?, tools = ?, updated_at = ?
+WHERE id = ?
 `
 
 type UpdateAgentParams struct {
-	Name         string             `json:"name"`
-	SystemPrompt string             `json:"system_prompt"`
-	Tools        []string           `json:"tools"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	ID           string             `json:"id"`
+	Name         string       `json:"name"`
+	SystemPrompt string       `json:"system_prompt"`
+	Tools        string       `json:"tools"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
+	ID           string       `json:"id"`
 }
 
 func (q *Queries) UpdateAgent(ctx context.Context, arg UpdateAgentParams) error {
-	_, err := q.db.Exec(ctx, updateAgent,
+	_, err := q.db.ExecContext(ctx, updateAgent,
 		arg.Name,
 		arg.SystemPrompt,
 		arg.Tools,

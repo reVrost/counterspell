@@ -7,75 +7,44 @@ package sqlc
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"database/sql"
 )
 
 const assignAgent = `-- name: AssignAgent :exec
-UPDATE tasks SET assigned_agent_id = $1, updated_at = $2 WHERE id = $3 AND user_id = $4
+UPDATE tasks SET assigned_agent_id = ?, updated_at = ? WHERE id = ?
 `
 
 type AssignAgentParams struct {
-	AssignedAgentID pgtype.Text        `json:"assigned_agent_id"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	ID              string             `json:"id"`
-	UserID          string             `json:"user_id"`
+	AssignedAgentID sql.NullString `json:"assigned_agent_id"`
+	UpdatedAt       sql.NullTime   `json:"updated_at"`
+	ID              string         `json:"id"`
 }
 
 func (q *Queries) AssignAgent(ctx context.Context, arg AssignAgentParams) error {
-	_, err := q.db.Exec(ctx, assignAgent,
-		arg.AssignedAgentID,
-		arg.UpdatedAt,
-		arg.ID,
-		arg.UserID,
-	)
+	_, err := q.db.ExecContext(ctx, assignAgent, arg.AssignedAgentID, arg.UpdatedAt, arg.ID)
 	return err
 }
 
-const assignUser = `-- name: AssignUser :exec
-UPDATE tasks SET assigned_user_id = $1, updated_at = $2 WHERE id = $3 AND user_id = $4
-`
-
-type AssignUserParams struct {
-	AssignedUserID pgtype.Text        `json:"assigned_user_id"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	ID             string             `json:"id"`
-	UserID         string             `json:"user_id"`
-}
-
-func (q *Queries) AssignUser(ctx context.Context, arg AssignUserParams) error {
-	_, err := q.db.Exec(ctx, assignUser,
-		arg.AssignedUserID,
-		arg.UpdatedAt,
-		arg.ID,
-		arg.UserID,
-	)
-	return err
-}
-
-const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (id, user_id, project_id, title, intent, status, position, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step
+const createTask = `-- name: CreateTask :exec
+INSERT INTO tasks (id, machine_id, title, intent, status, position, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
-	ID        string             `json:"id"`
-	UserID    string             `json:"user_id"`
-	ProjectID string             `json:"project_id"`
-	Title     string             `json:"title"`
-	Intent    string             `json:"intent"`
-	Status    string             `json:"status"`
-	Position  pgtype.Int4        `json:"position"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID        string        `json:"id"`
+	MachineID string        `json:"machine_id"`
+	Title     string        `json:"title"`
+	Intent    string        `json:"intent"`
+	Status    string        `json:"status"`
+	Position  sql.NullInt64 `json:"position"`
+	CreatedAt sql.NullTime  `json:"created_at"`
+	UpdatedAt sql.NullTime  `json:"updated_at"`
 }
 
-func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, error) {
-	row := q.db.QueryRow(ctx, createTask,
+func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) error {
+	_, err := q.db.ExecContext(ctx, createTask,
 		arg.ID,
-		arg.UserID,
-		arg.ProjectID,
+		arg.MachineID,
 		arg.Title,
 		arg.Intent,
 		arg.Status,
@@ -83,130 +52,47 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i Task
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ProjectID,
-		&i.Title,
-		&i.Intent,
-		&i.Status,
-		&i.Position,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.AssignedAgentID,
-		&i.AssignedUserID,
-		&i.CurrentStep,
-	)
-	return i, err
+	return err
 }
 
 const deleteTask = `-- name: DeleteTask :exec
-DELETE FROM tasks WHERE id = $1 AND user_id = $2
+DELETE FROM tasks WHERE id = ?
 `
 
-type DeleteTaskParams struct {
-	ID     string `json:"id"`
-	UserID string `json:"user_id"`
-}
-
-func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) error {
-	_, err := q.db.Exec(ctx, deleteTask, arg.ID, arg.UserID)
+func (q *Queries) DeleteTask(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteTask, id)
 	return err
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks WHERE id = $1 AND user_id = $2
+SELECT id, machine_id, title, intent, status, position, current_step, assigned_agent_id, created_at, updated_at FROM tasks WHERE id = ?
 `
 
-type GetTaskParams struct {
-	ID     string `json:"id"`
-	UserID string `json:"user_id"`
-}
-
-func (q *Queries) GetTask(ctx context.Context, arg GetTaskParams) (Task, error) {
-	row := q.db.QueryRow(ctx, getTask, arg.ID, arg.UserID)
+func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
+	row := q.db.QueryRowContext(ctx, getTask, id)
 	var i Task
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
-		&i.ProjectID,
-		&i.Title,
-		&i.Intent,
-		&i.Status,
-		&i.Position,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.AssignedAgentID,
-		&i.AssignedUserID,
-		&i.CurrentStep,
-	)
-	return i, err
-}
-
-const getTaskWithProject = `-- name: GetTaskWithProject :one
-SELECT
-    t.id, t.user_id, t.project_id, t.title, t.intent, t.status, t.position,
-    t.current_step, t.assigned_agent_id, t.assigned_user_id, t.created_at, t.updated_at,
-    p.github_owner as project_owner,
-    p.github_repo as project_repo
-FROM tasks t
-LEFT JOIN projects p ON t.project_id = p.id
-WHERE t.id = $1 AND t.user_id = $2
-`
-
-type GetTaskWithProjectParams struct {
-	ID     string `json:"id"`
-	UserID string `json:"user_id"`
-}
-
-type GetTaskWithProjectRow struct {
-	ID              string             `json:"id"`
-	UserID          string             `json:"user_id"`
-	ProjectID       string             `json:"project_id"`
-	Title           string             `json:"title"`
-	Intent          string             `json:"intent"`
-	Status          string             `json:"status"`
-	Position        pgtype.Int4        `json:"position"`
-	CurrentStep     pgtype.Text        `json:"current_step"`
-	AssignedAgentID pgtype.Text        `json:"assigned_agent_id"`
-	AssignedUserID  pgtype.Text        `json:"assigned_user_id"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	ProjectOwner    pgtype.Text        `json:"project_owner"`
-	ProjectRepo     pgtype.Text        `json:"project_repo"`
-}
-
-func (q *Queries) GetTaskWithProject(ctx context.Context, arg GetTaskWithProjectParams) (GetTaskWithProjectRow, error) {
-	row := q.db.QueryRow(ctx, getTaskWithProject, arg.ID, arg.UserID)
-	var i GetTaskWithProjectRow
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ProjectID,
+		&i.MachineID,
 		&i.Title,
 		&i.Intent,
 		&i.Status,
 		&i.Position,
 		&i.CurrentStep,
 		&i.AssignedAgentID,
-		&i.AssignedUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ProjectOwner,
-		&i.ProjectRepo,
 	)
 	return i, err
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
-WHERE user_id = $1
+SELECT id, machine_id, title, intent, status, position, current_step, assigned_agent_id, created_at, updated_at FROM tasks
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
-func (q *Queries) ListTasks(ctx context.Context, userID string) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTasks, userID)
+func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasks)
 	if err != nil {
 		return nil, err
 	}
@@ -216,21 +102,22 @@ func (q *Queries) ListTasks(ctx context.Context, userID string) ([]Task, error) 
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
-			&i.ProjectID,
+			&i.MachineID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
 			&i.Position,
+			&i.CurrentStep,
+			&i.AssignedAgentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AssignedAgentID,
-			&i.AssignedUserID,
-			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -239,13 +126,13 @@ func (q *Queries) ListTasks(ctx context.Context, userID string) ([]Task, error) 
 }
 
 const listTasksByAssignedAgent = `-- name: ListTasksByAssignedAgent :many
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
-WHERE assigned_agent_id = $1
+SELECT id, machine_id, title, intent, status, position, current_step, assigned_agent_id, created_at, updated_at FROM tasks
+WHERE assigned_agent_id = ?
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListTasksByAssignedAgent(ctx context.Context, assignedAgentID pgtype.Text) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTasksByAssignedAgent, assignedAgentID)
+func (q *Queries) ListTasksByAssignedAgent(ctx context.Context, assignedAgentID sql.NullString) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByAssignedAgent, assignedAgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -255,21 +142,22 @@ func (q *Queries) ListTasksByAssignedAgent(ctx context.Context, assignedAgentID 
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
-			&i.ProjectID,
+			&i.MachineID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
 			&i.Position,
+			&i.CurrentStep,
+			&i.AssignedAgentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AssignedAgentID,
-			&i.AssignedUserID,
-			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -277,58 +165,14 @@ func (q *Queries) ListTasksByAssignedAgent(ctx context.Context, assignedAgentID 
 	return items, nil
 }
 
-const listTasksByAssignedUser = `-- name: ListTasksByAssignedUser :many
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
-WHERE assigned_user_id = $1
-ORDER BY created_at DESC
-`
-
-func (q *Queries) ListTasksByAssignedUser(ctx context.Context, assignedUserID pgtype.Text) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTasksByAssignedUser, assignedUserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Task{}
-	for rows.Next() {
-		var i Task
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.ProjectID,
-			&i.Title,
-			&i.Intent,
-			&i.Status,
-			&i.Position,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.AssignedAgentID,
-			&i.AssignedUserID,
-			&i.CurrentStep,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTasksByProject = `-- name: ListTasksByProject :many
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
-WHERE user_id = $1 AND project_id = $2
+const listTasksByMachine = `-- name: ListTasksByMachine :many
+SELECT id, machine_id, title, intent, status, position, current_step, assigned_agent_id, created_at, updated_at FROM tasks
+WHERE machine_id = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
-type ListTasksByProjectParams struct {
-	UserID    string `json:"user_id"`
-	ProjectID string `json:"project_id"`
-}
-
-func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTasksByProject, arg.UserID, arg.ProjectID)
+func (q *Queries) ListTasksByMachine(ctx context.Context, machineID string) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByMachine, machineID)
 	if err != nil {
 		return nil, err
 	}
@@ -338,21 +182,22 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
-			&i.ProjectID,
+			&i.MachineID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
 			&i.Position,
+			&i.CurrentStep,
+			&i.AssignedAgentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AssignedAgentID,
-			&i.AssignedUserID,
-			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -361,18 +206,13 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
-WHERE user_id = $1 AND status = $2
+SELECT id, machine_id, title, intent, status, position, current_step, assigned_agent_id, created_at, updated_at FROM tasks
+WHERE status = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
-type ListTasksByStatusParams struct {
-	UserID string `json:"user_id"`
-	Status string `json:"status"`
-}
-
-func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusParams) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTasksByStatus, arg.UserID, arg.Status)
+func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByStatus, status)
 	if err != nil {
 		return nil, err
 	}
@@ -382,21 +222,22 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
-			&i.ProjectID,
+			&i.MachineID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
 			&i.Position,
+			&i.CurrentStep,
+			&i.AssignedAgentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AssignedAgentID,
-			&i.AssignedUserID,
-			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -404,20 +245,19 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, arg ListTasksByStatusPa
 	return items, nil
 }
 
-const listTasksByStatusAndProject = `-- name: ListTasksByStatusAndProject :many
-SELECT id, user_id, project_id, title, intent, status, position, created_at, updated_at, assigned_agent_id, assigned_user_id, current_step FROM tasks
-WHERE user_id = $1 AND status = $2 AND project_id = $3
+const listTasksByStatusAndMachine = `-- name: ListTasksByStatusAndMachine :many
+SELECT id, machine_id, title, intent, status, position, current_step, assigned_agent_id, created_at, updated_at FROM tasks
+WHERE status = ? AND machine_id = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
-type ListTasksByStatusAndProjectParams struct {
-	UserID    string `json:"user_id"`
+type ListTasksByStatusAndMachineParams struct {
 	Status    string `json:"status"`
-	ProjectID string `json:"project_id"`
+	MachineID string `json:"machine_id"`
 }
 
-func (q *Queries) ListTasksByStatusAndProject(ctx context.Context, arg ListTasksByStatusAndProjectParams) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTasksByStatusAndProject, arg.UserID, arg.Status, arg.ProjectID)
+func (q *Queries) ListTasksByStatusAndMachine(ctx context.Context, arg ListTasksByStatusAndMachineParams) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByStatusAndMachine, arg.Status, arg.MachineID)
 	if err != nil {
 		return nil, err
 	}
@@ -427,21 +267,22 @@ func (q *Queries) ListTasksByStatusAndProject(ctx context.Context, arg ListTasks
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
-			&i.ProjectID,
+			&i.MachineID,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
 			&i.Position,
+			&i.CurrentStep,
+			&i.AssignedAgentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.AssignedAgentID,
-			&i.AssignedUserID,
-			&i.CurrentStep,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -450,110 +291,88 @@ func (q *Queries) ListTasksByStatusAndProject(ctx context.Context, arg ListTasks
 }
 
 const updateTaskPosition = `-- name: UpdateTaskPosition :exec
-UPDATE tasks SET position = $1, updated_at = $2 WHERE id = $3 AND user_id = $4
+UPDATE tasks SET position = ?, updated_at = ? WHERE id = ?
 `
 
 type UpdateTaskPositionParams struct {
-	Position  pgtype.Int4        `json:"position"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	ID        string             `json:"id"`
-	UserID    string             `json:"user_id"`
+	Position  sql.NullInt64 `json:"position"`
+	UpdatedAt sql.NullTime  `json:"updated_at"`
+	ID        string        `json:"id"`
 }
 
 func (q *Queries) UpdateTaskPosition(ctx context.Context, arg UpdateTaskPositionParams) error {
-	_, err := q.db.Exec(ctx, updateTaskPosition,
-		arg.Position,
-		arg.UpdatedAt,
-		arg.ID,
-		arg.UserID,
-	)
+	_, err := q.db.ExecContext(ctx, updateTaskPosition, arg.Position, arg.UpdatedAt, arg.ID)
 	return err
 }
 
 const updateTaskPositionAndStatus = `-- name: UpdateTaskPositionAndStatus :exec
-UPDATE tasks SET status = $1, position = $2, updated_at = $3 WHERE id = $4 AND user_id = $5
+UPDATE tasks SET status = ?, position = ?, updated_at = ? WHERE id = ?
 `
 
 type UpdateTaskPositionAndStatusParams struct {
-	Status    string             `json:"status"`
-	Position  pgtype.Int4        `json:"position"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	ID        string             `json:"id"`
-	UserID    string             `json:"user_id"`
+	Status    string        `json:"status"`
+	Position  sql.NullInt64 `json:"position"`
+	UpdatedAt sql.NullTime  `json:"updated_at"`
+	ID        string        `json:"id"`
 }
 
 func (q *Queries) UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error {
-	_, err := q.db.Exec(ctx, updateTaskPositionAndStatus,
+	_, err := q.db.ExecContext(ctx, updateTaskPositionAndStatus,
 		arg.Status,
 		arg.Position,
 		arg.UpdatedAt,
 		arg.ID,
-		arg.UserID,
 	)
 	return err
 }
 
 const updateTaskStatus = `-- name: UpdateTaskStatus :exec
-UPDATE tasks SET status = $1, updated_at = $2 WHERE id = $3 AND user_id = $4
+UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?
 `
 
 type UpdateTaskStatusParams struct {
-	Status    string             `json:"status"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	ID        string             `json:"id"`
-	UserID    string             `json:"user_id"`
+	Status    string       `json:"status"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
+	ID        string       `json:"id"`
 }
 
 func (q *Queries) UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error {
-	_, err := q.db.Exec(ctx, updateTaskStatus,
-		arg.Status,
-		arg.UpdatedAt,
-		arg.ID,
-		arg.UserID,
-	)
+	_, err := q.db.ExecContext(ctx, updateTaskStatus, arg.Status, arg.UpdatedAt, arg.ID)
 	return err
 }
 
 const updateTaskStatusAndStep = `-- name: UpdateTaskStatusAndStep :exec
-UPDATE tasks SET status = $1, current_step = $2, updated_at = $3 WHERE id = $4 AND user_id = $5
+UPDATE tasks SET status = ?, current_step = ?, updated_at = ? WHERE id = ?
 `
 
 type UpdateTaskStatusAndStepParams struct {
-	Status      string             `json:"status"`
-	CurrentStep pgtype.Text        `json:"current_step"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	ID          string             `json:"id"`
-	UserID      string             `json:"user_id"`
+	Status      string         `json:"status"`
+	CurrentStep sql.NullString `json:"current_step"`
+	UpdatedAt   sql.NullTime   `json:"updated_at"`
+	ID          string         `json:"id"`
 }
 
 func (q *Queries) UpdateTaskStatusAndStep(ctx context.Context, arg UpdateTaskStatusAndStepParams) error {
-	_, err := q.db.Exec(ctx, updateTaskStatusAndStep,
+	_, err := q.db.ExecContext(ctx, updateTaskStatusAndStep,
 		arg.Status,
 		arg.CurrentStep,
 		arg.UpdatedAt,
 		arg.ID,
-		arg.UserID,
 	)
 	return err
 }
 
 const updateTaskStep = `-- name: UpdateTaskStep :exec
-UPDATE tasks SET current_step = $1, updated_at = $2 WHERE id = $3 AND user_id = $4
+UPDATE tasks SET current_step = ?, updated_at = ? WHERE id = ?
 `
 
 type UpdateTaskStepParams struct {
-	CurrentStep pgtype.Text        `json:"current_step"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	ID          string             `json:"id"`
-	UserID      string             `json:"user_id"`
+	CurrentStep sql.NullString `json:"current_step"`
+	UpdatedAt   sql.NullTime   `json:"updated_at"`
+	ID          string         `json:"id"`
 }
 
 func (q *Queries) UpdateTaskStep(ctx context.Context, arg UpdateTaskStepParams) error {
-	_, err := q.db.Exec(ctx, updateTaskStep,
-		arg.CurrentStep,
-		arg.UpdatedAt,
-		arg.ID,
-		arg.UserID,
-	)
+	_, err := q.db.ExecContext(ctx, updateTaskStep, arg.CurrentStep, arg.UpdatedAt, arg.ID)
 	return err
 }

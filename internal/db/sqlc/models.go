@@ -5,86 +5,61 @@
 package sqlc
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"database/sql"
 )
 
 type Agent struct {
-	ID           string             `json:"id"`
-	UserID       string             `json:"user_id"`
-	Name         string             `json:"name"`
-	SystemPrompt string             `json:"system_prompt"`
-	Tools        []string           `json:"tools"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	SystemPrompt string       `json:"system_prompt"`
+	Tools        string       `json:"tools"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
 }
 
 type AgentRun struct {
-	ID             string             `json:"id"`
-	TaskID         string             `json:"task_id"`
-	Step           string             `json:"step"`
-	AgentID        pgtype.Text        `json:"agent_id"`
-	Status         string             `json:"status"`
-	Input          pgtype.Text        `json:"input"`
-	Output         pgtype.Text        `json:"output"`
-	MessageHistory []byte             `json:"message_history"`
-	ArtifactPath   pgtype.Text        `json:"artifact_path"`
-	Error          pgtype.Text        `json:"error"`
-	StartedAt      pgtype.Timestamptz `json:"started_at"`
-	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ID             string         `json:"id"`
+	TaskID         string         `json:"task_id"`
+	Step           string         `json:"step"`
+	AgentID        sql.NullString `json:"agent_id"`
+	Status         string         `json:"status"`
+	Input          sql.NullString `json:"input"`
+	Output         sql.NullString `json:"output"`
+	MessageHistory sql.NullString `json:"message_history"`
+	ArtifactPath   sql.NullString `json:"artifact_path"`
+	Error          sql.NullString `json:"error"`
+	StartedAt      sql.NullTime   `json:"started_at"`
+	CompletedAt    sql.NullTime   `json:"completed_at"`
+	CreatedAt      sql.NullTime   `json:"created_at"`
 }
 
-type GithubConnection struct {
-	ID        string             `json:"id"`
-	UserID    string             `json:"user_id"`
-	Type      string             `json:"type"`
-	Login     string             `json:"login"`
-	AvatarUrl pgtype.Text        `json:"avatar_url"`
-	Token     string             `json:"token"`
-	Scope     pgtype.Text        `json:"scope"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+type Machine struct {
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Mode         string         `json:"mode"`
+	Capabilities sql.NullString `json:"capabilities"`
+	LastSeenAt   sql.NullTime   `json:"last_seen_at"`
 }
 
-type Project struct {
-	ID          string             `json:"id"`
-	UserID      string             `json:"user_id"`
-	GithubOwner string             `json:"github_owner"`
-	GithubRepo  string             `json:"github_repo"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-}
-
-type RepoCache struct {
-	ID            string             `json:"id"`
-	UserID        string             `json:"user_id"`
-	Owner         string             `json:"owner"`
-	Name          string             `json:"name"`
-	DefaultBranch string             `json:"default_branch"`
-	LastFetchedAt pgtype.Timestamptz `json:"last_fetched_at"`
-	IsFavorite    pgtype.Bool        `json:"is_favorite"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+type Setting struct {
+	ID            int64          `json:"id"`
+	OpenrouterKey sql.NullString `json:"openrouter_key"`
+	ZaiKey        sql.NullString `json:"zai_key"`
+	AnthropicKey  sql.NullString `json:"anthropic_key"`
+	OpenaiKey     sql.NullString `json:"openai_key"`
+	AgentBackend  sql.NullString `json:"agent_backend"`
+	UpdatedAt     sql.NullTime   `json:"updated_at"`
 }
 
 type Task struct {
-	ID              string             `json:"id"`
-	UserID          string             `json:"user_id"`
-	ProjectID       string             `json:"project_id"`
-	Title           string             `json:"title"`
-	Intent          string             `json:"intent"`
-	Status          string             `json:"status"`
-	Position        pgtype.Int4        `json:"position"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	AssignedAgentID pgtype.Text        `json:"assigned_agent_id"`
-	AssignedUserID  pgtype.Text        `json:"assigned_user_id"`
-	CurrentStep     pgtype.Text        `json:"current_step"`
-}
-
-type UserSetting struct {
-	UserID        string             `json:"user_id"`
-	OpenrouterKey pgtype.Text        `json:"openrouter_key"`
-	ZaiKey        pgtype.Text        `json:"zai_key"`
-	AnthropicKey  pgtype.Text        `json:"anthropic_key"`
-	OpenaiKey     pgtype.Text        `json:"openai_key"`
-	AgentBackend  pgtype.Text        `json:"agent_backend"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID              string         `json:"id"`
+	MachineID       string         `json:"machine_id"`
+	Title           string         `json:"title"`
+	Intent          string         `json:"intent"`
+	Status          string         `json:"status"`
+	Position        sql.NullInt64  `json:"position"`
+	CurrentStep     sql.NullString `json:"current_step"`
+	AssignedAgentID sql.NullString `json:"assigned_agent_id"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	UpdatedAt       sql.NullTime   `json:"updated_at"`
 }

@@ -354,14 +354,22 @@ GITHUB_CLIENT_ID=xxx
 GITHUB_CLIENT_SECRET=xxx
 GITHUB_REDIRECT_URI=http://localhost:8710/github/callback
 
-# Optional: Supabase auth (for multi-user)
+# Required: Supabase auth (for multi-user)
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=xxx
 SUPABASE_JWT_SECRET=xxx
+
+# Required: Frontend Supabase config (for OAuth via @supabase/supabase-js)
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=xxx
 
 # Optional
 LOG_LEVEL=debug
 DATA_DIR=./data
 ```
 
-Without Supabase env vars, all requests use `userID = "default"` (single-user mode).
+**OAuth Flow:**
+- Frontend uses `@supabase/supabase-js` to initiate GitHub OAuth with PKCE
+- Supabase redirects to `/api/v1/auth/callback` with auth code
+- Backend exchanges code for tokens (access, refresh, provider/GitHub PAT)
+- Backend sets session cookies and redirects to dashboard

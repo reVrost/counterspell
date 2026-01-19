@@ -1,110 +1,80 @@
-// Package db provides PostgreSQL database connection management.
+// Package db provides SQLite database connection management.
 package db
 
 import (
 	"context"
+	"database/sql"
 	"embed"
-	"errors"
 	"fmt"
 	"log/slog"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/revrost/code/counterspell/internal/db/sqlc"
 )
 
-//go:embed migrations/*.sql
-var migrationsFS embed.FS
+//go:embed schema.sql
+var schemaFS embed.FS
 
-// DB wraps pgxpool and sqlc queries.
+// DB wraps database/sql and sqlc queries.
 type DB struct {
-	Pool    *pgxpool.Pool
+	DB      *sql.DB
 	Queries *sqlc.Queries
 }
 
-// Connect creates a new database connection pool.
-func Connect(ctx context.Context, databaseURL string) (*DB, error) {
-	if databaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is required")
+// Connect creates a new SQLite database connection.
+// If dbPath is empty, uses "./data/counterspell.db".
+func Connect(ctx context.Context, dbPath string) (*DB, error) {
+	if dbPath == "" {
+		dbPath = "./data/counterspell.db"
 	}
 
-	config, err := pgxpool.ParseConfig(databaseURL)
+	// Open SQLite database
+	sqlDB, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse database URL: %w", err)
-	}
-	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheDescribe
-
-	pool, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database: %w", err)
+		return nil, fmt.Errorf("unable to open database: %w", err)
 	}
 
 	// Verify connection
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
+	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
 
-	slog.Info("Connected to PostgreSQL database, waiting for migration")
+	// Enable WAL mode for better concurrency
+	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		slog.Warn("Failed to enable WAL mode", "error", err)
+	}
+
+	slog.Info("Connected to SQLite database", "path", dbPath)
 
 	return &DB{
-		Pool:    pool,
-		Queries: sqlc.New(pool),
+		DB:      sqlDB,
+		Queries: sqlc.New(sqlDB),
 	}, nil
 }
 
-// RunMigrations executes all pending migrations.
+// RunMigrations executes the schema.
 func (db *DB) RunMigrations(ctx context.Context) error {
-	// Create source from embedded filesystem
-	source, err := iofs.New(migrationsFS, "migrations")
+	// Read schema from embedded filesystem
+	schemaBytes, err := schemaFS.ReadFile("schema.sql")
 	if err != nil {
-		return fmt.Errorf("failed to create migration source: %w", err)
+		return fmt.Errorf("failed to read schema: %w", err)
 	}
 
-	// Get stdlib connection from pgxpool for migrate driver
-	conn, err := db.Pool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to acquire connection: %w", err)
-	}
-	defer conn.Release()
-
-	// Convert pgx conn to stdlib *sql.DB
-	sqlDB := stdlib.OpenDBFromPool(db.Pool)
-	defer sqlDB.Close()
-
-	// Create postgres driver
-	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
-	if err != nil {
-		return fmt.Errorf("failed to create postgres driver: %w", err)
+	// Execute schema
+	if _, err := db.DB.ExecContext(ctx, string(schemaBytes)); err != nil {
+		return fmt.Errorf("failed to execute schema: %w", err)
 	}
 
-	// Create migrate instance
-	m, err := migrate.NewWithInstance("iofs", source, "postgres", driver)
-	if err != nil {
-		return fmt.Errorf("failed to create migrate instance: %w", err)
-	}
-
-	// Run migrations
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
-
-	version, dirty, _ := m.Version()
-	if dirty {
-		slog.Warn("Database migration state is dirty", "version", version)
-	} else {
-		slog.Info("Database migrations completed", "version", version)
-	}
+	slog.Info("Database schema initialized")
 
 	return nil
 }
 
-// Close closes the connection pool.
+// Close closes database connection.
 func (db *DB) Close() {
-	db.Pool.Close()
-	slog.Info("Database connection pool closed")
+	if err := db.DB.Close(); err != nil {
+		slog.Error("Error closing database", "error", err)
+	} else {
+		slog.Info("Database connection closed")
+	}
 }
