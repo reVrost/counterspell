@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/render"
+	"github.com/revrost/code/counterspell/internal/models"
 	"github.com/revrost/code/counterspell/internal/services"
 )
 
@@ -111,6 +112,31 @@ type ConflictResponse struct {
 }
 
 func (cr *ConflictResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+// FeedData is the structured response for the dashboard.
+type FeedData struct {
+	Active   []*models.Task             `json:"active"`
+	Reviews  []*models.Task             `json:"reviews"`
+	Done     []*models.Task             `json:"done"`
+	Todo     []*models.Task             `json:"todo"`
+	Projects map[string]ProjectResponse `json:"projects"`
+}
+
+func (f *FeedData) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+// ProjectResponse matches the frontend Project interface.
+type ProjectResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Icon  string `json:"icon"`
+	Color string `json:"color"`
+}
+
+func (p *ProjectResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 

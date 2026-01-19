@@ -129,13 +129,13 @@ func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 		repoID = &task.RepositoryID.String
 	}
 	return &models.Task{
-		ID:           task.ID,
-		RepositoryID: repoID,
-		Title:        task.Title,
-		Intent:       task.Intent,
-		Status:       task.Status,
-		Position:     task.Position.Int64,
-		CreatedAt:    time.UnixMilli(task.CreatedAt),
-		UpdatedAt:    time.UnixMilli(task.UpdatedAt),
+		ID:        task.ID,
+		ProjectID: repoID,
+		Title:     task.Title,
+		Intent:    task.Intent,
+		Status:    task.Status,
+		Position:  task.Position.Int64,
+		CreatedAt: time.UnixMilli(task.CreatedAt),
+		UpdatedAt: time.UnixMilli(task.UpdatedAt),
 	}
 }
