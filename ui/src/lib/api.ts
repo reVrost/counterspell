@@ -133,7 +133,7 @@ export const authAPI = {
 	},
 
 	async loginWithGitHub() {
-		window.location.href = '/api/v1/auth/oauth/github?redirect_url=' + window.location.origin + '/dashboard';
+		window.location.href = '/api/v1/github/authorize?redirect_url=' + window.location.origin + '/dashboard';
 	},
 
 	async connectGitHub() {
@@ -202,8 +202,8 @@ export const tasksAPI = {
 	},
 
 	async create(intent: string, projectId: string, modelId: string): Promise<APIResponse> {
-		return postJsonWithResponse('/api/v1/add-task', {
-			voice_input: intent,
+		return postJsonWithResponse('/api/v1/tasks', {
+			intent: intent,
 			project_id: projectId,
 			model_id: modelId
 		});
@@ -217,23 +217,23 @@ export const tasksAPI = {
 	},
 
 	async retry(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/v1/action/retry/${taskId}`);
+		return postAction(`/api/v1/tasks/${taskId}/retry`);
 	},
 
 	async clear(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/v1/action/clear/${taskId}`);
+		return postAction(`/api/v1/tasks/${taskId}/clear`);
 	},
 
 	async merge(taskId: string): Promise<APIResponse | ConflictResponse> {
-		return postAction(`/api/v1/action/merge/${taskId}`);
+		return postAction(`/api/v1/tasks/${taskId}/merge`);
 	},
 
 	async createPR(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/v1/action/pr/${taskId}`);
+		return postAction(`/api/v1/tasks/${taskId}/pr`);
 	},
 
 	async discard(taskId: string): Promise<APIResponse> {
-		return postAction(`/api/v1/action/discard/${taskId}`);
+		return postAction(`/api/v1/tasks/${taskId}/discard`);
 	},
 
 	async resolveConflict(taskId: string, filePath: string, choice: 'ours' | 'theirs'): Promise<APIResponse> {
