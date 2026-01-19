@@ -7,6 +7,7 @@ type TaskStatus string
 
 const (
 	StatusPending    TaskStatus = "pending"
+	StatusPlanning   TaskStatus = "planning"
 	StatusInProgress TaskStatus = "in_progress"
 	StatusReview     TaskStatus = "review"
 	StatusDone       TaskStatus = "done"
@@ -15,25 +16,26 @@ const (
 
 // Task represents a work item.
 type Task struct {
-	ID             string     `json:"id"`
-	MachineID      string     `json:"machine_id"`
-	Title          string     `json:"title"`
-	Intent         string     `json:"intent"`
-	Status         string     `json:"status"`
-	Position       int64      `json:"position"`
-	CurrentStep    string     `json:"current_step,omitempty"`
-	AssignedAgentID string     `json:"assigned_agent_id,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID              string    `json:"id"`
+	RepositoryID    *string   `json:"repository_id,omitempty"`
+	MachineID       string    `json:"machine_id"`
+	Title           string    `json:"title"`
+	Intent          string    `json:"intent"`
+	Status          string    `json:"status"`
+	Position        int64     `json:"position"`
+	CurrentStep     string    `json:"current_step,omitempty"`
+	AssignedAgentID string    `json:"assigned_agent_id,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Machine represents a worker instance.
 type Machine struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Mode         string `json:"mode"` // "local" or "cloud"
-	Capabilities string `json:"capabilities,omitempty"` // JSON string
-	LastSeenAt  time.Time `json:"last_seen_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Mode         string    `json:"mode"`                   // "local" or "cloud"
+	Capabilities string    `json:"capabilities,omitempty"` // JSON string
+	LastSeenAt   time.Time `json:"last_seen_at"`
 }
 
 // Agent represents an agent configuration.
@@ -65,10 +67,10 @@ type AgentRun struct {
 
 // Settings represents application settings.
 type Settings struct {
-	OpenRouterKey string `json:"openrouter_key,omitempty"`
-	ZaiKey        string `json:"zai_key,omitempty"`
-	AnthropicKey  string `json:"anthropic_key,omitempty"`
-	OpenAIKey     string `json:"openai_key,omitempty"`
-	AgentBackend  string `json:"agent_backend"` // "native", "openai", "anthropic", "openrouter", "zai"
+	OpenRouterKey string    `json:"openrouter_key,omitempty"`
+	ZaiKey        string    `json:"zai_key,omitempty"`
+	AnthropicKey  string    `json:"anthropic_key,omitempty"`
+	OpenAIKey     string    `json:"openai_key,omitempty"`
+	AgentBackend  string    `json:"agent_backend"` // "native", "openai", "anthropic", "openrouter", "zai"
 	UpdatedAt     time.Time `json:"updated_at"`
 }

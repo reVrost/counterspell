@@ -19,7 +19,7 @@ type Config struct {
 	NativeAllowlist []string
 
 	// Worker pool configuration
-	WorkerPoolSize int
+	WorkerPoolSize  int
 	MaxTasksPerUser int
 
 	// Sandbox configuration
@@ -28,6 +28,10 @@ type Config struct {
 
 	// Data directories (for repos and workspaces)
 	DataDir string
+
+	// GitHub OAuth
+	GitHubClientID     string
+	GitHubClientSecret string
 }
 
 // Load loads configuration from environment variables.
@@ -51,6 +55,10 @@ func Load() *Config {
 
 		// Data directory
 		DataDir: getEnvString("DATA_DIR", "./data"),
+
+		// GitHub OAuth
+		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 	}
 
 	log.Printf("Config loaded: DATABASE_PATH=%s, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",

@@ -51,7 +51,7 @@ type Orchestrator struct {
 	repos      *RepoManager
 	events     *EventBus
 	settings   *SettingsService
-
+	github     *GitHubService
 	dataDir    string
 	userID     string
 	workerPool *ants.Pool
@@ -67,6 +67,7 @@ func NewOrchestrator(
 	repos *RepoManager,
 	events *EventBus,
 	settings *SettingsService,
+	github *GitHubService,
 	dataDir string,
 ) (*Orchestrator, error) {
 	userID := "default" // Hardcoded for local-first single-tenant mode
@@ -83,6 +84,7 @@ func NewOrchestrator(
 		repos:      repos,
 		events:     events,
 		settings:   settings,
+		github:     github,
 		dataDir:    dataDir,
 		userID:     userID,
 		workerPool: pool,
@@ -109,9 +111,29 @@ func (o *Orchestrator) Shutdown() {
 
 // StartTask creates a task and begins execution.
 func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID string) (string, error) {
-	// For local-first mode, projectID can be a local repository path
+	// 1. Resolve projectID to a repository and ensure it's cloned
+	var token string
+	if projectID != "" {
+		// Look up repo in DB
+		repo, err := o.db.Queries.GetRepository(ctx, projectID)
+		if err == nil {
+			// Get connection for token
+			conn, err := o.db.Queries.GetGithubConnectionByID(ctx, repo.ConnectionID)
+			if err == nil {
+				token = conn.AccessToken
+				slog.Info("[ORCHESTRATOR] Found repository and connection", "repo", repo.FullName, "owner", repo.Owner)
+
+				// Ensure repo exists
+				_, err = o.repos.EnsureRepo(repo.Owner, repo.Name, token)
+				if err != nil {
+					return "", fmt.Errorf("failed to ensure repo: %w", err)
+				}
+			}
+		}
+	}
+
 	taskID := shortuuid.New()
-	machineID := o.userID // Default to user ID as machine ID
+	machineID := o.userID
 
 	// Create task in database
 	_, err := o.tasks.Create(ctx, machineID, projectID, intent)
@@ -176,8 +198,8 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		TaskID:  job.TaskID,
 		UserID:  job.UserID,
 		RunID:   job.RunID,
-		Success:  true,
-		Output:   "Task completed",
+		Success: true,
+		Output:  "Task completed",
 	}
 
 	slog.Info("[ORCHESTRATOR] Task completed", "task_id", job.TaskID, "success", true)
