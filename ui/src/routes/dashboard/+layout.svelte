@@ -4,6 +4,7 @@
 	import SettingsModal from "$lib/components/SettingsModal.svelte";
 	import Navigator from "$lib/components/Navigator.svelte";
 	import TaskDetail from "$lib/components/TaskDetail.svelte";
+	import ChatInput from "$lib/components/ChatInput.svelte";
 	import Skeleton from "$lib/components/Skeleton.svelte";
 	import { appState } from "$lib/stores/app.svelte";
 	import { taskStore } from "$lib/stores/tasks.svelte";
@@ -315,6 +316,7 @@
 	if (typeof window !== "undefined") {
 		(window as any).prefetchTask = prefetchTask;
 	}
+	let activeTab = $state<"inbox" | "projects" | "focus" | "layers">("inbox");
 </script>
 
 <div class="h-screen flex flex-col overflow-hidden bg-background">
@@ -331,7 +333,31 @@
 
 	<!-- Bottom Navigation Bar -->
 	<div class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-lg">
-		<Navigator activeTab="inbox" />
+		{#if appState.showChatInput}
+			<div
+				transition:slide|local={{
+					direction: "up",
+					duration: DURATIONS.normal,
+				}}
+			>
+				<ChatInput
+					mode="create"
+					onClose={() => appState.closeChatInput()}
+				/>
+			</div>
+		{:else}
+			<div
+				transition:slide|local={{
+					direction: "down",
+					duration: DURATIONS.normal,
+				}}
+			>
+				<Navigator
+					{activeTab}
+					onNavigate={(tab) => (activeTab = tab as any)}
+				/>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Task Detail Modal -->
