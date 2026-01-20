@@ -35,6 +35,7 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("[HANDLER] Starting task submission", "project_id", req.ProjectID, "intent", req.Intent, "model_id", req.ModelID)
 	taskID, err := orch.StartTask(ctx, req.ProjectID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
@@ -42,6 +43,7 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	slog.Info("[HANDLER] Task submitted successfully", "task_id", taskID)
 	render.JSON(w, r, map[string]string{"task_id": taskID})
 }
 

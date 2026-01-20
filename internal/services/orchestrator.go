@@ -53,15 +53,15 @@ type TaskJob struct {
 // Orchestrator manages task execution with agents.
 type Orchestrator struct {
 	repo            *Repository
-	gitReposManager  *GitManager
-	eventBus         *EventBus
-	settings         *SettingsService
-	github           *GitHubService
-	dataDir          string
-	workerPool       *ants.Pool
-	resultCh         chan TaskResult
-	running          map[string]context.CancelFunc
-	mu               sync.Mutex
+	gitReposManager *GitManager
+	eventBus        *EventBus
+	settings        *SettingsService
+	github          *GitHubService
+	dataDir         string
+	workerPool      *ants.Pool
+	resultCh        chan TaskResult
+	running         map[string]context.CancelFunc
+	mu              sync.Mutex
 }
 
 // NewOrchestrator creates a new orchestrator.
@@ -81,18 +81,18 @@ func NewOrchestrator(
 	}
 
 	orch := &Orchestrator{
-		repo:             repo,
-		eventBus:          eventBus,
-		settings:          settings,
-		github:            github,
+		repo:     repo,
+		eventBus: eventBus,
+		settings: settings,
+		github:   github,
 
-		gitReposManager:  NewGitManager(dataDir),
-		dataDir:           dataDir,
+		gitReposManager: NewGitManager(dataDir),
+		dataDir:         dataDir,
 
 		// Worker related fields
-		workerPool:        pool,
-		resultCh:          make(chan TaskResult, 100),
-		running:           make(map[string]context.CancelFunc),
+		workerPool: pool,
+		resultCh:   make(chan TaskResult, 100),
+		running:    make(map[string]context.CancelFunc),
 	}
 
 	slog.Info("[ORCHESTRATOR] Worker pool created", "workers", 5, "prealloc", false)
@@ -159,14 +159,24 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 		Repo:           repoName,
 		Token:          token,
 		IsContinuation: false,
-		ResultCh:        o.resultCh,
+		ResultCh:       o.resultCh,
 	}
 
+	slog.Info("[ORCHESTRATOR] Submitting job to worker pool", "task_id", taskID)
 	if err := o.workerPool.Submit(func() {
 		o.executeTask(ctx, job)
 	}); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to submit job to worker pool", "error", err, "task_id", taskID)
 		return "", err
 	}
+
+	// Publish agent_run_updated event
+	o.eventBus.Publish(models.Event{
+		TaskID: taskID,
+		Type:   string(EventTypeTaskStarted),
+		Data:   "",
+	})
+	slog.Info("[ORCHESTRATOR] Job submitted successfully", "task_id", taskID)
 
 	return taskID, nil
 }
@@ -212,15 +222,15 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	// Publish agent_run_updated event
 	o.eventBus.Publish(models.Event{
 		TaskID: taskID,
-		Type:    "agent_run_updated",
-		Data:    "",
+		Type:   string(EventTypeAgentRunUpdated),
+		Data:   "",
 	})
 
 	// Publish task_updated event
 	o.eventBus.Publish(models.Event{
 		TaskID: taskID,
-		Type:    "task_updated",
-		Data:    "",
+		Type:   string(EventTypeTaskUpdated),
+		Data:   "",
 	})
 
 	// Load existing messages for state restoration
@@ -246,7 +256,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 		Token:          token,
 		MessageHistory: messageHistoryJSON,
 		IsContinuation: true,
-		ResultCh:        o.resultCh,
+		ResultCh:       o.resultCh,
 	}
 
 	if err := o.workerPool.Submit(func() {
@@ -262,8 +272,15 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	slog.Info("[ORCHESTRATOR] Executing task", "task_id", job.TaskID, "intent", job.Intent, "continuation", job.IsContinuation)
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	// Check if incoming context is already cancelled
+	if ctx.Err() != nil {
+		slog.Error("[ORCHESTRATOR] Incoming context already cancelled", "task_id", job.TaskID, "error", ctx.Err())
+		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: fmt.Sprintf("context cancelled before execution: %v", ctx.Err())}
+		return
+	}
+
+	// Create a fresh context with timeout (don't inherit from request context which may be cancelled)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// Track running task
@@ -279,44 +296,54 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 	// Update task to in_progress if not continuation
 	if !job.IsContinuation {
+		slog.Info("[ORCHESTRATOR] Updating task status to in_progress", "task_id", job.TaskID)
 		if err := o.repo.UpdateStatus(ctx, job.TaskID, "in_progress"); err != nil {
 			slog.Error("[ORCHESTRATOR] Failed to update status", "error", err)
+			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
+			return
 		}
+		slog.Info("[ORCHESTRATOR] Task status updated successfully", "task_id", job.TaskID)
 	}
 
 	// Publish agent_run_started event
 	o.eventBus.Publish(models.Event{
 		TaskID: job.TaskID,
-		Type:    "agent_run_started",
-		Data:    "",
+		Type:   string(EventTypeAgentRunStarted),
+		Data:   "",
 	})
 
 	// Create agent run if not continuation
 	if !job.IsContinuation {
-		_, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
+		slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent)
+		runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
 		if err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err)
+			slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err, "task_id", job.TaskID)
 			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 			return
 		}
+		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID, "run_id", runID)
 	}
 
 	// Create worktree for isolated execution
+	slog.Info("[ORCHESTRATOR] Creating worktree", "task_id", job.TaskID, "owner", job.Owner, "repo", job.Repo)
 	worktreePath, err := o.gitReposManager.CreateWorktree(job.Owner, job.Repo, job.TaskID, "agent/task-"+job.TaskID)
 	if err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to create worktree", "error", err)
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 		return
 	}
+	slog.Info("[ORCHESTRATOR] Worktree created", "task_id", job.TaskID, "path", worktreePath)
 	o.emit(job.TaskID, "plan", fmt.Sprintf("Created worktree at %s", worktreePath))
 
 	// Get settings for API key and provider
+	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID)
 	apiKey, provider, model, err := o.settings.GetAPIKey(ctx)
 	if err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to get API key", "error", err)
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 		return
 	}
+	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
 
 	// Parse ModelID if provided
 	if job.ModelID != "" {
@@ -367,6 +394,7 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 
 	// Execute task
+	slog.Info("[ORCHESTRATOR] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation)
 	var execErr error
 	if job.IsContinuation {
 		execErr = backend.Send(ctx, job.Intent)
@@ -375,11 +403,13 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 
 	if execErr != nil {
-		slog.Error("[ORCHESTRATOR] Agent execution failed", "error", execErr)
+		slog.Error("[ORCHESTRATOR] Agent execution failed", "error", execErr, "task_id", job.TaskID)
 		o.emitError(job.TaskID, fmt.Sprintf("Agent execution failed: %s", execErr.Error()))
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: execErr.Error()}
 		return
 	}
+
+	slog.Info("[ORCHESTRATOR] Agent execution completed", "task_id", job.TaskID)
 
 	// Commit changes
 	commitMessage := fmt.Sprintf("Task: %s", job.Intent)
@@ -429,9 +459,9 @@ func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) 
 		if err := o.saveMessageHistory(taskID, event.Messages); err != nil {
 			slog.Error("[ORCHESTRATOR] Failed to save message history", "error", err)
 		}
-		o.eventBus.Publish(models.Event{TaskID: taskID, Type: "agent_run_updated", Data: ""})
+		o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
 	case agent.EventTodo:
-		o.eventBus.Publish(models.Event{TaskID: taskID, Type: "agent_run_updated", Data: ""})
+		o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
 	}
 }
 
@@ -493,7 +523,7 @@ func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	}
 
 	// Publish task_updated event
-	o.eventBus.Publish(models.Event{TaskID: taskID, Type: "task_updated", Data: ""})
+	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeTaskUpdated), Data: ""})
 
 	return nil
 }
@@ -590,7 +620,7 @@ func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID strin
 	}
 
 	// Publish task_updated event
-	o.eventBus.Publish(models.Event{TaskID: taskID, Type: "task_updated", Data: ""})
+	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeTaskUpdated), Data: ""})
 
 	return nil
 }
@@ -653,7 +683,7 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 	}
 
 	// Emit status change event
-	o.eventBus.Publish(models.Event{TaskID: taskID, Type: "task_updated", Data: ""})
+	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeTaskUpdated), Data: ""})
 
 	return prURL, nil
 }
@@ -804,9 +834,9 @@ func (o *Orchestrator) emit(taskID, level, message string) {
 	htmlPayload := fmt.Sprintf(`<span class="%s">[%s]</span> %s`, colorClass, level, html.EscapeString(message))
 
 	o.eventBus.Publish(models.Event{
-		TaskID:      taskID,
-		Type:        "log",
-		Data:        htmlPayload,
+		TaskID: taskID,
+		Type:   string(EventTypeLog),
+		Data:   htmlPayload,
 	})
 }
 

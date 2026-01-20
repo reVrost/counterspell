@@ -12,7 +12,10 @@ import (
 
 const getSettings = `-- name: GetSettings :one
 SELECT openrouter_key, zai_key, anthropic_key, openai_key,
-       COALESCE(agent_backend, 'native') as agent_backend, updated_at
+       COALESCE(agent_backend, 'native') as agent_backend,
+       COALESCE(provider, 'anthropic') as provider,
+       COALESCE(model, 'claude-opus-4-5') as model,
+       updated_at
 FROM settings WHERE id = 1
 `
 
@@ -22,6 +25,8 @@ type GetSettingsRow struct {
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
 	AgentBackend  string         `json:"agent_backend"`
+	Provider      string         `json:"provider"`
+	Model         string         `json:"model"`
 	UpdatedAt     int64          `json:"updated_at"`
 }
 
@@ -34,6 +39,8 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 		&i.AnthropicKey,
 		&i.OpenaiKey,
 		&i.AgentBackend,
+		&i.Provider,
+		&i.Model,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -46,6 +53,8 @@ zai_key = ?,
 anthropic_key = ?,
 openai_key = ?,
 agent_backend = ?,
+provider = ?,
+model = ?,
 updated_at = ?
 WHERE id = 1
 `
@@ -56,6 +65,8 @@ type UpsertSettingsParams struct {
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
 	AgentBackend  string         `json:"agent_backend"`
+	Provider      sql.NullString `json:"provider"`
+	Model         sql.NullString `json:"model"`
 	UpdatedAt     int64          `json:"updated_at"`
 }
 
@@ -66,6 +77,8 @@ func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) 
 		arg.AnthropicKey,
 		arg.OpenaiKey,
 		arg.AgentBackend,
+		arg.Provider,
+		arg.Model,
 		arg.UpdatedAt,
 	)
 	return err
