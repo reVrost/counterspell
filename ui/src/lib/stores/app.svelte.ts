@@ -9,6 +9,7 @@ class AppState {
 	settingsOpen = $state(false);
 	projectMenuOpen = $state(false);
 	inputProjectMenuOpen = $state(false);
+	showChatInput = $state(false);
 
 	// Toast
 	toastOpen = $state(false);
@@ -165,6 +166,14 @@ class AppState {
 		if (history.state?.modal) {
 			history.back();
 		}
+	}
+
+	toggleChatInput() {
+		this.showChatInput = !this.showChatInput;
+	}
+
+	closeChatInput() {
+		this.showChatInput = false;
 	}
 
 	openModal(taskId: string) {

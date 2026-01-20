@@ -1,46 +1,56 @@
 <script lang="ts">
-	import { appState } from '$lib/stores/app.svelte';
-	import { MODELS, type Project } from '$lib/types';
-	import { cn } from '$lib/utils';
-	import { tasksAPI, filesAPI } from '$lib/api';
-	import { dropdownPop, slide, DURATIONS } from '$lib/utils/transitions';
-	import { onMount } from 'svelte';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import PaperclipIcon from '@lucide/svelte/icons/paperclip';
-	import ZapIcon from '@lucide/svelte/icons/zap';
-	import MicIcon from '@lucide/svelte/icons/mic';
-	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
-	import XIcon from '@lucide/svelte/icons/x';
-	import SearchIcon from '@lucide/svelte/icons/search';
-	import FileIcon from '@lucide/svelte/icons/file';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import LoaderIcon from '@lucide/svelte/icons/loader-2';
+	import { appState } from "$lib/stores/app.svelte";
+	import { MODELS, type Project } from "$lib/types";
+	import { cn } from "$lib/utils";
+	import { tasksAPI, filesAPI } from "$lib/api";
+	import { dropdownPop, slide, DURATIONS } from "$lib/utils/transitions";
+	import { onMount } from "svelte";
+	import FolderIcon from "@lucide/svelte/icons/folder";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import PaperclipIcon from "@lucide/svelte/icons/paperclip";
+	import ZapIcon from "@lucide/svelte/icons/zap";
+	import MicIcon from "@lucide/svelte/icons/mic";
+	import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
+	import XIcon from "@lucide/svelte/icons/x";
+	import SearchIcon from "@lucide/svelte/icons/search";
+	import FileIcon from "@lucide/svelte/icons/file";
+	import CheckIcon from "@lucide/svelte/icons/check";
+	import LoaderIcon from "@lucide/svelte/icons/loader-2";
 
 	interface Props {
-		mode: 'create' | 'chat';
+		mode: "create" | "chat";
 		taskId?: string;
 		placeholder?: string;
 		onSubmit?: (message: string, modelId: string) => void;
 		onClose?: () => void;
 	}
 
-	let { mode, taskId, placeholder = 'What do you want to build?', onSubmit, onClose }: Props = $props();
+	let {
+		mode,
+		taskId,
+		placeholder = "What do you want to build?",
+		onSubmit,
+		onClose,
+	}: Props = $props();
 
-	let text = $state('');
+	let text = $state("");
 	let inputRef = $state<HTMLTextAreaElement | null>(null);
 	let modelOpen = $state(false);
 	let showFileMenu = $state(false);
 	let files = $state<string[]>([]);
 	let selectedIndex = $state(0);
-	let projectSearch = $state('');
+	let projectSearch = $state("");
 	let projectMenuRef = $state<HTMLDivElement | null>(null);
 	let modelMenuRef = $state<HTMLDivElement | null>(null);
 
 	// Click outside handler for dropdowns
 	function handleClickOutside(event: MouseEvent) {
 		const target = event.target as Node;
-		if (appState.inputProjectMenuOpen && projectMenuRef && !projectMenuRef.contains(target)) {
+		if (
+			appState.inputProjectMenuOpen &&
+			projectMenuRef &&
+			!projectMenuRef.contains(target)
+		) {
 			appState.inputProjectMenuOpen = false;
 		}
 		if (modelOpen && modelMenuRef && !modelMenuRef.contains(target)) {
@@ -49,15 +59,15 @@
 	}
 
 	onMount(() => {
-		document.addEventListener('click', handleClickOutside);
-		return () => document.removeEventListener('click', handleClickOutside);
+		document.addEventListener("click", handleClickOutside);
+		return () => document.removeEventListener("click", handleClickOutside);
 	});
 
 	function resize() {
 		if (!inputRef) return;
-		inputRef.style.height = 'auto';
+		inputRef.style.height = "auto";
 		let newHeight = inputRef.scrollHeight;
-		const maxHeight = window.innerHeight * (mode === 'create' ? 0.4 : 0.35);
+		const maxHeight = window.innerHeight * (mode === "create" ? 0.4 : 0.35);
 		if (newHeight > maxHeight) newHeight = maxHeight;
 		inputRef.style.height = `${newHeight}px`;
 	}
@@ -66,13 +76,13 @@
 		const match = text.match(/@([^ ]*)$/);
 		if (match) {
 			showFileMenu = true;
-			const query = match[1] || '';
+			const query = match[1] || "";
 			await searchFiles(query);
 		} else {
 			showFileMenu = false;
 			files = [];
 		}
-		if (e.key === 'Escape') {
+		if (e.key === "Escape") {
 			showFileMenu = false;
 			files = [];
 		}
@@ -85,20 +95,20 @@
 			files = await filesAPI.search(projectId, query);
 			selectedIndex = 0;
 		} catch (e) {
-			console.error('File search failed:', e);
+			console.error("File search failed:", e);
 			files = [];
 		}
 	}
 
 	function handleFileNav(e: KeyboardEvent) {
 		if (!showFileMenu || !files || files.length === 0) return;
-		if (e.key === 'ArrowDown') {
+		if (e.key === "ArrowDown") {
 			e.preventDefault();
 			selectedIndex = Math.min(selectedIndex + 1, files.length - 1);
-		} else if (e.key === 'ArrowUp') {
+		} else if (e.key === "ArrowUp") {
 			e.preventDefault();
 			selectedIndex = Math.max(selectedIndex - 1, 0);
-		} else if (e.key === 'Enter' || e.key === 'Tab') {
+		} else if (e.key === "Enter" || e.key === "Tab") {
 			e.preventDefault();
 			if (files[selectedIndex]) {
 				insertFile(files[selectedIndex]);
@@ -107,7 +117,7 @@
 	}
 
 	function insertFile(f: string) {
-		text = text.replace(/@[^ ]*$/, '') + f + ' ';
+		text = text.replace(/@[^ ]*$/, "") + f + " ";
 		showFileMenu = false;
 		files = [];
 		selectedIndex = 0;
@@ -115,11 +125,28 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (showFileMenu && files && files.length > 0 && ['ArrowUp', 'ArrowDown', 'Tab'].includes(e.key)) {
+		if (e.key === "Escape") {
+			e.preventDefault();
+			if (onClose) onClose();
+			return;
+		}
+
+		if (
+			showFileMenu &&
+			files &&
+			files.length > 0 &&
+			["ArrowUp", "ArrowDown", "Tab"].includes(e.key)
+		) {
 			handleFileNav(e);
-		} else if (showFileMenu && files && files.length > 0 && e.key === 'Enter' && !e.shiftKey) {
+		} else if (
+			showFileMenu &&
+			files &&
+			files.length > 0 &&
+			e.key === "Enter" &&
+			!e.shiftKey
+		) {
 			handleFileNav(e);
-		} else if (!showFileMenu && e.key === 'Enter' && !e.shiftKey) {
+		} else if (!showFileMenu && e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 			submit();
 		}
@@ -127,36 +154,53 @@
 
 	async function submit() {
 		if (!text.trim()) return;
-		if (mode === 'create' && !appState.activeProjectId) {
-			appState.showToast('Select a project first', 'error');
+		if (mode === "create" && !appState.activeProjectId) {
+			appState.showToast("Select a project first", "error");
 			return;
 		}
 
 		const msg = text.trim();
-		text = '';
-		if (inputRef) inputRef.style.height = 'auto';
+		text = "";
+		if (inputRef) inputRef.style.height = "auto";
 
 		if (onSubmit) {
 			onSubmit(msg, appState.activeModelId);
-		} else if (mode === 'create') {
+		} else if (mode === "create") {
 			// Handle task creation
 			try {
-				const response = await tasksAPI.create(msg, appState.activeProjectId, appState.activeModelId);
-				appState.showToast(response.message || 'Task created', 'success');
+				const response = await tasksAPI.create(
+					msg,
+					appState.activeProjectId,
+					appState.activeModelId,
+				);
+				appState.showToast(
+					response.message || "Task created",
+					"success",
+				);
 			} catch (e) {
-				console.error('Failed to create task:', e);
-				appState.showToast(e instanceof Error ? e.message : 'Failed to create task', 'error');
+				console.error("Failed to create task:", e);
+				appState.showToast(
+					e instanceof Error ? e.message : "Failed to create task",
+					"error",
+				);
 			}
-		} else if (mode === 'chat' && taskId) {
+		} else if (mode === "chat" && taskId) {
 			// Handle chat submission
 			try {
-				const response = await tasksAPI.chat(taskId, msg, appState.activeModelId);
+				const response = await tasksAPI.chat(
+					taskId,
+					msg,
+					appState.activeModelId,
+				);
 				if (response.message) {
-					appState.showToast(response.message, 'success');
+					appState.showToast(response.message, "success");
 				}
 			} catch (e) {
-				console.error('Failed to send message:', e);
-				appState.showToast(e instanceof Error ? e.message : 'Failed to send message', 'error');
+				console.error("Failed to send message:", e);
+				appState.showToast(
+					e instanceof Error ? e.message : "Failed to send message",
+					"error",
+				);
 			}
 		}
 
@@ -182,25 +226,36 @@
 	>
 		<!-- Voice Recording Visualization -->
 		{#if appState.isRecording}
-			<div class="absolute inset-0 bg-secondary rounded-3xl flex items-center px-4 z-10">
+			<div
+				class="absolute inset-0 bg-secondary rounded-3xl flex items-center px-4 z-10"
+			>
 				<button
 					type="button"
 					class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0"
 				>
 					<XIcon class="w-4 h-4" />
 				</button>
-				<div class="flex-1 flex items-center justify-center gap-[3px] h-10 mx-4">
+				<div
+					class="flex-1 flex items-center justify-center gap-[3px] h-10 mx-4"
+				>
 					{#each appState.audioLevels as level, i}
 						<div
 							class="w-1 bg-red-500 rounded-full transition-all duration-75"
-							style="height: {Math.max(4, level * 0.4)}px; opacity: {0.4 + (level / 100) * 0.6}"
+							style="height: {Math.max(
+								4,
+								level * 0.4,
+							)}px; opacity: {0.4 + (level / 100) * 0.6}"
 						></div>
 					{/each}
 				</div>
 				<div class="flex items-center gap-2 shrink-0">
-					<div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+					<div
+						class="w-2 h-2 rounded-full bg-red-500 animate-pulse"
+					></div>
 					<span class="text-sm text-gray-300 font-mono"
-						>{Math.floor(appState.recordedDuration / 60)}:{String(appState.recordedDuration % 60).padStart(2, '0')}</span
+						>{Math.floor(appState.recordedDuration / 60)}:{String(
+							appState.recordedDuration % 60,
+						).padStart(2, "0")}</span
 					>
 				</div>
 			</div>
@@ -238,10 +293,10 @@
 							onclick={() => insertFile(file)}
 							onmouseenter={() => (selectedIndex = idx)}
 							class={cn(
-								'w-full px-3 py-2 text-xs font-mono cursor-pointer transition flex items-center gap-2 text-left',
+								"w-full px-3 py-2 text-xs font-mono cursor-pointer transition flex items-center gap-2 text-left",
 								idx === selectedIndex
-									? 'bg-blue-500/20 text-blue-300'
-									: 'text-gray-300 hover:bg-white/5'
+									? "bg-blue-500/20 text-blue-300"
+									: "text-gray-300 hover:bg-white/5",
 							)}
 						>
 							<FileIcon class="w-2.5 h-2.5 opacity-40" />
@@ -281,38 +336,57 @@
 		<div class="flex items-center justify-between px-2 pb-2 mt-1">
 			<!-- Left Side -->
 			<div class="flex items-center gap-1">
-				{#if mode === 'create'}
+				{#if mode === "create"}
+					<button
+						type="button"
+						onclick={onClose}
+						aria-label="Cancel"
+						class="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all duration-150 mr-1"
+					>
+						<XIcon class="w-4 h-4" />
+					</button>
+
 					<!-- Project Selector -->
 					<div class="relative" bind:this={projectMenuRef}>
 						<button
 							type="button"
-							onclick={() => (appState.inputProjectMenuOpen = !appState.inputProjectMenuOpen)}
+							onclick={() =>
+								(appState.inputProjectMenuOpen =
+									!appState.inputProjectMenuOpen)}
 							class={cn(
-								'flex items-center gap-2 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border border-transparent',
+								"flex items-center gap-2 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border border-transparent",
 								appState.activeProjectId
-									? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-									: 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
+									? "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+									: "bg-gray-800/50 text-gray-400 hover:bg-gray-800",
 							)}
 						>
 							<div
 								class={cn(
-									'flex items-center justify-center w-3.5 h-3.5 rounded-full',
-									appState.activeProjectId ? 'bg-blue-400/20' : 'bg-gray-700/50'
+									"flex items-center justify-center w-3.5 h-3.5 rounded-full",
+									appState.activeProjectId
+										? "bg-blue-400/20"
+										: "bg-gray-700/50",
 								)}
 							>
 								<FolderIcon
 									class={cn(
-										'w-2.5 h-2.5',
-										appState.activeProjectId ? 'text-blue-400' : 'text-gray-400'
+										"w-2.5 h-2.5",
+										appState.activeProjectId
+											? "text-blue-400"
+											: "text-gray-400",
 									)}
 								/>
 							</div>
 							<span class="max-w-[120px] truncate">
 								{appState.activeProjectName
-									? appState.activeProjectName.split('/').pop()
-									: 'Select project'}
+									? appState.activeProjectName
+											.split("/")
+											.pop()
+									: "Select project"}
 							</span>
-							<ChevronDownIcon class="w-2.5 h-2.5 opacity-50 ml-0.5" />
+							<ChevronDownIcon
+								class="w-2.5 h-2.5 opacity-50 ml-0.5"
+							/>
 						</button>
 
 						{#if appState.inputProjectMenuOpen}
@@ -321,9 +395,13 @@
 								class="absolute bottom-full left-0 mb-3 w-72 bg-popover border border-gray-700 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col z-50"
 							>
 								<!-- Search Header -->
-								<div class="p-3 border-b border-gray-800 bg-gray-900/50">
+								<div
+									class="p-3 border-b border-gray-800 bg-gray-900/50"
+								>
 									<div class="relative">
-										<SearchIcon class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-3 h-3" />
+										<SearchIcon
+											class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-3 h-3"
+										/>
 										<input
 											bind:value={projectSearch}
 											type="text"
@@ -334,56 +412,97 @@
 								</div>
 
 								<!-- Projects/Repos List -->
-								<div class="max-h-64 overflow-y-auto py-2 px-1 scrollbar-thin">
+								<div
+									class="max-h-64 overflow-y-auto py-2 px-1 scrollbar-thin"
+								>
 									{#if appState.projects.length > 0}
-										<div class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+										<div
+											class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1"
+										>
 											Active Projects
 										</div>
-										{#each appState.projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())) as p}
+										{#each appState.projects.filter( (p) => p.name
+													.toLowerCase()
+													.includes(projectSearch.toLowerCase()), ) as p}
 											<button
 												type="button"
-												onclick={() => appState.setActiveProject(p.id, p.name)}
+												onclick={() =>
+													appState.setActiveProject(
+														p.id,
+														p.name,
+													)}
 												class={cn(
-													'w-full px-3 py-2 rounded-xl flex items-center justify-between group transition-all duration-150',
-													appState.activeProjectId === p.id 
-														? 'bg-blue-500/10 text-white' 
-														: 'text-gray-400 hover:bg-white/5 hover:text-white'
+													"w-full px-3 py-2 rounded-xl flex items-center justify-between group transition-all duration-150",
+													appState.activeProjectId ===
+														p.id
+														? "bg-blue-500/10 text-white"
+														: "text-gray-400 hover:bg-white/5 hover:text-white",
 												)}
 											>
-												<div class="flex items-center gap-3 overflow-hidden">
-													<div class="w-2 h-2 rounded-full bg-blue-500/40 group-hover:bg-blue-500 transition-colors"></div>
-													<span class="text-xs font-medium truncate">{p.name}</span>
+												<div
+													class="flex items-center gap-3 overflow-hidden"
+												>
+													<div
+														class="w-2 h-2 rounded-full bg-blue-500/40 group-hover:bg-blue-500 transition-colors"
+													></div>
+													<span
+														class="text-xs font-medium truncate"
+														>{p.name}</span
+													>
 												</div>
 												{#if appState.activeProjectId === p.id}
-													<CheckIcon class="w-3 h-3 text-blue-500" />
+													<CheckIcon
+														class="w-3 h-3 text-blue-500"
+													/>
 												{/if}
 											</button>
 										{/each}
-										<div class="h-px bg-gray-800 my-2 mx-2"></div>
+										<div
+											class="h-px bg-gray-800 my-2 mx-2"
+										></div>
 									{/if}
 
-									<div class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+									<div
+										class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1"
+									>
 										All Repositories
 									</div>
-									{#each appState.repos.filter(r => r.full_name.toLowerCase().includes(projectSearch.toLowerCase()) && !appState.projects.some(p => p.name === r.full_name)) as r}
+									{#each appState.repos.filter((r) => r.full_name
+												.toLowerCase()
+												.includes(projectSearch.toLowerCase()) && !appState.projects.some((p) => p.name === r.full_name)) as r}
 										<button
 											type="button"
-											onclick={() => appState.setActiveProject(r.id.toString(), r.full_name)}
+											onclick={() =>
+												appState.setActiveProject(
+													r.id.toString(),
+													r.full_name,
+												)}
 											class="w-full px-3 py-2 rounded-xl flex items-center gap-3 text-gray-400 hover:bg-white/5 hover:text-white group transition-all duration-150"
 										>
-											<div class="w-2 h-2 rounded-full bg-gray-700 group-hover:bg-gray-500 transition-colors"></div>
-											<span class="text-xs font-medium truncate">{r.full_name}</span>
+											<div
+												class="w-2 h-2 rounded-full bg-gray-700 group-hover:bg-gray-500 transition-colors"
+											></div>
+											<span
+												class="text-xs font-medium truncate"
+												>{r.full_name}</span
+											>
 										</button>
 									{:else}
-										<div class="px-4 py-8 text-center text-gray-600 text-[11px] italic">
+										<div
+											class="px-4 py-8 text-center text-gray-600 text-[11px] italic"
+										>
 											No repositories found matching "{projectSearch}"
 										</div>
 									{/each}
 								</div>
 
 								<!-- Footer -->
-								<div class="px-4 py-2 border-t border-gray-800 bg-gray-900/30">
-									<p class="text-[9px] text-gray-600 text-center font-medium">
+								<div
+									class="px-4 py-2 border-t border-gray-800 bg-gray-900/30"
+								>
+									<p
+										class="text-[9px] text-gray-600 text-center font-medium"
+									>
 										{appState.repos.length} REPOSITORIES SYNCED
 									</p>
 								</div>
@@ -436,13 +555,15 @@
 												modelOpen = false;
 											}}
 											class={cn(
-												'w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition text-left group',
+												"w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition text-left group",
 												appState.activeModelId === m.id
-													? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-													: 'hover:bg-white/5 text-gray-400 hover:text-white border border-transparent'
+													? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+													: "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent",
 											)}
 										>
-											<span class="text-xs font-medium">{m.name}</span>
+											<span class="text-xs font-medium"
+												>{m.name}</span
+											>
 											{#if appState.activeModelId === m.id}
 												<div
 													class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
@@ -459,7 +580,7 @@
 
 			<!-- Right Side -->
 			<div class="flex items-center gap-1">
-				{#if mode === 'create'}
+				{#if mode === "create"}
 					<button
 						type="button"
 						aria-label="Attach file"
@@ -496,13 +617,15 @@
 												modelOpen = false;
 											}}
 											class={cn(
-												'w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition text-left group',
+												"w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition text-left group",
 												appState.activeModelId === m.id
-													? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-													: 'hover:bg-white/5 text-gray-400 hover:text-white border border-transparent'
+													? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+													: "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent",
 											)}
 										>
-											<span class="text-xs font-medium">{m.name}</span>
+											<span class="text-xs font-medium"
+												>{m.name}</span
+											>
 											{#if appState.activeModelId === m.id}
 												<div
 													class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
@@ -525,12 +648,12 @@
 					aria-label="Send message or hold to record voice"
 					onclick={handleSubmitClick}
 					class={cn(
-						'w-9 h-9 rounded-xl flex items-center justify-center text-base transition-all duration-150 select-none',
+						"w-9 h-9 rounded-xl flex items-center justify-center text-base transition-all duration-150 select-none",
 						appState.isRecording
-							? 'bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] scale-110'
+							? "bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] scale-110"
 							: text.length > 0
-								? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]'
-								: 'bg-white/10 text-gray-300 hover:bg-white/15'
+								? "bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]"
+								: "bg-white/10 text-gray-300 hover:bg-white/15",
 					)}
 				>
 					{#if text.length > 0}

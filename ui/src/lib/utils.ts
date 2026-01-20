@@ -11,7 +11,7 @@ export function formatDuration(secs: number): string {
 	return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-export function emailInitial(email: string): string {
-	if (!email) return '?';
-	return email[0].toUpperCase();
+export function getInitial(text: string | null | undefined): string {
+	if (!text) return '?';
+	return text[0].toUpperCase();
 }

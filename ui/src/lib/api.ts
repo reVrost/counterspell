@@ -10,7 +10,6 @@ import type {
   APIResponse,
   ConflictResponse,
 } from "$lib/types";
-import { logError } from "$lib/utils/logger";
 
 // API base URL - uses proxy in dev, relative path in prod
 const API_BASE = import.meta.env.DEV ? "" : "";
@@ -32,10 +31,6 @@ async function fetchAPI<T>(
   if (!response.ok) {
     const error = await response.text().catch(() => "Unknown error");
     const errMsg = `API error: ${response.status} - ${error}`;
-    logError(errMsg, {
-      component: "api",
-      extra: { path, status: response.status },
-    });
     throw new Error(errMsg);
   }
 
@@ -53,10 +48,6 @@ async function postForm<T>(path: string, formData: FormData): Promise<T> {
   if (!response.ok) {
     const error = await response.text().catch(() => "Unknown error");
     const errMsg = `API error: ${response.status} - ${error}`;
-    logError(errMsg, {
-      component: "api",
-      extra: { path, status: response.status },
-    });
     throw new Error(errMsg);
   }
 
@@ -77,10 +68,6 @@ async function postFormNoResponse(
   if (!response.ok) {
     const error = await response.text().catch(() => "Unknown error");
     const errMsg = `API error: ${response.status} - ${error}`;
-    logError(errMsg, {
-      component: "api",
-      extra: { path, status: response.status },
-    });
     throw new Error(errMsg);
   }
 }
@@ -102,10 +89,6 @@ async function postFormWithResponse(
 
   if (!response.ok) {
     const errMsg = data.message || `API error: ${response.status}`;
-    logError(errMsg, {
-      component: "api",
-      extra: { path, status: response.status },
-    });
     throw new Error(errMsg);
   }
 
@@ -126,10 +109,6 @@ async function postAction(path: string): Promise<APIResponse> {
 
   if (!response.ok) {
     const errMsg = data.message || `API error: ${response.status}`;
-    logError(errMsg, {
-      component: "api",
-      extra: { path, status: response.status },
-    });
     throw new Error(errMsg);
   }
 
@@ -154,10 +133,6 @@ async function postJsonWithResponse(
 
   if (!response.ok) {
     const errMsg = data.message || `API error: ${response.status}`;
-    logError(errMsg, {
-      component: "api",
-      extra: { path, status: response.status },
-    });
     throw new Error(errMsg);
   }
 
@@ -249,9 +224,7 @@ export const tasksAPI = {
     return fetchAPI<FeedData>("/api/v1/tasks");
   },
 
-  async get(
-    id: string,
-  ): Promise<{
+  async get(id: string): Promise<{
     task: Task;
     project: Project;
     messages: Message[];
