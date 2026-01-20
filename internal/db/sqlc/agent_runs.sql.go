@@ -7,28 +7,35 @@ package sqlc
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createAgentRun = `-- name: CreateAgentRun :exec
-INSERT INTO agent_runs (id, task_id, agent_backend, prompt, created_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO agent_runs (id, task_id, prompt, agent_backend, provider, model, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAgentRunParams struct {
-	ID           string `json:"id"`
-	TaskID       string `json:"task_id"`
-	AgentBackend string `json:"agent_backend"`
-	Prompt       string `json:"prompt"`
-	CreatedAt    int64  `json:"created_at"`
+	ID           string         `json:"id"`
+	TaskID       string         `json:"task_id"`
+	Prompt       string         `json:"prompt"`
+	AgentBackend string         `json:"agent_backend"`
+	Provider     sql.NullString `json:"provider"`
+	Model        sql.NullString `json:"model"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
 }
 
 func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) error {
 	_, err := q.db.ExecContext(ctx, createAgentRun,
 		arg.ID,
 		arg.TaskID,
-		arg.AgentBackend,
 		arg.Prompt,
+		arg.AgentBackend,
+		arg.Provider,
+		arg.Model,
 		arg.CreatedAt,
+		arg.UpdatedAt,
 	)
 	return err
 }
@@ -43,7 +50,7 @@ func (q *Queries) DeleteAgentRunsByTask(ctx context.Context, taskID string) erro
 }
 
 const getAgentRun = `-- name: GetAgentRun :one
-SELECT id, task_id, prompt, agent_backend, summary_message_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs WHERE id = ?
+SELECT id, task_id, prompt, agent_backend, provider, model, summary_message_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs WHERE id = ?
 `
 
 func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) {
@@ -54,6 +61,8 @@ func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) 
 		&i.TaskID,
 		&i.Prompt,
 		&i.AgentBackend,
+		&i.Provider,
+		&i.Model,
 		&i.SummaryMessageID,
 		&i.Cost,
 		&i.MessageCount,
@@ -67,7 +76,7 @@ func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) 
 }
 
 const getLatestRun = `-- name: GetLatestRun :one
-SELECT id, task_id, prompt, agent_backend, summary_message_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs
+SELECT id, task_id, prompt, agent_backend, provider, model, summary_message_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs
 WHERE task_id = ?
 ORDER BY created_at DESC
 LIMIT 1
@@ -81,6 +90,8 @@ func (q *Queries) GetLatestRun(ctx context.Context, taskID string) (AgentRun, er
 		&i.TaskID,
 		&i.Prompt,
 		&i.AgentBackend,
+		&i.Provider,
+		&i.Model,
 		&i.SummaryMessageID,
 		&i.Cost,
 		&i.MessageCount,
@@ -94,7 +105,7 @@ func (q *Queries) GetLatestRun(ctx context.Context, taskID string) (AgentRun, er
 }
 
 const listAgentRunsByTask = `-- name: ListAgentRunsByTask :many
-SELECT id, task_id, prompt, agent_backend, summary_message_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs
+SELECT id, task_id, prompt, agent_backend, provider, model, summary_message_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs
 WHERE task_id = ?
 ORDER BY created_at ASC
 `
@@ -113,6 +124,8 @@ func (q *Queries) ListAgentRunsByTask(ctx context.Context, taskID string) ([]Age
 			&i.TaskID,
 			&i.Prompt,
 			&i.AgentBackend,
+			&i.Provider,
+			&i.Model,
 			&i.SummaryMessageID,
 			&i.Cost,
 			&i.MessageCount,
@@ -133,4 +146,18 @@ func (q *Queries) ListAgentRunsByTask(ctx context.Context, taskID string) ([]Age
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAgentRunCompleted = `-- name: UpdateAgentRunCompleted :exec
+UPDATE agent_runs SET completed_at = ? WHERE id = ?
+`
+
+type UpdateAgentRunCompletedParams struct {
+	CompletedAt sql.NullTime `json:"completed_at"`
+	ID          string       `json:"id"`
+}
+
+func (q *Queries) UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error {
+	_, err := q.db.ExecContext(ctx, updateAgentRunCompleted, arg.CompletedAt, arg.ID)
+	return err
 }

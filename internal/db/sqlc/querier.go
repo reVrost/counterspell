@@ -35,6 +35,7 @@ type Querier interface {
 	ListRepositories(ctx context.Context, connectionID string) ([]Repository, error)
 	ListTasks(ctx context.Context) ([]Task, error)
 	ListTasksByStatus(ctx context.Context, status string) ([]Task, error)
+	UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error
 	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)
 	UpdateTaskPosition(ctx context.Context, arg UpdateTaskPositionParams) error
 	UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error

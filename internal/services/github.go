@@ -48,37 +48,32 @@ func (s *GitHubService) ExchangeCode(ctx context.Context, code string) (string, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("github oauth error: %d", resp.StatusCode)
+		return "", fmt.Errorf("failed to exchange code: %s", resp.Status)
 	}
 
 	var result struct {
 		AccessToken string `json:"access_token"`
-		Error       string `json:"error"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
-	}
-
-	if result.Error != "" {
-		return "", fmt.Errorf("github oauth error: %s", result.Error)
 	}
 
 	return result.AccessToken, nil
 }
 
 type GitHubUser struct {
-	ID        int64  `json:"id"`
+	ID       int64  `json:"id"`
 	Login     string `json:"login"`
 	AvatarURL string `json:"avatar_url"`
 }
 
-func (s *GitHubService) GetUserInfo(ctx context.Context, token string) (*GitHubUser, error) {
+func (s *GitHubService) GetGitHubUser(ctx context.Context, accessToken string) (*GitHubUser, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "token "+token)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -87,7 +82,7 @@ func (s *GitHubService) GetUserInfo(ctx context.Context, token string) (*GitHubU
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api error: %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to get user: %s", resp.Status)
 	}
 
 	var user GitHubUser
@@ -98,25 +93,67 @@ func (s *GitHubService) GetUserInfo(ctx context.Context, token string) (*GitHubU
 	return &user, nil
 }
 
+func (s *GitHubService) CreateConnection(ctx context.Context, accessToken string) (string, error) {
+	// Get user from GitHub
+	user, err := s.GetGitHubUser(ctx, accessToken)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if connection already exists (use user.login for now as simple lookup)
+	// In practice, you'd use github_user_id
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err == sql.ErrNoRows {
+		// Create new connection
+		id := uuid.New().String()
+		now := time.Now().UnixMilli()
+		if _, err := s.db.Queries.CreateGithubConnection(ctx, sqlc.CreateGithubConnectionParams{
+			ID:           id,
+			GithubUserID:  fmt.Sprintf("%d", user.ID),
+			AccessToken:  accessToken,
+			Username:     user.Login,
+			AvatarUrl:    sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}); err != nil {
+			return "", fmt.Errorf("failed to create connection: %w", err)
+		}
+		return id, nil
+	} else if err != nil {
+		return "", fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	// Update existing connection
+	if _, err := s.db.Queries.UpdateGithubConnection(ctx, sqlc.UpdateGithubConnectionParams{
+		ID:          conn.ID,
+		AccessToken: accessToken,
+		Username:    user.Login,
+		AvatarUrl:   sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
+	}); err != nil {
+		return "", fmt.Errorf("failed to update connection: %w", err)
+	}
+	return conn.ID, nil
+}
+
 type GitHubRepo struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	FullName string `json:"full_name"`
-	Private  bool   `json:"private"`
-	HTMLURL  string `json:"html_url"`
-	CloneURL string `json:"clone_url"`
 	Owner    struct {
 		Login string `json:"login"`
 	} `json:"owner"`
+	Private bool   `json:"private"`
+	HTMLURL string `json:"html_url"`
+	CloneURL string `json:"clone_url"`
 }
 
-func (s *GitHubService) FetchUserRepos(ctx context.Context, token string) ([]GitHubRepo, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user/repos?per_page=100&sort=updated", nil)
+func (s *GitHubService) FetchRepos(ctx context.Context, accessToken string) ([]GitHubRepo, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user/repos?visibility=all&affiliation=owner,collaborator", nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "token "+token)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -125,7 +162,7 @@ func (s *GitHubService) FetchUserRepos(ctx context.Context, token string) ([]Git
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github api error: %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to get repos: %s", resp.Status)
 	}
 
 	var repos []GitHubRepo
@@ -136,64 +173,37 @@ func (s *GitHubService) FetchUserRepos(ctx context.Context, token string) ([]Git
 	return repos, nil
 }
 
-func (s *GitHubService) SyncConnection(ctx context.Context, user *GitHubUser, token string) (string, error) {
-	existing, err := s.db.Queries.GetGithubConnection(ctx)
-	now := time.Now().UnixMilli()
-
-	if err == nil {
-		// Update existing
-		_, err = s.db.Queries.UpdateGithubConnection(ctx, sqlc.UpdateGithubConnectionParams{
-			AccessToken: token,
-			Username:    user.Login,
-			AvatarUrl:   sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
-			UpdatedAt:   now,
-			ID:          existing.ID,
-		})
-		if err != nil {
-			return "", err
-		}
-		return existing.ID, nil
-	}
-
-	// Create new
-	id := uuid.New().String()
-	_, err = s.db.Queries.CreateGithubConnection(ctx, sqlc.CreateGithubConnectionParams{
-		ID:           id,
-		GithubUserID: fmt.Sprintf("%d", user.ID),
-		AccessToken:  token,
-		Username:     user.Login,
-		AvatarUrl:    sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	})
+func (s *GitHubService) SyncRepos(ctx context.Context, connectionID string) error {
+	// Get connection
+	conn, err := s.db.Queries.GetGithubConnectionByID(ctx, connectionID)
 	if err != nil {
-		return "", err
-	}
-	return id, nil
-}
-
-func (s *GitHubService) SyncRepos(ctx context.Context, connectionID string, repos []GitHubRepo) error {
-	// Simple approach for single user: delete all and re-create
-	if err := s.db.Queries.DeleteRepositoriesByConnection(ctx, connectionID); err != nil {
-		return err
+		return fmt.Errorf("failed to get connection: %w", err)
 	}
 
+	// Get repos from GitHub
+	repos, err := s.FetchRepos(ctx, conn.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to get repos: %w", err)
+	}
+
+	// Sync repos - simplified: just create new ones
 	now := time.Now().UnixMilli()
 	for _, r := range repos {
-		_, err := s.db.Queries.CreateRepository(ctx, sqlc.CreateRepositoryParams{
-			ID:           uuid.New().String(),
+		// Try to create repo - if exists, it will fail (we ignore)
+		if _, err := s.db.Queries.CreateRepository(ctx, sqlc.CreateRepositoryParams{
+			ID:          uuid.New().String(),
 			ConnectionID: connectionID,
-			Name:         r.Name,
-			FullName:     r.FullName,
-			Owner:        r.Owner.Login,
-			IsPrivate:    r.Private,
-			HtmlUrl:      r.HTMLURL,
+			Name:        r.Name,
+			FullName:    r.FullName,
+			Owner:       r.Owner.Login,
+			IsPrivate:   r.Private,
+			HtmlUrl:     r.HTMLURL,
 			CloneUrl:     r.CloneURL,
 			CreatedAt:    now,
 			UpdatedAt:    now,
-		})
-		if err != nil {
-			return err
+		}); err != nil {
+			// Repo likely already exists, skip
+			continue
 		}
 	}
 
@@ -210,4 +220,93 @@ func (s *GitHubService) GetRepos(ctx context.Context) ([]sqlc.Repository, error)
 
 func (s *GitHubService) GetConnection(ctx context.Context) (sqlc.GithubConnection, error) {
 	return s.db.Queries.GetGithubConnection(ctx)
+}
+
+// CreatePullRequest creates a GitHub Pull Request.
+func (s *GitHubService) CreatePullRequest(ctx context.Context, owner, repo, branch, title, body string) (string, error) {
+	// Get connection
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	// Create PR request
+	type PRRequest struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+		Head  string `json:"head"`
+		Base  string `json:"base"`
+	}
+
+	prReq := PRRequest{
+		Title: title,
+		Body:  body,
+		Head:  branch,
+		Base:  "main",
+	}
+
+	reqBody, err := json.Marshal(prReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal PR request: %w", err)
+	}
+
+	// Create PR
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+conn.AccessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("failed to create PR: %s", resp.Status)
+	}
+
+	var result struct {
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode PR response: %w", err)
+	}
+
+	return result.HTMLURL, nil
+}
+
+// GetUserInfo returns GitHub user info for the connected account.
+func (s *GitHubService) GetUserInfo(ctx context.Context) (*GitHubUser, error) {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	return s.GetGitHubUser(ctx, conn.AccessToken)
+}
+
+// SyncConnection syncs the current connection's user info and repos.
+func (s *GitHubService) SyncConnection(ctx context.Context) error {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	// Sync repos
+	return s.SyncRepos(ctx, conn.ID)
+}
+
+// FetchUserRepos fetches repos from GitHub for the connected user.
+func (s *GitHubService) FetchUserRepos(ctx context.Context) ([]GitHubRepo, error) {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	return s.FetchRepos(ctx, conn.AccessToken)
 }

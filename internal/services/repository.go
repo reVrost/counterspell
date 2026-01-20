@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -96,7 +97,7 @@ func (s *Repository) ListByStatus(ctx context.Context, status string) ([]*models
 // UpdateStatus updates task status with validation.
 func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error {
 	// Validate status
-	validStatuses := []string{"pending", "in_progress", "review", "done", "failed"}
+	validStatuses := []string{"pending", "planning", "in_progress", "review", "done", "failed"}
 	if !slices.Contains(validStatuses, status) {
 		return fmt.Errorf("invalid status: %s", status)
 	}
@@ -156,4 +157,95 @@ func nullableString(s sql.NullString) *string {
 		return &s.String
 	}
 	return nil
+}
+
+// --- Message Operations ---
+
+// CreateMessage creates a new message.
+// NOTE: After running sqlc generate, update to include provider, model fields
+func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, content, model, provider string) error {
+	id := shortuuid.New()
+	now := time.Now().UnixMilli()
+
+	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
+		ID:        id,
+		TaskID:    taskID,
+		RunID:      sql.NullString{String: runID, Valid: runID != ""},
+		Role:      role,
+		Content:   content,
+		CreatedAt: now,
+	})
+}
+
+// GetMessagesByTask retrieves all messages for a task.
+func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sqlc.Message, error) {
+	return s.db.Queries.GetMessagesByTask(ctx, taskID)
+}
+
+// --- Agent Run Operations ---
+
+// CreateAgentRun creates a new agent run.
+// NOTE: After running sqlc generate, update to include provider, model fields
+func (s *Repository) CreateAgentRun(ctx context.Context, taskID, prompt, agentBackend, provider, model string) (string, error) {
+	id := shortuuid.New()
+	now := time.Now().UnixMilli()
+
+	if err := s.db.Queries.CreateAgentRun(ctx, sqlc.CreateAgentRunParams{
+		ID:          id,
+		TaskID:      taskID,
+		Prompt:      prompt,
+		AgentBackend: agentBackend,
+		CreatedAt:   now,
+	}); err != nil {
+		return "", err
+	}
+
+	return id, nil
+}
+
+// UpdateAgentRunCompleted marks an agent run as completed.
+// NOTE: After running sqlc generate, this method will be available
+func (s *Repository) UpdateAgentRunCompleted(ctx context.Context, runID string) error {
+	// Placeholder - will use s.db.Queries.UpdateAgentRunCompleted after sqlc generate
+	return nil
+}
+
+// GetLatestAgentRun retrieves the most recent agent run for a task.
+func (s *Repository) GetLatestAgentRun(ctx context.Context, taskID string) (*sqlc.AgentRun, error) {
+	run, err := s.db.Queries.GetLatestRun(ctx, taskID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &run, nil
+}
+
+// ConvertMessagesToJSON converts sqlc.Message to JSON format for agent state restoration.
+func ConvertMessagesToJSON(messages []sqlc.Message) (string, error) {
+	type ContentBlock struct {
+		Type string `json:"type"`
+		Text string `json:"text,omitempty"`
+	}
+	type Message struct {
+		Role    string         `json:"role"`
+		Content []ContentBlock `json:"content"`
+	}
+
+	result := make([]Message, 0, len(messages))
+	for _, msg := range messages {
+		result = append(result, Message{
+			Role: msg.Role,
+			Content: []ContentBlock{
+				{Type: "text", Text: msg.Content},
+			},
+		})
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal messages: %w", err)
+	}
+	return string(jsonData), nil
 }

@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     prompt TEXT NOT NULL,
     agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    provider TEXT,
+    model TEXT,
     summary_message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,
     cost REAL NOT NULL DEFAULT 0.0 CHECK (cost >= 0.0),
     message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
@@ -110,6 +112,8 @@ CREATE TABLE IF NOT EXISTS settings (
     anthropic_key TEXT,
     openai_key TEXT,
     agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    provider TEXT,
+    model TEXT,
     updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
 
@@ -161,7 +165,7 @@ WHERE id = new.id;
 END;
 
 -- Insert default settings row
-INSERT OR IGNORE INTO settings (id, agent_backend) VALUES (1, 'native');
+INSERT OR IGNORE INTO settings (id, agent_backend, provider, model) VALUES (1, 'native', 'anthropic', 'claude-opus-4-5');
 
 -- Indices (optimize for common query patterns)
 CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);

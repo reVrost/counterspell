@@ -11,8 +11,8 @@ import (
 )
 
 const createMessage = `-- name: CreateMessage :exec
-INSERT INTO messages (id, task_id, run_id, role, content, tool_id, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO messages (id, task_id, run_id, role, content, parts, model, provider, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateMessageParams struct {
@@ -21,8 +21,11 @@ type CreateMessageParams struct {
 	RunID     sql.NullString `json:"run_id"`
 	Role      string         `json:"role"`
 	Content   string         `json:"content"`
-	ToolID    sql.NullString `json:"tool_id"`
+	Parts     string         `json:"parts"`
+	Model     sql.NullString `json:"model"`
+	Provider  sql.NullString `json:"provider"`
 	CreatedAt int64          `json:"created_at"`
+	UpdatedAt int64          `json:"updated_at"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
@@ -32,8 +35,11 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 		arg.RunID,
 		arg.Role,
 		arg.Content,
-		arg.ToolID,
+		arg.Parts,
+		arg.Model,
+		arg.Provider,
 		arg.CreatedAt,
+		arg.UpdatedAt,
 	)
 	return err
 }

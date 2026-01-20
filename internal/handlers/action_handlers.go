@@ -48,8 +48,6 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 // HandleActionClear clears a task.
 func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
-	ctx := r.Context()
-	//	userID := "default"
 
 	orch, err := h.getOrchestrator()
 	if err != nil {
@@ -58,7 +56,7 @@ func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := orch.CleanupTask(ctx, taskID); err != nil {
+	if err := orch.CleanupTask(taskID); err != nil {
 		slog.Error("Failed to clear task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to clear task", err))
 		return
@@ -126,17 +124,6 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 // HandleActionPR creates a pull request for task changes.
 func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
-	ctx := r.Context()
-	//	userID := "default"
-
-	var req struct {
-		Title string `json:"title"`
-		Body  string `json:"body"`
-	}
-	if err := render.DecodeJSON(r.Body, &req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
 
 	orch, err := h.getOrchestrator()
 	if err != nil {
@@ -145,20 +132,19 @@ func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := orch.CreatePR(ctx, taskID, req.Title, req.Body); err != nil {
+	prURL, err := orch.CreatePR(r.Context(), taskID)
+	if err != nil {
 		slog.Error("Failed to create PR", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to create PR", err))
 		return
 	}
 
-	render.JSON(w, r, map[string]string{"status": "ok"})
+	render.JSON(w, r, map[string]string{"status": "ok", "pr_url": prURL})
 }
 
 // HandleActionDiscard discards task changes.
 func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
-	ctx := r.Context()
-	//	userID := "default"
 
 	orch, err := h.getOrchestrator()
 	if err != nil {
@@ -167,7 +153,7 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := orch.CleanupTask(ctx, taskID); err != nil {
+	if err := orch.CleanupTask(taskID); err != nil {
 		slog.Error("Failed to discard task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to discard task", err))
 		return

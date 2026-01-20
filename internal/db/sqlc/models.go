@@ -13,6 +13,8 @@ type AgentRun struct {
 	TaskID           string         `json:"task_id"`
 	Prompt           string         `json:"prompt"`
 	AgentBackend     string         `json:"agent_backend"`
+	Provider         sql.NullString `json:"provider"`
+	Model            sql.NullString `json:"model"`
 	SummaryMessageID sql.NullString `json:"summary_message_id"`
 	Cost             float64        `json:"cost"`
 	MessageCount     int64          `json:"message_count"`
@@ -79,6 +81,8 @@ type Setting struct {
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
 	AgentBackend  string         `json:"agent_backend"`
+	Provider      sql.NullString `json:"provider"`
+	Model         sql.NullString `json:"model"`
 	UpdatedAt     int64          `json:"updated_at"`
 }
 

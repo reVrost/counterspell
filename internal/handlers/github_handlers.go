@@ -54,31 +54,17 @@ func (h *Handlers) HandleGitHubCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 2. Get user info
-	user, err := h.githubService.GetUserInfo(ctx, token)
-	if err != nil {
-		slog.Error("Failed to get github user info", "error", err)
-		http.Error(w, "Failed to get user info", http.StatusInternalServerError)
-		return
-	}
-
-	// 3. Sync connection
-	connectionID, err := h.githubService.SyncConnection(ctx, user, token)
-	if err != nil {
-		slog.Error("Failed to sync github connection", "error", err)
+	// 2. Create connection (this gets user info and saves to DB)
+	if _, err := h.githubService.CreateConnection(ctx, token); err != nil {
+		slog.Error("Failed to create github connection", "error", err)
 		http.Error(w, "Failed to save connection", http.StatusInternalServerError)
 		return
 	}
 
-	// 4. Fetch and sync repos
-	repos, err := h.githubService.FetchUserRepos(ctx, token)
-	if err != nil {
-		slog.Error("Failed to fetch github repos", "error", err)
+	// 3. Sync connection (fetch and sync repos)
+	if err := h.githubService.SyncConnection(ctx); err != nil {
+		slog.Error("Failed to sync github connection", "error", err)
 		// Don't fail the whole login if repo sync fails
-	} else {
-		if err := h.githubService.SyncRepos(ctx, connectionID, repos); err != nil {
-			slog.Error("Failed to sync github repos", "error", err)
-		}
 	}
 
 	// Redirect back to the app
