@@ -76,24 +76,6 @@ func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, task)
 }
 
-// HandleAPIMessages returns messages for a task.
-func (h *Handlers) HandleAPIMessages(w http.ResponseWriter, r *http.Request) {
-	taskID := chi.URLParam(r, "id")
-	if taskID == "" {
-		http.Error(w, "Task ID required", http.StatusBadRequest)
-		return
-	}
-
-	ctx := r.Context()
-	messages, err := h.messageService.GetMessagesByTask(ctx, taskID)
-	if err != nil {
-		slog.Error("Failed to get messages", "error", err)
-		http.Error(w, "Failed to get messages", http.StatusInternalServerError)
-		return
-	}
-	render.JSON(w, r, messages)
-}
-
 // HandleAPISession returns session info based on GitHub connection status.
 func (h *Handlers) HandleAPISession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

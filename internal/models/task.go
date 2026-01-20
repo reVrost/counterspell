@@ -14,14 +14,14 @@ const (
 
 // Task represents a work item.
 type Task struct {
-	ID             string  `json:"id"`
-	RepositoryName string  `json:"repository_name"`
-	Title          string  `json:"title"`
-	Intent         string  `json:"intent"`
-	Status         string  `json:"status"`
-	Position       *int64  `json:"position,omitempty"`
-	CreatedAt      int64   `json:"created_at"`
-	UpdatedAt      int64   `json:"updated_at"`
+	ID           string  `json:"id"`
+	RepositoryID *string `json:"repository_id,omitempty"`
+	Title        string  `json:"title"`
+	Intent       string  `json:"intent"`
+	Status       string  `json:"status"`
+	Position     *int64  `json:"position,omitempty"`
+	CreatedAt    int64   `json:"created_at"`
+	UpdatedAt    int64   `json:"updated_at"`
 }
 
 // AgentRun represents an execution of an agent.

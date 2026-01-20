@@ -141,7 +141,7 @@ func main() {
 		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
 
 		// Task messages
-		r.Get("/api/v1/task/{id}/messages", h.HandleAPIMessages)
+		// r.Get("/api/v1/task/{id}/messages", h.HandleAPIMessages)
 
 	})
 

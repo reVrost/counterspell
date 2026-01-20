@@ -8,19 +8,14 @@ import (
 
 // Handlers contains all HTTP handlers.
 type Handlers struct {
-	db            *db.DB
-	events        *services.EventBus
-	cfg           *config.Config
-	transcription *services.TranscriptionService
+	events *services.EventBus
+	cfg    *config.Config
 
 	// Shared services (created once at startup)
-	taskService     *services.TaskService
+	transcription   *services.TranscriptionService
+	taskService     *services.Repository
 	settingsService *services.SettingsService
-	repoManager     *services.RepoManager
 	fileService     *services.FileService
-	toolService     *services.ToolService
-	messageService  *services.MessageService
-	gitService      *services.GitService
 	githubService   *services.GitHubService
 }
 
@@ -29,19 +24,14 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 	transcriptionService := services.NewTranscriptionService()
 
 	return &Handlers{
-		db:            database,
 		events:        events,
 		transcription: transcriptionService,
 		cfg:           cfg,
 
 		// Create shared services
-		taskService:     services.NewTaskService(database),
+		taskService:     services.NewRepository(database),
 		settingsService: services.NewSettingsService(database),
-		repoManager:     services.NewRepoManager(cfg.DataDir),
 		fileService:     services.NewFileService(cfg.DataDir),
-		toolService:     services.NewToolService(cfg.DataDir),
-		messageService:  services.NewMessageService(database),
-		gitService:      services.NewGitService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
 	}, nil
 }
@@ -50,9 +40,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 // For local-first single-tenant mode, we use a fixed userID "default".
 func (h *Handlers) getOrchestrator() (*services.Orchestrator, error) {
 	return services.NewOrchestrator(
-		h.db,
 		h.taskService,
-		h.repoManager,
 		h.events,
 		h.settingsService,
 		h.githubService,

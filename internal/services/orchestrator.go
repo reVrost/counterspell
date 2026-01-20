@@ -9,7 +9,6 @@ import (
 
 	"github.com/lithammer/shortuuid/v4"
 	"github.com/panjf2000/ants/v2"
-	"github.com/revrost/code/counterspell/internal/db"
 )
 
 // ConflictFile represents a merge conflict.
@@ -46,14 +45,12 @@ type TaskJob struct {
 
 // Orchestrator manages task execution with agents.
 type Orchestrator struct {
-	db         *db.DB
-	tasks      *TaskService
-	repos      *RepoManager
-	events     *EventBus
+	repo       *Repository
+	gitManager *GitManager
+	eventBus   *EventBus
 	settings   *SettingsService
 	github     *GitHubService
 	dataDir    string
-	userID     string
 	workerPool *ants.Pool
 	resultCh   chan TaskResult
 	running    map[string]context.CancelFunc
@@ -62,10 +59,8 @@ type Orchestrator struct {
 
 // NewOrchestrator creates a new orchestrator.
 func NewOrchestrator(
-	database *db.DB,
-	tasks *TaskService,
-	repos *RepoManager,
-	events *EventBus,
+	repo *Repository,
+	eventBus *EventBus,
 	settings *SettingsService,
 	github *GitHubService,
 	dataDir string,
@@ -79,14 +74,15 @@ func NewOrchestrator(
 	}
 
 	orch := &Orchestrator{
-		db:         database,
-		tasks:      tasks,
-		repos:      repos,
-		events:     events,
-		settings:   settings,
-		github:     github,
+		repo:     repo,
+		eventBus: eventBus,
+		settings: settings,
+		github:   github,
+
+		gitManager: NewGitManager(dataDir),
 		dataDir:    dataDir,
-		userID:     userID,
+
+		// Worker related fields
 		workerPool: pool,
 		resultCh:   make(chan TaskResult, 100),
 		running:    make(map[string]context.CancelFunc),
@@ -117,16 +113,16 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 		return "", fmt.Errorf("project_id is required")
 	}
 	// Look up repo in DB
-	repo, err := o.db.Queries.GetRepository(ctx, projectID)
+	repo, err := o.repo.GetRepository(ctx, projectID)
 	if err == nil {
 		// Get connection for token
-		conn, err := o.db.Queries.GetGithubConnectionByID(ctx, repo.ConnectionID)
+		conn, err := o.repo.GetGithubConnectionByID(ctx, repo.ConnectionID)
 		if err == nil {
 			token = conn.AccessToken
 			slog.Info("[ORCHESTRATOR] Found repository and connection", "repo", repo.FullName, "owner", repo.Owner)
 
 			// Ensure repo exists
-			_, err = o.repos.EnsureRepo(repo.Owner, repo.Name, token)
+			_, err = o.gitManager.EnsureRepo(repo.Owner, repo.Name, token)
 			if err != nil {
 				return "", fmt.Errorf("failed to ensure repo: %w", err)
 			}
@@ -136,9 +132,9 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	taskID := shortuuid.New()
 
 	// Create task in database
-	_, err = o.tasks.Create(ctx, repo.FullName, intent)
+	_, err = o.repo.Create(ctx, repo.FullName, intent)
 	if err != nil {
-		return "", fmt.Errorf("failed to create task: %w", err)
+		return "", err
 	}
 
 	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", projectID, "intent", intent)
@@ -146,7 +142,6 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	// Submit job to worker pool
 	job := TaskJob{
 		TaskID:    taskID,
-		UserID:    o.userID,
 		Intent:    intent,
 		ModelID:   modelID,
 		ProjectID: projectID,
@@ -187,7 +182,7 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	slog.Info("[ORCHESTRATOR] Task execution started", "task_id", job.TaskID)
 
 	// Update task to in_progress
-	_ = o.tasks.UpdateStatus(ctx, job.TaskID, "in_progress")
+	_ = o.repo.UpdateStatus(ctx, job.TaskID, "in_progress")
 
 	// TODO: Implement actual agent execution here
 	// For now, just mark as done after a short delay
@@ -212,11 +207,11 @@ func (o *Orchestrator) processResults() {
 		ctx := context.Background()
 
 		if result.Success {
-			if err := o.tasks.UpdateStatus(ctx, result.TaskID, "done"); err != nil {
+			if err := o.repo.UpdateStatus(ctx, result.TaskID, "done"); err != nil {
 				slog.Error("[ORCHESTRATOR] Failed to update task status", "error", err)
 			}
 		} else {
-			if err := o.tasks.UpdateStatus(ctx, result.TaskID, "failed"); err != nil {
+			if err := o.repo.UpdateStatus(ctx, result.TaskID, "failed"); err != nil {
 				slog.Error("[ORCHESTRATOR] Failed to update task status", "error", err)
 			}
 		}
@@ -251,5 +246,5 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID, title, body string)
 }
 
 func (o *Orchestrator) CleanupTask(ctx context.Context, taskID string) error {
-	return o.tasks.Delete(ctx, taskID)
+	return o.repo.Delete(ctx, taskID)
 }
