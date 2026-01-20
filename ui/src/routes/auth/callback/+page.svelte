@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { appState } from '$lib/stores/app.svelte';
 	import { page } from '$app/stores';
 
-	onMount(() => {
+	$effect(() => {
 		// Get auth status from URL parameters if present
 		const params = new URLSearchParams(window.location.search);
 

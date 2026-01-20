@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { authAPI } from '$lib/api';
 	import { appState } from '$lib/stores/app.svelte';
 
-	onMount(async () => {
+	$effect(async () => {
 		// Clear auth state immediately
 		appState.isAuthenticated = false;
 		appState.userEmail = '';

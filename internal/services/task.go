@@ -24,25 +24,22 @@ func NewTaskService(database *db.DB) *TaskService {
 }
 
 // Create creates a new task with validation.
-func (s *TaskService) Create(ctx context.Context, machineID, projectID, intent string) (*models.Task, error) {
+func (s *TaskService) Create(ctx context.Context, projectName, intent string) (*models.Task, error) {
 	id := shortuuid.New()
 	// Validate input
-	if machineID == "" {
-		return nil, fmt.Errorf("machine_id is required")
-	}
 	if intent == "" {
 		return nil, fmt.Errorf("intent is required")
 	}
 
 	now := time.Now().UnixMilli()
 	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
-		ID:           id,
-		RepositoryID: sql.NullString{String: projectID, Valid: projectID != ""},
-		Title:        intent, // Use intent as title for now
-		Intent:       intent,
-		Status:       "pending",
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:             id,
+		RepositoryName: projectName,
+		Title:          intent, // Use intent as title for now
+		Intent:         intent,
+		Status:         "pending",
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}); err != nil {
 		return nil, err
 	}
@@ -124,18 +121,22 @@ func (s *TaskService) GetInProgressTasks(ctx context.Context) ([]*models.Task, e
 
 // sqlcTaskToModel converts sqlc task to model.
 func sqlcTaskToModel(task *sqlc.Task) *models.Task {
-	var repoID *string
-	if task.RepositoryID.Valid {
-		repoID = &task.RepositoryID.String
-	}
 	return &models.Task{
-		ID:        task.ID,
-		ProjectID: repoID,
-		Title:     task.Title,
-		Intent:    task.Intent,
-		Status:    task.Status,
-		Position:  task.Position.Int64,
-		CreatedAt: time.UnixMilli(task.CreatedAt),
-		UpdatedAt: time.UnixMilli(task.UpdatedAt),
+		ID:             task.ID,
+		RepositoryName: task.RepositoryName,
+		Title:          task.Title,
+		Intent:         task.Intent,
+		Status:         task.Status,
+		Position:       nullableInt64(task.Position),
+		CreatedAt:      task.CreatedAt,
+		UpdatedAt:      task.UpdatedAt,
 	}
+}
+
+// nullableInt64 converts sql.NullInt64 to *int64.
+func nullableInt64(n sql.NullInt64) *int64 {
+	if n.Valid {
+		return &n.Int64
+	}
+	return nil
 }

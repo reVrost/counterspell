@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import { fade, fly, scale } from "svelte/transition";
 
     let {
@@ -15,7 +14,7 @@
     }
 
     let mounted = $state(false);
-    onMount(() => {
+    $effect(() => {
         mounted = true;
     });
 </script>

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from "svelte";
 	import { page } from "$app/stores";
 	import { authAPI } from "$lib/api";
 	import { appState } from "$lib/stores/app.svelte";
@@ -57,7 +56,7 @@
 		errorMsg = "";
 	}
 
-	onMount(async () => {
+	$effect(async () => {
 		if (!browser) return;
 
 		console.log("📍 Landing page mounted, checking auth...");

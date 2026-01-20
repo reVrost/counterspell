@@ -319,7 +319,7 @@
 <div class="h-screen flex flex-col overflow-hidden bg-background">
   <Toast />
   <SettingsModal />
-  <Header />
+  <Header {activeTab} />
 
   <main
     class="flex-1 overflow-y-auto bg-background relative pt-14"
@@ -330,7 +330,7 @@
 
   <!-- Bottom Navigation Bar -->
   <div
-    class="fixed bottom-6 left-4 right-4 z-20 mx-auto max-w-lg grid items-end"
+    class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-lg grid items-end"
   >
     {#if appState.showChatInput}
       <div class="col-start-1 row-start-1 w-full relative z-50">

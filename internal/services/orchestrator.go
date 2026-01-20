@@ -113,32 +113,32 @@ func (o *Orchestrator) Shutdown() {
 func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID string) (string, error) {
 	// 1. Resolve projectID to a repository and ensure it's cloned
 	var token string
-	if projectID != "" {
-		// Look up repo in DB
-		repo, err := o.db.Queries.GetRepository(ctx, projectID)
+	if projectID == "" {
+		return "", fmt.Errorf("project_id is required")
+	}
+	// Look up repo in DB
+	repo, err := o.db.Queries.GetRepository(ctx, projectID)
+	if err == nil {
+		// Get connection for token
+		conn, err := o.db.Queries.GetGithubConnectionByID(ctx, repo.ConnectionID)
 		if err == nil {
-			// Get connection for token
-			conn, err := o.db.Queries.GetGithubConnectionByID(ctx, repo.ConnectionID)
-			if err == nil {
-				token = conn.AccessToken
-				slog.Info("[ORCHESTRATOR] Found repository and connection", "repo", repo.FullName, "owner", repo.Owner)
+			token = conn.AccessToken
+			slog.Info("[ORCHESTRATOR] Found repository and connection", "repo", repo.FullName, "owner", repo.Owner)
 
-				// Ensure repo exists
-				_, err = o.repos.EnsureRepo(repo.Owner, repo.Name, token)
-				if err != nil {
-					return "", fmt.Errorf("failed to ensure repo: %w", err)
-				}
+			// Ensure repo exists
+			_, err = o.repos.EnsureRepo(repo.Owner, repo.Name, token)
+			if err != nil {
+				return "", fmt.Errorf("failed to ensure repo: %w", err)
 			}
 		}
 	}
 
 	taskID := shortuuid.New()
-	machineID := o.userID
 
 	// Create task in database
-	_, err := o.tasks.Create(ctx, machineID, projectID, intent)
+	_, err = o.tasks.Create(ctx, repo.FullName, intent)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create task: %w", err)
 	}
 
 	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", projectID, "intent", intent)
