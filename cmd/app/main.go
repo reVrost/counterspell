@@ -140,9 +140,6 @@ func main() {
 		r.Post("/api/v1/tasks/{id}/pr", h.HandleActionPR)
 		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
 
-		// Task messages
-		// r.Get("/api/v1/task/{id}/messages", h.HandleAPIMessages)
-
 	})
 
 	// Serve SvelteKit SPA from embedded filesystem

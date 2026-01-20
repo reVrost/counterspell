@@ -1,6 +1,6 @@
 -- name: CreateMessage :exec
-INSERT INTO messages (id, task_id, run_id, role, content, tool_id, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO messages (id, task_id, run_id, role, content, parts, model, provider, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetMessage :one
 SELECT * FROM messages WHERE id = ?;

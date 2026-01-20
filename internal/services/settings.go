@@ -25,6 +25,8 @@ type Settings struct {
 	AnthropicKey  string    `json:"anthropic_key,omitempty"`
 	OpenAIKey     string    `json:"openai_key,omitempty"`
 	AgentBackend  string    `json:"agent_backend"` // "native", "openai", "anthropic", "openrouter", "zai"
+	Provider      *string   `json:"provider"`      // "anthropic", "openrouter", etc.
+	Model         *string   `json:"model"`         // "claude-opus-4-5", etc.
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
@@ -49,6 +51,10 @@ func (s *SettingsService) GetSettings(ctx context.Context) (*Settings, error) {
 		AnthropicKey:  row.AnthropicKey.String,
 		OpenAIKey:     row.OpenaiKey.String,
 		AgentBackend:  row.AgentBackend,
+		// Provider and Model fields - will be added after sqlc generate
+		// For now, set defaults
+		Provider: nil,
+		Model:    nil,
 	}, nil
 }
 
@@ -75,7 +81,7 @@ func (s *SettingsService) UpdateSettings(ctx context.Context, settings *Settings
 // ValidateSettings validates settings values.
 func (s *SettingsService) ValidateSettings(settings *Settings) error {
 	// Validate agent backend
-	validBackends := []string{"native", "openai", "anthropic", "openrouter", "zai"}
+	validBackends := []string{"native", "claude-code", "codex"}
 	if settings.AgentBackend == "" {
 		return fmt.Errorf("agent_backend is required")
 	}
@@ -83,52 +89,69 @@ func (s *SettingsService) ValidateSettings(settings *Settings) error {
 		return fmt.Errorf("invalid agent_backend: %s (must be one of: %s)", settings.AgentBackend, strings.Join(validBackends, ", "))
 	}
 
-	// Validate that the selected backend has a corresponding API key
-	switch settings.AgentBackend {
+	// Validate provider
+	validProviders := []string{"anthropic", "openrouter", "openai", "zai"}
+	if settings.Provider != nil && !slices.Contains(validProviders, *settings.Provider) {
+		return fmt.Errorf("invalid provider: %s (must be one of: %s)", *settings.Provider, strings.Join(validProviders, ", "))
+	}
+
+	// Validate that selected backend has a corresponding API key
+	provider := "anthropic"
+	if settings.Provider != nil {
+		provider = *settings.Provider
+	}
+
+	switch provider {
 	case "openai":
 		if settings.OpenAIKey == "" {
-			return fmt.Errorf("OpenAI API key required when using OpenAI backend")
+			return fmt.Errorf("OpenAI API key required when using OpenAI provider")
 		}
 	case "anthropic":
 		if settings.AnthropicKey == "" {
-			return fmt.Errorf("anthropic API key required when using Anthropic backend")
+			return fmt.Errorf("anthropic API key required when using Anthropic provider")
 		}
 	case "openrouter":
 		if settings.OpenRouterKey == "" {
-			return fmt.Errorf("OpenRouter API key required when using OpenRouter backend")
+			return fmt.Errorf("OpenRouter API key required when using OpenRouter provider")
 		}
 	case "zai":
 		if settings.ZaiKey == "" {
-			return fmt.Errorf("zai API key required when using Zai backend")
+			return fmt.Errorf("zai API key required when using Zai provider")
 		}
-	case "native":
-		// No API key needed for native mode
-	default:
-		return fmt.Errorf("unsupported agent_backend: %s", settings.AgentBackend)
+	case "":
+		// No provider set - use default
+		return nil
 	}
 
 	return nil
 }
 
-// GetAPIKey returns the API key for the current backend.
-func (s *SettingsService) GetAPIKey(ctx context.Context) (string, error) {
+// GetAPIKey returns API key for the current provider.
+func (s *SettingsService) GetAPIKey(ctx context.Context) (string, string, string, error) {
 	settings, err := s.GetSettings(ctx)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 
-	switch settings.AgentBackend {
+	provider := "anthropic" // default
+	model := "claude-opus-4-5" // default
+	if settings.Provider != nil {
+		provider = *settings.Provider
+	}
+	if settings.Model != nil {
+		model = *settings.Model
+	}
+
+	switch provider {
 	case "openai":
-		return settings.OpenAIKey, nil
+		return settings.OpenAIKey, "openai", model, nil
 	case "anthropic":
-		return settings.AnthropicKey, nil
+		return settings.AnthropicKey, "anthropic", model, nil
 	case "openrouter":
-		return settings.OpenRouterKey, nil
+		return settings.OpenRouterKey, "openrouter", model, nil
 	case "zai":
-		return settings.ZaiKey, nil
-	case "native":
-		return "", nil
+		return settings.ZaiKey, "zai", model, nil
 	default:
-		return "", fmt.Errorf("unknown agent_backend: %s", settings.AgentBackend)
+		return "", "", "", fmt.Errorf("unknown provider: %s", provider)
 	}
 }
