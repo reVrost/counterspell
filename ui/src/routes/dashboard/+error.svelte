@@ -5,7 +5,9 @@
     const status = $derived(page.status);
     const error = $derived(page.error);
 
-    console.error("Dashboard error:", error);
+    $effect(() => {
+        console.error("Dashboard error:", error);
+    });
 </script>
 
 <ErrorView
