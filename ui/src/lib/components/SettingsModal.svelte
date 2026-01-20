@@ -59,6 +59,7 @@
 		role="presentation"
 		aria-hidden="true"
 		onclick={(e) => e.target === e.currentTarget && appState.closeSettings()}
+		onkeydown={(e) => e.key === 'Escape' && appState.closeSettings()}
 		aria-label="Close settings"
 	>
 		<div
@@ -66,7 +67,9 @@
 			class="bg-popover border border-gray-700 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
 			role="dialog"
 			aria-modal="true"
+			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && appState.closeSettings()}
 		>
 			<div
 				class="px-6 py-4 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-popover z-10"
@@ -162,10 +165,11 @@
 					</h3>
 					<div class="space-y-4">
 						<div>
-							<label class="block text-xs font-medium text-gray-400 mb-1.5">
+							<label for="openrouter-key" class="block text-xs font-medium text-gray-400 mb-1.5">
 								OpenRouter API Key
 							</label>
 							<Input
+								id="openrouter-key"
 								type="password"
 								bind:value={openRouterKey}
 								placeholder="sk-or-..."
@@ -173,8 +177,9 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs font-medium text-gray-400 mb-1.5">Z.ai API Key</label>
+							<label for="zai-key" class="block text-xs font-medium text-gray-400 mb-1.5">Z.ai API Key</label>
 							<Input
+								id="zai-key"
 								type="password"
 								bind:value={zaiKey}
 								placeholder="zai-..."
@@ -182,10 +187,11 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs font-medium text-gray-400 mb-1.5">
+							<label for="anthropic-key" class="block text-xs font-medium text-gray-400 mb-1.5">
 								Anthropic API Key
 							</label>
 							<Input
+								id="anthropic-key"
 								type="password"
 								bind:value={anthropicKey}
 								placeholder="sk-ant-..."
@@ -193,8 +199,9 @@
 							/>
 						</div>
 						<div>
-							<label class="block text-xs font-medium text-gray-400 mb-1.5">OpenAI API Key</label>
+							<label for="openai-key" class="block text-xs font-medium text-gray-400 mb-1.5">OpenAI API Key</label>
 							<Input
+								id="openai-key"
 								type="password"
 								bind:value={openAiKey}
 								placeholder="sk-..."

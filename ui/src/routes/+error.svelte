@@ -5,7 +5,9 @@
     const status = $derived(page.status);
     const error = $derived(page.error);
 
-    console.error("Global error:", error);
+    $effect(() => {
+        console.error("Global error:", error);
+    });
 </script>
 
 <div class="min-h-screen bg-background flex flex-col">

@@ -13,4 +13,4 @@
 	};
 </script>
 
-<div class={variants[variant]} {className}></div>
+<div class={`${variants[variant]} ${className}`}></div>
