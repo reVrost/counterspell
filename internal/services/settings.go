@@ -51,10 +51,9 @@ func (s *SettingsService) GetSettings(ctx context.Context) (*Settings, error) {
 		AnthropicKey:  row.AnthropicKey.String,
 		OpenAIKey:     row.OpenaiKey.String,
 		AgentBackend:  row.AgentBackend,
-		// Provider and Model fields - will be added after sqlc generate
-		// For now, set defaults
-		Provider: nil,
-		Model:    nil,
+		Provider:      &row.Provider,
+		Model:         &row.Model,
+		UpdatedAt:     time.UnixMilli(row.UpdatedAt),
 	}, nil
 }
 
@@ -65,12 +64,25 @@ func (s *SettingsService) UpdateSettings(ctx context.Context, settings *Settings
 		return fmt.Errorf("invalid settings: %w", err)
 	}
 
+	provider := ""
+	if settings.Provider != nil {
+		provider = *settings.Provider
+	}
+
+	model := ""
+	if settings.Model != nil {
+		model = *settings.Model
+	}
+
 	err := s.db.Queries.UpsertSettings(ctx, sqlc.UpsertSettingsParams{
 		OpenrouterKey: sql.NullString{String: settings.OpenRouterKey, Valid: settings.OpenRouterKey != ""},
 		ZaiKey:        sql.NullString{String: settings.ZaiKey, Valid: settings.ZaiKey != ""},
 		AnthropicKey:  sql.NullString{String: settings.AnthropicKey, Valid: settings.AnthropicKey != ""},
 		OpenaiKey:     sql.NullString{String: settings.OpenAIKey, Valid: settings.OpenAIKey != ""},
 		AgentBackend:  settings.AgentBackend,
+		Provider:      sql.NullString{String: provider, Valid: provider != ""},
+		Model:         sql.NullString{String: model, Valid: model != ""},
+		UpdatedAt:     time.Now().UnixMilli(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update settings: %w", err)

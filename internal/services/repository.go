@@ -162,7 +162,6 @@ func nullableString(s sql.NullString) *string {
 // --- Message Operations ---
 
 // CreateMessage creates a new message.
-// NOTE: After running sqlc generate, update to include provider, model fields
 func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, content, model, provider string) error {
 	id := shortuuid.New()
 	now := time.Now().UnixMilli()
@@ -170,10 +169,14 @@ func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, con
 	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
 		ID:        id,
 		TaskID:    taskID,
-		RunID:      sql.NullString{String: runID, Valid: runID != ""},
+		RunID:     sql.NullString{String: runID, Valid: runID != ""},
 		Role:      role,
 		Content:   content,
+		Parts:     "[]",
+		Model:     sql.NullString{String: model, Valid: model != ""},
+		Provider:  sql.NullString{String: provider, Valid: provider != ""},
 		CreatedAt: now,
+		UpdatedAt: now,
 	})
 }
 
@@ -185,17 +188,19 @@ func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sq
 // --- Agent Run Operations ---
 
 // CreateAgentRun creates a new agent run.
-// NOTE: After running sqlc generate, update to include provider, model fields
 func (s *Repository) CreateAgentRun(ctx context.Context, taskID, prompt, agentBackend, provider, model string) (string, error) {
 	id := shortuuid.New()
 	now := time.Now().UnixMilli()
 
 	if err := s.db.Queries.CreateAgentRun(ctx, sqlc.CreateAgentRunParams{
-		ID:          id,
-		TaskID:      taskID,
-		Prompt:      prompt,
+		ID:           id,
+		TaskID:       taskID,
+		Prompt:       prompt,
 		AgentBackend: agentBackend,
-		CreatedAt:   now,
+		Provider:     sql.NullString{String: provider, Valid: provider != ""},
+		Model:        sql.NullString{String: model, Valid: model != ""},
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}); err != nil {
 		return "", err
 	}
@@ -204,10 +209,12 @@ func (s *Repository) CreateAgentRun(ctx context.Context, taskID, prompt, agentBa
 }
 
 // UpdateAgentRunCompleted marks an agent run as completed.
-// NOTE: After running sqlc generate, this method will be available
 func (s *Repository) UpdateAgentRunCompleted(ctx context.Context, runID string) error {
-	// Placeholder - will use s.db.Queries.UpdateAgentRunCompleted after sqlc generate
-	return nil
+	now := time.Now()
+	return s.db.Queries.UpdateAgentRunCompleted(ctx, sqlc.UpdateAgentRunCompletedParams{
+		CompletedAt: sql.NullTime{Time: now, Valid: true},
+		ID:          runID,
+	})
 }
 
 // GetLatestAgentRun retrieves the most recent agent run for a task.
