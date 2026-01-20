@@ -13,18 +13,11 @@ import (
 // HandleAPITasks returns tasks.
 func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tasks, err := h.taskService.List(ctx)
+	tasks, err := h.taskService.ListWithRepository(ctx)
 	if err != nil {
 		slog.Error("Failed to get tasks", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks", err))
 		return
-	}
-
-	repos, err := h.githubService.GetRepos(ctx)
-	if err != nil {
-		slog.Warn("Failed to fetch repos for feed", "error", err)
-		// Don't fail the whole request if repos can't be fetched
-		repos = nil
 	}
 
 	feed := &FeedData{
@@ -32,26 +25,19 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 		Reviews:  []*models.Task{},
 		Done:     []*models.Task{},
 		Todo:     []*models.Task{},
-		Projects: make(map[string]ProjectResponse),
+		Planning: []*models.Task{},
 	}
 
 	for _, t := range tasks {
 		switch t.Status {
 		case "pending", "in_progress":
 			feed.Active = append(feed.Active, t)
+		case "planning":
+			feed.Planning = append(feed.Planning, t)
 		case "review":
 			feed.Reviews = append(feed.Reviews, t)
 		case "done", "failed":
 			feed.Done = append(feed.Done, t)
-		}
-	}
-
-	for _, repo := range repos {
-		feed.Projects[repo.ID] = ProjectResponse{
-			ID:    repo.ID,
-			Name:  repo.FullName,
-			Icon:  "fas fa-code-branch",
-			Color: "violet",
 		}
 	}
 

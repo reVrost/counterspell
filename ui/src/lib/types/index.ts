@@ -20,14 +20,15 @@ export interface GitHubRepo {
 
 export interface Task {
 	id: string;
-	project_id: string;
+	repository_id?: string;
+	repository_name?: string;
 	title: string;
 	intent: string;
 	status: TaskStatus;
-	position: number;
+	position?: number;
 	current_step?: string;
-	created_at: string;
-	updated_at: string;
+	created_at: number;
+	updated_at: number;
 	assigned_agent_id?: string;
 	assigned_user_id?: string;
 	// Frontend-added fields (from API enrichment)
@@ -36,8 +37,8 @@ export interface Task {
 	logs?: LogEntry[];
 }
 
-// Task Status Flow: pending → in_progress → review → done (or failed)
-export type TaskStatus = 'pending' | 'in_progress' | 'review' | 'done' | 'failed';
+// Task Status Flow: pending → planning → in_progress → review → done (or failed)
+export type TaskStatus = 'pending' | 'planning' | 'in_progress' | 'review' | 'done' | 'failed';
 
 export interface Message {
 	role: 'user' | 'assistant';
@@ -85,7 +86,7 @@ export interface FeedData {
 	reviews: Task[];
 	done: Task[];
 	todo: Task[];
-	projects: Record<string, Project>;
+	planning: Task[];
 }
 
 export interface Model {

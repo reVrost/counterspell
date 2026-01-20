@@ -1,29 +1,22 @@
 <script lang="ts">
   import { appState } from "$lib/stores/app.svelte";
   import { taskTimers } from "$lib/stores/tasks.svelte";
-  import { CheckIcon, ChevronRightIcon } from "lucide-react";
+  import { FolderIcon } from "@lucide/svelte";
+  import { CheckIcon, ChevronRightIcon, Folder } from "lucide-react";
   import { cn } from "tailwind-variants";
 
   interface Task {
     id: string;
     title: string;
-    project_id: string;
-  }
-
-  interface Project {
-    id: string;
-    name: string;
-    color: string;
-    icon: string;
+    repository_name?: string;
   }
 
   interface Props {
     task: Task;
-    project: Project;
-    variant: "pending" | "active" | "review" | "completed";
+    variant: "pending" | "active" | "review" | "completed" | "planning";
   }
 
-  let { task, project, variant }: Props = $props();
+  let { task, variant }: Props = $props();
 
   let elapsed = $state(0);
 
@@ -78,6 +71,8 @@
   const variantClasses = {
     pending:
       "border-gray-700/50 hover:border-gray-600/50 hover:shadow-md focus:ring-gray-500/50",
+    planning:
+      "border-purple-900/50 hover:border-purple-800/50 hover:shadow-md focus:ring-purple-500/50",
     active:
       "border-gray-800/50 hover:border-gray-700/50 hover:shadow-md focus:ring-orange-500/50",
     review:
@@ -108,27 +103,25 @@
             {task.title}
           </div>
           <div class="text-xs text-gray-600 mt-0.5">
-            {project?.name ?? "Unknown"}
+            {task.repository_name || "Unknown"}
           </div>
         </div>
       </div>
       <ChevronRightIcon class="w-4 h-4 text-gray-700 ml-3 shrink-0" />
     </div>
   {:else}
-    <!-- Active/Review Layout -->
     <div class="flex justify-between items-start mb-2">
       <div class="flex items-center gap-2">
         <span
           class={cn(
-            project?.color ?? "text-gray-400",
-            "opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-xs",
+            "text-gray-400 opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-xs",
             variant === "review" && "bg-gray-800/50 border border-gray-700/50",
           )}
         >
-          <i class="fas {project?.icon ?? 'fa-folder'}"></i>
+          <FolderIcon class="w-3 h-3" />
         </span>
-        <span class="text-sm font-medium text-gray-400"
-          >{project?.name ?? "Unknown"}</span
+        <span class="text-xs font-medium text-gray-400"
+          >{task.repository_name ?? "Unknown"}</span
         >
       </div>
 
@@ -137,6 +130,12 @@
           class="text-xs text-gray-400 bg-gray-500/10 px-2.5 py-1 rounded-lg font-medium border border-gray-500/20"
         >
           Pending
+        </span>
+      {:else if variant === "planning"}
+        <span
+          class="text-xs text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg font-medium border border-purple-500/20"
+        >
+          Planning
         </span>
       {:else if variant === "active"}
         <div class="flex items-center gap-2">

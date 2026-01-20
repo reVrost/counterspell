@@ -142,6 +142,67 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 	return items, nil
 }
 
+const listTasksWithRepository = `-- name: ListTasksWithRepository :many
+SELECT
+    t.id,
+    t.repository_id,
+    t.title,
+    t.intent,
+    t.status,
+    t.position,
+    t.created_at,
+    t.updated_at,
+    r.full_name as repository_name
+FROM tasks t
+LEFT JOIN repositories r ON t.repository_id = r.id
+ORDER BY t.status ASC, t.position ASC, t.created_at DESC
+`
+
+type ListTasksWithRepositoryRow struct {
+	ID             string         `json:"id"`
+	RepositoryID   sql.NullString `json:"repository_id"`
+	Title          string         `json:"title"`
+	Intent         string         `json:"intent"`
+	Status         string         `json:"status"`
+	Position       sql.NullInt64  `json:"position"`
+	CreatedAt      int64          `json:"created_at"`
+	UpdatedAt      int64          `json:"updated_at"`
+	RepositoryName sql.NullString `json:"repository_name"`
+}
+
+func (q *Queries) ListTasksWithRepository(ctx context.Context) ([]ListTasksWithRepositoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksWithRepository)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTasksWithRepositoryRow{}
+	for rows.Next() {
+		var i ListTasksWithRepositoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RepositoryID,
+			&i.Title,
+			&i.Intent,
+			&i.Status,
+			&i.Position,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RepositoryName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTaskPosition = `-- name: UpdateTaskPosition :exec
 UPDATE tasks SET position = ? WHERE id = ?
 `
