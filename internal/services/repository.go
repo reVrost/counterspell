@@ -13,18 +13,27 @@ import (
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
-// TaskService handles task persistence.
-type TaskService struct {
+// Repository handles task persistence.
+type Repository struct {
 	db *db.DB
 }
 
-// NewTaskService creates a new task service.
-func NewTaskService(database *db.DB) *TaskService {
-	return &TaskService{db: database}
+// NewRepository creates a new task service.
+func NewRepository(database *db.DB) *Repository {
+	return &Repository{db: database}
+}
+
+func (s *Repository) GetRepository(ctx context.Context, projectID string) (sqlc.Repository, error) {
+	return s.db.Queries.GetRepository(ctx, projectID)
+}
+
+func (s *Repository) GetGithubConnectionByID(ctx context.Context, githubConnectionID string) (sqlc.GithubConnection, error) {
+	return s.db.Queries.GetGithubConnectionByID(ctx, githubConnectionID)
+
 }
 
 // Create creates a new task with validation.
-func (s *TaskService) Create(ctx context.Context, projectName, intent string) (*models.Task, error) {
+func (s *Repository) Create(ctx context.Context, repositoryID, intent string) (*models.Task, error) {
 	id := shortuuid.New()
 	// Validate input
 	if intent == "" {
@@ -33,13 +42,13 @@ func (s *TaskService) Create(ctx context.Context, projectName, intent string) (*
 
 	now := time.Now().UnixMilli()
 	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
-		ID:             id,
-		RepositoryName: projectName,
-		Title:          intent, // Use intent as title for now
-		Intent:         intent,
-		Status:         "pending",
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:           id,
+		RepositoryID: sql.NullString{String: repositoryID, Valid: repositoryID != ""},
+		Title:        intent, // Use intent as title for now
+		Intent:       intent,
+		Status:       "pending",
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}); err != nil {
 		return nil, err
 	}
@@ -48,7 +57,7 @@ func (s *TaskService) Create(ctx context.Context, projectName, intent string) (*
 }
 
 // Get retrieves a task by ID.
-func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) {
+func (s *Repository) Get(ctx context.Context, id string) (*models.Task, error) {
 	task, err := s.db.Queries.GetTask(ctx, id)
 	if err != nil {
 		return nil, err
@@ -57,7 +66,7 @@ func (s *TaskService) Get(ctx context.Context, id string) (*models.Task, error) 
 }
 
 // List retrieves all tasks.
-func (s *TaskService) List(ctx context.Context) ([]*models.Task, error) {
+func (s *Repository) List(ctx context.Context) ([]*models.Task, error) {
 	tasks, err := s.db.Queries.ListTasks(ctx)
 	if err != nil {
 		return nil, err
@@ -71,7 +80,7 @@ func (s *TaskService) List(ctx context.Context) ([]*models.Task, error) {
 }
 
 // ListByStatus retrieves tasks by status.
-func (s *TaskService) ListByStatus(ctx context.Context, status string) ([]*models.Task, error) {
+func (s *Repository) ListByStatus(ctx context.Context, status string) ([]*models.Task, error) {
 	tasks, err := s.db.Queries.ListTasksByStatus(ctx, status)
 	if err != nil {
 		return nil, err
@@ -85,7 +94,7 @@ func (s *TaskService) ListByStatus(ctx context.Context, status string) ([]*model
 }
 
 // UpdateStatus updates task status with validation.
-func (s *TaskService) UpdateStatus(ctx context.Context, id, status string) error {
+func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error {
 	// Validate status
 	validStatuses := []string{"pending", "in_progress", "review", "done", "failed"}
 	if !slices.Contains(validStatuses, status) {
@@ -102,7 +111,7 @@ func (s *TaskService) UpdateStatus(ctx context.Context, id, status string) error
 }
 
 // Delete removes a task.
-func (s *TaskService) Delete(ctx context.Context, id string) error {
+func (s *Repository) Delete(ctx context.Context, id string) error {
 	if err := s.db.Queries.DeleteTask(ctx, id); err != nil {
 		return err
 	}
@@ -110,26 +119,26 @@ func (s *TaskService) Delete(ctx context.Context, id string) error {
 }
 
 // GetPendingTasks retrieves all pending tasks for execution.
-func (s *TaskService) GetPendingTasks(ctx context.Context) ([]*models.Task, error) {
+func (s *Repository) GetPendingTasks(ctx context.Context) ([]*models.Task, error) {
 	return s.ListByStatus(ctx, "pending")
 }
 
 // GetInProgressTasks retrieves all in-progress tasks.
-func (s *TaskService) GetInProgressTasks(ctx context.Context) ([]*models.Task, error) {
+func (s *Repository) GetInProgressTasks(ctx context.Context) ([]*models.Task, error) {
 	return s.ListByStatus(ctx, "in_progress")
 }
 
 // sqlcTaskToModel converts sqlc task to model.
 func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 	return &models.Task{
-		ID:             task.ID,
-		RepositoryName: task.RepositoryName,
-		Title:          task.Title,
-		Intent:         task.Intent,
-		Status:         task.Status,
-		Position:       nullableInt64(task.Position),
-		CreatedAt:      task.CreatedAt,
-		UpdatedAt:      task.UpdatedAt,
+		ID:           task.ID,
+		RepositoryID: nullableString(task.RepositoryID),
+		Title:        task.Title,
+		Intent:       task.Intent,
+		Status:       task.Status,
+		Position:     nullableInt64(task.Position),
+		CreatedAt:    task.CreatedAt,
+		UpdatedAt:    task.UpdatedAt,
 	}
 }
 
@@ -137,6 +146,14 @@ func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 func nullableInt64(n sql.NullInt64) *int64 {
 	if n.Valid {
 		return &n.Int64
+	}
+	return nil
+}
+
+// nullableString converts sql.NullString to *string.
+func nullableString(s sql.NullString) *string {
+	if s.Valid {
+		return &s.String
 	}
 	return nil
 }
