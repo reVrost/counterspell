@@ -25,3 +25,18 @@ UPDATE tasks SET status = ?, position = ? WHERE id = ?;
 
 -- name: DeleteTask :exec
 DELETE FROM tasks WHERE id = ?;
+
+-- name: ListTasksWithRepository :many
+SELECT
+    t.id,
+    t.repository_id,
+    t.title,
+    t.intent,
+    t.status,
+    t.position,
+    t.created_at,
+    t.updated_at,
+    r.full_name as repository_name
+FROM tasks t
+LEFT JOIN repositories r ON t.repository_id = r.id
+ORDER BY t.status ASC, t.position ASC, t.created_at DESC;

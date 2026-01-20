@@ -11,9 +11,9 @@
 
   // Split active into pending and in_progress
   const activeTasks = $derived(feedData?.active || []);
+  const planningTasks = $derived(feedData?.planning || []);
   const reviewsTasks = $derived(feedData?.reviews || []);
   const doneTasks = $derived(feedData?.done || []);
-  const projects = $derived(feedData?.projects || {});
 
   const pendingTasks = $derived(
     activeTasks.filter((t) => t.status === "pending"),
@@ -41,7 +41,7 @@
               delay: index * 50,
             }}
           >
-            <Task {task} project={projects[task.project_id]} variant="review" />
+            <Task {task} variant="review" />
           </div>
         {/each}
       </div>
@@ -65,7 +65,31 @@
               delay: index * 50,
             }}
           >
-            <Task {task} project={projects[task.project_id]} variant="active" />
+            <Task {task} variant="active" />
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Planning -->
+  {#if planningTasks.length > 0}
+    <div class="mb-6">
+      <h3
+        class="px-2 text-xs font-bold text-purple-500 uppercase tracking-wider mb-3"
+      >
+        Planning
+      </h3>
+      <div class="space-y-3">
+        {#each planningTasks as task, index (task.id)}
+          <div
+            transition:slide|local={{
+              direction: "up",
+              duration: DURATIONS.normal,
+              delay: index * 50,
+            }}
+          >
+            <Task {task} variant="planning" />
           </div>
         {/each}
       </div>
@@ -91,7 +115,6 @@
           >
             <Task
               {task}
-              project={projects[task.project_id]}
               variant="pending"
             />
           </div>
@@ -128,7 +151,6 @@
           >
             <Task
               {task}
-              project={projects[task.project_id]}
               variant="completed"
             />
           </div>

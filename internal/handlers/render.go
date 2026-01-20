@@ -117,11 +117,11 @@ func (cr *ConflictResponse) Render(w http.ResponseWriter, r *http.Request) error
 
 // FeedData is the structured response for the dashboard.
 type FeedData struct {
-	Active   []*models.Task             `json:"active"`
-	Reviews  []*models.Task             `json:"reviews"`
-	Done     []*models.Task             `json:"done"`
-	Todo     []*models.Task             `json:"todo"`
-	Projects map[string]ProjectResponse `json:"projects"`
+	Active   []*models.Task `json:"active"`
+	Reviews  []*models.Task `json:"reviews"`
+	Done     []*models.Task `json:"done"`
+	Todo     []*models.Task `json:"todo"`
+	Planning []*models.Task `json:"planning"`
 }
 
 func (f *FeedData) Render(w http.ResponseWriter, r *http.Request) error {

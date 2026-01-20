@@ -80,6 +80,20 @@ func (s *Repository) List(ctx context.Context) ([]*models.Task, error) {
 	return result, nil
 }
 
+// ListWithRepository retrieves all tasks with repository names.
+func (s *Repository) ListWithRepository(ctx context.Context) ([]*models.Task, error) {
+	tasks, err := s.db.Queries.ListTasksWithRepository(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*models.Task, len(tasks))
+	for i := range tasks {
+		result[i] = sqlcTaskWithRepoToModel(&tasks[i])
+	}
+	return result, nil
+}
+
 // ListByStatus retrieves tasks by status.
 func (s *Repository) ListByStatus(ctx context.Context, status string) ([]*models.Task, error) {
 	tasks, err := s.db.Queries.ListTasksByStatus(ctx, status)
@@ -140,6 +154,21 @@ func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 		Position:     nullableInt64(task.Position),
 		CreatedAt:    task.CreatedAt,
 		UpdatedAt:    task.UpdatedAt,
+	}
+}
+
+// sqlcTaskWithRepoToModel converts sqlc task with repository to model.
+func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task {
+	return &models.Task{
+		ID:             task.ID,
+		RepositoryID:   nullableString(task.RepositoryID),
+		RepositoryName: nullableString(task.RepositoryName),
+		Title:          task.Title,
+		Intent:         task.Intent,
+		Status:         task.Status,
+		Position:       nullableInt64(task.Position),
+		CreatedAt:      task.CreatedAt,
+		UpdatedAt:      task.UpdatedAt,
 	}
 }
 
