@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from "svelte";
 	import "../app.css";
 	import { QueryClient, QueryClientProvider } from "@tanstack/svelte-query";
 	import { appState } from "$lib/stores/app.svelte";
@@ -53,8 +52,8 @@
 		};
 	}
 
-	// Initialize app state on mount
-	onMount(async () => {
+	// Initialize app state
+	$effect(async () => {
 		// Initialize global error handlers first
 		initGlobalErrorHandlers();
 

@@ -87,7 +87,7 @@ func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newTaskID, err := orch.StartTask(ctx, task.MachineID, task.Intent, "")
+	newTaskID, err := orch.StartTask(ctx, task.RepositoryName, task.Intent, "")
 	if err != nil {
 		slog.Error("Failed to retry task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to retry task", err))

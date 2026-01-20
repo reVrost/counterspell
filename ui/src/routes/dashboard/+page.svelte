@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount, onDestroy } from "svelte";
 	import Feed from "$lib/components/Feed.svelte";
 	import type { FeedData } from "$lib/types";
 	import { tasksAPI } from "$lib/api";
@@ -54,19 +53,20 @@
 		}
 	}
 
-	onMount(async () => {
-		await loadFeedData();
+	$effect(() => {
+		// Load feed data immediately
+		loadFeedData();
 
 		// Set up SSE for real-time updates
 		eventSource = createFeedSSE(() => {
 			loadFeedData();
 		});
-	});
 
-	onDestroy(() => {
-		if (eventSource) {
-			eventSource.close();
-		}
+		return () => {
+			if (eventSource) {
+				eventSource.close();
+			}
+		};
 	});
 </script>
 

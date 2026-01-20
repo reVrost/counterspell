@@ -1,9 +1,6 @@
 <script lang="ts">
   import { appState } from "$lib/stores/app.svelte";
   import { cn, getInitial } from "$lib/utils";
-  import type { Project } from "$lib/types";
-  import LayersIcon from "@lucide/svelte/icons/layers";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import SettingsIcon from "@lucide/svelte/icons/settings";
   import DownloadIcon from "@lucide/svelte/icons/download";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
@@ -12,8 +9,22 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import { Folder, Inbox, Layers, Newspaper, Search } from "lucide-react";
+  import Title from "./ui/title/title.svelte";
 
   let projectSearch = $state("");
+  let { activeTab } = $props();
+
+  // const activeTabToIcon = {
+  //   inbox: Inbox,
+  //   projects: Folder,
+  //   search: Search,
+  //   layers: Layers,
+  //   new: Newspaper,
+  // };
+  // let CurrentIcon = (activeTabToIcon[activeTab] as any) ?? null;
+
+  // let CurrentIcon = null;
 
   const filteredProjects = $derived(
     appState.projects.filter((p) =>
@@ -36,7 +47,7 @@
       const res = await fetch("/api/v1/github/sync", { method: "POST" });
       if (res.ok) {
         // Refresh the feed to get updated projects
-        await appState.fetchFeed();
+        // await appState.fetchFeed();
       }
     } catch (e) {
       console.error("Failed to sync repos:", e);
@@ -54,15 +65,9 @@
     <DropdownMenu.Trigger
       class="flex items-center gap-2 cursor-pointer active:opacity-70 transition"
     >
-      <div
-        class="w-5 h-5 rounded bg-gray-800 flex items-center justify-center text-[10px] text-gray-400 border border-gray-700"
-      >
-        <LayersIcon class="w-3 h-3" />
-      </div>
-      <span class="font-semibold text-sm tracking-tight text-gray-200"
-        >All Projects</span
-      >
-      <ChevronDownIcon class="w-2.5 h-2.5 text-gray-600" />
+      <Title>
+        {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+      </Title>
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
       <DropdownMenu.Content

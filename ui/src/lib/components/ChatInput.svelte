@@ -4,7 +4,6 @@
   import { cn } from "$lib/utils";
   import { tasksAPI, filesAPI } from "$lib/api";
   import { dropdownPop, slide, DURATIONS } from "$lib/utils/transitions";
-  import { onMount } from "svelte";
   import FolderIcon from "@lucide/svelte/icons/folder";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import PaperclipIcon from "@lucide/svelte/icons/paperclip";
@@ -58,7 +57,7 @@
     }
   }
 
-  onMount(() => {
+  $effect(() => {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   });
