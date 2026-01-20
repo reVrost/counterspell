@@ -50,7 +50,7 @@ export function fade(node: Element, { duration = 200, delay = 0 }: { duration?: 
  */
 export function slide(
 	node: Element,
-	{ direction = 'up', duration = 300, delay = 0 }: { direction?: 'up' | 'down' | 'left' | 'right'; duration?: number; delay?: number } = {}
+	{ direction = 'up', duration = 300, delay = 0, opacity = true }: { direction?: 'up' | 'down' | 'left' | 'right'; duration?: number; delay?: number; opacity?: boolean } = {}
 ): TransitionConfig {
 	if (prefersReducedMotion()) {
 		return {
@@ -59,28 +59,26 @@ export function slide(
 		};
 	}
 
-	const transforms = {
-		up: 'translateY(0)',
-		down: 'translateY(0)',
-		left: 'translateX(0)',
-		right: 'translateX(0)'
-	};
-
-	const startTransforms = {
-		up: 'translateY(32px)',
-		down: 'translateY(-32px)',
-		left: 'translateX(32px)',
-		right: 'translateX(-32px)'
-	};
+	const distance = 32;
 
 	return {
 		duration,
 		delay,
 		easing: EASINGS.position,
-		css: (t) => `
-			transform: ${t === 0 ? startTransforms[direction] : transforms[direction]};
-			opacity: ${t};
-		`
+		css: (t) => {
+			const move = (1 - t) * distance;
+			const transform = direction === 'up' ? `translateY(${move}px)` :
+				direction === 'down' ? `translateY(${-move}px)` :
+					direction === 'left' ? `translateX(${move}px)` :
+						`translateX(${-move}px)`;
+
+			return opacity ? `
+				transform: ${transform};
+				opacity: ${t};
+			` : `
+				transform: ${transform};
+			`;
+		}
 	};
 }
 
