@@ -47,6 +47,44 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, map[string]string{"task_id": taskID})
 }
 
+func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req struct {
+		Intent   string `json:"intent"`
+		TaskID   string `json:"task_id"`
+		Model    string `json:"model"`
+		Provider string `json:"provider"`
+	}
+	if err := render.DecodeJSON(r.Body, &req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Intent == "" {
+		http.Error(w, "Intent required", http.StatusBadRequest)
+		return
+	}
+
+	orch, err := h.getOrchestrator()
+	if err != nil {
+		slog.Error("Failed to create orchestrator", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to create task", err))
+		return
+	}
+
+	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model", req.Model, "provider", req.Provider)
+	err = orch.ContinueTask(ctx, req.TaskID, req.Intent, "native", req.Provider, req.Model)
+	if err != nil {
+		slog.Error("Failed to start task", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))
+		return
+	}
+
+	slog.Info("[HANDLER] Task continued successfully", "task_id", req.TaskID)
+	render.JSON(w, r, map[string]string{"task_id": req.TaskID, "status": "in_progress"})
+}
+
 // HandleActionClear clears a task.
 func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")

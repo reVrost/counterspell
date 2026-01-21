@@ -51,7 +51,7 @@ func (s *Repository) Create(ctx context.Context, repositoryID, intent string) (*
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create task with id %s: %w", id, err)
 	}
 
 	return s.Get(ctx, id)

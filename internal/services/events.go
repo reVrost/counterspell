@@ -176,3 +176,16 @@ func (b *EventBus) Unsubscribe(ch chan models.Event) {
 		close(ch)
 	}
 }
+
+// Shutdown stops the event bus and cleanup goroutine.
+func (b *EventBus) Shutdown() {
+	slog.Info("[EVENTBUS] Shutting down")
+	// Close all subscriber channels to unblock them
+	b.mu.Lock()
+	for ch := range b.subscribers {
+		close(ch)
+		delete(b.subscribers, ch)
+	}
+	b.mu.Unlock()
+	slog.Info("[EVENTBUS] Shutdown complete")
+}

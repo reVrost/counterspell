@@ -134,6 +134,7 @@ func main() {
 		r.Post("/api/v1/transcribe", h.HandleTranscribe)
 
 		// Task Actions
+		r.Post("/api/v1/tasks/{id}/chat", h.HandleActionChat)
 		r.Post("/api/v1/tasks/{id}/clear", h.HandleActionClear)
 		r.Post("/api/v1/tasks/{id}/retry", h.HandleActionRetry)
 		r.Post("/api/v1/tasks/{id}/merge", h.HandleActionMerge)
@@ -169,6 +170,12 @@ func main() {
 	<-quit
 
 	logger.Info("Server shutting down...")
+
+	// Cancel running tasks via orchestrator if any exist
+	// Note: orchestrators are created on-demand per task
+
+	// Shutdown event bus (stops cleanup goroutine)
+	eventBus.Shutdown()
 
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
