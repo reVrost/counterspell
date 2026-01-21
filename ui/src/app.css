@@ -100,19 +100,19 @@
 		--card-foreground: 0 0% 98%;
 		--popover: 222 15% 8%;
 		--popover-foreground: 0 0% 98%;
-		--primary: 226 100% 64%; /* Blue accent */
+		--primary: 270 72% 78%; /* Pale violet - subtle professional pink/purple accent */
 		--primary-foreground: 0 0% 100%;
 		--secondary: 222 15% 12%;
 		--secondary-foreground: 0 0% 98%;
 		--muted: 222 15% 15%;
 		--muted-foreground: 215 20% 65%;
-		--accent: 226 100% 64%;
+		--accent: 270 72% 78%;
 		--accent-foreground: 0 0% 100%;
 		--destructive: 0 62.8% 30.6%;
 		--destructive-foreground: 0 0% 98%;
 		--border: 222 15% 15%;
 		--input: 222 15% 15%;
-		--ring: 226 100% 64%;
+		--ring: 270 72% 70%;
 		--chart-1: 220 70% 50%;
 		--chart-2: 160 60% 45%;
 		--chart-3: 30 80% 55%;
@@ -131,11 +131,11 @@
 	.shimmer {
 		background-image: linear-gradient(
 			90deg,
-			#8b5cf6 0%,
-			#a78bfa 25%,
-			#c4b5fd 50%,
-			#a78bfa 75%,
-			#8b5cf6 100%
+			hsl(270 72% 65%) 0%,
+			hsl(270 72% 78%) 25%,
+			hsl(270 72% 85%) 50%,
+			hsl(270 72% 78%) 75%,
+			hsl(270 72% 65%) 100%
 		);
 		background-size: 200% 100%;
 		background-clip: text;

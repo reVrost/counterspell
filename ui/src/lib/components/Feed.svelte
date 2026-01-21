@@ -28,7 +28,7 @@
   {#if reviewsTasks.length > 0}
     <div class="mb-6">
       <h3
-        class="px-2 text-xs font-bold text-blue-500 uppercase tracking-wider mb-3"
+        class="px-2 text-10 font-bold text-primary uppercase tracking-wider mb-3"
       >
         Review
       </h3>
@@ -52,7 +52,7 @@
   {#if inProgressTasks.length > 0}
     <div class="mb-6">
       <h3
-        class="px-2 text-xs font-bold text-orange-500 uppercase tracking-wider mb-3"
+        class="px-2 text-sm font-bold text-orange-500 uppercase tracking-wider mb-3"
       >
         In Progress
       </h3>
@@ -76,7 +76,7 @@
   {#if planningTasks.length > 0}
     <div class="mb-6">
       <h3
-        class="px-2 text-xs font-bold text-purple-500 uppercase tracking-wider mb-3"
+        class="px-2 text-sm font-bold text-primary uppercase tracking-wider mb-3"
       >
         Planning
       </h3>
@@ -100,7 +100,7 @@
   {#if pendingTasks.length > 0}
     <div class="mb-6">
       <h3
-        class="px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3"
+        class="px-2 text-sm font-bold text-gray-500 uppercase tracking-wider mb-3"
       >
         Pending
       </h3>
@@ -133,7 +133,7 @@
   {#if doneTasks.length > 0}
     <div class="pt-4 border-t border-gray-800/50">
       <h3
-        class="px-2 text-xs font-bold text-gray-600 uppercase tracking-wider mb-3"
+        class="px-2 text-sm font-bold text-gray-600 uppercase tracking-wider mb-3"
       >
         Completed
       </h3>
