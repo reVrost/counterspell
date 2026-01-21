@@ -9,7 +9,6 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-  import { Folder, Inbox, Layers, Newspaper, Search } from "lucide-react";
   import Title from "./ui/title/title.svelte";
 
   let projectSearch = $state("");

@@ -1,8 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { taskTimers } from "$lib/stores/tasks.svelte";
   import { FolderIcon } from "@lucide/svelte";
-  import { CheckIcon, ChevronRightIcon, Folder } from "lucide-react";
+  import { Check, ChevronRight } from "@lucide/svelte";
   import { cn } from "tailwind-variants";
 
   interface Task {
@@ -37,7 +36,7 @@
     review:
       "border-blue-800 hover:border-blue-700/50 hover:shadow-lg focus:ring-blue-500/50",
     completed:
-      "bg-card/60 border-gray-800/20 flex-row hover:border-gray-700/30 focus:ring-green-500/50",
+      "bg-card border-gray-600/20 flex-row hover:border-gray-500/30 focus:ring-green-500/50",
   };
 </script>
 
@@ -45,8 +44,6 @@
   type="button"
   class="{baseClasses} {variantClasses[variant]}"
   onclick={handleClick}
-  onmouseenter={handleHover}
-  onmouseleave={handleMouseLeave}
 >
   {#if variant === "completed"}
     <!-- Completed Layout -->
@@ -55,18 +52,18 @@
         <div
           class="w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-base shrink-0"
         >
-          <CheckIcon class="w-3 h-3" />
+          <Check class="w-3 h-3" />
         </div>
         <div class="min-w-0">
-          <div class="text-base text-gray-400 leading-snug line-clamp-2">
+          <div class="text-base leading-snug line-clamp-2">
             {task.title}
           </div>
-          <div class="text-sm text-gray-600 mt-0.5">
+          <div class="text-sm text-gray-400 mt-0.5">
             {task.repository_name || "Unknown"}
           </div>
         </div>
       </div>
-      <ChevronRightIcon class="w-4 h-4 text-gray-700 ml-3 shrink-0" />
+      <ChevronRight class="w-4 h-4 text-gray-700 ml-3 shrink-0" />
     </div>
   {:else}
     <div class="flex justify-between items-start mb-2">
@@ -125,7 +122,7 @@
 
     {#if variant === "review"}
       <div class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600">
-        <ChevronRightIcon class="w-4 h-4" />
+        <ChevronRight class="w-4 h-4" />
       </div>
     {/if}
   {/if}

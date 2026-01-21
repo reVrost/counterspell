@@ -41,7 +41,10 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	render.Render(w, r, feed)
+	if err := render.Render(w, r, feed); err != nil {
+		http.Error(w, "Failed to render response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // HandleAPITask returns a single task with full details including messages and artifacts.

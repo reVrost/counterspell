@@ -236,7 +236,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  :global(button, :global(a)) {
+  :global(button, a) {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }

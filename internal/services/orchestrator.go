@@ -221,13 +221,13 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, ag
 	}
 
 	// Create agent run row
-	_, err = o.repo.CreateAgentRun(ctx, taskID, followUpMsg, agentBackend, provider, model)
+	runID, err := o.repo.CreateAgentRun(ctx, taskID, followUpMsg, agentBackend, provider, model)
 	if err != nil {
 		return fmt.Errorf("failed to create agent run: %w", err)
 	}
 
 	// Append user message to DB immediately
-	if err := o.repo.CreateMessage(ctx, taskID, "", "user", followUpMsg, "", ""); err != nil {
+	if err := o.repo.CreateMessage(ctx, taskID, runID, "user", followUpMsg, "", ""); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
 	}
 
@@ -334,6 +334,11 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			return
 		}
 		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID, "run_id", runID)
+
+		// Create initial user message with the intent
+		if err := o.repo.CreateMessage(ctx, job.TaskID, runID, "user", job.Intent, "", ""); err != nil {
+			slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err, "task_id", job.TaskID)
+		}
 	}
 
 	// Create worktree for isolated execution
@@ -489,7 +494,9 @@ func (o *Orchestrator) processResults() {
 			}
 			// Update agent run as completed
 			if run, err := o.repo.GetLatestAgentRun(ctx, result.TaskID); err == nil && run != nil {
-				o.repo.UpdateAgentRunCompleted(ctx, run.ID)
+				if err := o.repo.UpdateAgentRunCompleted(ctx, run.ID); err != nil {
+					slog.Error("[ORCHESTRATOR] Failed to update agent run completed", "error", err)
+				}
 			}
 		} else {
 			if err := o.repo.UpdateStatus(ctx, result.TaskID, "failed"); err != nil {
@@ -547,8 +554,8 @@ func (o *Orchestrator) GetConflictDetails(ctx context.Context, taskID string) ([
 
 	// Read all files in worktree
 	var conflicts []ConflictFile
-	var err error
-	err = filepath.Walk(worktreePath, func(path string, info os.FileInfo, err error) error {
+
+	err := filepath.Walk(worktreePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
