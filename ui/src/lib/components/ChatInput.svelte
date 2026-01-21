@@ -222,9 +222,9 @@
       >
         <button
           type="button"
-          class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0"
+          class="w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition shrink-0"
         >
-          <XIcon class="w-4 h-4" />
+          <XIcon class="w-5 h-5" />
         </button>
         <div
           class="flex-1 flex items-center justify-center gap-[3px] h-10 mx-4"
@@ -253,7 +253,7 @@
       <div
         class="absolute inset-0 bg-secondary rounded-3xl flex items-center justify-center z-10"
       >
-        <LoaderIcon class="w-4 h-4 text-primary mr-2 animate-spin" />
+        <LoaderIcon class="w-5 h-5 text-primary mr-2 animate-spin" />
         <span class="text-sm text-gray-400">Transcribing...</span>
       </div>
     {/if}
@@ -264,7 +264,7 @@
       {#if showFileMenu && files && files.length > 0}
         <div
           transition:dropdownPop|local
-          class="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto z-50"
+          class="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-58 overflow-y-auto z-50"
         >
           <div
             class="px-3 py-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider border-b border-gray-800 flex items-center justify-between"
@@ -300,7 +300,7 @@
           class="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50"
         >
           <div class="px-3 py-4 text-sm text-gray-500 text-center">
-            <SearchIcon class="w-4 h-4 mx-auto mb-2 opacity-50" />
+            <SearchIcon class="w-5 h-5 mx-auto mb-2 opacity-50" />
             <div>No files found</div>
           </div>
         </div>
@@ -328,9 +328,9 @@
             type="button"
             onclick={onClose}
             aria-label="Cancel"
-            class="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all duration-150 mr-1"
+            class="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all duration-150 mr-1"
           >
-            <XIcon class="w-4 h-4" />
+            <XIcon class="w-5 h-5" />
           </button>
 
           <!-- Project Selector -->
@@ -470,16 +470,16 @@
             type="button"
             onclick={onClose}
             aria-label="Close chat"
-            class="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
+            class="w-12 h-12 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
           >
-            <XIcon class="w-4 h-4" />
+            <XIcon class="w-5 h-5" />
           </button>
           <button
             type="button"
             aria-label="Attach file"
-            class="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
+            class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
           >
-            <PaperclipIcon class="w-4 h-4" />
+            <PaperclipIcon class="w-5 h-5" />
           </button>
           <!-- Model Selector (chat mode inline) -->
           <div class="relative" bind:this={modelMenuRef}>
@@ -487,9 +487,9 @@
               type="button"
               onclick={() => (modelOpen = !modelOpen)}
               aria-label="Select model"
-              class="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
+              class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
             >
-              <ZapIcon class="w-4 h-4" />
+              <ZapIcon class="w-5 h-5" />
             </button>
             {#if modelOpen}
               <div
@@ -539,7 +539,7 @@
             aria-label="Attach file"
             class="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
           >
-            <PaperclipIcon class="w-4 h-4" />
+            <PaperclipIcon class="w-5 h-5" />
           </button>
           <!-- Model Selector (create mode) -->
           <div class="relative" bind:this={modelMenuRef}>
@@ -547,9 +547,9 @@
               type="button"
               onclick={() => (modelOpen = !modelOpen)}
               aria-label="Select model"
-              class="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
+              class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 active:text-white active:bg-white/10 transition-all duration-150"
             >
-              <ZapIcon class="w-4 h-4" />
+              <ZapIcon class="w-5 h-5" />
             </button>
             {#if modelOpen}
               <div
@@ -591,7 +591,7 @@
         {/if}
 
         <!-- Divider -->
-        <div class="w-px h-4 bg-gray-700 mx-1"></div>
+        <div class="w-px h-5 bg-gray-700 mx-1"></div>
 
         <!-- Submit/Voice Button -->
         <button
@@ -599,7 +599,7 @@
           aria-label="Send message or hold to record voice"
           onclick={handleSubmitClick}
           class={cn(
-            "w-9 h-9 rounded-xl flex items-center justify-center text-base transition-all duration-150 select-none",
+            "w-10 h-10 rounded-xl flex items-center justify-center text-base transition-all duration-150 select-none",
             appState.isRecording
               ? "bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] scale-110"
               : text.length > 0
@@ -608,11 +608,11 @@
           )}
         >
           {#if text.length > 0}
-            <ArrowUpIcon class="w-4 h-4" />
+            <ArrowUpIcon class="w-5 h-5" />
           {:else if appState.isRecording}
-            <MicIcon class="w-4 h-4 animate-pulse" />
+            <MicIcon class="w-5 h-5 animate-pulse" />
           {:else}
-            <MicIcon class="w-4 h-4" />
+            <MicIcon class="w-5 h-5" />
           {/if}
         </button>
       </div>

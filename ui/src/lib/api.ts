@@ -224,18 +224,8 @@ export const tasksAPI = {
     return fetchAPI<FeedData>("/api/v1/tasks");
   },
 
-  async get(id: string): Promise<{
-    task: Task;
-    project: Project;
-    messages: Message[];
-    logs: LogEntry[];
-  }> {
-    return fetchAPI<{
-      task: Task;
-      project: Project;
-      messages: Message[];
-      logs: LogEntry[];
-    }>(`/api/v1/task/${id}`);
+  async get(id: string): Promise<Task> {
+    return fetchAPI<Task>(`/api/v1/task/${id}`);
   },
 
   async create(
