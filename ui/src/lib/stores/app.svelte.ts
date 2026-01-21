@@ -1,5 +1,6 @@
 import { MODELS, type Model, type Project, type UserSettings, type GitHubRepo, type ToastType } from '$lib/types';
 import { authAPI, projectsAPI, settingsAPI, githubAPI } from '$lib/api';
+import { pushState } from '$app/navigation';
 
 // Reactive app state using Svelte 5 runes
 class AppState {
@@ -179,7 +180,7 @@ class AppState {
 	openModal(taskId: string) {
 		this.modalTaskId = taskId;
 		this.modalOpen = true;
-		history.pushState({ modal: true }, '');
+		pushState({ modal: true }, '');
 	}
 
 	installPWA() {
