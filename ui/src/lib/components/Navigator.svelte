@@ -36,8 +36,8 @@
   <div class="flex-1 flex items-center justify-center">
     <div
       class={navBase}
-      style="transform:translateX({(activeIndex === -1 ? 0 : activeIndex) * 46.5 +
-        -100}px) ; "
+      style="transform:translateX({(activeIndex === -1 ? 0 : activeIndex) * 48 +
+        -102}px) ; "
     ></div>
     <div
       class="inline-flex items-center gap-1 bg-[#1a1a1a] rounded-full px-1 border border-white/[0.06]"
