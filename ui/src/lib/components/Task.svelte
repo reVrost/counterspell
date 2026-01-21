@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appState } from "$lib/stores/app.svelte";
+  import { goto } from "$app/navigation";
   import { taskTimers } from "$lib/stores/tasks.svelte";
   import { FolderIcon } from "@lucide/svelte";
   import { CheckIcon, ChevronRightIcon, Folder } from "lucide-react";
@@ -20,49 +20,8 @@
 
   let elapsed = $state(0);
 
-  // Hover prefetch
-  let prefetchTimeout: number | null = null;
-
-  function handleHover() {
-    if (variant === "completed" || prefetchTimeout !== null) return;
-
-    prefetchTimeout = window.setTimeout(() => {
-      // Call global prefetch function from layout
-      if ((window as any).prefetchTask) {
-        (window as any).prefetchTask(task.id);
-      }
-    }, 150);
-  }
-
-  function handleMouseLeave() {
-    if (prefetchTimeout) {
-      clearTimeout(prefetchTimeout);
-      prefetchTimeout = null;
-    }
-  }
-
-  $effect(() => {
-    if (variant === "active") {
-      if (!taskTimers[task.id]) {
-        taskTimers[task.id] = Date.now();
-      }
-      elapsed = Math.floor((Date.now() - taskTimers[task.id]) / 1000);
-
-      const interval = setInterval(() => {
-        elapsed = Math.floor((Date.now() - taskTimers[task.id]) / 1000);
-      }, 1000);
-
-      return () => {
-        clearInterval(interval);
-        if (prefetchTimeout) {
-          clearTimeout(prefetchTimeout);
-        }
-      };
-    }
-  });
-
   function handleClick() {
-    appState.openModal(task.id);
+    goto(`/tasks/${task.id}`);
   }
 
   const baseClasses =
