@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lithammer/shortuuid/v4"
 	"github.com/panjf2000/ants/v2"
 	"github.com/revrost/code/counterspell/internal/agent"
 	"github.com/revrost/code/counterspell/internal/llm"
@@ -139,13 +138,12 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 		}
 	}
 
-	taskID := shortuuid.New()
-
 	// Create task in database
-	_, err = o.repo.Create(ctx, projectID, intent)
+	task, err := o.repo.Create(ctx, projectID, intent)
 	if err != nil {
 		return "", err
 	}
+	taskID := task.ID
 
 	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", projectID, "intent", intent)
 
@@ -182,7 +180,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 }
 
 // ContinueTask continues a task with a follow-up message.
-func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage, modelID string) error {
+func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, agentBackend, provider, model string) error {
 	// Get task info
 	task, err := o.repo.Get(ctx, taskID)
 	if err != nil {
@@ -209,13 +207,13 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	}
 
 	// Create agent run row
-	_, err = o.repo.CreateAgentRun(ctx, taskID, followUpMessage, "native", "", "")
+	_, err = o.repo.CreateAgentRun(ctx, taskID, followUpMsg, agentBackend, provider, model)
 	if err != nil {
 		return fmt.Errorf("failed to create agent run: %w", err)
 	}
 
 	// Append user message to DB immediately
-	if err := o.repo.CreateMessage(ctx, taskID, "", "user", followUpMessage, "", ""); err != nil {
+	if err := o.repo.CreateMessage(ctx, taskID, "", "user", followUpMsg, "", ""); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
 	}
 
@@ -249,8 +247,8 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	job := TaskJob{
 		TaskID:         taskID,
 		ProjectID:      *task.RepositoryID,
-		Intent:         followUpMessage,
-		ModelID:        modelID,
+		Intent:         followUpMsg,
+		ModelID:        model,
 		Owner:          owner,
 		Repo:           repoName,
 		Token:          token,
