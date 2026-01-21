@@ -33,5 +33,20 @@ INSERT INTO repositories (
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 ) RETURNING *;
 
+-- name: UpsertRepository :one
+INSERT INTO repositories (
+    id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
+) VALUES (
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
+ON CONFLICT(connection_id, full_name) DO UPDATE SET
+    name = excluded.name,
+    is_private = excluded.is_private,
+    html_url = excluded.html_url,
+    clone_url = excluded.clone_url,
+    local_path = excluded.local_path,
+    updated_at = excluded.updated_at
+RETURNING *;
+
 -- name: DeleteRepositoriesByConnection :exec
 DELETE FROM repositories WHERE connection_id = ?;

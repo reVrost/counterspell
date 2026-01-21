@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
     provider TEXT,
     model TEXT,
-    summary_message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,
+    summary_message_id TEXT,
     cost REAL NOT NULL DEFAULT 0.0 CHECK (cost >= 0.0),
     message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
     prompt_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),
@@ -154,7 +154,8 @@ CREATE TABLE IF NOT EXISTS repositories (
     clone_url TEXT NOT NULL,
     local_path TEXT,
     created_at INTEGER NOT NULL, -- Unix ms
-    updated_at INTEGER NOT NULL  -- Unix ms
+    updated_at INTEGER NOT NULL, -- Unix ms
+    UNIQUE(connection_id, full_name)
 );
 
 CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at

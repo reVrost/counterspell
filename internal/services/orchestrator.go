@@ -164,7 +164,7 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 
 	slog.Info("[ORCHESTRATOR] Submitting job to worker pool", "task_id", taskID)
 	if err := o.workerPool.Submit(func() {
-		o.executeTask(ctx, job)
+		o.executeTask(context.Background(), job)
 	}); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to submit job to worker pool", "error", err, "task_id", taskID)
 		return "", err
@@ -260,7 +260,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMessage
 	}
 
 	if err := o.workerPool.Submit(func() {
-		o.executeTask(ctx, job)
+		o.executeTask(context.Background(), job)
 	}); err != nil {
 		return err
 	}

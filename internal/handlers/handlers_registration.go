@@ -17,6 +17,7 @@ type Handlers struct {
 	settingsService *services.SettingsService
 	fileService     *services.FileService
 	githubService   *services.GitHubService
+	gitReposManager *services.GitManager
 }
 
 // NewHandlers creates new HTTP handlers.
@@ -33,6 +34,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		settingsService: services.NewSettingsService(database),
 		fileService:     services.NewFileService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
+		gitReposManager: services.NewGitManager(cfg.DataDir),
 	}, nil
 }
 

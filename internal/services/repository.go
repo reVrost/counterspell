@@ -216,6 +216,66 @@ func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sq
 
 // --- Agent Run Operations ---
 
+// GetTaskWithDetails retrieves a task with all related data for TaskResponse.
+// This includes the task, all messages, artifacts, latest agent run, and message count.
+func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*models.TaskResponse, error) {
+	// Get the base task
+	task, err := s.Get(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all messages for the task
+	messages, err := s.db.Queries.GetMessagesByTask(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert sqlc messages to models
+	taskMessages := make([]models.Message, len(messages))
+	for i, msg := range messages {
+		taskMessages[i] = sqlcMessageToModel(&msg)
+	}
+
+	// Get all artifacts for the task
+	artifacts, err := s.db.Queries.GetArtifactsByTask(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert sqlc artifacts to models
+	taskArtifacts := make([]models.Artifact, len(artifacts))
+	for i, art := range artifacts {
+		taskArtifacts[i] = sqlcArtifactToModel(&art)
+	}
+
+	// Get the latest agent run
+	latestRun, err := s.GetLatestAgentRun(ctx, taskID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	var latestAgentRun *models.AgentRun
+	var messageCount int64
+	if latestRun != nil {
+		latestAgentRun = sqlcAgentRunToModel(latestRun)
+		messageCount = latestRun.MessageCount
+	}
+
+	// If no runs, count the messages directly
+	if messageCount == 0 {
+		messageCount = int64(len(messages))
+	}
+
+	return &models.TaskResponse{
+		Task:          *task,
+		Messages:      taskMessages,
+		Artifacts:     taskArtifacts,
+		LatestAgentRun: latestAgentRun,
+		MessageCount:  messageCount,
+	}, nil
+}
+
 // CreateAgentRun creates a new agent run.
 func (s *Repository) CreateAgentRun(ctx context.Context, taskID, prompt, agentBackend, provider, model string) (string, error) {
 	id := shortuuid.New()
@@ -284,4 +344,62 @@ func ConvertMessagesToJSON(messages []sqlc.Message) (string, error) {
 		return "", fmt.Errorf("failed to marshal messages: %w", err)
 	}
 	return string(jsonData), nil
+}
+
+// sqlcMessageToModel converts sqlc.Message to models.Message.
+func sqlcMessageToModel(msg *sqlc.Message) models.Message {
+	return models.Message{
+		ID:        msg.ID,
+		TaskID:    msg.TaskID,
+		RunID:     nullableString(msg.RunID),
+		Role:      msg.Role,
+		Parts:     msg.Parts,
+		Model:     nullableString(msg.Model),
+		Provider:  nullableString(msg.Provider),
+		Content:   msg.Content,
+		ToolID:    nullableString(msg.ToolID),
+		CreatedAt: msg.CreatedAt,
+		UpdatedAt: msg.UpdatedAt,
+		FinishedAt: nullableInt64(msg.FinishedAt),
+	}
+}
+
+// sqlcArtifactToModel converts sqlc.Artifact to models.Artifact.
+func sqlcArtifactToModel(art *sqlc.Artifact) models.Artifact {
+	return models.Artifact{
+		ID:        art.ID,
+		RunID:     art.RunID,
+		Path:      art.Path,
+		Content:   art.Content,
+		Version:   art.Version,
+		CreatedAt: art.CreatedAt,
+		UpdatedAt: art.UpdatedAt,
+	}
+}
+
+// sqlcAgentRunToModel converts sqlc.AgentRun to models.AgentRun.
+func sqlcAgentRunToModel(run *sqlc.AgentRun) *models.AgentRun {
+	return &models.AgentRun{
+		ID:               run.ID,
+		TaskID:           run.TaskID,
+		Prompt:           run.Prompt,
+		AgentBackend:     run.AgentBackend,
+		SummaryMessageID: nullableString(run.SummaryMessageID),
+		Cost:             run.Cost,
+		MessageCount:     run.MessageCount,
+		PromptTokens:     run.PromptTokens,
+		CompletionTokens: run.CompletionTokens,
+		CompletedAt:      nullableInt64FromTime(run.CompletedAt),
+		CreatedAt:        run.CreatedAt,
+		UpdatedAt:        run.UpdatedAt,
+	}
+}
+
+// nullableInt64FromTime converts sql.NullTime to *int64.
+func nullableInt64FromTime(t sql.NullTime) *int64 {
+	if t.Valid {
+		unixMillis := t.Time.UnixMilli()
+		return &unixMillis
+	}
+	return nil
 }
