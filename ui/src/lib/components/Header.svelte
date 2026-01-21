@@ -85,7 +85,7 @@
               bind:value={projectSearch}
               type="text"
               placeholder="Filter repositories..."
-              class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder-gray-600 transition-colors"
+              class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-primary placeholder-gray-600 transition-colors"
             />
           </div>
         </div>
@@ -127,7 +127,7 @@
           {/each}
 
           {#if filteredProjects.length === 0}
-            <div class="px-4 py-8 text-center text-gray-600 text-xs">
+            <div class="px-4 py-8 text-center text-gray-600 text-sm">
               No projects found.
             </div>
           {/if}
@@ -169,26 +169,24 @@
         sideOffset={8}
       >
         <div class="px-4 py-3 border-b border-gray-800 mb-1">
-          <p
-            class="text-[10px] text-gray-500 uppercase tracking-wider font-bold"
-          >
+          <p class="text-sm text-gray-500 uppercase tracking-wider font-bold">
             Signed in as
           </p>
-          <p class="text-xs font-medium text-gray-200 mt-1 truncate">
+          <p class="text-sm font-medium text-gray-200 mt-1 truncate">
             {appState.githubLogin || appState.userEmail}
           </p>
         </div>
         <DropdownMenu.Group class="px-2">
           <DropdownMenu.Item
             onSelect={() => (appState.settingsOpen = true)}
-            class="w-full px-2 py-1.5 hover:bg-white/5 rounded text-xs text-gray-400 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none"
+            class="w-full px-2 py-1.5 hover:bg-white/5 rounded text-sm text-gray-400 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none"
           >
             <SettingsIcon class="w-4 h-4" /> Settings
           </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={handleSyncRepos}
             disabled={syncing}
-            class="w-full px-2 py-1.5 hover:bg-white/5 rounded text-xs text-gray-400 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none disabled:opacity-50"
+            class="w-full px-2 py-1.5 hover:bg-white/5 rounded text-sm text-gray-400 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none disabled:opacity-50"
           >
             <RefreshCwIcon class="w-4 h-4 {syncing ? 'animate-spin' : ''}" />
             {syncing ? "Syncing..." : "Sync Repos"}
@@ -196,7 +194,7 @@
           {#if appState.canInstallPWA}
             <DropdownMenu.Item
               onSelect={() => appState.installPWA()}
-              class="w-full px-2 py-1.5 hover:bg-purple-500/10 rounded text-xs text-purple-400 hover:text-purple-300 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-purple-500/10 outline-none"
+              class="w-full px-2 py-1.5 hover:bg-purple-500/10 rounded text-sm text-purple-400 hover:text-purple-300 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-purple-500/10 outline-none"
             >
               <DownloadIcon class="w-4 h-4" /> Install App
             </DropdownMenu.Item>
@@ -206,7 +204,7 @@
         <DropdownMenu.Group class="px-2 pb-1">
           <DropdownMenu.Item
             onSelect={handleSignOut}
-            class="w-full px-2 py-1.5 hover:bg-red-500/10 rounded text-xs text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-red-500/10 outline-none"
+            class="w-full px-2 py-1.5 hover:bg-red-500/10 rounded text-sm text-red-400 hover:text-red-300 flex items-center gap-2 transition-colors text-left cursor-pointer focus:bg-red-500/10 outline-none"
           >
             <LogOutIcon class="w-4 h-4" /> Sign Out
           </DropdownMenu.Item>

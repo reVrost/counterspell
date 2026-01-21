@@ -106,8 +106,22 @@ func NewOrchestrator(
 // Shutdown gracefully shuts down orchestrator.
 func (o *Orchestrator) Shutdown() {
 	slog.Info("[ORCHESTRATOR] Shutting down")
+
+	// Cancel all running tasks
+	o.mu.Lock()
+	for taskID, cancel := range o.running {
+		slog.Info("[ORCHESTRATOR] Cancelling running task", "task_id", taskID)
+		cancel()
+	}
+	o.running = make(map[string]context.CancelFunc)
+	o.mu.Unlock()
+
+	// Release worker pool (prevents new tasks from starting)
 	o.workerPool.Release()
+
+	// Close result channel to unblock processResults goroutine
 	close(o.resultCh)
+
 	slog.Info("[ORCHESTRATOR] Shutdown complete")
 }
 

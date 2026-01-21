@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"log/slog"
+	"sync"
+
 	"github.com/revrost/code/counterspell/internal/config"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/services"
@@ -18,6 +21,10 @@ type Handlers struct {
 	fileService     *services.FileService
 	githubService   *services.GitHubService
 	gitReposManager *services.GitManager
+
+	// Track active orchestrators for shutdown
+	orchestrators map[string]*services.Orchestrator
+	mu            sync.Mutex
 }
 
 // NewHandlers creates new HTTP handlers.
@@ -35,17 +42,48 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		fileService:     services.NewFileService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
 		gitReposManager: services.NewGitManager(cfg.DataDir),
+
+		// Initialize orchestrator tracking
+		orchestrators: make(map[string]*services.Orchestrator),
 	}, nil
 }
 
 // getOrchestrator creates an orchestrator for a task execution.
 // For local-first single-tenant mode, we use a fixed userID "default".
+// We create a single shared orchestrator for all tasks.
 func (h *Handlers) getOrchestrator() (*services.Orchestrator, error) {
-	return services.NewOrchestrator(
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Use a single shared orchestrator for "shared"
+	if orch, ok := h.orchestrators["shared"]; ok {
+		return orch, nil
+	}
+
+	// Create the shared orchestrator
+	orch, err := services.NewOrchestrator(
 		h.taskService,
 		h.events,
 		h.settingsService,
 		h.githubService,
 		h.cfg.DataDir,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	h.orchestrators["shared"] = orch
+	return orch, nil
+}
+
+// Shutdown gracefully shuts down all active orchestrators.
+func (h *Handlers) Shutdown() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for name, orch := range h.orchestrators {
+		slog.Info("[HANDLERS] Shutting down orchestrator", "name", name)
+		orch.Shutdown()
+	}
+	slog.Info("[HANDLERS] All orchestrators shut down")
 }

@@ -144,6 +144,9 @@ func (s *SettingsService) GetAPIKey(ctx context.Context) (string, string, string
 	if err != nil {
 		return "", "", "", err
 	}
+	if settings == nil {
+		return "", "", "", errors.New("settings not configured")
+	}
 
 	provider := "anthropic" // default
 	model := "claude-opus-4-5" // default
