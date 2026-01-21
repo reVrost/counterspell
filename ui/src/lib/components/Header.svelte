@@ -58,13 +58,14 @@
 </script>
 
 <header
-  class="h-12 border-linear-border backdrop-blur-md flex items-center justify-between px-4 z-20 shrink-0 fixed top-0 left-0 right-0"
+  class="h-14 border-linear-border backdrop-blur-md flex items-center justify-between px-4 z-20 shrink-0 fixed top-0 left-0 right-0 border-b border-white/[0.06] shadow-[0_1px_0_0_rgba(0,0,0,0.3)]"
 >
   <!-- Project Selector -->
   <DropdownMenu.Root bind:open={appState.projectMenuOpen}>
     <DropdownMenu.Trigger
       class="flex items-center gap-2 cursor-pointer active:opacity-70 transition"
     >
+      <img src="/favicon-16.png" alt="Counterspell" class="h-6 w-6" />
       <Title>
         {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
       </Title>
@@ -84,7 +85,7 @@
               bind:value={projectSearch}
               type="text"
               placeholder="Filter repositories..."
-              class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600"
+              class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder-gray-600 transition-colors"
             />
           </div>
         </div>

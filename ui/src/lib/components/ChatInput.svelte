@@ -253,8 +253,8 @@
       <div
         class="absolute inset-0 bg-secondary rounded-3xl flex items-center justify-center z-10"
       >
-        <LoaderIcon class="w-4 h-4 text-blue-400 mr-2 animate-spin" />
-        <span class="text-gray-400 text-sm">Transcribing...</span>
+        <LoaderIcon class="w-4 h-4 text-primary mr-2 animate-spin" />
+        <span class="text-sm text-gray-400">Transcribing...</span>
       </div>
     {/if}
 
@@ -280,9 +280,9 @@
               onclick={() => insertFile(file)}
               onmouseenter={() => (selectedIndex = idx)}
               class={cn(
-                "w-full px-3 py-2 text-xs font-mono cursor-pointer transition flex items-center gap-2 text-left",
+                "w-full px-3 py-2 text-sm font-mono cursor-pointer transition flex items-center gap-2 text-left",
                 idx === selectedIndex
-                  ? "bg-blue-500/20 text-blue-300"
+                  ? "bg-primary/20 text-primary"
                   : "text-gray-300 hover:bg-white/5",
               )}
             >
@@ -299,7 +299,7 @@
           transition:dropdownPop|local
           class="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50"
         >
-          <div class="px-3 py-4 text-xs text-gray-500 text-center">
+          <div class="px-3 py-4 text-sm text-gray-500 text-center">
             <SearchIcon class="w-4 h-4 mx-auto mb-2 opacity-50" />
             <div>No files found</div>
           </div>
@@ -315,7 +315,7 @@
         rows="1"
         {placeholder}
         aria-label={placeholder}
-        class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-[15px] placeholder-gray-500 w-full resize-none font-medium p-0 leading-relaxed max-h-[40vh] min-h-[24px]"
+        class="bg-transparent border-none focus:ring-0 focus:outline-none text-white text-base placeholder-gray-500 w-full resize-none font-medium p-0 leading-relaxed max-h-[40vh] min-h-[24px]"
       ></textarea>
     </div>
 
@@ -341,26 +341,22 @@
                 (appState.inputProjectMenuOpen =
                   !appState.inputProjectMenuOpen)}
               class={cn(
-                "flex items-center gap-2 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border border-transparent",
+                "flex items-center gap-2 px-2.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 border border-transparent",
                 appState.activeProjectId
-                  ? "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+                  ? "bg-primary/20 text-primary hover:bg-primary/30"
                   : "bg-gray-800/50 text-gray-400 hover:bg-gray-800",
               )}
             >
               <div
                 class={cn(
                   "flex items-center justify-center w-3.5 h-3.5 rounded-full",
-                  appState.activeProjectId
-                    ? "bg-blue-400/20"
-                    : "bg-gray-700/50",
+                  appState.activeProjectId ? "bg-primary/20" : "bg-gray-700/50",
                 )}
               >
                 <FolderIcon
                   class={cn(
                     "w-2.5 h-2.5",
-                    appState.activeProjectId
-                      ? "text-blue-400"
-                      : "text-gray-400",
+                    appState.activeProjectId ? "text-primary" : "text-gray-400",
                   )}
                 />
               </div>
@@ -387,7 +383,7 @@
                       bind:value={projectSearch}
                       type="text"
                       placeholder="Search repositories..."
-                      class="w-full bg-black/40 border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-gray-600 transition-all font-medium"
+                      class="w-full bg-black/40 border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary placeholder-gray-600 transition-all font-medium"
                     />
                   </div>
                 </div>
@@ -409,20 +405,20 @@
                         class={cn(
                           "w-full px-3 py-2 rounded-xl flex items-center justify-between group transition-all duration-150",
                           appState.activeProjectId === p.id
-                            ? "bg-blue-500/10 text-white"
+                            ? "bg-primary/10 text-white"
                             : "text-gray-400 hover:bg-white/5 hover:text-white",
                         )}
                       >
                         <div class="flex items-center gap-3 overflow-hidden">
                           <div
-                            class="w-2 h-2 rounded-full bg-blue-500/40 group-hover:bg-blue-500 transition-colors"
+                            class="w-2 h-2 rounded-full bg-primary/40 group-hover:bg-primary transition-colors"
                           ></div>
-                          <span class="text-xs font-medium truncate"
+                          <span class="text-sm font-medium truncate"
                             >{p.name}</span
                           >
                         </div>
                         {#if appState.activeProjectId === p.id}
-                          <CheckIcon class="w-3 h-3 text-blue-500" />
+                          <CheckIcon class="w-3 h-3 text-primary" />
                         {/if}
                       </button>
                     {/each}
@@ -446,7 +442,7 @@
                       <div
                         class="w-2 h-2 rounded-full bg-gray-700 group-hover:bg-gray-500 transition-colors"
                       ></div>
-                      <span class="text-xs font-medium truncate"
+                      <span class="text-sm font-medium truncate"
                         >{r.full_name}</span
                       >
                     </button>
@@ -516,14 +512,14 @@
                       class={cn(
                         "w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition text-left group",
                         appState.activeModelId === m.id
-                          ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                          ? "bg-primary/10 text-primary border border-primary/20"
                           : "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent",
                       )}
                     >
-                      <span class="text-xs font-medium">{m.name}</span>
+                      <span class="text-sm font-medium">{m.name}</span>
                       {#if appState.activeModelId === m.id}
                         <div
-                          class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
+                          class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsla(270,72%,78%,0.8)]"
                         ></div>
                       {/if}
                     </button>
@@ -576,14 +572,14 @@
                       class={cn(
                         "w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition text-left group",
                         appState.activeModelId === m.id
-                          ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                          ? "bg-primary/10 text-primary border border-primary/20"
                           : "hover:bg-white/5 text-gray-400 hover:text-white border border-transparent",
                       )}
                     >
-                      <span class="text-xs font-medium">{m.name}</span>
+                      <span class="text-sm font-medium">{m.name}</span>
                       {#if appState.activeModelId === m.id}
                         <div
-                          class="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
+                          class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsla(270,72%,78%,0.8)]"
                         ></div>
                       {/if}
                     </button>
@@ -607,7 +603,7 @@
             appState.isRecording
               ? "bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] scale-110"
               : text.length > 0
-                ? "bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]"
+                ? "bg-primary text-white shadow-[0_0_15px_hsla(270,72%,78%,0.4)]"
                 : "bg-white/10 text-gray-300 hover:bg-white/15",
           )}
         >

@@ -32,6 +32,13 @@ export default {
     			'2xl': ['1.5rem', { lineHeight: '1.3', letterSpacing: '-0.02em' }],
     			'3xl': ['1.875rem', { lineHeight: '1.2', letterSpacing: '-0.03em' }],
     			'4xl': ['2.25rem', { lineHeight: '1.1', letterSpacing: '-0.03em' }],
+    			// Consistent UI scale for app components
+    			'10': ['10px', { lineHeight: '1.3', letterSpacing: '0.05em' }], // Labels, section headers
+    			'11': ['11px', { lineHeight: '1.4', letterSpacing: '0.02em' }], // Subtext, footers
+    			'12': ['12px', { lineHeight: '1.4', letterSpacing: '0.01em' }], // Small content
+    			'13': ['13px', { lineHeight: '1.5', letterSpacing: '0' }],       // Standard content, input text
+    			'14': ['14px', { lineHeight: '1.5', letterSpacing: '-0.01em' }], // Slightly larger content
+    			'15': ['15px', { lineHeight: '1.5', letterSpacing: '-0.01em' }], // Emphasized content
     		},
     		colors: {
     			gray: {
@@ -120,11 +127,11 @@ export default {
     			'pulse-glow': {
     				'0%, 100%': {
     					opacity: '0.5',
-    					filter: 'drop-shadow(0 0 2px #8B5CF6)'
+    					filter: 'drop-shadow(0 0 2px hsl(270 72% 70%))'
     				},
     				'50%': {
     					opacity: '1',
-    					filter: 'drop-shadow(0 0 8px #8B5CF6)'
+    					filter: 'drop-shadow(0 0 8px hsl(270 72% 70%))'
     				}
     			}
     		},

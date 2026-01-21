@@ -133,7 +133,7 @@
         </span>
       {:else if variant === "planning"}
         <span
-          class="text-sm text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg font-medium border border-purple-500/20"
+          class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium border border-primary/20"
         >
           Planning
         </span>
@@ -150,7 +150,7 @@
         </div>
       {:else if variant === "review"}
         <span
-          class="text-sm text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg font-medium border border-blue-500/20"
+          class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium border border-primary/20"
         >
           Review
         </span>
