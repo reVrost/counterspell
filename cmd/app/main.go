@@ -171,8 +171,8 @@ func main() {
 
 	logger.Info("Server shutting down...")
 
-	// Cancel running tasks via orchestrator if any exist
-	// Note: orchestrators are created on-demand per task
+	// Shutdown handlers (stops all active orchestrators)
+	h.Shutdown()
 
 	// Shutdown event bus (stops cleanup goroutine)
 	eventBus.Shutdown()

@@ -98,14 +98,14 @@
         </span>
       {:else if variant === "active"}
         <div class="flex items-center gap-2">
+          <span class="text-sm text-orange-300/80 font-mono tabular-nums"
+            >{elapsed}s</span
+          >
           <span
-            class="text-sm text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20"
+            class="text-sm text-orange-300 bg-orange-300/10 px-2.5 py-1 rounded-lg font-medium border border-orange-300/20"
           >
             In Progress
           </span>
-          <span class="text-sm text-orange-400/80 font-mono tabular-nums"
-            >{elapsed}s</span
-          >
         </div>
       {:else if variant === "review"}
         <span

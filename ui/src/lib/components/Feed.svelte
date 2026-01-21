@@ -52,7 +52,7 @@
   {#if inProgressTasks.length > 0}
     <div class="mb-6">
       <h3
-        class="px-2 text-sm font-bold text-orange-500 uppercase tracking-wider mb-3"
+        class="px-2 text-sm font-bold text-orange-300 uppercase tracking-wider mb-3"
       >
         In Progress
       </h3>
