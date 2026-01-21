@@ -4,6 +4,10 @@
 .envrc.multi
 .envrc.single
 tmp
+node_modules
+dist
+.svelte-kit
+ui/.svelte-kit
 
 # Database
 *.db

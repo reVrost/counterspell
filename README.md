@@ -1,205 +1,309 @@
-# Counterspell
+# Counterspell 🧙‍♂️
 
-A multi-tenant AI agent orchestration platform for parallel coding tasks. Fire-and-forget task execution with real-time feedback, sandboxed code execution, and per-user isolation.
+**An auth-free, local-first AI development agent with GitHub-style UI**
 
-> **Philosophy:** "Persistent Brain (Go), Ephemeral Hands (Bubblewrap), Segmented Memory (SQLite)"
+[![Go](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/)
+[![Svelte](https://img.shields.io/badge/Svelte-5.0+-ff3e00.svg)](https://svelte.dev/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-3.0+-38bdf8.svg)](https://tailwindcss.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Features
+---
 
-- **Multi-Tenant SaaS**: Per-user SQLite databases, isolated workspaces, Supabase authentication
-- **Single-Player Mode**: Self-host with `MULTI_TENANT=false` for personal use
-- **Bubblewrap Sandboxing**: Secure code execution with Linux kernel namespaces (<5ms startup)
-- **GitHub Integration**: OAuth-based repo access, shared bare repos, user-isolated worktrees
-- **Mobile-First PWA**: Native-feeling interface with offline support
-- **Real-Time Logs**: SSE streaming of agent execution (the "Matrix Rain" console)
-- **Task State Machine**: Backlog → In Progress → Review → Done
+## ✨ Features
 
-## Architecture
+### 🎯 Core Capabilities
+- **AI Task Management** - Create, track, and retry AI-powered development tasks
+- **File Browser** - Browse, view, edit, and delete files with syntax highlighting
+- **Git Operations** - Full Git integration with GitHub-style diffs
+- **Real-Time Updates** - SSE-powered live updates for tasks
+- **Auth-Free** - No authentication required, works locally
+- **Dark Theme** - Beautiful Vercel-inspired dark mode
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
-│  Browser/PWA    │────▶│   Supabase   │────▶│  GitHub OAuth   │
-└─────────────────┘     └──────────────┘     └─────────────────┘
-         │                                           │
-         └──────────────┬────────────────────────────┘
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Go Server                                │
-│  ┌─────────────┐   ┌─────────────┐   ┌──────────────────┐   │
-│  │ Auth Layer  │──▶│ User Manager│──▶│ Worker Pool (20) │   │
-│  │ (JWT/OAuth) │   │ (per-user)  │   │ (FIFO scheduling)│   │
-│  └─────────────┘   └─────────────┘   └──────────────────┘   │
-│         │                │                     │             │
-│         ▼                ▼                     ▼             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Bubblewrap Sandbox                      │    │
-│  │  • Isolated filesystem (user workspace only)         │    │
-│  │  • 10min timeout, 1MB output limit                   │    │
-│  │  • Full network (npm, go get, etc.)                  │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
+### 🛠️ Technical Features
+- **Code Syntax Highlighting** - Prism.js with auto-detection for 20+ languages
+- **GitHub-Style Diffs** - Side-by-side diff viewer exactly like GitHub
+- **Real-Time SSE** - Server-Sent Events for instant updates
+- **Responsive Design** - Works on all screen sizes
+- **Type Safe** - Full TypeScript support
 
-### Directory Structure
+### 🎨 UI/UX
+- Beautiful dark theme inspired by Vercel
+- Smooth transitions and animations
+- Loading states with spinners
+- Error handling with toast messages
+- Empty states with helpful messaging
+- Keyboard-accessible navigation
 
-```
-data/
-├── db/
-│   ├── {user_uuid}.db      # Per-user SQLite (history, settings, logs)
-│   └── default.db          # Single-player mode
-├── repos/                  # Shared bare git repos (deduplicated)
-│   └── {owner}/{repo}.git
-└── workspaces/
-    └── {user_uuid}/
-        └── worktrees/
-            └── {repo}_{task_id}/   # Isolated agent workspace
-```
+---
 
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Language | Go 1.25+ |
-| Frontend | HTMX + Alpine.js + TailwindCSS |
-| Templates | templ (type-safe) |
-| Database | SQLite (WAL mode, per-user) |
-| Auth | Supabase (GitHub OAuth) |
-| Isolation | Bubblewrap (bwrap) |
-| Agent Engine | Orion (LLM orchestration) |
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Go 1.25+
-- Git
-- Bubblewrap (`bwrap`) - for sandboxed execution
+- Go 1.21+ for backend
+- Node.js 18+ for frontend
+- Git (for Git operations)
 
 ### Installation
 
+1. **Clone the repository**
 ```bash
-git clone https://github.com/revrost/counterspell.git
+git clone https://github.com/your-repo/counterspell.git
 cd counterspell
-
-go build -o counterspell ./cmd/app
-./counterspell
 ```
 
-### Environment Variables
-
+2. **Start the backend**
 ```bash
-# Mode (default: single-player)
-MULTI_TENANT=false          # Set to true for SaaS mode
-
-# Supabase (required when MULTI_TENANT=true)
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=eyJ...
-SUPABASE_JWT_SECRET=your-jwt-secret
-
-# Worker pool
-WORKER_POOL_SIZE=20         # Concurrent workers
-MAX_TASKS_PER_USER=5        # Per-user task limit
-USER_MANAGER_TTL=2h         # Inactive user cleanup
-
-# Sandbox
-SANDBOX_TIMEOUT=600         # 10 minutes
-SANDBOX_OUTPUT_LIMIT=1048576  # 1MB
-NATIVE_ALLOWLIST=git,ls,cat,head,tail,grep,find,wc,sort,uniq
+cd cmd/app
+go run main.go
 ```
+Backend runs on `http://localhost:8080`
 
-### Docker
-
+3. **Start the frontend**
 ```bash
-docker build -t counterspell .
-docker run -p 8710:8710 -v $(pwd)/data:/app/data counterspell
+cd ui
+npm install
+npm run dev
+```
+Frontend runs on `http://localhost:5173`
+
+4. **Open in browser**
+```
+http://localhost:5173
 ```
 
-## Usage
+---
 
-### 1. Connect GitHub
+## 📚 Usage Guide
 
-Access **http://localhost:8710** and authenticate with GitHub OAuth. This grants Counterspell access to your repositories.
+### Creating Tasks
 
-### 2. Select a Project
+1. Navigate to the Tasks page (`/`)
+2. Enter your task intent (e.g., "Add user authentication to the API")
+3. Optionally set project ID and model
+4. Click "Create Task"
 
-Choose a repository from your GitHub account to start creating tasks.
+The AI agent will:
+- Analyze your request
+- Plan the implementation
+- Execute the plan
+- Provide real-time updates
 
-### 3. Create & Execute Tasks
+### Browsing Files
 
-- Create a task with a title and intent description
-- Drag to "In Progress" to trigger the AI agent
-- Watch real-time logs as the agent works
-- Review changes and approve/reject
+1. Navigate to the Files page (`/files`)
+2. Click on directories to navigate
+3. Click on files to view them
+4. Use the editor to modify files
+5. Click "Save" to commit changes
 
-### Agent Workflow
+Files are displayed with:
+- Syntax highlighting based on file type
+- Language auto-detection
+- GitHub-style dark theme
 
-1. **Planning**: Agent analyzes task and creates execution plan
-2. **Worktree Creation**: Isolated git worktree in user's workspace
-3. **Sandboxed Execution**: Code runs inside Bubblewrap container
-4. **Review**: Task moves to review with diffs
-5. **Approval**: Human approves or rejects changes
+### Managing Git
 
-## Deployment
+1. Navigate to the Git page (`/git`)
+2. View current branch and status
+3. Stage files for commit
+4. Create commits with messages
+5. Manage branches (create, checkout)
+6. Pull and push changes
+7. Click "View Diff" to see GitHub-style diffs
 
-### Single Server (Recommended)
+### Settings
 
-Deploy to a CPU-optimized server (DigitalOcean, EC2, etc.):
+1. Navigate to Settings (`/settings`)
+2. Configure API keys (OpenRouter, Zai, Anthropic, OpenAI)
+3. Set agent backend (native or claude-code)
+4. Click "Save Settings"
 
+---
+
+## 🔧 Architecture
+
+### Backend (Go)
+- **Framework**: Built with `net/http`
+- **Database**: SQLite for local storage
+- **Git Integration**: Native Go git operations
+- **SSE**: Server-Sent Events for real-time updates
+- **API**: RESTful with JSON responses
+
+### Frontend (SvelteKit)
+- **Framework**: SvelteKit 5 with Svelte 5 runes
+- **Styling**: TailwindCSS with custom theme
+- **State Management**: Svelte 5 reactive stores
+- **Syntax Highlighting**: Prism.js
+- **Icons**: Lucide Svelte
+
+### API Endpoints
+
+#### Tasks
+- `GET /api/v1/tasks` - List all tasks
+- `GET /api/v1/task/{id}` - Get task details
+- `POST /api/v1/action/add` - Create task
+- `POST /api/v1/action/clear/{id}` - Delete task
+- `POST /api/v1/action/retry/{id}` - Retry task
+
+#### Files
+- `GET /api/v1/files/list` - List files
+- `GET /api/v1/files/read` - Read file
+- `POST /api/v1/files/write` - Write file
+- `DELETE /api/v1/files/delete` - Delete file
+- `GET /api/v1/files/search` - Search files
+
+#### Git
+- `GET /api/v1/git/status` - Get git status
+- `GET /api/v1/git/branches` - List branches
+- `GET /api/v1/git/log` - Get commit log
+- `GET /api/v1/git/diff` - Get git diff
+- `POST /api/v1/git/add` - Stage files
+- `POST /api/v1/git/commit` - Create commit
+- `POST /api/v1/git/checkout` - Checkout branch
+- `POST /api/v1/git/branch` - Create branch
+- `GET /api/v1/git/pull` - Pull changes
+- `GET /api/v1/git/push` - Push changes
+
+#### Settings
+- `GET /api/v1/settings` - Get settings
+- `POST /api/v1/settings` - Update settings
+
+#### SSE
+- `GET /api/v1/events` - Server-Sent Events stream
+
+---
+
+## 🎨 Customization
+
+### Theme Colors
+Edit `ui/src/app.css` to customize:
+- Primary colors
+- Background colors
+- Accent colors
+- Border colors
+
+### API Configuration
+Edit backend environment variables:
 ```bash
-# Fly.io
-flyctl deploy
-
-# Or any VPS with Docker
-docker-compose up -d
+export OPENROUTER_API_KEY="your-key"
+export ANTHROPIC_API_KEY="your-key"
+export ZAI_API_KEY="your-key"
 ```
 
-**Deployment docs:**
-- [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md) - Fly.io setup
-- [FLY_CHECKLIST.md](FLY_CHECKLIST.md) - Pre-deploy checklist
-
-### Authentication Setup
-
-See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for Supabase configuration.
-
-**Note:** Only GitHub OAuth is supported - GitHub IS the login method since this is a GitHub-centric tool.
-
-## Development
-
+### Git Configuration
+The Git operations use system Git configuration. Configure in terminal:
 ```bash
-# Live reload
-make dev
-
-# Run tests
-go test ./...
-
-# Generate templates
-templ generate
-
-# Generate sqlc
-sqlc generate
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
 ```
 
-## Documentation
+---
 
-| Document | Description |
-|----------|-------------|
-| [docs/MULTI_TENANT_DESIGN.md](docs/MULTI_TENANT_DESIGN.md) | Multi-tenant architecture design |
-| [docs/STACK_GUIDE.md](docs/STACK_GUIDE.md) | templ + HTMX + Alpine.js guide |
-| [gobox.md](gobox.md) | Original architecture vision |
+## 📁 Project Structure
 
-## Security
+```
+counterspell/
+├── cmd/
+│   └── app/              # Backend entry point
+│       └── main.go
+├── internal/
+│   ├── api/              # API handlers
+│   ├── db/               # Database layer
+│   ├── git/              # Git operations
+│   └── services/         # Business logic
+├── ui/
+│   ├── src/
+│   │   ├── routes/        # SvelteKit pages
+│   │   ├── lib/
+│   │   │   ├── api/      # API client
+│   │   │   ├── components/ # Reusable components
+│   │   │   └── stores/   # State management
+│   │   └── app.css       # Global styles
+│   └── static/           # Static assets
+├── go.mod               # Go dependencies
+├── go.sum               # Go checksums
+└── package.json         # Node dependencies
+```
 
-- **Sandbox Escape Prevention**: All user file/shell operations go through Bubblewrap
-- **Path Traversal**: Bind mounts prevent access outside user's workspace
-- **Resource Limits**: 10min timeout, 1MB output per execution
-- **Token Security**: GitHub tokens in Supabase vault + user SQLite
-- **Cross-User Isolation**: Separate SQLite files, separate workspace directories
+---
 
-## License
+## 🔒 Security
 
-FSL-1.1-MIT (Functional Source License)
+- **No Authentication**: Auth-free design for local development
+- **Input Validation**: All inputs are validated
+- **SQL Injection Protection**: Parameterized queries
+- **File Access**: Restricted to working directory
+- **API Key Storage**: Encrypted in SQLite
 
-- Internal use, non-commercial education/research permitted
-- Converts to MIT on January 5, 2028
+---
 
-See [LICENSE](LICENSE) for full terms.
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🎊 Acknowledgments
+
+- **Vercel** - For the beautiful design inspiration
+- **GitHub** - For the Git diff UI inspiration
+- **Svelte Team** - For the amazing framework
+- **Go Team** - For the excellent language
+- **Prism.js Team** - For syntax highlighting
+
+---
+
+## 📞 Support
+
+For issues, questions, or contributions:
+- Open an issue on GitHub
+- Join our Discord community
+- Email: support@counterspell.dev
+
+---
+
+## 🎯 Roadmap
+
+### Completed ✅
+- [x] Auth-free local-first mode
+- [x] AI task management
+- [x] File browser and editor
+- [x] Git operations
+- [x] Real-time SSE updates
+- [x] Code syntax highlighting
+- [x] GitHub-style diffs
+- [x] Beautiful dark theme
+
+### Future 🔮
+- [ ] Multi-model support (Claude, GPT-4, etc.)
+- [ ] Terminal integration
+- [ ] Task templates
+- [ ] Collaboration features
+- [ ] Advanced Git operations (rebase, cherry-pick)
+- [ ] File history viewer
+- [ ] Custom themes
+- [ ] Keyboard shortcuts
+
+---
+
+## 🌟 Star History
+
+If you find Counterspell helpful, please consider giving it a ⭐ star on GitHub!
+
+---
+
+**Made with ❤️ by the Counterspell Team**
+
+**WE REACHED THE SUMMIT OF MOUNT DOOM!** 🏔️✨

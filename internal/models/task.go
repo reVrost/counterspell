@@ -1,72 +1,113 @@
 package models
 
-import "time"
-
-// TaskStatus represents the status of a task in the workflow.
+// TaskStatus represents the status of a task.
 type TaskStatus string
 
 const (
-	StatusTodo       TaskStatus = "todo"
+	StatusPending    TaskStatus = "pending"
+	StatusPlanning   TaskStatus = "planning"
 	StatusInProgress TaskStatus = "in_progress"
 	StatusReview     TaskStatus = "review"
 	StatusDone       TaskStatus = "done"
+	StatusFailed     TaskStatus = "failed"
 )
 
-// Task represents a work item in the system.
+// Task represents a work item.
 type Task struct {
-	ID             string     `json:"id"`
-	ProjectID      string     `json:"project_id"`
-	Title          string     `json:"title"`
-	Intent         string     `json:"intent"`
-	Status         TaskStatus `json:"status"`
-	Position       int        `json:"position"`
-	AgentOutput    string     `json:"agent_output,omitempty"`
-	GitDiff        string     `json:"git_diff,omitempty"`
-	MessageHistory string     `json:"message_history,omitempty"` // JSON serialized agent message history
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID             string  `json:"id"`
+	RepositoryID   *string `json:"repository_id,omitempty"`
+	RepositoryName *string `json:"repository_name,omitempty"`
+	Title          string  `json:"title"`
+	Intent         string  `json:"intent"`
+	Status         string  `json:"status"`
+	Position       *int64  `json:"position,omitempty"`
+	CreatedAt      int64   `json:"created_at"`
+	UpdatedAt      int64   `json:"updated_at"`
 }
 
-// LogLevel represents the severity level of an agent log entry.
-type LogLevel string
-
-const (
-	LogInfo    LogLevel = "info"
-	LogPlan    LogLevel = "plan"
-	LogCode    LogLevel = "code"
-	LogError   LogLevel = "error"
-	LogSuccess LogLevel = "success"
-)
-
-// AgentLog represents a log entry from agent execution.
-type AgentLog struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id"`
-	Level     LogLevel  `json:"level"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+// AgentRun represents an execution of an agent.
+type AgentRun struct {
+	ID               string   `json:"id"`
+	TaskID           string   `json:"task_id"`
+	Prompt           string   `json:"prompt"`
+	AgentBackend     string   `json:"agent_backend"`
+	SummaryMessageID *string  `json:"summary_message_id,omitempty"`
+	Cost             float64  `json:"cost"`
+	MessageCount     int64    `json:"message_count"`
+	PromptTokens     int64    `json:"prompt_tokens"`
+	CompletionTokens int64    `json:"completion_tokens"`
+	CompletedAt      *int64   `json:"completed_at,omitempty"`
+	CreatedAt        int64    `json:"created_at"`
+	UpdatedAt        int64    `json:"updated_at"`
 }
 
-// EventType represents the type of server-sent event.
-type EventType string
+// Settings represents application settings.
+type Settings struct {
+	ID            int64   `json:"id"`
+	OpenRouterKey *string `json:"openrouter_key,omitempty"`
+	ZaiKey        *string `json:"zai_key,omitempty"`
+	AnthropicKey  *string `json:"anthropic_key,omitempty"`
+	OpenAIKey     *string `json:"openai_key,omitempty"`
+	AgentBackend  string  `json:"agent_backend"`
+	UpdatedAt     int64   `json:"updated_at"`
+}
 
-const (
-	EventTypeLog            EventType = "log"
-	EventTypeStatus         EventType = "status"
-	EventTypeStatusChange   EventType = "status_change"
-	EventTypeError          EventType = "error"
-	EventTypeAgentUpdate    EventType = "agent_update"
-	EventTypeTodo           EventType = "todo"
-	EventTypeTaskCreated    EventType = "task_created"
-	EventTypeProjectCreated EventType = "project_created"
-	EventTypeProjectUpdated EventType = "project_updated"
-	EventTypeProjectDeleted EventType = "project_deleted"
-)
+// Artifact represents a file uploaded by an agent.
+type Artifact struct {
+	ID        string `json:"id"`
+	RunID     string `json:"run_id"`
+	Path      string `json:"path"`
+	Content   string `json:"content"`
+	Version   int64  `json:"version"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
+}
 
-// Event represents a server-sent event for real-time updates.
-type Event struct {
-	ID          int64     `json:"id"`           // Sequence number for deduplication
-	TaskID      string    `json:"task_id"`
-	Type        EventType `json:"type"`
-	HTMLPayload string    `json:"html_payload"`
+// Message represents a chat message for agent conversation history.
+type Message struct {
+	ID         string  `json:"id"`
+	TaskID     string  `json:"task_id"`
+	RunID      *string `json:"run_id,omitempty"`
+	Role       string  `json:"role"`
+	Parts      string  `json:"parts"`
+	Model      *string `json:"model,omitempty"`
+	Provider   *string `json:"provider,omitempty"`
+	Content    string  `json:"content"`
+	ToolID     *string `json:"tool_id,omitempty"`
+	CreatedAt  int64   `json:"created_at"`
+	UpdatedAt  int64   `json:"updated_at"`
+	FinishedAt *int64  `json:"finished_at,omitempty"`
+}
+
+// TaskResponse represents a detailed task response with all related data.
+// Used by the API handler to provide complete task information including messages, git diff, and artifacts.
+type TaskResponse struct {
+	// Task information
+	Task          Task       `json:"task"`
+	Messages      []Message  `json:"messages"`
+	Artifacts     []Artifact `json:"artifacts"`
+
+	// Latest agent run information (if any)
+	LatestAgentRun *AgentRun `json:"latest_agent_run,omitempty"`
+
+	// Total message count across all agent runs
+	MessageCount int64 `json:"message_count"`
+
+	// Git diff from the worktree (if available)
+	GitDiff string `json:"git_diff,omitempty"`
+}
+
+// Repository represents a GitHub repository.
+type Repository struct {
+	ID           string  `json:"id"`
+	ConnectionID string  `json:"connection_id"`
+	Name         string  `json:"name"`
+	FullName     string  `json:"full_name"`
+	Owner        string  `json:"owner"`
+	IsPrivate    bool    `json:"is_private"`
+	HTMLUrl      string  `json:"html_url"`
+	CloneUrl     string  `json:"clone_url"`
+	LocalPath    *string `json:"local_path,omitempty"`
+	CreatedAt    int64   `json:"created_at"`
+	UpdatedAt    int64   `json:"updated_at"`
 }

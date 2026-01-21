@@ -3,20 +3,24 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/revrost/code/counterspell/internal/auth"
+	"github.com/go-chi/render"
 	"github.com/revrost/code/counterspell/internal/config"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/handlers"
 	"github.com/revrost/code/counterspell/internal/services"
+	"github.com/revrost/code/counterspell/ui"
 )
 
 func main() {
@@ -24,9 +28,19 @@ func main() {
 	addr := flag.String("addr", ":8710", "Server address")
 	flag.Parse()
 
+	// Setup log output: always write to both stdout and server.log
+	logFile, err := os.OpenFile("server.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		slog.Error("Failed to open log file", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = logFile.Close() }()
+	logOutput := io.MultiWriter(os.Stdout, logFile)
+
 	// Setup logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+	logger := slog.New(slog.NewTextHandler(logOutput, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: true,
 	}))
 	slog.SetDefault(logger)
 
@@ -37,18 +51,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Log startup mode
-	if cfg.MultiTenant {
-		logger.Info("Starting in MULTI-TENANT mode",
-			"supabase_url", cfg.SupabaseURL,
-			"worker_pool_size", cfg.WorkerPoolSize,
-			"max_tasks_per_user", cfg.MaxTasksPerUser,
-		)
-	} else {
-		logger.Info("Starting in SINGLE-PLAYER mode",
-			"data_dir", cfg.DataDir,
-		)
-	}
+	logger.Info("Starting server",
+		"database_path", cfg.DatabasePath,
+		"data_dir", cfg.DataDir,
+		"worker_pool_size", cfg.WorkerPoolSize,
+		"max_tasks_per_user", cfg.MaxTasksPerUser,
+	)
 
 	// Ensure directory structure
 	if err := config.EnsureDirectories(cfg); err != nil {
@@ -56,43 +64,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	// In single-player mode, migrate from old structure
-	if !cfg.MultiTenant {
-		if err := config.MigrateFromSingleUser(cfg); err != nil {
-			logger.Warn("Migration from single-user failed (may be first run)", "error", err)
-		}
+	// Connect to SQLite
+	ctx := context.Background()
+	database, err := db.Connect(ctx, cfg.DatabasePath)
+	if err != nil {
+		logger.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer database.Close()
+
+	// Run migrations
+	if err := database.RunMigrations(ctx); err != nil {
+		logger.Error("Failed to run migrations", "error", err)
+		os.Exit(1)
 	}
 
-	// Create DB manager (handles per-user databases)
-	dbManager := db.NewDBManager(cfg)
-	userRegistry := services.NewUserManagerRegistry(cfg, dbManager)
+	// Create event bus
 	eventBus := services.NewEventBus()
 
-	// Reset stuck tasks on startup for default user (single-player mode)
-	if !cfg.MultiTenant {
-		defaultDB, err := dbManager.GetDB("default")
-		if err != nil {
-			logger.Error("Failed to open default database", "error", err)
-			os.Exit(1)
-		}
-		taskSvc := services.NewTaskService(defaultDB)
-		ctx := context.Background()
-		if err := taskSvc.ResetInProgress(ctx); err != nil {
-			logger.Error("Failed to reset in-progress tasks", "error", err)
-		}
-	}
-
-	// Create auth middleware
-	authMiddleware := auth.NewMiddleware(cfg, dbManager)
-
-	// Create handlers with user registry for per-user service creation
-	h, err := handlers.NewHandlers(userRegistry, eventBus, cfg)
+	// Create handlers with shared database
+	h, err := handlers.NewHandlers(database, eventBus, cfg)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)
 	}
 
 	// Setup router
+	slog.Info("Setting up router")
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -106,68 +104,48 @@ func main() {
 	r.Group(func(r chi.Router) {
 		// Health check
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"status":"ok"}`))
-		})
-		// Static files
-		r.Handle("/static/*", http.StripPrefix("/static", http.FileServer(http.Dir("static"))))
-		r.HandleFunc("/static/manifest.json", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/manifest+json")
-			http.ServeFile(w, r, "static/manifest.json")
-		})
-		r.HandleFunc("/static/sw.js", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/javascript")
-			w.Header().Set("Service-Worker-Allowed", "/")
-			http.ServeFile(w, r, "static/sw.js")
+			render.JSON(w, r, map[string]string{"status": "ok"})
 		})
 
-		// Landing page (public home)
-		r.Get("/", h.HandleHome)
-		// Auth routes (login page, OAuth callbacks)
-		r.Get("/auth/oauth/{provider}", h.HandleOAuth)
-		r.Get("/auth/callback", h.HandleAuthCallback)
-		r.Get("/github/callback", h.HandleGitHubCallback)
+		// UI logging - no auth required so errors can be logged even when auth fails
+		// r.Post("/api/v1/log", h.HandleUILog)
 	})
 
-	// Protected routes (auth required in multi-tenant mode)
+	// Protected routes (auth not required for local-first)
 	r.Group(func(r chi.Router) {
-		// Apply auth middleware - in single-player mode this sets userID to "default"
-		r.Use(authMiddleware.RequireAuth)
-
-		// Main app routes (authenticated users go to /app or /feed)
-		r.Get("/app", h.RenderApp)
-		r.Get("/feed", h.HandleFeed)
-		r.Get("/task/{id}", h.HandleTaskDetailUI)
+		// GitHub OAuth routes
+		r.Get("/api/v1/github/authorize", h.HandleGitHubLogin)
+		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
+		r.Get("/api/v1/github/repos", h.HandleGitHubRepos)
 
 		// Unified SSE endpoint
-		r.Get("/events", h.HandleSSE)
+		r.Get("/api/v1/events", h.HandleSSE)
 
-		// Actions
-		r.Post("/add-task", h.HandleAddTask)
-		r.Post("/action/retry/{id}", h.HandleActionRetry)
-		r.Post("/action/clear/{id}", h.HandleActionClear)
-		r.Post("/action/merge/{id}", h.HandleActionMerge)
-		r.Post("/action/pr/{id}", h.HandleActionPR)
-		r.Post("/action/discard/{id}", h.HandleActionDiscard)
-		r.Post("/action/chat/{id}", h.HandleActionChat)
-
-		// Merge
-		r.Post("/action/resolve-conflict/{id}", h.HandleResolveConflict)
-		r.Post("/action/abort-merge/{id}", h.HandleAbortMerge)
-		r.Post("/action/complete-merge/{id}", h.HandleCompleteMerge)
+		// Home page actions, tasks are like inbox
+		r.Get("/api/v1/tasks", h.HandleAPITasks)
+		r.Post("/api/v1/tasks", h.HandleAddTask)
+		r.Get("/api/v1/session", h.HandleAPISession)
+		r.Get("/api/v1/task/{id}", h.HandleAPITask)
+		r.Get("/api/v1/settings", h.HandleAPISettings)
+		r.Get("/api/v1/files/search", h.HandleFileSearch)
 
 		// Settings and transcription
-		r.Post("/settings", h.HandleSaveSettings)
-		r.Post("/transcribe", h.HandleTranscribe)
-		r.Get("/api/files/search", h.HandleFileSearch)
+		r.Post("/api/v1/settings", h.HandleSaveSettings)
+		r.Post("/api/v1/transcribe", h.HandleTranscribe)
 
-		// Auth management
-		r.Post("/auth/logout", h.HandleLogout)
+		// Task Actions
+		r.Post("/api/v1/tasks/{id}/chat", h.HandleActionChat)
+		r.Post("/api/v1/tasks/{id}/clear", h.HandleActionClear)
+		r.Post("/api/v1/tasks/{id}/retry", h.HandleActionRetry)
+		r.Post("/api/v1/tasks/{id}/merge", h.HandleActionMerge)
+		r.Post("/api/v1/tasks/{id}/pr", h.HandleActionPR)
+		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
 
-		// GitHub OAuth
-		r.Get("/github/authorize", h.HandleGitHubAuthorize)
-		r.Post("/disconnect", h.HandleDisconnect)
 	})
+
+	// Serve SvelteKit SPA from embedded filesystem
+	// This must come after API routes - it's a catch-all for the SPA
+	r.Get("/*", spaHandler(ui.DistDirFs))
 
 	// Start server
 	server := &http.Server{
@@ -193,6 +171,12 @@ func main() {
 
 	logger.Info("Server shutting down...")
 
+	// Shutdown handlers (stops all active orchestrators)
+	h.Shutdown()
+
+	// Shutdown event bus (stops cleanup goroutine)
+	eventBus.Shutdown()
+
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -202,10 +186,45 @@ func main() {
 		os.Exit(1)
 	}
 
-	userRegistry.Shutdown()
-	if err := dbManager.CloseAll(); err != nil {
-		logger.Error("Failed to close databases", "error", err)
-	}
-
 	logger.Info("Server stopped")
+}
+
+// spaHandler serves the SvelteKit SPA from an embedded filesystem.
+// It serves static assets directly and falls back to index.html for client-side routing.
+func spaHandler(fsys fs.FS) http.HandlerFunc {
+	fileServer := http.FileServer(http.FS(fsys))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+
+		// Try to serve the file directly
+		f, err := fsys.Open(path)
+		if err == nil {
+			_ = f.Close()
+			// File exists - serve it with caching for immutable assets
+			if strings.HasPrefix(path, "_app/immutable/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// File not found - serve index.html for SPA routing
+		indexFile, err := fsys.Open("index.html")
+		if err != nil {
+			http.Error(w, "index.html not found", http.StatusInternalServerError)
+			return
+		}
+		defer func() { _ = indexFile.Close() }()
+
+		stat, err := indexFile.Stat()
+		if err != nil {
+			http.Error(w, "Failed to stat index.html", http.StatusInternalServerError)
+			return
+		}
+
+		// Serve index.html
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeContent(w, r, "index.html", stat.ModTime(), indexFile.(io.ReadSeeker))
+	}
 }

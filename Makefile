@@ -1,4 +1,4 @@
-.PHONY: dev build test clean tidy generate lint docker-build docker-run run
+.PHONY: dev build test clean tidy generate lint docker-build docker-run run ui preprod
 
 # Variables
 PROJECT_NAME := counterspell
@@ -10,9 +10,22 @@ all: dev
 
 ##@ Development
 
-dev: generate build
-	@echo "Starting $(PROJECT_NAME) in development mode..."
-	./counterspell -addr :8710 -db ./data/$(PROJECT_NAME).db
+# dev: generate build
+# 	@echo "Starting $(PROJECT_NAME) in development mode..."
+# 	./counterspell -addr :8710 -db ./data/$(PROJECT_NAME).db
+
+dev: build
+	ENV=dev ./$(PROJECT_NAME) -addr :8710
+
+ui: ## Run Vite dev server (frontend on :5173, proxies to Go on :8710)
+	@echo "Starting Vite dev server..."
+	@FRONTEND_URL=http://localhost:5173 cd ui && npm run dev
+
+preprod: build ## Run Go server with built frontend (everything on :8710)
+	@echo "Building frontend..."
+	@cd ui && npm run build
+	@echo "Starting $(PROJECT_NAME) in preprod mode..."
+	@FRONTEND_URL=http://localhost:8710 ./$(BINARY_PATH)
 
 air:
 	@echo "Starting air with direnv..."

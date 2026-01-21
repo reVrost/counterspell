@@ -20,46 +20,46 @@ func (e *ErrMergeConflict) Error() string {
 	return fmt.Sprintf("merge conflict in %d files: %s", len(e.ConflictedFiles), strings.Join(e.ConflictedFiles, ", "))
 }
 
-// RepoManager handles cloning and updating repositories.
-type RepoManager struct {
+// GitManager handles cloning and updating repositories.
+type GitManager struct {
 	dataDir string
 	mu      sync.Mutex
 }
 
-// NewRepoManager creates a new repo manager.
+// NewGitManager creates a new repo manager.
 // dataDir is the base directory for storing repos (e.g., "./data")
-func NewRepoManager(dataDir string) *RepoManager {
+func NewGitManager(dataDir string) *GitManager {
 	// Convert to absolute path to ensure worktrees are created at correct level
 	absDir, err := filepath.Abs(dataDir)
 	if err != nil {
 		absDir = dataDir // fallback if conversion fails
 	}
-	return &RepoManager{dataDir: absDir}
+	return &GitManager{dataDir: absDir}
 }
 
 // repoPath returns the local path for a given owner/repo.
-func (m *RepoManager) repoPath(owner, repo string) string {
+func (m *GitManager) repoPath(owner, repo string) string {
 	return filepath.Join(m.dataDir, "repos", owner, repo)
 }
 
 // worktreePath returns the worktree path for a given task.
-func (m *RepoManager) worktreePath(taskID string) string {
+func (m *GitManager) worktreePath(taskID string) string {
 	return filepath.Join(m.dataDir, "worktrees", "task-"+taskID)
 }
 
 // WorktreePath returns the worktree path for a given task (exported).
-func (m *RepoManager) WorktreePath(taskID string) string {
+func (m *GitManager) WorktreePath(taskID string) string {
 	return m.worktreePath(taskID)
 }
 
 // RepoPath returns the local path for a given owner/repo (exported).
-func (m *RepoManager) RepoPath(owner, repo string) string {
+func (m *GitManager) RepoPath(owner, repo string) string {
 	return m.repoPath(owner, repo)
 }
 
 // EnsureRepo clones or updates a repository.
 // Returns the local repo path.
-func (m *RepoManager) EnsureRepo(owner, repo, token string) (string, error) {
+func (m *GitManager) EnsureRepo(owner, repo, token string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -89,7 +89,7 @@ func (m *RepoManager) EnsureRepo(owner, repo, token string) (string, error) {
 }
 
 // cloneRepo performs the actual clone.
-func (m *RepoManager) cloneRepo(owner, repo, token, destPath string) error {
+func (m *GitManager) cloneRepo(owner, repo, token, destPath string) error {
 	// Ensure parent directory exists
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
@@ -121,7 +121,7 @@ func (m *RepoManager) cloneRepo(owner, repo, token, destPath string) error {
 }
 
 // fetchLatest fetches the latest changes from origin.
-func (m *RepoManager) fetchLatest(repoPath, token, owner, repo string) error {
+func (m *GitManager) fetchLatest(repoPath, token, owner, repo string) error {
 	slog.Info("[GIT] Fetching latest changes", "path", repoPath, "has_token", token != "")
 
 	// Update remote URL with current token if provided
@@ -170,7 +170,7 @@ func (m *RepoManager) fetchLatest(repoPath, token, owner, repo string) error {
 
 // CreateWorktree creates an isolated worktree for a task.
 // Returns the worktree path.
-func (m *RepoManager) CreateWorktree(owner, repo, taskID, branchName string) (string, error) {
+func (m *GitManager) CreateWorktree(owner, repo, taskID, branchName string) (string, error) {
 	repoPath := m.repoPath(owner, repo)
 	worktreePath := m.worktreePath(taskID)
 
@@ -210,7 +210,7 @@ func (m *RepoManager) CreateWorktree(owner, repo, taskID, branchName string) (st
 }
 
 // CleanupWorktree removes a worktree.
-func (m *RepoManager) CleanupWorktree(owner, repo, taskID string) error {
+func (m *GitManager) CleanupWorktree(owner, repo, taskID string) error {
 	repoPath := m.repoPath(owner, repo)
 	worktreePath := m.worktreePath(taskID)
 
@@ -225,11 +225,11 @@ func (m *RepoManager) CleanupWorktree(owner, repo, taskID string) error {
 	return nil
 }
 
-// CommitAndPush commits changes and pushes the branch.
-func (m *RepoManager) CommitAndPush(taskID, message string) error {
+// Commit stages and commits changes without pushing.
+func (m *GitManager) Commit(taskID, message string) error {
 	worktreePath := m.worktreePath(taskID)
 
-	slog.Info("[GIT] CommitAndPush called", "task_id", taskID, "worktree_path", worktreePath)
+	slog.Info("[GIT] Commit called", "task_id", taskID, "worktree_path", worktreePath)
 
 	// Stage all changes
 	cmd := exec.Command("git", "add", "-A")
@@ -257,23 +257,21 @@ func (m *RepoManager) CommitAndPush(taskID, message string) error {
 		slog.Error("[GIT] git commit failed", "error", err, "output", string(output))
 		return fmt.Errorf("git commit failed: %w\nOutput: %s", err, string(output))
 	}
-	slog.Info("[GIT] git commit successful")
 
-	// Push
-	cmd = exec.Command("git", "push", "-u", "origin", "HEAD")
-	cmd.Dir = worktreePath
-	slog.Info("[GIT] Executing: git push -u origin HEAD", "dir", worktreePath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		slog.Error("[GIT] git push failed", "error", err, "output", string(output))
-		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
-	}
-
-	slog.Info("[GIT] Committed and pushed successfully", "task_id", taskID)
+	slog.Info("[GIT] Committed successfully", "task_id", taskID)
 	return nil
 }
 
+// CommitAndPush commits changes and pushes the branch.
+func (m *GitManager) CommitAndPush(taskID, message string) error {
+	if err := m.Commit(taskID, message); err != nil {
+		return err
+	}
+	return m.PushBranch(taskID)
+}
+
 // PushBranch pushes the current branch to remote without committing.
-func (m *RepoManager) PushBranch(taskID string) error {
+func (m *GitManager) PushBranch(taskID string) error {
 	worktreePath := m.worktreePath(taskID)
 
 	cmd := exec.Command("git", "push", "-u", "origin", "HEAD")
@@ -289,7 +287,7 @@ func (m *RepoManager) PushBranch(taskID string) error {
 }
 
 // GetCurrentBranch returns the current branch name in a worktree.
-func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
+func (m *GitManager) GetCurrentBranch(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
 
 	cmd := exec.Command("git", "branch", "--show-current")
@@ -304,7 +302,7 @@ func (m *RepoManager) GetCurrentBranch(taskID string) (string, error) {
 
 // GetDiff returns the git diff for a task's worktree.
 // Shows diff between main branch and HEAD (all changes on the feature branch).
-func (m *RepoManager) GetDiff(taskID string) (string, error) {
+func (m *GitManager) GetDiff(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
 
 	slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
@@ -331,7 +329,7 @@ func (m *RepoManager) GetDiff(taskID string) (string, error) {
 
 // PullMainIntoWorktree pulls the latest main into the worktree and merges.
 // If there's a merge conflict, returns ErrMergeConflict with the conflicted files.
-func (m *RepoManager) PullMainIntoWorktree(owner, repo, taskID string) error {
+func (m *GitManager) PullMainIntoWorktree(owner, repo, taskID string) error {
 	worktreePath := m.worktreePath(taskID)
 	repoPath := m.repoPath(owner, repo)
 
@@ -386,7 +384,7 @@ func (m *RepoManager) PullMainIntoWorktree(owner, repo, taskID string) error {
 }
 
 // CommitMergeResolution commits after merge conflict resolution.
-func (m *RepoManager) CommitMergeResolution(taskID, message string) error {
+func (m *GitManager) CommitMergeResolution(taskID, message string) error {
 	worktreePath := m.worktreePath(taskID)
 
 	// Stage all changes
@@ -415,7 +413,7 @@ func (m *RepoManager) CommitMergeResolution(taskID, message string) error {
 }
 
 // AbortMerge aborts an in-progress merge.
-func (m *RepoManager) AbortMerge(taskID string) error {
+func (m *GitManager) AbortMerge(taskID string) error {
 	worktreePath := m.worktreePath(taskID)
 
 	cmd := exec.Command("git", "merge", "--abort")
@@ -430,7 +428,7 @@ func (m *RepoManager) AbortMerge(taskID string) error {
 
 // MergeToMain merges the task branch to main and pushes.
 // Returns the branch name that was merged.
-func (m *RepoManager) MergeToMain(owner, repo, taskID string) (string, error) {
+func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -563,7 +561,7 @@ func (m *RepoManager) MergeToMain(owner, repo, taskID string) (string, error) {
 }
 
 // RemoveWorktree removes the worktree for a task.
-func (m *RepoManager) RemoveWorktree(taskID string) error {
+func (m *GitManager) RemoveWorktree(taskID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

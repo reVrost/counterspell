@@ -2,7 +2,9 @@
 package config
 
 import (
+	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -10,13 +12,8 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	// Multi-tenant mode
-	MultiTenant bool
-
-	// Supabase configuration (required when MultiTenant=true)
-	SupabaseURL       string
-	SupabaseAnonKey   string
-	SupabaseJWTSecret string
+	// Database
+	DatabasePath string
 
 	// Native backend allowlist (comma-separated commands)
 	NativeAllowlist []string
@@ -24,26 +21,24 @@ type Config struct {
 	// Worker pool configuration
 	WorkerPoolSize  int
 	MaxTasksPerUser int
-	UserManagerTTL  time.Duration
 
 	// Sandbox configuration
 	SandboxTimeout     time.Duration
 	SandboxOutputLimit int64
 
-	// Data directories
+	// Data directories (for repos and workspaces)
 	DataDir string
+
+	// GitHub OAuth
+	GitHubClientID     string
+	GitHubClientSecret string
 }
 
 // Load loads configuration from environment variables.
 func Load() *Config {
 	cfg := &Config{
-		// Multi-tenant mode (default: false for backward compatibility)
-		MultiTenant: getEnvBool("MULTI_TENANT", false),
-
-		// Supabase
-		SupabaseURL:       os.Getenv("SUPABASE_URL"),
-		SupabaseAnonKey:   os.Getenv("SUPABASE_ANON_KEY"),
-		SupabaseJWTSecret: os.Getenv("SUPABASE_JWT_SECRET"),
+		// Database
+		DatabasePath: getEnvString("DATABASE_PATH", "./data/counterspell.db"),
 
 		// Native allowlist
 		NativeAllowlist: getEnvStringSlice("NATIVE_ALLOWLIST", []string{
@@ -53,7 +48,6 @@ func Load() *Config {
 		// Worker pool
 		WorkerPoolSize:  getEnvInt("WORKER_POOL_SIZE", 20),
 		MaxTasksPerUser: getEnvInt("MAX_TASKS_PER_USER", 5),
-		UserManagerTTL:  getEnvDuration("USER_MANAGER_TTL", 2*time.Hour),
 
 		// Sandbox
 		SandboxTimeout:     getEnvDuration("SANDBOX_TIMEOUT", 10*time.Minute),
@@ -61,23 +55,25 @@ func Load() *Config {
 
 		// Data directory
 		DataDir: getEnvString("DATA_DIR", "./data"),
+
+		// GitHub OAuth
+		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 	}
+
+	log.Printf("Config loaded: DATABASE_PATH=%s, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",
+		cfg.DatabasePath,
+		len(cfg.NativeAllowlist),
+		len(cfg.DataDir),
+	)
 
 	return cfg
 }
 
 // Validate checks if the configuration is valid.
 func (c *Config) Validate() error {
-	if c.MultiTenant {
-		if c.SupabaseURL == "" {
-			return &ConfigError{Field: "SUPABASE_URL", Message: "required when MULTI_TENANT=true"}
-		}
-		if c.SupabaseAnonKey == "" {
-			return &ConfigError{Field: "SUPABASE_ANON_KEY", Message: "required when MULTI_TENANT=true"}
-		}
-		if c.SupabaseJWTSecret == "" {
-			return &ConfigError{Field: "SUPABASE_JWT_SECRET", Message: "required when MULTI_TENANT=true"}
-		}
+	if c.DatabasePath == "" {
+		return &ConfigError{Field: "DATABASE_PATH", Message: "required"}
 	}
 	return nil
 }
@@ -93,18 +89,6 @@ func (e *ConfigError) Error() string {
 }
 
 // Helper functions
-
-func getEnvBool(key string, defaultVal bool) bool {
-	val := os.Getenv(key)
-	if val == "" {
-		return defaultVal
-	}
-	b, err := strconv.ParseBool(val)
-	if err != nil {
-		return defaultVal
-	}
-	return b
-}
 
 func getEnvInt(key string, defaultVal int) int {
 	val := os.Getenv(key)
@@ -168,21 +152,7 @@ func getEnvStringSlice(key string, defaultVal []string) []string {
 
 // IsCommandAllowed checks if a command is in the native allowlist.
 func (c *Config) IsCommandAllowed(cmd string) bool {
-	for _, allowed := range c.NativeAllowlist {
-		if cmd == allowed {
-			return true
-		}
-	}
-	return false
-}
-
-// DBPath returns the database path for a user.
-// In single-player mode, returns path for "default" user.
-func (c *Config) DBPath(userID string) string {
-	if !c.MultiTenant {
-		userID = "default"
-	}
-	return c.DataDir + "/db/" + userID + ".db"
+	return slices.Contains(c.NativeAllowlist, cmd)
 }
 
 // ReposPath returns the shared repos directory.
@@ -191,9 +161,6 @@ func (c *Config) ReposPath() string {
 }
 
 // WorkspacesPath returns the workspaces directory for a user.
-func (c *Config) WorkspacesPath(userID string) string {
-	if !c.MultiTenant {
-		userID = "default"
-	}
-	return c.DataDir + "/workspaces/" + userID
+func (c *Config) WorkspacesPath(machineID string) string {
+	return c.DataDir + "/workspaces/" + machineID
 }

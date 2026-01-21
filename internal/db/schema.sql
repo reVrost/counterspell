@@ -1,84 +1,179 @@
--- Enforce WAL mode for concurrency
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
+-- SQLite Schema for Counterspell (Local-First Data Plane)
+-- This is consolidated schema - no migrations needed
 
--- 0. Schema Version: Track migrations per database file
-CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER PRIMARY KEY,
-    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- 1. Tasks: The core unit of work
+-- Tasks: Core unit of work
+-- Status flow: planning -> in_progress -> review -> done | failed
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
+    repository_id TEXT REFERENCES repositories(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('todo', 'in_progress', 'review', 'done')),
+    status TEXT NOT NULL CHECK(status IN ('pending', 'planning', 'in_progress', 'review', 'done', 'failed')),
     position INTEGER DEFAULT 0,
-    agent_output TEXT,
-    git_diff TEXT,
-    message_history TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
 
--- 2. Agent Logs: "The Matrix" Code Stream
-CREATE TABLE IF NOT EXISTS agent_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TRIGGER IF NOT EXISTS update_tasks_updated_at
+AFTER UPDATE ON tasks
+BEGIN
+UPDATE tasks SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Agent Runs: One row per agent execution within a task
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    level TEXT CHECK(level IN ('info', 'plan', 'code', 'error', 'success')),
-    message TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    prompt TEXT NOT NULL,
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    provider TEXT,
+    model TEXT,
+    summary_message_id TEXT,
+    cost REAL NOT NULL DEFAULT 0.0 CHECK (cost >= 0.0),
+    message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
+    prompt_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),
+    completion_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (completion_tokens>= 0),
+    completed_at DATETIME,
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
 
--- 3. GitHub Connections
-CREATE TABLE IF NOT EXISTS github_connections (
+CREATE TRIGGER IF NOT EXISTS update_agent_runs_updated_at
+AFTER UPDATE ON agent_runs
+BEGIN
+UPDATE agent_runs SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Artifacts: Files uploaded by agents
+CREATE TABLE IF NOT EXISTS artifacts (
     id TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK(type IN ('org', 'user')),
-    login TEXT NOT NULL,
-    avatar_url TEXT,
-    token TEXT NOT NULL,
-    scope TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    content TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    updated_at INTEGER NOT NULL,  -- Unix timestamp in milliseconds
+    UNIQUE(path, run_id, version)
 );
 
--- 4. Projects (connected GitHub repos)
-CREATE TABLE IF NOT EXISTS projects (
+CREATE TRIGGER IF NOT EXISTS update_artifacts_updated_at
+AFTER UPDATE ON artifacts
+BEGIN
+UPDATE artifacts SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Messages: Chat messages for agent conversation history
+CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
-    github_owner TEXT NOT NULL,
-    github_repo TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    run_id TEXT REFERENCES agent_runs(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('system', 'user', 'assistant', 'tool')),
+    parts TEXT NOT NULL default '[]',
+    model TEXT,
+    provider TEXT,
+    content TEXT NOT NULL,
+    tool_id TEXT,  -- For tool messages: which tool was called
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    finished_at INTEGER
 );
 
--- Indices for performance
-CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-CREATE INDEX IF NOT EXISTS idx_agent_logs_task ON agent_logs(task_id);
-CREATE INDEX IF NOT EXISTS idx_github_connections_type ON github_connections(type);
-CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(github_owner);
+CREATE TRIGGER IF NOT EXISTS update_messages_updated_at
+AFTER UPDATE ON messages
+BEGIN
+UPDATE messages SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
 
--- 5. User Settings (BYOK)
-CREATE TABLE IF NOT EXISTS user_settings (
-    user_id TEXT PRIMARY KEY DEFAULT 'default',
+CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_insert
+AFTER INSERT ON messages
+BEGIN
+UPDATE agent_runs SET
+    message_count = message_count + 1
+WHERE id = new.run_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_delete
+AFTER DELETE ON messages
+BEGIN
+UPDATE agent_runs SET
+    message_count = message_count - 1
+WHERE id = old.run_id;
+END;
+
+-- Settings: API keys and configuration (no user_id - single-tenant)
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     openrouter_key TEXT,
     zai_key TEXT,
     anthropic_key TEXT,
     openai_key TEXT,
-    agent_backend TEXT DEFAULT 'native',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    provider TEXT,
+    model TEXT,
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
 
--- 6. Repo Cache: Metadata for GitHub repos
-CREATE TABLE IF NOT EXISTS repo_cache (
+CREATE TRIGGER IF NOT EXISTS update_settings_updated_at
+AFTER UPDATE ON settings
+BEGIN
+UPDATE settings SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- GitHub Connections: Store OAuth tokens (single connection for now)
+CREATE TABLE IF NOT EXISTS github_connections (
     id TEXT PRIMARY KEY,
-    owner TEXT NOT NULL,
-    name TEXT NOT NULL,
-    default_branch TEXT NOT NULL DEFAULT 'main',
-    last_fetched_at DATETIME,
-    is_favorite BOOLEAN DEFAULT FALSE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    github_user_id TEXT UNIQUE NOT NULL,
+    access_token TEXT NOT NULL,
+    username TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL  -- Unix ms
 );
 
-CREATE INDEX IF NOT EXISTS idx_repo_cache_owner ON repo_cache(owner);
-CREATE INDEX IF NOT EXISTS idx_repo_cache_favorite ON repo_cache(is_favorite);
+CREATE TRIGGER IF NOT EXISTS update_github_connections_updated_at
+AFTER UPDATE ON github_connections
+BEGIN
+UPDATE github_connections SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Repositories: Available repos for selection
+CREATE TABLE IF NOT EXISTS repositories (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    is_private BOOLEAN NOT NULL,
+    html_url TEXT NOT NULL,
+    clone_url TEXT NOT NULL,
+    local_path TEXT,
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL, -- Unix ms
+    UNIQUE(connection_id, full_name)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at
+AFTER UPDATE ON repositories
+BEGIN
+UPDATE repositories SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Insert default settings row
+INSERT OR IGNORE INTO settings (id, agent_backend, provider, model) VALUES (1, 'native', 'anthropic', 'claude-opus-4-5');
+
+-- Indices (optimize for common query patterns)
+CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
+CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);
+CREATE INDEX IF NOT EXISTS idx_messages_task_created ON messages(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id);
+CREATE INDEX IF NOT EXISTS idx_runs_created_at ON agent_runs (created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
+CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts (created_at);
+CREATE INDEX IF NOT EXISTS idx_repos_connection ON repositories(connection_id);

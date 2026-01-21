@@ -1,91 +1,89 @@
 package handlers
 
 import (
-	"context"
-	"os"
+	"log/slog"
+	"sync"
 
-	"github.com/revrost/code/counterspell/internal/auth"
 	"github.com/revrost/code/counterspell/internal/config"
+	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/services"
 )
 
-// UserServices holds per-user service instances.
-type UserServices struct {
-	Tasks    *services.TaskService
-	GitHub   *services.GitHubService
-	Settings *services.SettingsService
-}
-
 // Handlers contains all HTTP handlers.
 type Handlers struct {
-	registry      *services.UserManagerRegistry
-	events        *services.EventBus
-	auth          *auth.AuthService
-	transcription *services.TranscriptionService
-	cfg           *config.Config
-	clientID      string
-	clientSecret  string
-	redirectURI   string
+	events *services.EventBus
+	cfg    *config.Config
+
+	// Shared services (created once at startup)
+	transcription   *services.TranscriptionService
+	taskService     *services.Repository
+	settingsService *services.SettingsService
+	fileService     *services.FileService
+	githubService   *services.GitHubService
+	gitReposManager *services.GitManager
+
+	// Track active orchestrators for shutdown
+	orchestrators map[string]*services.Orchestrator
+	mu            sync.Mutex
 }
 
 // NewHandlers creates new HTTP handlers.
-func NewHandlers(registry *services.UserManagerRegistry, events *services.EventBus, cfg *config.Config) (*Handlers, error) {
-	clientID := os.Getenv("GITHUB_CLIENT_ID")
-	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
-	redirectURI := os.Getenv("GITHUB_REDIRECT_URI")
-
+func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config) (*Handlers, error) {
 	transcriptionService := services.NewTranscriptionService()
 
-	// Initialize auth service for multi-tenant mode
-	var authService *auth.AuthService
-	var err error
-	if cfg.MultiTenant {
-		authService, err = auth.NewAuthServiceFromEnv()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return &Handlers{
-		registry:      registry,
 		events:        events,
-		auth:          authService,
 		transcription: transcriptionService,
 		cfg:           cfg,
-		clientID:      clientID,
-		clientSecret:  clientSecret,
-		redirectURI:   redirectURI,
+
+		// Create shared services
+		taskService:     services.NewRepository(database),
+		settingsService: services.NewSettingsService(database),
+		fileService:     services.NewFileService(cfg.DataDir),
+		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
+		gitReposManager: services.NewGitManager(cfg.DataDir),
+
+		// Initialize orchestrator tracking
+		orchestrators: make(map[string]*services.Orchestrator),
 	}, nil
 }
 
-// getServices returns per-user services for the current request.
-// This is the core of multi-tenant support - each user gets their own DB and services.
-func (h *Handlers) getServices(ctx context.Context) (*UserServices, error) {
-	userID := auth.UserIDFromContext(ctx)
-	if userID == "" {
-		userID = "default"
+// getOrchestrator creates an orchestrator for a task execution.
+// For local-first single-tenant mode, we use a fixed userID "default".
+// We create a single shared orchestrator for all tasks.
+func (h *Handlers) getOrchestrator() (*services.Orchestrator, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Use a single shared orchestrator for "shared"
+	if orch, ok := h.orchestrators["shared"]; ok {
+		return orch, nil
 	}
 
-	um, err := h.registry.Get(ctx, userID)
+	// Create the shared orchestrator
+	orch, err := services.NewOrchestrator(
+		h.taskService,
+		h.events,
+		h.settingsService,
+		h.githubService,
+		h.cfg.DataDir,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	db := um.DB()
-	return &UserServices{
-		Tasks:    services.NewTaskService(db),
-		GitHub:   services.NewGitHubService(h.clientID, h.clientSecret, h.redirectURI, db),
-		Settings: services.NewSettingsService(db),
-	}, nil
+	h.orchestrators["shared"] = orch
+	return orch, nil
 }
 
-// getOrchestrator creates an orchestrator for the current user.
-// Orchestrators are created per-request because they hold user-specific services.
-func (h *Handlers) getOrchestrator(ctx context.Context) (*services.Orchestrator, error) {
-	svc, err := h.getServices(ctx)
-	if err != nil {
-		return nil, err
-	}
+// Shutdown gracefully shuts down all active orchestrators.
+func (h *Handlers) Shutdown() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-	return services.NewOrchestrator(svc.Tasks, svc.GitHub, h.events, svc.Settings, h.cfg.DataDir)
+	for name, orch := range h.orchestrators {
+		slog.Info("[HANDLERS] Shutting down orchestrator", "name", name)
+		orch.Shutdown()
+	}
+	slog.Info("[HANDLERS] All orchestrators shut down")
 }

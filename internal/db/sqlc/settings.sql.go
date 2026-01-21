@@ -10,65 +10,75 @@ import (
 	"database/sql"
 )
 
-const getUserSettings = `-- name: GetUserSettings :one
-SELECT user_id, openrouter_key, zai_key, anthropic_key, openai_key, 
-       COALESCE(agent_backend, 'native') as agent_backend, updated_at 
-FROM user_settings WHERE user_id = 'default'
+const getSettings = `-- name: GetSettings :one
+SELECT openrouter_key, zai_key, anthropic_key, openai_key,
+       COALESCE(agent_backend, 'native') as agent_backend,
+       COALESCE(provider, 'anthropic') as provider,
+       COALESCE(model, 'claude-opus-4-5') as model,
+       updated_at
+FROM settings WHERE id = 1
 `
 
-type GetUserSettingsRow struct {
-	UserID        string         `json:"user_id"`
+type GetSettingsRow struct {
 	OpenrouterKey sql.NullString `json:"openrouter_key"`
 	ZaiKey        sql.NullString `json:"zai_key"`
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
 	AgentBackend  string         `json:"agent_backend"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
+	Provider      string         `json:"provider"`
+	Model         string         `json:"model"`
+	UpdatedAt     int64          `json:"updated_at"`
 }
 
-func (q *Queries) GetUserSettings(ctx context.Context) (GetUserSettingsRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserSettings)
-	var i GetUserSettingsRow
+func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
+	row := q.db.QueryRowContext(ctx, getSettings)
+	var i GetSettingsRow
 	err := row.Scan(
-		&i.UserID,
 		&i.OpenrouterKey,
 		&i.ZaiKey,
 		&i.AnthropicKey,
 		&i.OpenaiKey,
 		&i.AgentBackend,
+		&i.Provider,
+		&i.Model,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const upsertUserSettings = `-- name: UpsertUserSettings :exec
-INSERT INTO user_settings (user_id, openrouter_key, zai_key, anthropic_key, openai_key, agent_backend, updated_at)
-VALUES ('default', ?, ?, ?, ?, ?, ?)
-ON CONFLICT(user_id) DO UPDATE SET
-openrouter_key = excluded.openrouter_key,
-zai_key = excluded.zai_key,
-anthropic_key = excluded.anthropic_key,
-openai_key = excluded.openai_key,
-agent_backend = excluded.agent_backend,
-updated_at = excluded.updated_at
+const upsertSettings = `-- name: UpsertSettings :exec
+UPDATE settings SET
+openrouter_key = ?,
+zai_key = ?,
+anthropic_key = ?,
+openai_key = ?,
+agent_backend = ?,
+provider = ?,
+model = ?,
+updated_at = ?
+WHERE id = 1
 `
 
-type UpsertUserSettingsParams struct {
+type UpsertSettingsParams struct {
 	OpenrouterKey sql.NullString `json:"openrouter_key"`
 	ZaiKey        sql.NullString `json:"zai_key"`
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
-	AgentBackend  sql.NullString `json:"agent_backend"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
+	AgentBackend  string         `json:"agent_backend"`
+	Provider      sql.NullString `json:"provider"`
+	Model         sql.NullString `json:"model"`
+	UpdatedAt     int64          `json:"updated_at"`
 }
 
-func (q *Queries) UpsertUserSettings(ctx context.Context, arg UpsertUserSettingsParams) error {
-	_, err := q.db.ExecContext(ctx, upsertUserSettings,
+func (q *Queries) UpsertSettings(ctx context.Context, arg UpsertSettingsParams) error {
+	_, err := q.db.ExecContext(ctx, upsertSettings,
 		arg.OpenrouterKey,
 		arg.ZaiKey,
 		arg.AnthropicKey,
 		arg.OpenaiKey,
 		arg.AgentBackend,
+		arg.Provider,
+		arg.Model,
 		arg.UpdatedAt,
 	)
 	return err

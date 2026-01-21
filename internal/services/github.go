@@ -1,485 +1,313 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/google/uuid"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/db/sqlc"
-	"github.com/revrost/code/counterspell/internal/models"
 )
 
-// GitHubService handles GitHub OAuth API interactions.
 type GitHubService struct {
+	db           *db.DB
 	clientID     string
 	clientSecret string
-	redirectURI  string
-	db           *db.DB
 }
 
-// NewGitHubService creates a new GitHub service.
-// This are github details that are stored in the sqlite database
-func NewGitHubService(clientID, clientSecret, redirectURI string, db *db.DB) *GitHubService {
-	fmt.Printf("GitHub Service initialized:\n")
-	fmt.Printf("  Client ID: %s\n", maskString(clientID))
-	fmt.Printf("  Client Secret: %s\n", maskString(clientSecret))
-	fmt.Printf("  Redirect URI: %s\n", redirectURI)
-
+func NewGitHubService(database *db.DB, clientID, clientSecret string) *GitHubService {
 	return &GitHubService{
+		db:           database,
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		redirectURI:  redirectURI,
-		db:           db,
 	}
 }
 
-// getDB returns the database from context if available, otherwise the default db.
-// This enables multi-tenant support where each user has their own database.
-func (s *GitHubService) getDB(ctx context.Context) *db.DB {
-	if ctxDB := db.DBFromContext(ctx); ctxDB != nil {
-		return ctxDB
-	}
-	return s.db
-}
+func (s *GitHubService) ExchangeCode(ctx context.Context, code string) (string, error) {
+	data := url.Values{}
+	data.Set("client_id", s.clientID)
+	data.Set("client_secret", s.clientSecret)
+	data.Set("code", code)
 
-// maskString masks sensitive values for logging
-func maskString(s string) string {
-	if s == "" {
-		return "not set"
-	}
-	if len(s) <= 8 {
-		return "***"
-	}
-	return s[:4] + "..." + s[len(s)-4:]
-}
-
-// ExchangeCodeForToken exchanges the OAuth code for an access token.
-func (s *GitHubService) ExchangeCodeForToken(ctx context.Context, code string) (string, error) {
-	type tokenRequest struct {
-		ClientID     string `json:"client_id"`
-		ClientSecret string `json:"client_secret"`
-		Code         string `json:"code"`
-		RedirectURI  string `json:"redirect_uri"`
-	}
-
-	type tokenResponse struct {
-		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		Scope       string `json:"scope"`
-	}
-
-	reqBody := tokenRequest{
-		ClientID:     s.clientID,
-		ClientSecret: s.clientSecret,
-		Code:         code,
-		RedirectURI:  s.redirectURI,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://github.com/login/oauth/access_token", strings.NewReader(data.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal token request: %w", err)
+		return "", err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://github.com/login/oauth/access_token", bytes.NewReader(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to exchange token: %w", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub token exchange failed: %s", string(body))
+		return "", fmt.Errorf("failed to exchange code: %s", resp.Status)
 	}
 
-	var tokenResp tokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return "", fmt.Errorf("failed to parse token response: %w", err)
+	var result struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
 	}
 
-	if tokenResp.AccessToken == "" {
-		return "", fmt.Errorf("no access token in response")
-	}
-
-	return tokenResp.AccessToken, nil
+	return result.AccessToken, nil
 }
 
-// GetUserInfo fetches user info from GitHub.
-func (s *GitHubService) GetUserInfo(ctx context.Context, token string) (login, avatarURL string, err error) {
+type GitHubUser struct {
+	ID       int64  `json:"id"`
+	Login     string `json:"login"`
+	AvatarURL string `json:"avatar_url"`
+}
+
+func (s *GitHubService) GetGitHubUser(ctx context.Context, accessToken string) (*GitHubUser, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to fetch user info: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to read response: %w", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("GitHub API failed: %s", string(body))
+		return nil, fmt.Errorf("failed to get user: %s", resp.Status)
 	}
 
-	type userResponse struct {
-		Login     string `json:"login"`
-		AvatarURL string `json:"avatar_url"`
-	}
-
-	var userResp userResponse
-	if err := json.Unmarshal(body, &userResp); err != nil {
-		return "", "", fmt.Errorf("failed to parse user response: %w", err)
-	}
-
-	return userResp.Login, userResp.AvatarURL, nil
-}
-
-// SaveConnection saves a GitHub connection to the database.
-func (s *GitHubService) SaveConnection(ctx context.Context, connType, login, avatarURL, token, scope string) error {
-	userDB := s.getDB(ctx)
-	err := userDB.Queries.CreateGitHubConnection(ctx, sqlc.CreateGitHubConnectionParams{
-		ID:        shortuuid.New(),
-		Type:      connType,
-		Login:     login,
-		AvatarUrl: sql.NullString{String: avatarURL, Valid: avatarURL != ""},
-		Token:     token,
-		Scope:     sql.NullString{String: scope, Valid: scope != ""},
-		CreatedAt: time.Now().Unix(),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to save connection: %w", err)
-	}
-
-	return nil
-}
-
-// GetActiveConnection retrieves the active GitHub connection.
-func (s *GitHubService) GetActiveConnection(ctx context.Context) (*models.GitHubConnection, error) {
-	fmt.Println("[GITHUB] GetActiveConnection: querying database")
-	userDB := s.getDB(ctx)
-	conn, err := userDB.Queries.GetActiveGitHubConnection(ctx)
-	if err != nil {
-		fmt.Printf("[GITHUB] GetActiveConnection: no connection found, error=%v\n", err)
+	var user GitHubUser
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
 		return nil, err
 	}
 
-	result := &models.GitHubConnection{
-		ID:        conn.ID,
-		Type:      conn.Type,
-		Login:     conn.Login,
-		AvatarURL: conn.AvatarUrl.String,
-		Token:     conn.Token,
-		Scope:     conn.Scope.String,
-	}
-	result.CreatedAt = conn.CreatedAt
-
-	fmt.Printf("[GITHUB] GetActiveConnection: found connection login=%s type=%s\n", result.Login, result.Type)
-	return result, nil
+	return &user, nil
 }
 
-// SaveProject saves a project to the database.
-func (s *GitHubService) SaveProject(ctx context.Context, owner, repo string) error {
-	userDB := s.getDB(ctx)
-	err := userDB.Queries.CreateProject(ctx, sqlc.CreateProjectParams{
-		ID:          shortuuid.New(),
-		GithubOwner: owner,
-		GithubRepo:  repo,
-		CreatedAt:   time.Now().Unix(),
-	})
+func (s *GitHubService) CreateConnection(ctx context.Context, accessToken string) (string, error) {
+	// Get user from GitHub
+	user, err := s.GetGitHubUser(ctx, accessToken)
 	if err != nil {
-		return fmt.Errorf("failed to save project: %w", err)
+		return "", err
 	}
 
-	return nil
-}
-
-// GetProjects retrieves all projects.
-func (s *GitHubService) GetProjects(ctx context.Context) ([]models.Project, error) {
-	fmt.Println("[GITHUB] GetProjects: querying database")
-	userDB := s.getDB(ctx)
-	projects, err := userDB.Queries.GetProjects(ctx)
-	if err != nil {
-		fmt.Printf("[GITHUB] GetProjects: query error=%v\n", err)
-		return nil, fmt.Errorf("failed to query projects: %w", err)
-	}
-
-	result := make([]models.Project, len(projects))
-	for i, p := range projects {
-		result[i] = models.Project{
-			ID:          p.ID,
-			GitHubOwner: p.GithubOwner,
-			GitHubRepo:  p.GithubRepo,
-			CreatedAt:   p.CreatedAt,
-		}
-	}
-
-	fmt.Printf("[GITHUB] GetProjects: returning %d projects\n", len(result))
-	return result, nil
-}
-
-// GetRecentProjects retrieves the first 5 recent projects.
-func (s *GitHubService) GetRecentProjects(ctx context.Context) ([]models.Project, error) {
-	userDB := s.getDB(ctx)
-	projects, err := userDB.Queries.GetRecentProjects(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query recent projects: %w", err)
-	}
-
-	result := make([]models.Project, len(projects))
-	for i, p := range projects {
-		result[i] = models.Project{
-			ID:          p.ID,
-			GitHubOwner: p.GithubOwner,
-			GitHubRepo:  p.GithubRepo,
-			CreatedAt:   p.CreatedAt,
-		}
-	}
-
-	return result, nil
-}
-
-// GetProjectByRepo retrieves a project by repository name.
-func (s *GitHubService) GetProjectByRepo(ctx context.Context, repo string) (*models.Project, error) {
-	userDB := s.getDB(ctx)
-	p, err := userDB.Queries.GetProjectByRepo(ctx, repo)
+	// Check if connection already exists (use user.login for now as simple lookup)
+	// In practice, you'd use github_user_id
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
 	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get project by repo: %w", err)
+		// Create new connection
+		id := uuid.New().String()
+		now := time.Now().UnixMilli()
+		if _, err := s.db.Queries.CreateGithubConnection(ctx, sqlc.CreateGithubConnectionParams{
+			ID:           id,
+			GithubUserID:  fmt.Sprintf("%d", user.ID),
+			AccessToken:  accessToken,
+			Username:     user.Login,
+			AvatarUrl:    sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}); err != nil {
+			return "", fmt.Errorf("failed to create connection: %w", err)
+		}
+		return id, nil
+	} else if err != nil {
+		return "", fmt.Errorf("failed to get connection: %w", err)
 	}
 
-	result := &models.Project{
-		ID:          p.ID,
-		GitHubOwner: p.GithubOwner,
-		GitHubRepo:  p.GithubRepo,
-		CreatedAt:   p.CreatedAt,
+	// Update existing connection
+	if _, err := s.db.Queries.UpdateGithubConnection(ctx, sqlc.UpdateGithubConnectionParams{
+		ID:          conn.ID,
+		AccessToken: accessToken,
+		Username:    user.Login,
+		AvatarUrl:   sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
+	}); err != nil {
+		return "", fmt.Errorf("failed to update connection: %w", err)
 	}
-
-	return result, nil
+	return conn.ID, nil
 }
 
-// DeleteConnection deletes the active GitHub connection.
-func (s *GitHubService) DeleteConnection(ctx context.Context) error {
-	fmt.Println("[GITHUB] DeleteConnection: starting")
-	userDB := s.getDB(ctx)
-	result, err := userDB.Queries.DeleteAllGitHubConnections(ctx)
-	if err != nil {
-		fmt.Printf("[GITHUB] DeleteConnection: error=%v\n", err)
-		return fmt.Errorf("failed to delete connection: %w", err)
-	}
-	rows, _ := result.RowsAffected()
-	fmt.Printf("[GITHUB] DeleteConnection: success, rows_affected=%d\n", rows)
-	return nil
+type GitHubRepo struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	FullName string `json:"full_name"`
+	Owner    struct {
+		Login string `json:"login"`
+	} `json:"owner"`
+	Private bool   `json:"private"`
+	HTMLURL string `json:"html_url"`
+	CloneURL string `json:"clone_url"`
 }
 
-// DeleteAllProjects deletes all projects.
-func (s *GitHubService) DeleteAllProjects(ctx context.Context) error {
-	fmt.Println("[GITHUB] DeleteAllProjects: starting")
-	userDB := s.getDB(ctx)
-	result, err := userDB.Queries.DeleteAllProjects(ctx)
+func (s *GitHubService) FetchRepos(ctx context.Context, accessToken string) ([]GitHubRepo, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user/repos?visibility=all&affiliation=owner,collaborator", nil)
 	if err != nil {
-		fmt.Printf("[GITHUB] DeleteAllProjects: error=%v\n", err)
-		return fmt.Errorf("failed to delete projects: %w", err)
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	fmt.Printf("[GITHUB] DeleteAllProjects: success, rows_affected=%d\n", rows)
-	return nil
-}
-
-// FetchAndSaveRepositories fetches repositories from GitHub and saves them to database.
-func (s *GitHubService) FetchAndSaveRepositories(ctx context.Context, conn *models.GitHubConnection) error {
-	type repoResponse struct {
-		Name     string `json:"name"`
-		FullName string `json:"full_name"`
-		Owner    struct {
-			Login string `json:"login"`
-		} `json:"owner"`
-	}
-
-	var url string
-	if conn.Type == "org" {
-		url = "https://api.github.com/orgs/" + conn.Login + "/repos"
-	} else {
-		url = "https://api.github.com/user/repos"
-	}
-
-	fmt.Printf("Fetching from URL: %s\n", url)
-
-	repoCount := 0
-	for {
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Authorization", "Bearer "+conn.Token)
-		req.Header.Set("Accept", "application/json")
-
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return fmt.Errorf("failed to fetch repos: %w", err)
-		}
-
-		linkHeader := resp.Header.Get("Link")
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return fmt.Errorf("failed to read response: %w", err)
-		}
-
-		fmt.Printf("Response status: %d\n", resp.StatusCode)
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("GitHub API failed: %s", string(body))
-		}
-
-		var repos []repoResponse
-		if err := json.Unmarshal(body, &repos); err != nil {
-			return fmt.Errorf("failed to parse repos: %w", err)
-		}
-
-		fmt.Printf("Found %d repos in this page\n", len(repos))
-
-		// Save each repository
-		for _, repo := range repos {
-			owner := repo.Owner.Login
-			repoName := repo.Name
-			fmt.Printf("Checking repo: %s/%s\n", owner, repoName)
-
-			// Check if already exists
-			userDB := s.getDB(ctx)
-			exists, err := userDB.Queries.ProjectExists(ctx, sqlc.ProjectExistsParams{
-				GithubOwner: owner,
-				GithubRepo:  repoName,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to check existing project: %w", err)
-			}
-
-			if exists == 0 {
-				if err := s.SaveProject(ctx, owner, repoName); err != nil {
-					// Log error but continue with other repos
-					fmt.Printf("Failed to save project %s/%s: %v\n", owner, repoName, err)
-				} else {
-					fmt.Printf("Saved project %s/%s\n", owner, repoName)
-					repoCount++
-				}
-			} else {
-				fmt.Printf("Project %s/%s already exists\n", owner, repoName)
-			}
-		}
-
-		// Check if there's a next page
-		url = ""
-		if linkHeader != "" {
-			links := strings.Split(linkHeader, ",")
-			for _, link := range links {
-				if strings.Contains(link, `rel="next"`) {
-					parts := strings.Split(link, ";")
-					url = strings.TrimSpace(parts[0])
-					url = strings.TrimPrefix(url, "<")
-					url = strings.TrimSuffix(url, ">")
-					break
-				}
-			}
-		}
-
-		if url == "" {
-			break
-		}
-		fmt.Printf("Fetching next page: %s\n", url)
-	}
-
-	fmt.Printf("Total repositories saved: %d\n", repoCount)
-	return nil
-}
-
-// CreatePullRequest creates a GitHub PR for the given branch.
-// Returns the PR URL on success.
-func (s *GitHubService) CreatePullRequest(ctx context.Context, owner, repo, branch, title, body string) (string, error) {
-	conn, err := s.GetActiveConnection(ctx)
-	if err != nil {
-		return "", fmt.Errorf("no GitHub connection: %w", err)
-	}
-
-	// Create PR via GitHub API
-	prData := map[string]string{
-		"title": title,
-		"body":  body,
-		"head":  branch,
-		"base":  "main",
-	}
-
-	jsonData, err := json.Marshal(prData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal PR data: %w", err)
-	}
-
-	prURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
-	req, err := http.NewRequestWithContext(ctx, "POST", prURL, bytes.NewReader(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+conn.Token)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to create PR: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get repos: %s", resp.Status)
+	}
+
+	var repos []GitHubRepo
+	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+		return nil, err
+	}
+
+	return repos, nil
+}
+
+func (s *GitHubService) SyncRepos(ctx context.Context, connectionID string) error {
+	// Get connection
+	conn, err := s.db.Queries.GetGithubConnectionByID(ctx, connectionID)
+	if err != nil {
+		return fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	// Get repos from GitHub
+	repos, err := s.FetchRepos(ctx, conn.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to get repos: %w", err)
+	}
+
+	// Sync repos - upsert based on connection_id and full_name
+	now := time.Now().UnixMilli()
+	for _, r := range repos {
+		// Use GitHub repo ID as our database ID for consistency
+		repoID := fmt.Sprintf("%d", r.ID)
+		if _, err := s.db.Queries.UpsertRepository(ctx, sqlc.UpsertRepositoryParams{
+			ID:          repoID,
+			ConnectionID: connectionID,
+			Name:        r.Name,
+			FullName:    r.FullName,
+			Owner:       r.Owner.Login,
+			IsPrivate:   r.Private,
+			HtmlUrl:     r.HTMLURL,
+			CloneUrl:    r.CloneURL,
+			LocalPath:   sql.NullString{},
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}); err != nil {
+			return fmt.Errorf("failed to upsert repo %s: %w", r.FullName, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *GitHubService) GetRepos(ctx context.Context) ([]sqlc.Repository, error) {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.db.Queries.ListRepositories(ctx, conn.ID)
+}
+
+func (s *GitHubService) GetConnection(ctx context.Context) (sqlc.GithubConnection, error) {
+	return s.db.Queries.GetGithubConnection(ctx)
+}
+
+// CreatePullRequest creates a GitHub Pull Request.
+func (s *GitHubService) CreatePullRequest(ctx context.Context, owner, repo, branch, title, body string) (string, error) {
+	// Get connection
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	// Create PR request
+	type PRRequest struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+		Head  string `json:"head"`
+		Base  string `json:"base"`
+	}
+
+	prReq := PRRequest{
+		Title: title,
+		Body:  body,
+		Head:  branch,
+		Base:  "main",
+	}
+
+	reqBody, err := json.Marshal(prReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal PR request: %w", err)
+	}
+
+	// Create PR
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+conn.AccessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		// Check if PR already exists
-		if resp.StatusCode == 422 && strings.Contains(string(respBody), "A pull request already exists") {
-			return "", fmt.Errorf("PR already exists for this branch")
-		}
-		return "", fmt.Errorf("GitHub API failed (%d): %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("failed to create PR: %s", resp.Status)
 	}
 
-	var prResponse struct {
+	var result struct {
 		HTMLURL string `json:"html_url"`
-		Number  int    `json:"number"`
 	}
-	if err := json.Unmarshal(respBody, &prResponse); err != nil {
-		return "", fmt.Errorf("failed to parse PR response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode PR response: %w", err)
 	}
 
-	return prResponse.HTMLURL, nil
+	return result.HTMLURL, nil
+}
+
+// GetUserInfo returns GitHub user info for the connected account.
+func (s *GitHubService) GetUserInfo(ctx context.Context) (*GitHubUser, error) {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	return s.GetGitHubUser(ctx, conn.AccessToken)
+}
+
+// SyncConnection syncs the current connection's user info and repos.
+func (s *GitHubService) SyncConnection(ctx context.Context) error {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	// Sync repos
+	return s.SyncRepos(ctx, conn.ID)
+}
+
+// FetchUserRepos fetches repos from GitHub for the connected user.
+func (s *GitHubService) FetchUserRepos(ctx context.Context) ([]GitHubRepo, error) {
+	conn, err := s.db.Queries.GetGithubConnection(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	return s.FetchRepos(ctx, conn.AccessToken)
 }

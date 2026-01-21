@@ -9,6 +9,18 @@ import (
 	"github.com/revrost/code/counterspell/internal/models"
 )
 
+// EventType represents the type of event being published.
+type EventType string
+
+const (
+	EventTypeAgentRunStarted EventType = "agent_run_started"
+	EventTypeAgentRunUpdated EventType = "agent_run_updated"
+	EventTypeTaskUpdated     EventType = "task_updated"
+	EventTypeTaskStarted     EventType = "task_started"
+	EventTypeLog             EventType = "log"
+	EventTypeAgentUpdate     EventType = "agent_update"
+)
+
 // EventBus handles pub/sub for real-time events via SSE.
 type EventBus struct {
 	subscribers map[chan models.Event]bool
@@ -84,22 +96,10 @@ func (b *EventBus) Publish(event models.Event) {
 	}
 
 	// Cache agent_update for quick state recovery
-	if event.Type == "agent_update" && event.TaskID != "" {
+	if event.Type == string(EventTypeAgentUpdate) && event.TaskID != "" {
 		b.lastAgentStateMu.Lock()
-		b.lastAgentState[event.TaskID] = event.HTMLPayload
+		b.lastAgentState[event.TaskID] = event.Data
 		b.lastAgentStateMu.Unlock()
-	}
-
-	// Clear cache when task completes
-	if event.Type == "status_change" && event.TaskID != "" {
-		b.lastAgentStateMu.Lock()
-		delete(b.lastAgentState, event.TaskID)
-		b.lastAgentStateMu.Unlock()
-
-		// Also clear event log for completed tasks
-		b.eventLogMu.Lock()
-		delete(b.eventLog, event.TaskID)
-		b.eventLogMu.Unlock()
 	}
 
 	b.mu.RLock()
@@ -175,4 +175,17 @@ func (b *EventBus) Unsubscribe(ch chan models.Event) {
 		delete(b.subscribers, ch)
 		close(ch)
 	}
+}
+
+// Shutdown stops the event bus and cleanup goroutine.
+func (b *EventBus) Shutdown() {
+	slog.Info("[EVENTBUS] Shutting down")
+	// Close all subscriber channels to unblock them
+	b.mu.Lock()
+	for ch := range b.subscribers {
+		close(ch)
+		delete(b.subscribers, ch)
+	}
+	b.mu.Unlock()
+	slog.Info("[EVENTBUS] Shutdown complete")
 }

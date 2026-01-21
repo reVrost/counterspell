@@ -24,8 +24,8 @@ type Claims struct {
 	// Supabase-specific claims
 	Email         string                 `json:"email"`
 	Role          string                 `json:"role"`
-	AppMetadata   map[string]interface{} `json:"app_metadata"`
-	UserMetadata  map[string]interface{} `json:"user_metadata"`
+	AppMetadata   map[string]any `json:"app_metadata"`
+	UserMetadata  map[string]any `json:"user_metadata"`
 	AMR           []AMREntry             `json:"amr"` // Authentication Method Reference
 	SessionID     string                 `json:"session_id"`
 	IsAnonymous   bool                   `json:"is_anonymous"`
