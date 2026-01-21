@@ -186,24 +186,25 @@ func (s *GitHubService) SyncRepos(ctx context.Context, connectionID string) erro
 		return fmt.Errorf("failed to get repos: %w", err)
 	}
 
-	// Sync repos - simplified: just create new ones
+	// Sync repos - upsert based on connection_id and full_name
 	now := time.Now().UnixMilli()
 	for _, r := range repos {
-		// Try to create repo - if exists, it will fail (we ignore)
-		if _, err := s.db.Queries.CreateRepository(ctx, sqlc.CreateRepositoryParams{
-			ID:          uuid.New().String(),
+		// Use GitHub repo ID as our database ID for consistency
+		repoID := fmt.Sprintf("%d", r.ID)
+		if _, err := s.db.Queries.UpsertRepository(ctx, sqlc.UpsertRepositoryParams{
+			ID:          repoID,
 			ConnectionID: connectionID,
 			Name:        r.Name,
 			FullName:    r.FullName,
 			Owner:       r.Owner.Login,
 			IsPrivate:   r.Private,
 			HtmlUrl:     r.HTMLURL,
-			CloneUrl:     r.CloneURL,
-			CreatedAt:    now,
-			UpdatedAt:    now,
+			CloneUrl:    r.CloneURL,
+			LocalPath:   sql.NullString{},
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}); err != nil {
-			// Repo likely already exists, skip
-			continue
+			return fmt.Errorf("failed to upsert repo %s: %w", r.FullName, err)
 		}
 	}
 

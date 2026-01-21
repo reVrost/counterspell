@@ -11,16 +11,21 @@ import (
 
 type Querier interface {
 	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) error
+	CreateArtifact(ctx context.Context, arg CreateArtifactParams) error
 	CreateGithubConnection(ctx context.Context, arg CreateGithubConnectionParams) (GithubConnection, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) error
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) error
 	DeleteAgentRunsByTask(ctx context.Context, taskID string) error
+	DeleteArtifactsByRun(ctx context.Context, runID string) error
 	DeleteGithubConnection(ctx context.Context, id string) error
 	DeleteMessagesByTask(ctx context.Context, taskID string) error
 	DeleteRepositoriesByConnection(ctx context.Context, connectionID string) error
 	DeleteTask(ctx context.Context, id string) error
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
+	GetArtifact(ctx context.Context, id string) (Artifact, error)
+	GetArtifactsByRun(ctx context.Context, runID string) ([]Artifact, error)
+	GetArtifactsByTask(ctx context.Context, taskID string) ([]Artifact, error)
 	GetGithubConnection(ctx context.Context) (GithubConnection, error)
 	GetGithubConnectionByID(ctx context.Context, id string) (GithubConnection, error)
 	GetLatestRun(ctx context.Context, taskID string) (AgentRun, error)
@@ -41,6 +46,7 @@ type Querier interface {
 	UpdateTaskPosition(ctx context.Context, arg UpdateTaskPositionParams) error
 	UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error
+	UpsertRepository(ctx context.Context, arg UpsertRepositoryParams) (Repository, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) error
 }
 

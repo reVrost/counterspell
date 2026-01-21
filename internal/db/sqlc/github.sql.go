@@ -257,3 +257,64 @@ func (q *Queries) UpdateGithubConnection(ctx context.Context, arg UpdateGithubCo
 	)
 	return i, err
 }
+
+const upsertRepository = `-- name: UpsertRepository :one
+INSERT INTO repositories (
+    id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
+) VALUES (
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
+ON CONFLICT(connection_id, full_name) DO UPDATE SET
+    name = excluded.name,
+    is_private = excluded.is_private,
+    html_url = excluded.html_url,
+    clone_url = excluded.clone_url,
+    local_path = excluded.local_path,
+    updated_at = excluded.updated_at
+RETURNING id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
+`
+
+type UpsertRepositoryParams struct {
+	ID           string         `json:"id"`
+	ConnectionID string         `json:"connection_id"`
+	Name         string         `json:"name"`
+	FullName     string         `json:"full_name"`
+	Owner        string         `json:"owner"`
+	IsPrivate    bool           `json:"is_private"`
+	HtmlUrl      string         `json:"html_url"`
+	CloneUrl     string         `json:"clone_url"`
+	LocalPath    sql.NullString `json:"local_path"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
+}
+
+func (q *Queries) UpsertRepository(ctx context.Context, arg UpsertRepositoryParams) (Repository, error) {
+	row := q.db.QueryRowContext(ctx, upsertRepository,
+		arg.ID,
+		arg.ConnectionID,
+		arg.Name,
+		arg.FullName,
+		arg.Owner,
+		arg.IsPrivate,
+		arg.HtmlUrl,
+		arg.CloneUrl,
+		arg.LocalPath,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i Repository
+	err := row.Scan(
+		&i.ID,
+		&i.ConnectionID,
+		&i.Name,
+		&i.FullName,
+		&i.Owner,
+		&i.IsPrivate,
+		&i.HtmlUrl,
+		&i.CloneUrl,
+		&i.LocalPath,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

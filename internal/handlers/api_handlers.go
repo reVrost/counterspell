@@ -44,7 +44,7 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 	render.Render(w, r, feed)
 }
 
-// HandleAPITask returns a single task.
+// HandleAPITask returns a single task with full details including messages and artifacts.
 func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	if taskID == "" {
@@ -53,13 +53,25 @@ func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	task, err := h.taskService.Get(ctx, taskID)
+	taskResp, err := h.taskService.GetTaskWithDetails(ctx, taskID)
 	if err != nil {
-		slog.Error("Failed to get task", "error", err)
+		slog.Error("Failed to get task details", "error", err)
 		http.Error(w, "Task not found", http.StatusNotFound)
 		return
 	}
-	render.JSON(w, r, task)
+
+	// Get git diff if task is in progress or review
+	if taskResp.Task.Status == "in_progress" || taskResp.Task.Status == "review" {
+		gitDiff, err := h.gitReposManager.GetDiff(taskID)
+		if err != nil {
+			slog.Warn("Failed to get git diff", "task_id", taskID, "error", err)
+			// Continue without diff, don't fail the request
+		} else {
+			taskResp.GitDiff = gitDiff
+		}
+	}
+
+	render.JSON(w, r, taskResp)
 }
 
 // HandleAPISession returns session info based on GitHub connection status.

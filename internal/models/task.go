@@ -79,6 +79,24 @@ type Message struct {
 	FinishedAt *int64  `json:"finished_at,omitempty"`
 }
 
+// TaskResponse represents a detailed task response with all related data.
+// Used by the API handler to provide complete task information including messages, git diff, and artifacts.
+type TaskResponse struct {
+	// Task information
+	Task          Task       `json:"task"`
+	Messages      []Message  `json:"messages"`
+	Artifacts     []Artifact `json:"artifacts"`
+
+	// Latest agent run information (if any)
+	LatestAgentRun *AgentRun `json:"latest_agent_run,omitempty"`
+
+	// Total message count across all agent runs
+	MessageCount int64 `json:"message_count"`
+
+	// Git diff from the worktree (if available)
+	GitDiff string `json:"git_diff,omitempty"`
+}
+
 // Repository represents a GitHub repository.
 type Repository struct {
 	ID           string  `json:"id"`
