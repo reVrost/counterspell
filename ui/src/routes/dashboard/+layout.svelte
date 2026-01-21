@@ -80,16 +80,6 @@
     if (!isPrefetch) loadingTask = true;
     taskError = null;
 
-    // Optimistic: use task from feed if available (no SSE yet)
-    if (!isPrefetch) {
-      const feedTask = taskStore.tasks.find((t) => t.id === taskId);
-      if (feedTask) {
-        currentTask = feedTask;
-        const feedProject = taskStore.projects[feedTask.project_id];
-        if (feedProject) currentProject = feedProject;
-      }
-    }
-
     try {
       const data = await tasksAPI.get(taskId);
 

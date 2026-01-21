@@ -59,8 +59,12 @@
 		--tw-ring-offset-shadow: none !important;
 	}
 
+	html {
+		font-size: 13px;
+	}
+
 	body {
-		@apply bg-background text-foreground;
+		@apply bg-background text-foreground text-base;
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 		overscroll-behavior: none;

@@ -66,7 +66,7 @@
   }
 
   const baseClasses =
-    "w-full text-left bg-card border rounded-2xl p-4 shadow-sm focus:outline-none focus:ring-2 transition-transform active:scale-[0.98]";
+    "w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-transform active:scale-[0.98]";
 
   const variantClasses = {
     pending:
@@ -94,15 +94,15 @@
     <div class="flex justify-between items-center w-full">
       <div class="flex items-center gap-3">
         <div
-          class="w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-xs shrink-0"
+          class="w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-base shrink-0"
         >
           <CheckIcon class="w-3 h-3" />
         </div>
         <div class="min-w-0">
-          <div class="text-sm text-gray-400 leading-snug line-clamp-2">
+          <div class="text-base text-gray-400 leading-snug line-clamp-2">
             {task.title}
           </div>
-          <div class="text-xs text-gray-600 mt-0.5">
+          <div class="text-sm text-gray-600 mt-0.5">
             {task.repository_name || "Unknown"}
           </div>
         </div>
@@ -114,43 +114,43 @@
       <div class="flex items-center gap-2">
         <span
           class={cn(
-            "text-gray-400 opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-xs",
+            "text-gray-400 opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-base",
             variant === "review" && "bg-gray-800/50 border border-gray-700/50",
           )}
         >
           <FolderIcon class="w-3 h-3" />
         </span>
-        <span class="text-xs font-medium text-gray-400"
+        <span class="text-sm font-medium text-gray-400"
           >{task.repository_name ?? "Unknown"}</span
         >
       </div>
 
       {#if variant === "pending"}
         <span
-          class="text-xs text-gray-400 bg-gray-500/10 px-2.5 py-1 rounded-lg font-medium border border-gray-500/20"
+          class="text-sm text-gray-400 bg-gray-500/10 px-2.5 py-1 rounded-lg font-medium border border-gray-500/20"
         >
           Pending
         </span>
       {:else if variant === "planning"}
         <span
-          class="text-xs text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg font-medium border border-purple-500/20"
+          class="text-sm text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg font-medium border border-purple-500/20"
         >
           Planning
         </span>
       {:else if variant === "active"}
         <div class="flex items-center gap-2">
           <span
-            class="text-xs text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20"
+            class="text-sm text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg font-medium border border-orange-500/20"
           >
             In Progress
           </span>
-          <span class="text-xs text-orange-400/80 font-mono tabular-nums"
+          <span class="text-sm text-orange-400/80 font-mono tabular-nums"
             >{elapsed}s</span
           >
         </div>
       {:else if variant === "review"}
         <span
-          class="text-xs text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg font-medium border border-blue-500/20"
+          class="text-sm text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg font-medium border border-blue-500/20"
         >
           Review
         </span>
@@ -158,7 +158,7 @@
     </div>
 
     <p
-      class="text-sm text-gray-200 font-medium leading-snug line-clamp-2"
+      class="text-base text-gray-200 font-medium leading-snug line-clamp-2"
       class:pr-6={variant === "review"}
     >
       {task.title}

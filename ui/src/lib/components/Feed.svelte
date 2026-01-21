@@ -104,7 +104,7 @@
       >
         Pending
       </h3>
-      <div class="space-y-3">
+      <div class="space-y-1">
         {#each pendingTasks as task, index (task.id)}
           <div
             transition:slide|local={{
@@ -113,10 +113,7 @@
               delay: index * 50,
             }}
           >
-            <Task
-              {task}
-              variant="pending"
-            />
+            <Task {task} variant="pending" />
           </div>
         {/each}
       </div>
@@ -149,10 +146,7 @@
               delay: index * 50,
             }}
           >
-            <Task
-              {task}
-              variant="completed"
-            />
+            <Task {task} variant="completed" />
           </div>
         {/each}
       </div>
