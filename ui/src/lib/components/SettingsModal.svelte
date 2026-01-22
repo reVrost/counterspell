@@ -78,7 +78,7 @@
       <div
         class="px-6 py-4 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-popover z-10"
       >
-        <h2 class="text-lg font-bold text-white">Settings</h2>
+        <h2 class="font-heading text-lg font-bold text-white">Settings</h2>
         <button
           onclick={() => appState.closeSettings()}
           class="text-gray-500 hover:text-white transition"

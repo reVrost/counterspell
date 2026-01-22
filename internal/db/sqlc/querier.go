@@ -6,7 +6,6 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 )
 
 type Querier interface {
@@ -30,7 +29,7 @@ type Querier interface {
 	GetGithubConnectionByID(ctx context.Context, id string) (GithubConnection, error)
 	GetLatestRun(ctx context.Context, taskID string) (AgentRun, error)
 	GetMessage(ctx context.Context, id string) (Message, error)
-	GetMessagesByRun(ctx context.Context, runID sql.NullString) ([]Message, error)
+	GetMessagesByRun(ctx context.Context, runID string) ([]Message, error)
 	GetMessagesByTask(ctx context.Context, taskID string) ([]Message, error)
 	GetRecentMessages(ctx context.Context, arg GetRecentMessagesParams) ([]Message, error)
 	GetRepository(ctx context.Context, id string) (Repository, error)

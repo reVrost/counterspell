@@ -122,11 +122,11 @@ func main() {
 		r.Get("/api/v1/events", h.HandleSSE)
 
 		// Home page actions, tasks are like inbox
-		r.Get("/api/v1/tasks", h.HandleAPITasks)
+		r.Get("/api/v1/tasks", h.HandleListTask)
 		r.Post("/api/v1/tasks", h.HandleAddTask)
-		r.Get("/api/v1/session", h.HandleAPISession)
-		r.Get("/api/v1/task/{id}", h.HandleAPITask)
-		r.Get("/api/v1/settings", h.HandleAPISettings)
+		r.Get("/api/v1/session", h.HandleGetSession)
+		r.Get("/api/v1/task/{id}", h.HandleGetTask)
+		r.Get("/api/v1/settings", h.HandleGetSettings)
 		r.Get("/api/v1/files/search", h.HandleFileSearch)
 
 		// Settings and transcription

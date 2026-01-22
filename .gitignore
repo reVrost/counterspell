@@ -37,3 +37,8 @@ Thumbs.db
 
 # Worktrees
 worktree-*/
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/

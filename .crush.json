@@ -23,7 +23,7 @@
     "playwright": {
       "type": "stdio",
       "command": "docker",
-      "args": ["run", "-i", "--rm", "mcp/playwright"]
+      "args": ["run", "-i", "--rm", "--add-host=host.docker.internal:host-gateway", "mcp/playwright"]
     }
   }
 }

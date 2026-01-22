@@ -1,4 +1,4 @@
-.PHONY: dev build test clean tidy generate lint docker-build docker-run run ui preprod
+.PHONY: dev build test clean tidy generate lint docker-build docker-run run ui preprod kill-dev
 
 # Variables
 PROJECT_NAME := counterspell
@@ -13,6 +13,9 @@ all: dev
 # dev: generate build
 # 	@echo "Starting $(PROJECT_NAME) in development mode..."
 # 	./counterspell -addr :8710 -db ./data/$(PROJECT_NAME).db
+#
+kill-dev:
+	kill -9 $$(lsof -t -i:8710) 2>/dev/null || true
 
 dev: build
 	ENV=dev ./$(PROJECT_NAME) -addr :8710
@@ -59,9 +62,22 @@ test-cover:
 	@go test -v -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 
+test-e2e:
+	@echo "Running E2E tests..."
+	@cd ui && npm run test:e2e
+
 lint:
 	@echo "Running linter..."
 	@golangci-lint run ./... || echo "Note: golangci-lint not installed, skipping..."
+
+check-all: lint
+	@echo "Running all checks..."
+	@cd ui && npm run check
+
+format:
+	@echo "Formatting code..."
+	@cd ui && npx prettier --write .
+	@go fmt ./...
 
 ##@ Dependencies
 

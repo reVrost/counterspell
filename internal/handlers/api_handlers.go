@@ -10,8 +10,8 @@ import (
 	"github.com/revrost/code/counterspell/internal/services"
 )
 
-// HandleAPITasks returns tasks.
-func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
+// HandleListTask returns tasks.
+func (h *Handlers) HandleListTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	tasks, err := h.taskService.ListWithRepository(ctx)
 	if err != nil {
@@ -47,8 +47,8 @@ func (h *Handlers) HandleAPITasks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleAPITask returns a single task with full details including messages and artifacts.
-func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
+// HandleGetTask returns a single task with full details including messages and artifacts.
+func (h *Handlers) HandleGetTask(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	if taskID == "" {
 		http.Error(w, "Task ID required", http.StatusBadRequest)
@@ -77,8 +77,8 @@ func (h *Handlers) HandleAPITask(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, taskResp)
 }
 
-// HandleAPISession returns session info based on GitHub connection status.
-func (h *Handlers) HandleAPISession(w http.ResponseWriter, r *http.Request) {
+// HandleGetSession returns session info based on GitHub connection status.
+func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Check if there's a GitHub connection
@@ -118,8 +118,8 @@ func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, files)
 }
 
-// HandleAPISettings returns settings.
-func (h *Handlers) HandleAPISettings(w http.ResponseWriter, r *http.Request) {
+// HandleGetSettings returns settings.
+func (h *Handlers) HandleGetSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	settings, err := h.settingsService.GetSettings(ctx)
 	if err != nil {

@@ -198,7 +198,7 @@ func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, con
 	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
 		ID:        id,
 		TaskID:    taskID,
-		RunID:     sql.NullString{String: runID, Valid: runID != ""},
+		RunID:     runID,
 		Role:      role,
 		Content:   content,
 		Parts:     "[]",
@@ -217,10 +217,12 @@ func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sq
 // --- Agent Run Operations ---
 
 // GetTaskWithDetails retrieves a task with all related data for TaskResponse.
-// This includes the task, all messages, artifacts, latest agent run, and message count.
+// This uses multiple efficient queries to get the task, all messages, artifacts, and agent runs.
+// GetTaskWithDetails retrieves a task with all related data for TaskResponse.
+// This uses sqlc queries to get task, messages, artifacts, and agent runs.
 func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*models.TaskResponse, error) {
 	// Get the base task
-	task, err := s.Get(ctx, taskID)
+	task, err := s.db.Queries.GetTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -231,48 +233,114 @@ func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*mo
 		return nil, err
 	}
 
-	// Convert sqlc messages to models
-	taskMessages := make([]models.Message, len(messages))
-	for i, msg := range messages {
-		taskMessages[i] = sqlcMessageToModel(&msg)
-	}
-
 	// Get all artifacts for the task
 	artifacts, err := s.db.Queries.GetArtifactsByTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert sqlc artifacts to models
-	taskArtifacts := make([]models.Artifact, len(artifacts))
-	for i, art := range artifacts {
-		taskArtifacts[i] = sqlcArtifactToModel(&art)
-	}
-
-	// Get the latest agent run
-	latestRun, err := s.GetLatestAgentRun(ctx, taskID)
-	if err != nil && err != sql.ErrNoRows {
+	// Get all agent runs for the task
+	agentRuns, err := s.db.Queries.ListAgentRunsByTask(ctx, taskID)
+	if err != nil {
 		return nil, err
 	}
 
-	var latestAgentRun *models.AgentRun
-	var messageCount int64
-	if latestRun != nil {
-		latestAgentRun = sqlcAgentRunToModel(latestRun)
-		messageCount = latestRun.MessageCount
+	// Build agent runs with nested messages and artifacts
+	agentRunsWithDetails := make([]models.AgentRunWithDetails, len(agentRuns))
+	for i, ar := range agentRuns {
+		// Find messages for this run
+		runMessages := make([]models.Message, 0)
+		for _, msg := range messages {
+			if msg.RunID == ar.ID {
+				runMessages = append(runMessages, models.Message{
+					ID:         msg.ID,
+					TaskID:     msg.TaskID,
+					RunID:      &msg.RunID,
+					Role:       msg.Role,
+					Parts:      msg.Parts,
+					Model:      nullableString(msg.Model),
+					Provider:   nullableString(msg.Provider),
+					Content:    msg.Content,
+					ToolID:     nullableString(msg.ToolID),
+					CreatedAt:  msg.CreatedAt,
+					UpdatedAt:  msg.UpdatedAt,
+					FinishedAt: nullableInt64(msg.FinishedAt),
+				})
+			}
+		}
+
+		// Find artifacts for this run
+		runArtifacts := make([]models.Artifact, 0)
+		for _, art := range artifacts {
+			if art.RunID == ar.ID {
+				runArtifacts = append(runArtifacts, models.Artifact{
+					ID:        art.ID,
+					RunID:     art.RunID,
+					Path:      art.Path,
+					Content:   art.Content,
+					Version:   art.Version,
+					CreatedAt: art.CreatedAt,
+					UpdatedAt: art.UpdatedAt,
+				})
+			}
+		}
+
+		agentRunsWithDetails[i] = models.AgentRunWithDetails{
+			ID:               ar.ID,
+			TaskID:           ar.TaskID,
+			Prompt:           ar.Prompt,
+			AgentBackend:     ar.AgentBackend,
+			SummaryMessageID: nullableString(ar.SummaryMessageID),
+			Cost:             ar.Cost,
+			MessageCount:     ar.MessageCount,
+			PromptTokens:     ar.PromptTokens,
+			CompletionTokens: ar.CompletionTokens,
+			CompletedAt:      nullableInt64FromTime(ar.CompletedAt),
+			CreatedAt:        ar.CreatedAt,
+			UpdatedAt:        ar.UpdatedAt,
+			Messages:         runMessages,
+			Artifacts:        runArtifacts,
+		}
 	}
 
-	// If no runs, count the messages directly
-	if messageCount == 0 {
-		messageCount = int64(len(messages))
+	// Top-level messages should include ALL messages for the task
+	taskMessages := make([]models.Message, len(messages))
+	for i, msg := range messages {
+		taskMessages[i] = models.Message{
+			ID:         msg.ID,
+			TaskID:     msg.TaskID,
+			RunID:      &msg.RunID,
+			Role:       msg.Role,
+			Parts:      msg.Parts,
+			Model:      nullableString(msg.Model),
+			Provider:   nullableString(msg.Provider),
+			Content:    msg.Content,
+			ToolID:     nullableString(msg.ToolID),
+			CreatedAt:  msg.CreatedAt,
+			UpdatedAt:  msg.UpdatedAt,
+			FinishedAt: nullableInt64(msg.FinishedAt),
+		}
+	}
+
+	// Convert artifacts to models
+	taskArtifacts := make([]models.Artifact, len(artifacts))
+	for i, art := range artifacts {
+		taskArtifacts[i] = models.Artifact{
+			ID:        art.ID,
+			RunID:     art.RunID,
+			Path:      art.Path,
+			Content:   art.Content,
+			Version:   art.Version,
+			CreatedAt: art.CreatedAt,
+			UpdatedAt: art.UpdatedAt,
+		}
 	}
 
 	return &models.TaskResponse{
-		Task:          *task,
-		Messages:      taskMessages,
-		Artifacts:     taskArtifacts,
-		LatestAgentRun: latestAgentRun,
-		MessageCount:  messageCount,
+		Task:      *sqlcTaskToModel(&task),
+		Messages:  taskMessages,
+		Artifacts: taskArtifacts,
+		AgentRuns: agentRunsWithDetails,
 	}, nil
 }
 
@@ -344,55 +412,6 @@ func ConvertMessagesToJSON(messages []sqlc.Message) (string, error) {
 		return "", fmt.Errorf("failed to marshal messages: %w", err)
 	}
 	return string(jsonData), nil
-}
-
-// sqlcMessageToModel converts sqlc.Message to models.Message.
-func sqlcMessageToModel(msg *sqlc.Message) models.Message {
-	return models.Message{
-		ID:        msg.ID,
-		TaskID:    msg.TaskID,
-		RunID:     nullableString(msg.RunID),
-		Role:      msg.Role,
-		Parts:     msg.Parts,
-		Model:     nullableString(msg.Model),
-		Provider:  nullableString(msg.Provider),
-		Content:   msg.Content,
-		ToolID:    nullableString(msg.ToolID),
-		CreatedAt: msg.CreatedAt,
-		UpdatedAt: msg.UpdatedAt,
-		FinishedAt: nullableInt64(msg.FinishedAt),
-	}
-}
-
-// sqlcArtifactToModel converts sqlc.Artifact to models.Artifact.
-func sqlcArtifactToModel(art *sqlc.Artifact) models.Artifact {
-	return models.Artifact{
-		ID:        art.ID,
-		RunID:     art.RunID,
-		Path:      art.Path,
-		Content:   art.Content,
-		Version:   art.Version,
-		CreatedAt: art.CreatedAt,
-		UpdatedAt: art.UpdatedAt,
-	}
-}
-
-// sqlcAgentRunToModel converts sqlc.AgentRun to models.AgentRun.
-func sqlcAgentRunToModel(run *sqlc.AgentRun) *models.AgentRun {
-	return &models.AgentRun{
-		ID:               run.ID,
-		TaskID:           run.TaskID,
-		Prompt:           run.Prompt,
-		AgentBackend:     run.AgentBackend,
-		SummaryMessageID: nullableString(run.SummaryMessageID),
-		Cost:             run.Cost,
-		MessageCount:     run.MessageCount,
-		PromptTokens:     run.PromptTokens,
-		CompletionTokens: run.CompletionTokens,
-		CompletedAt:      nullableInt64FromTime(run.CompletedAt),
-		CreatedAt:        run.CreatedAt,
-		UpdatedAt:        run.UpdatedAt,
-	}
 }
 
 // nullableInt64FromTime converts sql.NullTime to *int64.

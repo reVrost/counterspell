@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { FolderIcon } from "@lucide/svelte";
-  import { Check, ChevronRight } from "@lucide/svelte";
-  import { cn } from "tailwind-variants";
+  import { goto } from '$app/navigation';
+  import { FolderIcon } from '@lucide/svelte';
+  import { Check, ChevronRight } from '@lucide/svelte';
+  import { cn } from 'tailwind-variants';
 
   interface Task {
     id: string;
@@ -12,7 +12,7 @@
 
   interface Props {
     task: Task;
-    variant: "pending" | "active" | "review" | "completed" | "planning";
+    variant: 'pending' | 'active' | 'review' | 'completed' | 'planning';
   }
 
   let { task, variant }: Props = $props();
@@ -24,28 +24,21 @@
   }
 
   const baseClasses =
-    "w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-transform active:scale-[0.98]";
+    'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-transform active:scale-[0.98]';
 
   const variantClasses = {
-    pending:
-      "border-gray-700/50 hover:border-gray-600/50 hover:shadow-md focus:ring-gray-500/50",
+    pending: 'border-gray-700/50 hover:border-gray-600/50 hover:shadow-md focus:ring-gray-500/50',
     planning:
-      "border-purple-900/50 hover:border-purple-800/50 hover:shadow-md focus:ring-purple-500/50",
-    active:
-      "border-gray-800/50 hover:border-gray-700/50 hover:shadow-md focus:ring-orange-500/50",
-    review:
-      "border-blue-800 hover:border-blue-700/50 hover:shadow-lg focus:ring-blue-500/50",
+      'border-purple-900/50 hover:border-purple-800/50 hover:shadow-md focus:ring-purple-500/50',
+    active: 'border-gray-800/50 hover:border-gray-700/50 hover:shadow-md focus:ring-orange-500/50',
+    review: 'border-blue-800 hover:border-blue-700/50 hover:shadow-lg focus:ring-blue-500/50',
     completed:
-      "bg-card border-gray-600/20 flex-row hover:border-gray-500/30 focus:ring-green-500/50",
+      'bg-card border-gray-600/20 flex-row hover:border-gray-500/30 focus:ring-green-500/50',
   };
 </script>
 
-<button
-  type="button"
-  class="{baseClasses} {variantClasses[variant]}"
-  onclick={handleClick}
->
-  {#if variant === "completed"}
+<button type="button" class="{baseClasses} {variantClasses[variant]}" onclick={handleClick}>
+  {#if variant === 'completed'}
     <!-- Completed Layout -->
     <div class="flex justify-between items-center w-full">
       <div class="flex items-center gap-3">
@@ -59,7 +52,7 @@
             {task.title}
           </div>
           <div class="text-sm text-gray-400 mt-0.5">
-            {task.repository_name || "Unknown"}
+            {task.repository_name || 'Unknown'}
           </div>
         </div>
       </div>
@@ -70,44 +63,32 @@
       <div class="flex items-center gap-2">
         <span
           class={cn(
-            "text-gray-400 opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-base",
-            variant === "review" && "bg-gray-800/50 border border-gray-700/50",
+            'text-gray-400 opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-base',
+            variant === 'review' && 'bg-gray-800/50 border border-gray-700/50'
           )}
         >
           <FolderIcon class="w-3 h-3" />
         </span>
-        <span class="text-sm font-medium text-gray-400"
-          >{task.repository_name ?? "Unknown"}</span
-        >
+        <span class="text-sm font-medium text-gray-400">{task.repository_name ?? 'Unknown'}</span>
       </div>
 
-      {#if variant === "pending"}
-        <span
-          class="text-sm text-gray-400 bg-gray-500/10 px-2.5 py-1 rounded-lg font-medium border border-gray-500/20"
-        >
-          Pending
-        </span>
-      {:else if variant === "planning"}
+      {#if variant === 'pending'}
+        <span class="text-sm text-gray-400 px-2.5 py-1 rounded-lg font-medium"> Pending </span>
+      {:else if variant === 'planning'}
         <span
           class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium border border-primary/20"
         >
           Planning
         </span>
-      {:else if variant === "active"}
+      {:else if variant === 'active'}
         <div class="flex items-center gap-2">
-          <span class="text-sm text-orange-300/80 font-mono tabular-nums"
-            >{elapsed}s</span
-          >
-          <span
-            class="text-sm text-orange-300 bg-orange-300/10 px-2.5 py-1 rounded-lg font-medium border border-orange-300/20"
-          >
+          <span class="text-sm text-orange-300/80 font-mono tabular-nums">{elapsed}s</span>
+          <span class="text-sm text-orange-300 px-2.5 py-1 rounded-lg font-medium">
             In Progress
           </span>
         </div>
-      {:else if variant === "review"}
-        <span
-          class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium border border-primary/20"
-        >
+      {:else if variant === 'review'}
+        <span class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium">
           Review
         </span>
       {/if}
@@ -115,12 +96,12 @@
 
     <p
       class="text-base text-gray-200 font-medium leading-snug line-clamp-2"
-      class:pr-6={variant === "review"}
+      class:pr-6={variant === 'review'}
     >
       {task.title}
     </p>
 
-    {#if variant === "review"}
+    {#if variant === 'review'}
       <div class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600">
         <ChevronRight class="w-4 h-4" />
       </div>

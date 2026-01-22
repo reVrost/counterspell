@@ -18,7 +18,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 type CreateMessageParams struct {
 	ID        string         `json:"id"`
 	TaskID    string         `json:"task_id"`
-	RunID     sql.NullString `json:"run_id"`
+	RunID     string         `json:"run_id"`
 	Role      string         `json:"role"`
 	Content   string         `json:"content"`
 	Parts     string         `json:"parts"`
@@ -81,7 +81,7 @@ const getMessagesByRun = `-- name: GetMessagesByRun :many
 SELECT id, task_id, run_id, role, parts, model, provider, content, tool_id, created_at, updated_at, finished_at FROM messages WHERE run_id = ? ORDER BY created_at ASC
 `
 
-func (q *Queries) GetMessagesByRun(ctx context.Context, runID sql.NullString) ([]Message, error) {
+func (q *Queries) GetMessagesByRun(ctx context.Context, runID string) ([]Message, error) {
 	rows, err := q.db.QueryContext(ctx, getMessagesByRun, runID)
 	if err != nil {
 		return nil, err

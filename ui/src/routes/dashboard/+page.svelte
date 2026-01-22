@@ -75,7 +75,7 @@
 </svelte:head>
 
 {#if loading}
-	<div class="flex items-center justify-center h-64">
+	<div data-testid="loading-state" class="flex items-center justify-center h-64">
 		<div class="flex flex-col items-center gap-3">
 			<div
 				class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center"
@@ -86,13 +86,17 @@
 		</div>
 	</div>
 {:else if error}
-	<ErrorView
-		title="Error"
-		message="Failed to load feed"
-		description={error}
-		onRetry={loadFeedData}
-		homeLink="/dashboard"
-	/>
+	<div data-testid="error-state">
+		<ErrorView
+			title="Error"
+			message="Failed to load feed"
+			description={error}
+			onRetry={loadFeedData}
+			homeLink="/dashboard"
+		/>
+	</div>
 {:else}
-	<Feed {feedData} />
+	<div data-testid="feed-loaded">
+		<Feed {feedData} />
+	</div>
 {/if}

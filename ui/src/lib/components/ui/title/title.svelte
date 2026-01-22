@@ -10,6 +10,6 @@
   let { class: className = "", children }: Props = $props();
 </script>
 
-<div class={cn("text-xl font-semibold leading-none tracking-tight", className)}>
+<div class={cn("font-heading text-xl font-semibold leading-none tracking-tight", className)}>
   {@render children()}
 </div>

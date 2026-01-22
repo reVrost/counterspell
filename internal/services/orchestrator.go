@@ -437,7 +437,10 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 
 	// Get git diff
-	gitDiff, _ := o.gitReposManager.GetDiff(job.TaskID)
+	gitDiff, err := o.gitReposManager.GetDiff(job.TaskID)
+	if err != nil {
+		slog.Warn("[ORCHESTRATOR] Failed to get git diff", "task_id", job.TaskID, "error", err)
+	}
 	if gitDiff != "" {
 		slog.Info("[ORCHESTRATOR] Git diff generated", "task_id", job.TaskID, "diff_size", len(gitDiff))
 	}

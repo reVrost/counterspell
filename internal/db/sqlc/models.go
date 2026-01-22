@@ -48,7 +48,7 @@ type GithubConnection struct {
 type Message struct {
 	ID         string         `json:"id"`
 	TaskID     string         `json:"task_id"`
-	RunID      sql.NullString `json:"run_id"`
+	RunID      string         `json:"run_id"`
 	Role       string         `json:"role"`
 	Parts      string         `json:"parts"`
 	Model      sql.NullString `json:"model"`
