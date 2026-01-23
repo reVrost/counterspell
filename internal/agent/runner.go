@@ -13,14 +13,13 @@ import (
 
 // Event types for streaming
 const (
-	EventPlan     = "plan"
-	EventTool     = "tool"
-	EventResult   = "result"
-	EventText     = "text"
-	EventError    = "error"
-	EventDone     = "done"
-	EventMessages = "messages" // Full message history update
-	EventTodo     = "todo"     // Todo list update
+	EventTool       = "tool"
+	EventToolResult = "result"
+	EventText       = "text"
+	EventUserText   = "user_text"
+	EventError      = "error"
+	EventDone       = "done"
+	EventTodo       = "todo" // Todo list update
 )
 
 // Message represents a single message in the conversation.
@@ -53,11 +52,10 @@ type ContentBlock struct {
 
 // StreamEvent represents a single event in the agent execution.
 type StreamEvent struct {
-	Type     string `json:"type"`
-	Content  string `json:"content"`
-	Tool     string `json:"tool,omitempty"`
-	Args     string `json:"args,omitempty"`
-	Messages string `json:"messages,omitempty"` // JSON message history for EventMessages
+	Type    string `json:"type"`
+	Content string `json:"content"`
+	Tool    string `json:"tool,omitempty"`
+	Args    string `json:"args,omitempty"`
 }
 
 // StreamCallback is called for each event during agent execution.
@@ -151,22 +149,20 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		messages = []Message{}
 	}
 
-	if isContinuation {
-		r.emit(StreamEvent{Type: EventPlan, Content: "Continuing with: " + userMessage})
-	} else {
-		r.emit(StreamEvent{Type: EventPlan, Content: "Analyzing task: " + userMessage})
+	if userMessage != "" {
+		// Add user message
+		msg := Message{
+			Role: "user",
+			Content: []ContentBlock{
+				{Type: "text", Text: userMessage},
+			},
+		}
+		messages = append(messages, msg)
+
+		r.emit(StreamEvent{Type: EventUserText, Content: userMessage})
+	} else if len(messages) == 0 {
+		return fmt.Errorf("agent: cannot start task with empty message")
 	}
-
-	// Add user message
-	messages = append(messages, Message{
-		Role: "user",
-		Content: []ContentBlock{
-			{Type: "text", Text: userMessage},
-		},
-	})
-
-	// Emit immediately so user message appears in UI right away
-	r.emitMessages(messages)
 
 	// Agent loop
 	for {
@@ -177,7 +173,6 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		default:
 		}
 
-		r.emit(StreamEvent{Type: EventPlan, Content: "Calling LLM API..."})
 		slog.Info("[RUNNER] Calling LLM API", "messages", messages, "all_tools", allTools, "system_prompt", r.systemPrompt)
 		resp, err := r.llmCaller.Call(messages, allTools, r.systemPrompt)
 		if err != nil {
@@ -186,7 +181,6 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 			slog.Error("[RUNNER] LLM API call failed", "error", err)
 			return err
 		}
-		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Received response with %d content blocks", len(resp.Content))})
 
 		// Log the raw response for debugging
 		respJSON, _ := json.MarshalIndent(resp, "", "  ")
@@ -198,8 +192,8 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		toolResults := []ContentBlock{}
 
 		// Immediately add assistant message and emit so UI shows response right away
-		messages = append(messages, Message{Role: "assistant", Content: resp.Content})
-		r.emitMessages(messages)
+		assistantMsg := Message{Role: "assistant", Content: resp.Content}
+		messages = append(messages, assistantMsg)
 
 		for _, block := range resp.Content {
 			if block.Type == "text" && block.Text != "" {
@@ -224,7 +218,7 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 					displayResult = displayResult[:200] + "..."
 				}
 				r.emit(StreamEvent{
-					Type:    EventResult,
+					Type:    EventToolResult,
 					Tool:    block.Name,
 					Content: displayResult,
 				})
@@ -238,15 +232,13 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		}
 
 		if len(toolResults) == 0 {
-			r.emit(StreamEvent{Type: EventPlan, Content: "No more tools to run, completing task"})
+			slog.Info("[RUNNER] No more tools to run, completing task")
 			break
 		}
 
-		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Running %d tool result(s) through agent loop", len(toolResults))})
-		messages = append(messages, Message{Role: "user", Content: toolResults})
-
-		// Emit with tool results so UI shows them
-		r.emitMessages(messages)
+		slog.Info("[RUNNER] Running %d tool result(s) through agent loop", "len_tool_results", len(toolResults))
+		toolResultMsg := Message{Role: "tool_result", Content: toolResults}
+		messages = append(messages, toolResultMsg)
 	}
 
 	// Store message history for future continuations
@@ -260,17 +252,6 @@ func (r *Runner) emit(event StreamEvent) {
 	if r.callback != nil {
 		r.callback(event)
 	}
-}
-
-func (r *Runner) emitMessages(messages []Message) {
-	data, err := json.Marshal(messages)
-	if err != nil {
-		return
-	}
-	r.emit(StreamEvent{
-		Type:     EventMessages,
-		Messages: string(data),
-	})
 }
 
 func (r *Runner) runTool(name string, args map[string]any, allTools map[string]tools.Tool) string {

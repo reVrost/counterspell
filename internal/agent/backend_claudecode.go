@@ -408,7 +408,7 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 		if len(content) > 200 {
 			content = content[:200] + "..."
 		}
-		b.emit(StreamEvent{Type: EventResult, Content: content})
+		b.emit(StreamEvent{Type: EventToolResult, Content: content})
 
 	case "result":
 		// Check if this is an error result
@@ -446,10 +446,6 @@ func (b *ClaudeCodeBackend) emitMessages() {
 		return
 	}
 	slog.Debug("[CLAUDE-CODE] emitMessages", "msg_count", len(msgs), "data_len", len(data))
-	b.callback(StreamEvent{
-		Type:     EventMessages,
-		Messages: string(data),
-	})
 }
 
 // --- Describable interface ---

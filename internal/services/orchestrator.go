@@ -2,9 +2,7 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"html"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -61,8 +59,6 @@ type Orchestrator struct {
 	resultCh        chan TaskResult
 	running         map[string]context.CancelFunc
 	mu              sync.Mutex
-	// Track how many messages have been saved per task to avoid duplicates
-	savedMessageCounts map[string]int
 }
 
 // NewOrchestrator creates a new orchestrator.
@@ -82,19 +78,18 @@ func NewOrchestrator(
 	}
 
 	orch := &Orchestrator{
-		repo:              repo,
-		eventBus:          eventBus,
-		settings:          settings,
-		github:            github,
+		repo:     repo,
+		eventBus: eventBus,
+		settings: settings,
+		github:   github,
 
-		gitReposManager:    NewGitManager(dataDir),
-		dataDir:           dataDir,
+		gitReposManager: NewGitManager(dataDir),
+		dataDir:         dataDir,
 
 		// Worker related fields
-		workerPool:         pool,
-		resultCh:           make(chan TaskResult, 100),
-		running:            make(map[string]context.CancelFunc),
-		savedMessageCounts:  make(map[string]int),
+		workerPool: pool,
+		resultCh:   make(chan TaskResult, 100),
+		running:    make(map[string]context.CancelFunc),
 	}
 
 	slog.Info("[ORCHESTRATOR] Worker pool created", "workers", 5, "prealloc", false)
@@ -198,6 +193,10 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 
 // ContinueTask continues a task with a follow-up message.
 func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, agentBackend, provider, model string) error {
+	if followUpMsg == "" {
+		return fmt.Errorf("follow-up message cannot be empty")
+	}
+
 	// Get task info
 	task, err := o.repo.Get(ctx, taskID)
 	if err != nil {
@@ -230,7 +229,7 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, ag
 	}
 
 	// Append user message to DB immediately
-	if err := o.repo.CreateMessage(ctx, taskID, runID, "user", followUpMsg, "", ""); err != nil {
+	if err := o.repo.CreateMessage(ctx, taskID, runID, "user", followUpMsg); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
 	}
 
@@ -330,18 +329,18 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	// Create agent run if not continuation
 	if !job.IsContinuation {
 		slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent)
-		_, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
+		runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
 		if err != nil {
 			slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err, "task_id", job.TaskID)
 			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 			return
 		}
 		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID)
-		
-		// Reset saved message count for new run
-		o.mu.Lock()
-		o.savedMessageCounts[job.TaskID] = 0
-		o.mu.Unlock()
+
+		// Append user message to DB immediately
+		if err := o.repo.CreateMessage(ctx, job.TaskID, runID, "user", job.Intent); err != nil {
+			slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
+		}
 	}
 
 	// Create worktree for isolated execution
@@ -353,7 +352,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		return
 	}
 	slog.Info("[ORCHESTRATOR] Worktree created", "task_id", job.TaskID, "path", worktreePath)
-	o.emit(job.TaskID, "plan", fmt.Sprintf("Created worktree at %s", worktreePath))
 
 	// Parse ModelID first to determine provider (format: "provider#model" e.g., "zai#glm-4.7" or "o#anthropic/claude-sonnet-4.5")
 	provider := ""
@@ -433,7 +431,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	execErr := backend.Run(ctx, job.Intent)
 	if execErr != nil {
 		slog.Error("[ORCHESTRATOR] Agent execution failed", "error", execErr, "task_id", job.TaskID)
-		o.emitError(job.TaskID, fmt.Sprintf("Agent execution failed: %s", execErr.Error()))
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: execErr.Error()}
 		return
 	}
@@ -444,7 +441,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	commitMessage := fmt.Sprintf("Task: %s", job.Intent)
 	if err := o.gitReposManager.CommitAndPush(job.TaskID, commitMessage); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to commit and push", "error", err)
-		o.emitError(job.TaskID, fmt.Sprintf("Failed to commit: %s", err.Error()))
 		// Don't fail task - commit might fail if no changes
 	}
 
@@ -474,27 +470,44 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 // handleAgentEvent processes agent events and publishes to UI.
 func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) {
 	switch event.Type {
-	case agent.EventPlan:
-		o.emit(taskID, "plan", event.Content)
 	case agent.EventTool:
-		o.emit(taskID, "code", fmt.Sprintf("[%s] %s", event.Tool, truncate(event.Args, 60)))
-	case agent.EventResult:
-		o.emit(taskID, "info", truncate(event.Content, 100))
+		o.saveMessage(taskID, agent.Message{Role: "tool", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
+	case agent.EventToolResult:
+		o.saveMessage(taskID, agent.Message{Role: "tool_result", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
 	case agent.EventText:
-		o.emit(taskID, "info", event.Content)
+		o.saveMessage(taskID, agent.Message{Role: "assistant", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
 	case agent.EventError:
-		o.emitError(taskID, event.Content)
 	case agent.EventDone:
-		o.emit(taskID, "success", event.Content)
-	case agent.EventMessages:
-		// Save message history to DB and publish agent_run_updated
-		if err := o.saveMessageHistory(taskID, event.Messages); err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to save message history", "error", err)
-		}
-		o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
 	case agent.EventTodo:
-		o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
 	}
+
+	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
+}
+
+// saveMessage saves a single agent message to database.
+func (o *Orchestrator) saveMessage(taskID string, msg agent.Message) {
+	// Get latest run ID
+	run, err := o.repo.GetLatestAgentRun(context.Background(), taskID)
+	if err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to get latest run", "error", err)
+		return
+	}
+
+	// Extract text content from content blocks
+	var textContent string
+	for _, block := range msg.Content {
+		if block.Type == "text" {
+			textContent += block.Text
+		}
+	}
+
+	slog.Info("[ORCHESTRATOR] Saving message", "task_id", taskID, "run_id", run.ID, "role", msg.Role, "content", textContent)
+	if err := o.repo.CreateMessage(context.Background(), taskID, run.ID, msg.Role, textContent); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to save message", "error", err)
+	}
+
+	// Publish agent_run_updated
+	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
 }
 
 // processResults processes task results from the worker pool.
@@ -613,9 +626,6 @@ func (o *Orchestrator) ResolveConflict(ctx context.Context, taskID, filePath, re
 	if err := os.WriteFile(fullPath, []byte(resolution), 0644); err != nil {
 		return fmt.Errorf("failed to write resolution: %w", err)
 	}
-
-	// Stage file
-	o.emit(taskID, "info", fmt.Sprintf("Resolved conflict in %s and staged", filePath))
 
 	return nil
 }
@@ -802,100 +812,6 @@ func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query 
 	// Fuzzy search files
 	matches := fuzzySearch(files, query, limit)
 	return matches, nil
-}
-
-// saveMessageHistory saves agent message history to database.
-func (o *Orchestrator) saveMessageHistory(taskID, messagesJSON string) error {
-	// Parse messages JSON
-	var messages []struct {
-		Role    string `json:"role"`
-		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text,omitempty"`
-		} `json:"content"`
-	}
-
-	if err := json.Unmarshal([]byte(messagesJSON), &messages); err != nil {
-		return fmt.Errorf("failed to parse messages: %w", err)
-	}
-
-	// Get latest run ID
-	run, err := o.repo.GetLatestAgentRun(context.Background(), taskID)
-	if err != nil {
-		return fmt.Errorf("failed to get latest run: %w", err)
-	}
-
-	// Get the number of messages already saved for this task
-	o.mu.Lock()
-	savedCount := o.savedMessageCounts[taskID]
-	o.mu.Unlock()
-
-	// Only save new messages (messages we haven't saved yet)
-	if len(messages) <= savedCount {
-		return nil // No new messages to save
-	}
-
-	newMessages := messages[savedCount:]
-	ctx := context.Background()
-
-	// Save each new message
-	for _, msg := range newMessages {
-		// Skip system messages for now
-		if msg.Role == "system" {
-			savedCount++
-			continue
-		}
-
-		// Extract text content from content blocks
-		var textContent string
-		for _, block := range msg.Content {
-			if block.Type == "text" {
-				textContent += block.Text
-			}
-		}
-
-		if err := o.repo.CreateMessage(ctx, taskID, run.ID, msg.Role, textContent, "", ""); err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to save message", "error", err)
-		}
-		savedCount++
-	}
-
-	// Update saved count
-	o.mu.Lock()
-	o.savedMessageCounts[taskID] = savedCount
-	o.mu.Unlock()
-
-	return nil
-}
-
-// emit sends an event to the UI.
-func (o *Orchestrator) emit(taskID, level, message string) {
-	colorClass := "text-gray-400"
-	switch level {
-	case "plan":
-		colorClass = "text-yellow-400"
-	case "code":
-		colorClass = "text-purple-400"
-	case "info":
-		colorClass = "text-blue-400"
-	case "success":
-		colorClass = "text-green-400"
-	case "error":
-		colorClass = "text-red-400"
-	}
-
-	htmlPayload := fmt.Sprintf(`<span class="%s">[%s]</span> %s`, colorClass, level, html.EscapeString(message))
-
-	o.eventBus.Publish(models.Event{
-		TaskID: taskID,
-		Type:   string(EventTypeLog),
-		Data:   htmlPayload,
-	})
-}
-
-// emitError sends an error event to the UI.
-func (o *Orchestrator) emitError(taskID, message string) {
-	o.emit(taskID, "error", message)
 }
 
 // truncate truncates a string to a maximum length.

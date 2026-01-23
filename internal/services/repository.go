@@ -191,19 +191,19 @@ func nullableString(s sql.NullString) *string {
 // --- Message Operations ---
 
 // CreateMessage creates a new message.
-func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, content, model, provider string) error {
+func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, content string) error {
 	id := shortuuid.New()
 	now := time.Now().UnixMilli()
 
 	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
-		ID:        id,
-		TaskID:    taskID,
-		RunID:     runID,
-		Role:      role,
-		Content:   content,
-		Parts:     "[]",
-		Model:     sql.NullString{String: model, Valid: model != ""},
-		Provider:  sql.NullString{String: provider, Valid: provider != ""},
+		ID:      id,
+		TaskID:  taskID,
+		RunID:   runID,
+		Role:    role,
+		Content: content,
+		Parts:   "[]",
+		// Model:     sql.NullString{String: model, Valid: model != ""},
+		// Provider:  sql.NullString{String: provider, Valid: provider != ""},
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
