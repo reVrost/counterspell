@@ -3,7 +3,7 @@
   import { tasksAPI } from "$lib/api";
   import { createTaskSSE } from "$lib/utils/sse";
   import type { PageData } from "./$types";
-  import type { Project, Task, Message, LogEntry } from "$lib/types";
+  import type { TaskResponse, Message } from "$lib/types";
   import TaskDetail from "$lib/components/TaskDetail.svelte";
   import Skeleton from "$lib/components/Skeleton.svelte";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
@@ -15,8 +15,7 @@
 
   let { data }: Props = $props();
 
-  let task = $state<Task | null>(null);
-  let project = $state<Project | null>(null);
+  let task = $state<TaskResponse | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let agentContent = $state("");
@@ -32,18 +31,18 @@
 
     try {
       const taskData = await tasksAPI.get(data.taskId);
+      task = taskData;
       agentContent = renderMessagesHTML(
         taskData.messages || [],
-        taskData.status === "in_progress",
+        taskData.task.status === "in_progress",
       );
-      diffContent = taskData.gitDiff
-        ? renderDiffHTML(taskData.gitDiff)
+      diffContent = taskData.git_diff
+        ? renderDiffHTML(taskData.git_diff)
         : '<div class="text-gray-500 italic">No changes made</div>';
-      logContent = taskData.logs?.map((log) => renderLogEntryHTML(log)) || [];
+      logContent = [];
 
-      taskStore.currentTask = task;
+      taskStore.currentTask = taskData.task;
 
-      // Set up SSE for real-time updates
       setupSSE(data.taskId);
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to load task";
@@ -72,8 +71,8 @@
       onStatus: (html: string) => {},
       onComplete: (status: string) => {
         if (task) {
-          task = { ...task, status: status as Task["status"] };
-          taskStore.currentTask = task;
+          task = { ...task, task: { ...task.task, status: status as Task["status"] } };
+          taskStore.currentTask = task.task;
         }
       },
       onError: (err) => {
@@ -127,21 +126,8 @@
     const iconColor = isUser ? "text-violet-400" : "text-blue-400";
 
     let contentHtml = "";
-    for (const block of msg.content) {
-      if (block.type === "text" && block.text) {
-        contentHtml += `<p class="text-sm text-gray-300 leading-normal">${escapeHtml(block.text)}</p>`;
-      } else if (block.type === "tool_use" && block.toolName) {
-        contentHtml += `
-					<div class="flex items-center gap-2 my-2">
-						<span class="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-mono text-blue-300">
-							${escapeHtml(block.toolName)}
-						</span>
-					</div>
-				`;
-      } else if (block.type === "tool_result") {
-        contentHtml += `<pre class="text-xs text-gray-400 font-mono whitespace-pre-wrap bg-gray-900/50 rounded p-2 my-2">${escapeHtml(block.text || "")}</pre>`;
-      }
-    }
+    // New format: content is a plain string
+    contentHtml += `<p class="text-sm text-gray-300 leading-normal">${escapeHtml(msg.content)}</p>`;
 
     return `
 			<div class="flex gap-3 px-4 py-3 ${bgClass} border-b border-white/5">
@@ -208,26 +194,6 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background flex flex-col">
-  <!-- Navigation Header -->
-  <div
-    class="px-4 py-2 border-b border-white/5 flex items-center gap-3 bg-popover shrink-0"
-  >
-    <a
-      href="/dashboard"
-      class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-      aria-label="Go back to dashboard"
-    >
-      <ArrowLeftIcon class="w-5 h-5" />
-    </a>
-    <div>
-      <span class="text-[10px] text-gray-600 font-mono"
-        >#{task?.id ?? "..."}</span
-      >
-      <h2 class="text-sm font-bold text-gray-200 line-clamp-1">
-        {task?.title ?? "Loading..."}
-      </h2>
-    </div>
-  </div>
 
   <!-- Task Detail Content -->
   <div class="flex-1 overflow-hidden">
@@ -276,8 +242,8 @@
           </button>
         </div>
       </div>
-    {:else if task && project}
-      <TaskDetail {task} {project} {agentContent} {diffContent} {logContent} />
+    {:else if task}
+      <TaskDetail task={task.task} {agentContent} {diffContent} {logContent} />
     {/if}
   </div>
 </div>

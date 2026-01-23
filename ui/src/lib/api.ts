@@ -1,6 +1,7 @@
 import type {
   Project,
   Task,
+  TaskResponse,
   FeedData,
   UserSettings,
   Message,
@@ -224,8 +225,8 @@ export const tasksAPI = {
     return fetchAPI<FeedData>("/api/v1/tasks");
   },
 
-  async get(id: string): Promise<Task> {
-    return fetchAPI<Task>(`/api/v1/task/${id}`);
+  async get(id: string): Promise<TaskResponse> {
+    return fetchAPI<TaskResponse>(`/api/v1/task/${id}`);
   },
 
   async create(
@@ -280,22 +281,16 @@ export const settingsAPI = {
   },
 
   async save(settings: UserSettings): Promise<void> {
-    const formData = new FormData();
-    formData.append("agent_backend", settings.agentBackend);
-    if (settings.openRouterKey) {
-      formData.append("openrouter_key", settings.openRouterKey);
-    }
-    if (settings.zaiKey) {
-      formData.append("zai_key", settings.zaiKey);
-    }
-    if (settings.anthropicKey) {
-      formData.append("anthropic_key", settings.anthropicKey);
-    }
-    if (settings.openAiKey) {
-      formData.append("openai_key", settings.openAiKey);
-    }
-
-    await postFormNoResponse("/api/v1/settings", formData);
+    await fetchAPI("/api/v1/settings", {
+      method: "POST",
+      body: JSON.stringify({
+        agent_backend: settings.agentBackend,
+        openrouter_key: settings.openRouterKey || "",
+        zai_key: settings.zaiKey || "",
+        anthropic_key: settings.anthropicKey || "",
+        openai_key: settings.openAiKey || "",
+      }),
+    });
   },
 };
 

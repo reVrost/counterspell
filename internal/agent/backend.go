@@ -41,9 +41,9 @@ type Backend interface {
 	// Blocks until completion; cancel via context.
 	Run(ctx context.Context, task string) error
 
-	// Send continues the conversation with a follow-up message.
-	// Must be called after a successful Run. Returns error if no session active.
-	Send(ctx context.Context, message string) error
+	// // Send continues the conversation with a follow-up message.
+	// // Must be called after a successful Run. Returns error if no session active.
+	// Send(ctx context.Context, message string) error
 
 	// Close releases resources. Safe to call multiple times.
 	Close() error

@@ -47,16 +47,27 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 }
 
 const upsertSettings = `-- name: UpsertSettings :exec
-UPDATE settings SET
-openrouter_key = ?,
-zai_key = ?,
-anthropic_key = ?,
-openai_key = ?,
-agent_backend = ?,
-provider = ?,
-model = ?,
-updated_at = ?
-WHERE id = 1
+INSERT OR REPLACE INTO settings (
+    id,
+    openrouter_key,
+    zai_key,
+    anthropic_key,
+    openai_key,
+    agent_backend,
+    provider,
+    model,
+    updated_at
+) VALUES (
+    1,
+    ?,
+    ?,
+    ?,
+    ?,
+    ?,
+    ?,
+    ?,
+    ?
+)
 `
 
 type UpsertSettingsParams struct {

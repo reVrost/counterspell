@@ -126,10 +126,10 @@ func (b *ClaudeCodeBackend) Run(ctx context.Context, task string) error {
 	return b.execute(ctx, task, false)
 }
 
-// Send continues the conversation with a follow-up message.
-func (b *ClaudeCodeBackend) Send(ctx context.Context, message string) error {
-	return b.execute(ctx, message, true)
-}
+// // Send continues the conversation with a follow-up message.
+// func (b *ClaudeCodeBackend) Send(ctx context.Context, message string) error {
+// 	return b.execute(ctx, message, true)
+// }
 
 // Close terminates any running claude process.
 func (b *ClaudeCodeBackend) Close() error {
@@ -366,7 +366,7 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 		id, _ := event["id"].(string)
 		input, _ := event["input"].(map[string]any)
 		inputJSON, _ := json.Marshal(input)
-		
+
 		// Add tool use to messages
 		b.mu.Lock()
 		b.messages = append(b.messages, Message{
@@ -380,7 +380,7 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 		})
 		b.mu.Unlock()
 		b.emitMessages()
-		
+
 		b.emit(StreamEvent{
 			Type:    EventTool,
 			Tool:    name,
@@ -391,7 +391,7 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 	case "tool_result":
 		content, _ := event["content"].(string)
 		toolUseID, _ := event["tool_use_id"].(string)
-		
+
 		// Add tool result to messages
 		b.mu.Lock()
 		b.messages = append(b.messages, Message{
@@ -404,7 +404,7 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 		})
 		b.mu.Unlock()
 		b.emitMessages()
-		
+
 		if len(content) > 200 {
 			content = content[:200] + "..."
 		}
@@ -439,7 +439,7 @@ func (b *ClaudeCodeBackend) emitMessages() {
 	msgs := make([]Message, len(b.messages))
 	copy(msgs, b.messages)
 	b.mu.Unlock()
-	
+
 	data, err := json.Marshal(msgs)
 	if err != nil {
 		slog.Error("[CLAUDE-CODE] emitMessages failed to marshal", "error", err)

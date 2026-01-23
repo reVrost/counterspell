@@ -1,13 +1,14 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { FolderIcon } from '@lucide/svelte';
-  import { Check, ChevronRight } from '@lucide/svelte';
+  import { Check, ChevronRight, X } from '@lucide/svelte';
   import { cn } from 'tailwind-variants';
 
   interface Task {
     id: string;
     title: string;
     repository_name?: string;
+    status?: string;
   }
 
   interface Props {
@@ -42,11 +43,19 @@
     <!-- Completed Layout -->
     <div class="flex justify-between items-center w-full">
       <div class="flex items-center gap-3">
-        <div
-          class="w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-base shrink-0"
-        >
-          <Check class="w-3 h-3" />
-        </div>
+        {#if task.status === 'failed'}
+          <div
+            class="w-6 h-6 rounded-full bg-red-900/40 text-red-500 flex items-center justify-center text-base shrink-0"
+          >
+            <X class="w-3 h-3" />
+          </div>
+        {:else}
+          <div
+            class="w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-base shrink-0"
+          >
+            <Check class="w-3 h-3" />
+          </div>
+        {/if}
         <div class="min-w-0">
           <div class="text-base leading-snug line-clamp-2">
             {task.title}

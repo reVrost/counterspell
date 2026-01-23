@@ -91,9 +91,9 @@ func (b *NativeBackend) Run(ctx context.Context, task string) error {
 }
 
 // Send continues the conversation with a follow-up message.
-func (b *NativeBackend) Send(ctx context.Context, message string) error {
-	return b.runner.Continue(ctx, message)
-}
+// func (b *NativeBackend) Send(ctx context.Context, message string) error {
+// 	return b.runner.Continue(ctx, message)
+// }
 
 // Close releases resources (no-op for native, context cancellation handles cleanup).
 func (b *NativeBackend) Close() error {

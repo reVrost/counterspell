@@ -10,7 +10,7 @@
     slide,
     DURATIONS,
   } from "$lib/utils/transitions";
-  import type { Task, Project } from "$lib/types";
+  import type { Task } from "$lib/types";
   import ChatInput from "./ChatInput.svelte";
   import TodoIndicator from "./TodoIndicator.svelte";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
@@ -20,20 +20,18 @@
   import GitMergeIcon from "@lucide/svelte/icons/git-merge";
   import MessageSquareIcon from "@lucide/svelte/icons/message-square";
   import GithubIcon from "@lucide/svelte/icons/github";
+  import SparklesIcon from "@lucide/svelte/icons/sparkles";
 
   interface Props {
     task: Task;
-    project: Project;
     agentContent: string;
     diffContent: string;
     logContent: string[];
   }
 
-  let { task, project, agentContent, diffContent, logContent }: Props =
-    $props();
+  let { task, agentContent, diffContent, logContent }: Props = $props();
 
   let activeTab = $state<"agent" | "diff" | "activity">("agent");
-  let showChat = $state(false);
   let confirmAction = $state<string | null>(null);
 
   function handleBack() {
@@ -41,7 +39,6 @@
   }
 
   async function handleChatSubmit(message: string, modelId: string) {
-    showChat = false;
     try {
       const response = await tasksAPI.chat(task.id, message, modelId);
       if (response.message) {
@@ -86,6 +83,11 @@
         } else {
           appState.showToast(response.message || "Changes merged", "success");
         }
+      } else if (action === "review") {
+        const response = await tasksAPI.chat(task.id, "Please review the changes made in this task", appState.activeModelId);
+        if (response.message) {
+          appState.showToast(response.message, "success");
+        }
       } else if (action === "discard") {
         const response = await tasksAPI.discard(task.id);
         appState.showToast(response.message || "Task discarded", "success");
@@ -116,9 +118,9 @@
       </button>
       <div>
         <div class="flex items-center gap-2">
-          <span class="{project.color} text-[10px]">
-            <i class="fas {project.icon}"></i>
-            {project.name}
+          <span class="text-gray-500 text-[10px]">
+            <i class="fas fa-folder"></i>
+            {task.repository_name || 'Unknown'}
           </span>
           <span class="text-[10px] text-gray-600 font-mono">#{task.id}</span>
         </div>
@@ -237,85 +239,73 @@
     {/if}
   </div>
 
-  <!-- Chat Input Overlay -->
-  {#if showChat}
+  <!-- Chat Input Overlay - Always visible -->
+  <div
+    class="absolute bottom-20 inset-x-0 z-20 pb-6 px-3"
+  >
     <div
-      class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3"
-      transition:slide|local={{ direction: "up", duration: DURATIONS.quick }}
-    >
-      <div
-        class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
-      ></div>
-      <div class="relative mx-auto max-w-xl">
-        <ChatInput
-          mode="chat"
-          taskId={task.id}
-          placeholder="Continue the conversation..."
-          onSubmit={handleChatSubmit}
-          onClose={() => (showChat = false)}
-        />
-      </div>
+      class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
+    ></div>
+    <div class="relative mx-auto max-w-xl">
+      <ChatInput
+        mode="chat"
+        taskId={task.id}
+        placeholder="Continue the conversation..."
+        onSubmit={handleChatSubmit}
+      />
     </div>
-  {/if}
+  </div>
 
-  <!-- Bottom Actions Toolbar -->
+  <!-- Bottom Actions Toolbar - Navigator Style -->
   <div
     class="shrink-0 px-4 py-3 border-t border-white/[0.06] bg-popover/95 backdrop-blur-sm pb-6"
-    class:invisible={showChat}
-    class:pointer-events-none={showChat}
   >
-    <!-- Secondary actions row -->
-    <div class="flex justify-center gap-1 space-y-3">
-      <button
-        onclick={() => (confirmAction = "retry")}
-        class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
-        aria-label="Retry task"
-      >
-        <RotateCcwIcon class="w-3 h-3" />
-        <span>Retry</span>
-      </button>
-      <span class="text-gray-700 self-center">·</span>
-      <button
-        onclick={() => (confirmAction = "clear")}
-        class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
-        aria-label="Clear history"
-      >
-        <EraserIcon class="w-3 h-3" />
-        <span>Clear</span>
-      </button>
-      {#if task.status === "review"}
-        <span class="text-gray-700 self-center">·</span>
-        <button
-          onclick={() => (confirmAction = "pr")}
-          class="h-11 px-4 rounded-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] active:bg-white/[0.08] transition-all"
-          aria-label="Create pull request"
+    <div class="flex items-center justify-center gap-2">
+      <div class="flex-1 flex items-center justify-center">
+        <div
+          class="inline-flex items-center gap-1 bg-[#1a1a1a] rounded-full px-1 border border-white/[0.06]"
         >
-          <GithubIcon class="w-3 h-3" />
-          <span>Create PR</span>
-        </button>
-      {/if}
-    </div>
+          <!-- Chat -->
+          <button
+            type="button"
+            onclick={() => {}}
+            class="relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 text-gray-400 hover:text-gray-300 hover:bg-white/[0.04]"
+            aria-label="Chat"
+          >
+            <MessageSquareIcon class="w-6 h-6" strokeWidth={2} />
+          </button>
 
-    <!-- Main action buttons -->
-    <div class="flex gap-2.5 mt-3">
-      <button
-        onclick={() => (showChat = true)}
-        class="flex-1 h-12 bg-card hover:bg-card/80 active:bg-card/60 border border-white/[0.08] hover:border-purple-500/30 text-white rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] relative group"
-      >
-        <MessageSquareIcon
-          class="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors"
-        />
-        <span class="text-sm font-medium">Chat</span>
-      </button>
-      {#if task.status === "review"}
-        <button
-          onclick={() => (confirmAction = "merge")}
-          class="flex-1 h-12 bg-white hover:bg-gray-100 active:bg-gray-200 text-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-white/10"
-        >
-          <GitMergeIcon class="w-4 h-4" />
-          <span class="text-sm font-medium">Merge</span>
-        </button>
-      {/if}
+          <!-- Merge to Main -->
+          <button
+            type="button"
+            onclick={() => (confirmAction = "merge")}
+            class="relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 text-gray-400 hover:text-gray-300 hover:bg-white/[0.04]"
+            aria-label="Merge to main"
+          >
+            <GitMergeIcon class="w-6 h-6" strokeWidth={2} />
+          </button>
+
+          <!-- Create PR -->
+          <button
+            type="button"
+            onclick={() => (confirmAction = "pr")}
+            class="relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 text-gray-400 hover:text-gray-300 hover:bg-white/[0.04]"
+            aria-label="Create pull request"
+          >
+            <GithubIcon class="w-6 h-6" strokeWidth={2} />
+          </button>
+
+          <!-- Request Review -->
+          <button
+            type="button"
+            onclick={() => (confirmAction = "review")}
+            class="relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 text-gray-400 hover:text-gray-300 hover:bg-white/[0.04]"
+            aria-label="Request AI review"
+          >
+            <SparklesIcon class="w-6 h-6" strokeWidth={2} />
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -459,6 +449,37 @@
                 class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
               >
                 Merge
+              </button>
+            </div>
+          </div>
+        {:else if confirmAction === "review"}
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center"
+              >
+                <SparklesIcon class="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <h3 class="font-semibold text-white">Request AI Review</h3>
+                <p class="text-xs text-gray-400">Get code review feedback</p>
+              </div>
+            </div>
+            <p class="text-sm text-gray-300">
+              This will request an AI code review of the changes made in this task.
+            </p>
+            <div class="flex gap-2 pt-2">
+              <button
+                onclick={() => (confirmAction = null)}
+                class="flex-1 h-9 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onclick={() => handleAction("review")}
+                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
+              >
+                Request Review
               </button>
             </div>
           </div>

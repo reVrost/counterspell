@@ -20,37 +20,67 @@ export interface GitHubRepo {
 
 export interface Task {
 	id: string;
-	repository_id?: string;
-	repository_name?: string;
+	repository_id?: string | null;
+	repository_name?: string | null;
 	title: string;
 	intent: string;
 	status: TaskStatus;
-	position?: number;
-	current_step?: string;
+	position?: number | null;
 	created_at: number;
 	updated_at: number;
-	assigned_agent_id?: string;
-	assigned_user_id?: string;
-	// Frontend-added fields (from API enrichment)
-	gitDiff?: string;
-	messages?: Message[];
-	logs?: LogEntry[];
 }
 
 // Task Status Flow: pending → planning → in_progress → review → done (or failed)
 export type TaskStatus = 'pending' | 'planning' | 'in_progress' | 'review' | 'done' | 'failed';
 
 export interface Message {
-	role: 'user' | 'assistant';
-	content: MessageContent[];
+	id: string;
+	task_id: string;
+	run_id?: string | null;
+	role: 'user' | 'assistant' | 'system';
+	parts: string; // JSON string
+	model?: string | null;
+	provider?: string | null;
+	content: string;
+	tool_id?: string | null;
+	created_at: number;
+	updated_at: number;
+	finished_at?: number | null;
 }
 
-export interface MessageContent {
-	type: 'text' | 'tool_use' | 'tool_result';
-	text?: string;
-	toolName?: string;
-	toolInput?: string;
-	toolId?: string;
+export interface AgentRun {
+	id: string;
+	task_id: string;
+	prompt: string;
+	agent_backend: string;
+	summary_message_id?: string | null;
+	cost: number;
+	message_count: number;
+	prompt_tokens: number;
+	completion_tokens: number;
+	completed_at?: number | null;
+	created_at: number;
+	updated_at: number;
+	messages?: Message[];
+	artifacts?: Artifact[];
+}
+
+export interface Artifact {
+	id: string;
+	run_id: string;
+	path: string;
+	content: string;
+	version: number;
+	created_at: number;
+	updated_at: number;
+}
+
+export interface TaskResponse {
+	task: Task;
+	messages: Message[];
+	artifacts: Artifact[];
+	agent_runs?: AgentRun[];
+	git_diff?: string;
 }
 
 export interface LogEntry {

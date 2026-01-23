@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -74,6 +75,8 @@ func (s *SettingsService) UpdateSettings(ctx context.Context, settings *Settings
 		model = *settings.Model
 	}
 
+	slog.Info("upserting settings", slog.String("provider", provider), slog.String("model", model), "settings", settings)
+
 	err := s.db.Queries.UpsertSettings(ctx, sqlc.UpsertSettingsParams{
 		OpenrouterKey: sql.NullString{String: settings.OpenRouterKey, Valid: settings.OpenRouterKey != ""},
 		ZaiKey:        sql.NullString{String: settings.ZaiKey, Valid: settings.ZaiKey != ""},
@@ -108,32 +111,32 @@ func (s *SettingsService) ValidateSettings(settings *Settings) error {
 	}
 
 	// Validate that selected backend has a corresponding API key
-	provider := "anthropic"
-	if settings.Provider != nil {
-		provider = *settings.Provider
-	}
+	// provider := "anthropic"
+	// if settings.Provider != nil {
+	// 	provider = *settings.Provider
+	// }
 
-	switch provider {
-	case "openai":
-		if settings.OpenAIKey == "" {
-			return fmt.Errorf("OpenAI API key required when using OpenAI provider")
-		}
-	case "anthropic":
-		if settings.AnthropicKey == "" {
-			return fmt.Errorf("anthropic API key required when using Anthropic provider")
-		}
-	case "openrouter":
-		if settings.OpenRouterKey == "" {
-			return fmt.Errorf("OpenRouter API key required when using OpenRouter provider")
-		}
-	case "zai":
-		if settings.ZaiKey == "" {
-			return fmt.Errorf("zai API key required when using Zai provider")
-		}
-	case "":
-		// No provider set - use default
-		return nil
-	}
+	// switch provider {
+	// case "openai":
+	// 	if settings.OpenAIKey == "" {
+	// 		return fmt.Errorf("OpenAI API key required when using OpenAI provider")
+	// 	}
+	// case "anthropic":
+	// 	if settings.AnthropicKey == "" {
+	// 		return fmt.Errorf("anthropic API key required when using Anthropic provider")
+	// 	}
+	// case "openrouter":
+	// 	if settings.OpenRouterKey == "" {
+	// 		return fmt.Errorf("OpenRouter API key required when using OpenRouter provider")
+	// 	}
+	// case "zai":
+	// 	if settings.ZaiKey == "" {
+	// 		return fmt.Errorf("zai API key required when using Zai provider")
+	// 	}
+	// case "":
+	// No provider set - use default
+	// return nil
+	// }
 
 	return nil
 }
@@ -148,7 +151,7 @@ func (s *SettingsService) GetAPIKey(ctx context.Context) (string, string, string
 		return "", "", "", errors.New("settings not configured")
 	}
 
-	provider := "anthropic" // default
+	provider := "anthropic"    // default
 	model := "claude-opus-4-5" // default
 	if settings.Provider != nil {
 		provider = *settings.Provider

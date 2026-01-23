@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/revrost/code/counterspell/internal/agent/tools"
 	"github.com/revrost/code/counterspell/internal/llm"
@@ -136,9 +137,9 @@ func (r *Runner) Run(ctx context.Context, task string) error {
 }
 
 // Continue resumes the agent loop with a new follow-up message.
-func (r *Runner) Continue(ctx context.Context, followUpMessage string) error {
-	return r.runWithMessage(ctx, followUpMessage, true)
-}
+// func (r *Runner) Continue(ctx context.Context, followUpMessage string) error {
+// 	return r.runWithMessage(ctx, followUpMessage, true)
+// }
 
 // runWithMessage is the core loop that handles both new runs and continuations.
 func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isContinuation bool) error {
@@ -177,10 +178,12 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		}
 
 		r.emit(StreamEvent{Type: EventPlan, Content: "Calling LLM API..."})
+		slog.Info("[RUNNER] Calling LLM API", "messages", messages, "all_tools", allTools, "system_prompt", r.systemPrompt)
 		resp, err := r.llmCaller.Call(messages, allTools, r.systemPrompt)
 		if err != nil {
 			r.messageHistory = messages
 			r.emit(StreamEvent{Type: EventError, Content: err.Error()})
+			slog.Error("[RUNNER] LLM API call failed", "error", err)
 			return err
 		}
 		r.emit(StreamEvent{Type: EventPlan, Content: fmt.Sprintf("Received response with %d content blocks", len(resp.Content))})

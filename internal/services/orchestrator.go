@@ -327,18 +327,13 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	// Create agent run if not continuation
 	if !job.IsContinuation {
 		slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent)
-		runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
+		_, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
 		if err != nil {
 			slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err, "task_id", job.TaskID)
 			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 			return
 		}
-		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID, "run_id", runID)
-
-		// Create initial user message with the intent
-		if err := o.repo.CreateMessage(ctx, job.TaskID, runID, "user", job.Intent, "", ""); err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err, "task_id", job.TaskID)
-		}
+		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID)
 	}
 
 	// Create worktree for isolated execution
@@ -362,12 +357,21 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
 
-	// Parse ModelID if provided
+	// Parse ModelID if provided (format: "provider#model" e.g., "zai#glm-4.7" or "o#anthropic/claude-sonnet-4.5")
 	if job.ModelID != "" {
-		parts := strings.SplitN(job.ModelID, ":", 2)
+		parts := strings.SplitN(job.ModelID, "#", 2)
 		if len(parts) == 2 {
-			provider = parts[0]
+			providerPrefix := parts[0]
 			model = parts[1]
+			// Map provider prefix to actual provider name
+			switch providerPrefix {
+			case "o":
+				provider = "openrouter"
+			case "zai":
+				provider = "zai"
+			default:
+				provider = providerPrefix
+			}
 		} else {
 			model = parts[0]
 		}
@@ -412,13 +416,7 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 	// Execute task
 	slog.Info("[ORCHESTRATOR] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation)
-	var execErr error
-	if job.IsContinuation {
-		execErr = backend.Send(ctx, job.Intent)
-	} else {
-		execErr = backend.Run(ctx, job.Intent)
-	}
-
+	execErr := backend.Run(ctx, job.Intent)
 	if execErr != nil {
 		slog.Error("[ORCHESTRATOR] Agent execution failed", "error", execErr, "task_id", job.TaskID)
 		o.emitError(job.TaskID, fmt.Sprintf("Agent execution failed: %s", execErr.Error()))
