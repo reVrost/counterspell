@@ -143,6 +143,11 @@ func (s *SettingsService) ValidateSettings(settings *Settings) error {
 
 // GetAPIKey returns API key for the current provider.
 func (s *SettingsService) GetAPIKey(ctx context.Context) (string, string, string, error) {
+	return s.GetAPIKeyForProvider(ctx, "")
+}
+
+// GetAPIKeyForProvider returns API key for the specified provider (or default if empty).
+func (s *SettingsService) GetAPIKeyForProvider(ctx context.Context, provider string) (string, string, string, error) {
 	settings, err := s.GetSettings(ctx)
 	if err != nil {
 		return "", "", "", err
@@ -151,11 +156,15 @@ func (s *SettingsService) GetAPIKey(ctx context.Context) (string, string, string
 		return "", "", "", errors.New("settings not configured")
 	}
 
-	provider := "anthropic"    // default
-	model := "claude-opus-4-5" // default
-	if settings.Provider != nil {
-		provider = *settings.Provider
+	// Use provided provider or default from settings
+	if provider == "" {
+		provider = "anthropic" // default
+		if settings.Provider != nil {
+			provider = *settings.Provider
+		}
 	}
+
+	model := "claude-opus-4-5" // default
 	if settings.Model != nil {
 		model = *settings.Model
 	}

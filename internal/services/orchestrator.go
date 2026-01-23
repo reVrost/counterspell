@@ -347,17 +347,9 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	slog.Info("[ORCHESTRATOR] Worktree created", "task_id", job.TaskID, "path", worktreePath)
 	o.emit(job.TaskID, "plan", fmt.Sprintf("Created worktree at %s", worktreePath))
 
-	// Get settings for API key and provider
-	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID)
-	apiKey, provider, model, err := o.settings.GetAPIKey(ctx)
-	if err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to get API key", "error", err)
-		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
-		return
-	}
-	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
-
-	// Parse ModelID if provided (format: "provider#model" e.g., "zai#glm-4.7" or "o#anthropic/claude-sonnet-4.5")
+	// Parse ModelID first to determine provider (format: "provider#model" e.g., "zai#glm-4.7" or "o#anthropic/claude-sonnet-4.5")
+	provider := ""
+	model := ""
 	if job.ModelID != "" {
 		parts := strings.SplitN(job.ModelID, "#", 2)
 		if len(parts) == 2 {
@@ -376,6 +368,20 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			model = parts[0]
 		}
 	}
+
+	// Get API key for the provider (or default if provider is empty)
+	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID, "provider", provider)
+	apiKey, actualProvider, actualModel, err := o.settings.GetAPIKeyForProvider(ctx, provider)
+	if err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to get API key", "error", err)
+		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
+		return
+	}
+	provider = actualProvider
+	if model == "" {
+		model = actualModel
+	}
+	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
 
 	// Create LLM provider
 	var llmProvider llm.Provider
