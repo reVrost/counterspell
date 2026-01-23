@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { taskStore } from "$lib/stores/tasks.svelte";
-  import { tasksAPI } from "$lib/api";
-  import { createTaskSSE } from "$lib/utils/sse";
-  import type { PageData } from "./$types";
-  import type { TaskResponse, Message } from "$lib/types";
-  import TaskDetail from "$lib/components/TaskDetail.svelte";
-  import Skeleton from "$lib/components/Skeleton.svelte";
-  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
-  import { onDestroy } from "svelte";
+  import { taskStore } from '$lib/stores/tasks.svelte';
+  import { tasksAPI } from '$lib/api';
+  import { createTaskSSE } from '$lib/utils/sse';
+  import type { PageData } from './$types';
+  import type { TaskResponse, Message } from '$lib/types';
+  import TaskDetail from '$lib/components/TaskDetail.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+  import { onDestroy } from 'svelte';
 
   interface Props {
     data: PageData;
@@ -18,8 +18,8 @@
   let task = $state<TaskResponse | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let agentContent = $state("");
-  let diffContent = $state("");
+  let agentContent = $state('');
+  let diffContent = $state('');
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
 
@@ -34,7 +34,7 @@
       task = taskData;
       agentContent = renderMessagesHTML(
         taskData.messages || [],
-        taskData.task.status === "in_progress",
+        taskData.task.status === 'in_progress'
       );
       diffContent = taskData.git_diff
         ? renderDiffHTML(taskData.git_diff)
@@ -45,8 +45,8 @@
 
       setupSSE(data.taskId);
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load task";
-      console.error("Task load error:", err);
+      error = err instanceof Error ? err.message : 'Failed to load task';
+      console.error('Task load error:', err);
     } finally {
       loading = false;
     }
@@ -71,20 +71,17 @@
       onStatus: (html: string) => {},
       onComplete: (status: string) => {
         if (task) {
-          task = { ...task, task: { ...task.task, status: status as Task["status"] } };
+          task = { ...task, task: { ...task.task, status: status as Task['status'] } };
           taskStore.currentTask = task.task;
         }
       },
       onError: (err) => {
-        console.error("Task SSE error:", err);
+        console.error('Task SSE error:', err);
       },
     });
   }
 
-  function renderMessagesHTML(
-    messages: Message[],
-    isInProgress: boolean,
-  ): string {
+  function renderMessagesHTML(messages: Message[], isInProgress: boolean): string {
     if (messages.length === 0) {
       return '<div class="p-5 text-gray-500 italic text-xs">No agent output</div>';
     }
@@ -93,7 +90,7 @@
     for (const msg of messages) {
       html += renderMessageBubbleHTML(msg);
     }
-    html += "</div>";
+    html += '</div>';
 
     if (isInProgress) {
       html += `
@@ -118,21 +115,19 @@
   }
 
   function renderMessageBubbleHTML(msg: Message): string {
-    const isUser = msg.role === "user";
-    const bgClass = isUser
-      ? "bg-violet-500/10 border-violet-500/20"
-      : "bg-gray-800/50 border-gray-700/50";
-    const icon = isUser ? "fa-user" : "fa-robot";
-    const iconColor = isUser ? "text-violet-400" : "text-blue-400";
+    const isUser = msg.role === 'user';
+    const bgClass = isUser ? 'border-violet-500/20' : 'border-gray-700/50';
+    const alias = isUser ? 'U' : 'A';
+    const iconColor = isUser ? 'text-violet-400' : 'text-blue-400';
 
-    let contentHtml = "";
+    let contentHtml = '';
     // New format: content is a plain string
     contentHtml += `<p class="text-sm text-gray-300 leading-normal">${escapeHtml(msg.content)}</p>`;
 
     return `
-			<div class="flex gap-3 px-4 py-3 ${bgClass} border-b border-white/5">
-				<div class="w-8 h-8 rounded-full ${iconColor} bg-white/5 flex items-center justify-center shrink-0">
-					<i class="fas ${icon} text-xs"></i>
+			<div class="flex gap-3 px-4 py-3 ${bgClass} items-center border-b border-white/5">
+				<div class="w-6 h-6 rounded-full ${iconColor} bg-white/5 flex items-center justify-center shrink-0">
+            ${alias}
 				</div>
 				<div class="flex-1 min-w-0">
 					${contentHtml}
@@ -144,16 +139,16 @@
   function renderDiffHTML(diff: string): string {
     if (!diff) return '<div class="text-gray-500 italic">No changes made</div>';
 
-    let html = "";
-    for (const line of diff.split("\n")) {
+    let html = '';
+    for (const line of diff.split('\n')) {
       const escapedLine = escapeHtml(line);
-      if (line.startsWith("+")) {
+      if (line.startsWith('+')) {
         html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-xs border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith("-")) {
+      } else if (line.startsWith('-')) {
         html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-xs border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith("@@")) {
+      } else if (line.startsWith('@@')) {
         html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-xs">${escapedLine}</div>`;
-      } else if (line.trim() !== "") {
+      } else if (line.trim() !== '') {
         html += `<div class="px-3 py-1 text-gray-400 font-mono text-xs">${escapedLine}</div>`;
       }
     }
@@ -171,11 +166,11 @@
 
   function escapeHtml(text: string): string {
     return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   $effect(() => {
@@ -190,11 +185,10 @@
 </script>
 
 <svelte:head>
-  <title>{task?.title || "Task"} - Counterspell</title>
+  <title>{task?.title || 'Task'} - Counterspell</title>
 </svelte:head>
 
 <div class="min-h-screen bg-background flex flex-col">
-
   <!-- Task Detail Content -->
   <div class="flex-1 overflow-hidden">
     {#if loading}

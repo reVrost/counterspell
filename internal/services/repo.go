@@ -307,19 +307,36 @@ func (m *GitManager) GetDiff(taskID string) (string, error) {
 
 	slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
 
-	// Get diff from main to HEAD (all changes on this branch compared to main)
-	cmd := exec.Command("git", "diff", "origin/main...HEAD")
+	// Get current branch name
+	branchCmd := exec.Command("git", "branch", "--show-current")
+	branchCmd.Dir = worktreePath
+	branchOutput, err := branchCmd.Output()
+	if err != nil {
+		slog.Error("[GIT] Failed to get branch name", "error", err)
+		return "", fmt.Errorf("git branch failed: %w", err)
+	}
+	currentBranch := strings.TrimSpace(string(branchOutput))
+
+	// Try origin/main first (remote tracking branch)
+	cmd := exec.Command("git", "diff", "origin/main", currentBranch)
 	cmd.Dir = worktreePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Warn("[GIT] GetDiff origin/main...HEAD failed, trying main...HEAD", "error", err)
-		// Fallback to local main if origin/main doesn't exist
-		cmd = exec.Command("git", "diff", "main...HEAD")
+		slog.Warn("[GIT] GetDiff origin/main failed, trying main", "error", err)
+		// Fallback to local main branch
+		cmd = exec.Command("git", "diff", "main", currentBranch)
 		cmd.Dir = worktreePath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
-			slog.Error("[GIT] GetDiff failed", "error", err, "output", string(output))
-			return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
+			slog.Warn("[GIT] GetDiff main failed, trying master", "error", err)
+			// Try master branch
+			cmd = exec.Command("git", "diff", "master", currentBranch)
+			cmd.Dir = worktreePath
+			output, err = cmd.CombinedOutput()
+			if err != nil {
+				slog.Error("[GIT] GetDiff failed for all branches", "error", err)
+				return "", fmt.Errorf("git diff failed: %w\nOutput: %s", err, string(output))
+			}
 		}
 	}
 

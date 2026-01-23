@@ -61,6 +61,8 @@ type Orchestrator struct {
 	resultCh        chan TaskResult
 	running         map[string]context.CancelFunc
 	mu              sync.Mutex
+	// Track how many messages have been saved per task to avoid duplicates
+	savedMessageCounts map[string]int
 }
 
 // NewOrchestrator creates a new orchestrator.
@@ -80,18 +82,19 @@ func NewOrchestrator(
 	}
 
 	orch := &Orchestrator{
-		repo:     repo,
-		eventBus: eventBus,
-		settings: settings,
-		github:   github,
+		repo:              repo,
+		eventBus:          eventBus,
+		settings:          settings,
+		github:            github,
 
-		gitReposManager: NewGitManager(dataDir),
-		dataDir:         dataDir,
+		gitReposManager:    NewGitManager(dataDir),
+		dataDir:           dataDir,
 
 		// Worker related fields
-		workerPool: pool,
-		resultCh:   make(chan TaskResult, 100),
-		running:    make(map[string]context.CancelFunc),
+		workerPool:         pool,
+		resultCh:           make(chan TaskResult, 100),
+		running:            make(map[string]context.CancelFunc),
+		savedMessageCounts:  make(map[string]int),
 	}
 
 	slog.Info("[ORCHESTRATOR] Worker pool created", "workers", 5, "prealloc", false)
@@ -334,6 +337,11 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			return
 		}
 		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID)
+		
+		// Reset saved message count for new run
+		o.mu.Lock()
+		o.savedMessageCounts[job.TaskID] = 0
+		o.mu.Unlock()
 	}
 
 	// Create worktree for isolated execution
@@ -817,11 +825,24 @@ func (o *Orchestrator) saveMessageHistory(taskID, messagesJSON string) error {
 		return fmt.Errorf("failed to get latest run: %w", err)
 	}
 
-	// Save each message
+	// Get the number of messages already saved for this task
+	o.mu.Lock()
+	savedCount := o.savedMessageCounts[taskID]
+	o.mu.Unlock()
+
+	// Only save new messages (messages we haven't saved yet)
+	if len(messages) <= savedCount {
+		return nil // No new messages to save
+	}
+
+	newMessages := messages[savedCount:]
 	ctx := context.Background()
-	for _, msg := range messages {
+
+	// Save each new message
+	for _, msg := range newMessages {
 		// Skip system messages for now
 		if msg.Role == "system" {
+			savedCount++
 			continue
 		}
 
@@ -836,7 +857,13 @@ func (o *Orchestrator) saveMessageHistory(taskID, messagesJSON string) error {
 		if err := o.repo.CreateMessage(ctx, taskID, run.ID, msg.Role, textContent, "", ""); err != nil {
 			slog.Error("[ORCHESTRATOR] Failed to save message", "error", err)
 		}
+		savedCount++
 	}
+
+	// Update saved count
+	o.mu.Lock()
+	o.savedMessageCounts[taskID] = savedCount
+	o.mu.Unlock()
 
 	return nil
 }
