@@ -19,14 +19,62 @@
 
   interface Props {
     task: Task;
-    agentContent: string;
+    messages: Message[];
     diffContent: string;
     logContent: string[];
+    isInProgress?: boolean;
   }
 
-  let { task, agentContent, diffContent, logContent }: Props = $props();
+  let { task, messages, diffContent, logContent, isInProgress }: Props = $props();
 
-  let activeTab = $state<'agent' | 'diff' | 'activity'>('agent');
+  // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
+  type DisplayItem =
+    | { type: 'message'; message: Message }
+    | { type: 'thinking'; items: { command: string; result: string }[] };
+
+  let displayItems = $derived.by(() => {
+    const items: DisplayItem[] = [];
+    let i = 0;
+    while (i < messages.length) {
+      const msg = messages[i];
+      if (msg.role === 'tool' || msg.role === 'tool_result') {
+        const thinkingItems: { command: string; result: string }[] = [];
+        while (
+          i < messages.length &&
+          (messages[i].role === 'tool' || messages[i].role === 'tool_result')
+        ) {
+          const toolMsg = messages[i];
+          if (toolMsg.role === 'tool') {
+            let result = '';
+            if (i + 1 < messages.length && messages[i + 1].role === 'tool_result') {
+              result = messages[i + 1].content;
+              i++;
+            }
+            thinkingItems.push({ command: toolMsg.content, result });
+          } else {
+            thinkingItems.push({ command: 'Command Trace', result: toolMsg.content });
+          }
+          i++;
+        }
+        items.push({ type: 'thinking', items: thinkingItems });
+      } else {
+        items.push({ type: 'message', message: msg });
+        i++;
+      }
+    }
+    return items;
+  });
+
+  function escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  let activeTab = $state<'agent' | 'diff'>('agent');
   let confirmAction = $state<string | null>(null);
 
   function handleBack() {
@@ -117,35 +165,35 @@
       </div>
     </div>
 
-    <div class="flex items-center justify-end gap-0">
-      <div class="w-6 flex justify-end pr-2">
-        {#if task.status === 'pending'}
-          <div class="w-1.5 h-1.5 rounded-full bg-gray-400" title="Pending"></div>
-        {:else if task.status === 'in_progress'}
-          <div class="w-1.5 h-1.5 rounded-full bg-orange-400" title="In Progress"></div>
-        {:else if task.status === 'review'}
-          <div class="w-1.5 h-1.5 rounded-full bg-blue-400" title="Review"></div>
-        {:else if task.status === 'done'}
-          <div class="w-1.5 h-1.5 rounded-full bg-green-400" title="Done"></div>
-        {:else if task.status === 'failed'}
-          <div class="w-1.5 h-1.5 rounded-full bg-red-400" title="Failed"></div>
-        {/if}
-      </div>
-      <button
-        onclick={() => (confirmAction = 'discard')}
-        class="w-11 h-11 flex items-center justify-center text-gray-600 hover:text-red-400 transition focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-lg"
-        aria-label="Discard task"
-      >
-        <TrashIcon class="w-5 h-5" />
-      </button>
+    <!-- Status Badge -->
+    <div
+      class="flex items-center px-2 py-1 rounded-full bg-white/5 border border-white/10 gap-1.5 h-7"
+    >
+      {#if task.status === 'pending'}
+        <div class="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+        <span class="text-[9px] uppercase font-bold tracking-wider text-gray-400">Pending</span>
+      {:else if task.status === 'in_progress'}
+        <div class="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-glow"></div>
+        <span class="text-[9px] uppercase font-bold tracking-wider text-orange-400">Running</span>
+      {:else if task.status === 'review'}
+        <div class="w-1.5 h-1.5 rounded-full bg-blue-400 pulse-glow"></div>
+        <span class="text-[9px] uppercase font-bold tracking-wider text-blue-400">Ready</span>
+      {:else if task.status === 'done'}
+        <div class="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+        <span class="text-[9px] uppercase font-bold tracking-wider text-green-400">Merged</span>
+      {:else if task.status === 'failed'}
+        <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
+        <span class="text-[9px] uppercase font-bold tracking-wider text-red-400">Failed</span>
+      {/if}
     </div>
   </div>
 
   <!-- Tabs Container -->
-  <div class="flex items-center justify-between p-2 bg-popover shrink-0 border-b border-white/5">
-    <div class="w-6"></div>
+  <div
+    class="flex items-center justify-between p-2 px-7 bg-popover shrink-0 border-b border-white/5"
+  >
     <div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50">
-      {#each ['agent', 'diff', 'activity'] as tab}
+      {#each ['agent', 'diff'] as tab}
         <button
           onclick={() => (activeTab = tab as typeof activeTab)}
           class={cn(
@@ -168,11 +216,37 @@
 
     <!-- Status Indicator -->
 
-    <div class="flex items-center justify-between gap-2 pr-2">
-      <div class="flex items-center justify-between gap-2">
-        <GitMergeIcon class="w-5" strokeWidth={2} />
-        <GithubIcon class="w-5 h-5" strokeWidth={2} />
-      </div>
+    <div class="flex items-center justify-end gap-2">
+      <!-- Action Buttons -->
+      {#if task.status !== 'in_progress' && task.status !== 'done'}
+        <div class="flex items-center gap-2">
+          <button
+            onclick={() => (confirmAction = 'merge')}
+            class="h-8 px-3 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-gray-300 transition-all flex items-center gap-1.5"
+            title="Merge directly to main"
+          >
+            <GithubIcon class="w-3.5 h-3.5" />
+            <span class="hidden sm:inline">Merge</span>
+          </button>
+
+          <button
+            onclick={() => (confirmAction = 'pr')}
+            class="h-8 px-3 rounded-md bg-white hover:bg-gray-100 text-black text-[11px] font-bold transition-all shadow-sm flex items-center gap-1.5"
+            title="Create a Pull Request"
+          >
+            <GitMergeIcon class="w-3.5 h-3.5" />
+            <span>Merge</span>
+          </button>
+        </div>
+      {/if}
+
+      <!-- <button -->
+      <!--   onclick={() => (confirmAction = 'discard')} -->
+      <!--   class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-400 transition focus:outline-none rounded-lg" -->
+      <!--   aria-label="Discard task" -->
+      <!-- > -->
+      <!--   <TrashIcon class="w-4 h-4" /> -->
+      <!-- </button> -->
     </div>
   </div>
 
@@ -186,11 +260,143 @@
     <!-- Agent Tab -->
     {#if activeTab === 'agent'}
       <div class="pb-32">
-        <div id="agent-content" class="mt-1">
-          {@html agentContent}
+        <div id="agent-content" class="mt-1 space-y-1">
+          {#each displayItems as item}
+            {#if item.type === 'message'}
+              {@render messageSnippet(item.message)}
+            {:else if item.type === 'thinking'}
+              {@render thinkingSnippet(item.items)}
+            {/if}
+          {/each}
+
+          {#if isInProgress}
+            <div class="flex items-center gap-3 px-12 py-3">
+              <div class="relative shrink-0">
+                <div
+                  class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center"
+                >
+                  <i class="fas fa-robot text-base text-violet-400 pulse-glow"></i>
+                </div>
+                <div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
+                  <div
+                    class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"
+                  ></div>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium shimmer text-gray-300">Agent is thinking...</p>
+                <p class="text-sm text-gray-600">Analyzing context</p>
+              </div>
+            </div>
+          {/if}
+
+          {#if messages.length === 0}
+            <div class="p-5 text-gray-500 italic text-xs">No agent output</div>
+          {/if}
         </div>
       </div>
     {/if}
+
+    {#snippet messageSnippet(msg: Message)}
+      {#if msg.role === 'user'}
+        <div class="flex gap-4 px-4 py-2 items-start">
+          <div
+            class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 overflow-hidden border border-white/5"
+          >
+            <img
+              src="https://api.dicebear.com/7.x/avataaars/svg?seed=user&backgroundColor=b6e3f4"
+              alt="User"
+              class="w-full h-full"
+            />
+          </div>
+          <div
+            class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-white shadow-lg"
+          >
+            <p class="text-base leading-relaxed">{msg.content}</p>
+          </div>
+        </div>
+      {:else}
+        <div class="px-12 py-2 pr-4">
+          <p class="text-base text-gray-200 leading-relaxed font-sans">{msg.content}</p>
+        </div>
+      {/if}
+    {/snippet}
+
+    {#snippet thinkingSnippet(items: { command: string; result: string }[])}
+      <details class="mx-12 my-4 group" open>
+        <summary
+          class="flex items-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors list-none outline-none"
+        >
+          <div
+            class="w-4 h-4 flex items-center justify-center group-open:rotate-90 transition-transform"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
+            >
+          </div>
+          <span class="text-xs font-bold tracking-widest uppercase">Thinking</span>
+        </summary>
+        <div class="mt-3 space-y-3">
+          {#each items as item}
+            <div
+              class="bg-[#0a0a0a] border border-white/5 rounded-lg overflow-hidden font-mono shadow-xl"
+            >
+              <div
+                class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5"
+              >
+                <div class="flex items-center gap-2 text-gray-400">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="text-gray-500"
+                    ><polyline points="4 17 10 11 4 5" /><line
+                      x1="12"
+                      y1="19"
+                      x2="20"
+                      y2="19"
+                    /></svg
+                  >
+                  <span class="text-xs font-bold text-gray-500 tracking-tight">{item.command}</span>
+                </div>
+                <div class="text-gray-700 hover:text-gray-500 transition-colors">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
+                  >
+                </div>
+              </div>
+              {#if item.result}
+                <div class="p-3 text-[11px] text-gray-400 overflow-x-auto max-h-[400px]">
+                  <pre class="whitespace-pre-wrap leading-tight antialiased">{item.result}</pre>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </details>
+    {/snippet}
 
     <!-- Diff Tab -->
     {#if activeTab === 'diff'}
@@ -199,26 +405,10 @@
           class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between"
         >
           <span class="text-sm text-gray-400 font-mono">changes</span>
-          <span class="text-[10px] text-green-500 font-mono">git diff</span>
+          <span class="text-xs text-green-500 font-mono">git diff</span>
         </div>
         <div class="p-3 diff-container">
           {@html diffContent}
-        </div>
-      </div>
-    {/if}
-
-    <!-- Activity Tab -->
-    {#if activeTab === 'activity'}
-      <div class="p-5 pb-32 space-y-6">
-        <div class="relative border-l border-gray-800 ml-2 space-y-6" id="log-content">
-          {#if logContent.length === 0}
-            <div class="ml-4 text-sm text-gray-500 italic">No activity yet</div>
-          {/if}
-          {#each logContent as logHtml}
-            <div>
-              {@html logHtml}
-            </div>
-          {/each}
         </div>
       </div>
     {/if}

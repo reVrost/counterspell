@@ -18,7 +18,7 @@
   let task = $state<TaskResponse | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let agentContent = $state('');
+  let messages = $state<Message[]>([]);
   let diffContent = $state('');
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
@@ -32,10 +32,7 @@
     try {
       const taskData = await tasksAPI.get(data.taskId);
       task = taskData;
-      agentContent = renderMessagesHTML(
-        taskData.messages || [],
-        taskData.task.status === 'in_progress'
-      );
+      messages = taskData.messages || [];
       diffContent = taskData.git_diff
         ? renderDiffHTML(taskData.git_diff)
         : '<div class="text-gray-500 italic">No changes made</div>';
@@ -59,8 +56,15 @@
     }
 
     eventSource = createTaskSSE(taskId, {
-      onAgentUpdate: (html: string) => {
-        agentContent = html;
+      onAgentUpdate: (data: string) => {
+        try {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) {
+            messages = parsed;
+          }
+        } catch (e) {
+          console.error('Failed to parse agent update JSON:', e);
+        }
       },
       onDiffUpdate: (html: string) => {
         diffContent = html;
@@ -79,127 +83,6 @@
         console.error('Task SSE error:', err);
       },
     });
-  }
-
-  function renderMessagesHTML(messages: Message[], isInProgress: boolean): string {
-    if (messages.length === 0) {
-      return '<div class="p-5 text-gray-500 italic text-xs">No agent output</div>';
-    }
-
-    let html = '<div class="space-y-4 py-4">';
-    let i = 0;
-    while (i < messages.length) {
-      const msg = messages[i];
-
-      if (msg.role === 'tool' || msg.role === 'tool_result') {
-        // Start of a potential thinking block
-        html += `
-          <details class="mx-12 my-4 group" open>
-            <summary class="flex items-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors list-none outline-none">
-              <div class="w-4 h-4 flex items-center justify-center group-open:rotate-90 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-              </div>
-              <span class="text-[10px] font-bold tracking-widest uppercase">Thinking</span>
-            </summary>
-            <div class="mt-3 space-y-3">`;
-
-        while (
-          i < messages.length &&
-          (messages[i].role === 'tool' || messages[i].role === 'tool_result')
-        ) {
-          const toolMsg = messages[i];
-          if (toolMsg.role === 'tool') {
-            // Look ahead for its result
-            let result = '';
-            if (i + 1 < messages.length && messages[i + 1].role === 'tool_result') {
-              result = messages[i + 1].content;
-              i++; // Skip result in next iteration
-            }
-            html += renderToolBlockHTML(toolMsg.content, result);
-          } else {
-            // Dangling tool_result
-            html += renderToolBlockHTML('Command Trace', toolMsg.content);
-          }
-          i++;
-        }
-
-        html += `</div></details>`;
-      } else {
-        html += renderMessageBubbleHTML(msg);
-        i++;
-      }
-    }
-    html += '</div>';
-
-    if (isInProgress) {
-      html += `
-				<div class="flex items-center gap-3 px-12 py-3">
-					<div class="relative shrink-0">
-						<div class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-							<i class="fas fa-robot text-base text-violet-400 pulse-glow"></i>
-						</div>
-						<div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
-							<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"></div>
-						</div>
-					</div>
-					<div>
-						<p class="text-xs font-medium shimmer text-gray-300">Agent is thinking...</p>
-						<p class="text-[10px] text-gray-600">Analyzing context</p>
-					</div>
-				</div>
-			`;
-    }
-
-    return html;
-  }
-
-  function renderMessageBubbleHTML(msg: Message): string {
-    const isUser = msg.role === 'user';
-
-    if (isUser) {
-      return `
-        <div class="flex gap-4 px-4 py-2 items-start">
-          <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 overflow-hidden border border-white/5">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=user&backgroundColor=b6e3f4" alt="User" class="w-full h-full" />
-          </div>
-          <div class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-white shadow-lg">
-            <p class="text-base leading-relaxed">${escapeHtml(msg.content)}</p>
-          </div>
-        </div>
-      `;
-    }
-
-    // Default: Assistant/Agent text
-    return `
-      <div class="px-12 py-2 pr-4">
-        <p class="text-base text-gray-200 leading-relaxed font-sans">${escapeHtml(msg.content)}</p>
-      </div>
-    `;
-  }
-
-  function renderToolBlockHTML(command: string, result: string): string {
-    return `
-      <div class="bg-[#0a0a0a] border border-white/5 rounded-lg overflow-hidden font-mono shadow-xl">
-        <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
-          <div class="flex items-center gap-2 text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-            <span class="text-[9px] font-bold text-gray-500 tracking-tight">${escapeHtml(command)}</span>
-          </div>
-          <div class="text-gray-700 hover:text-gray-500 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-          </div>
-        </div>
-        ${
-          result
-            ? `
-        <div class="p-3 text-[11px] text-gray-400 overflow-x-auto max-h-[400px]">
-          <pre class="whitespace-pre-wrap leading-tight antialiased">${escapeHtml(result)}</pre>
-        </div>
-        `
-            : ''
-        }
-      </div>
-    `;
   }
 
   function renderDiffHTML(diff: string): string {
@@ -303,7 +186,13 @@
         </div>
       </div>
     {:else if task}
-      <TaskDetail task={task.task} {agentContent} {diffContent} {logContent} />
+      <TaskDetail 
+        task={task.task} 
+        {messages} 
+        {diffContent} 
+        {logContent} 
+        isInProgress={task.task.status === 'in_progress'} 
+      />
     {/if}
   </div>
 </div>
