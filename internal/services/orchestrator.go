@@ -159,40 +159,15 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 
 	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", projectID, "intent", intent)
 
-	// Submit job to worker pool
-	job := TaskJob{
-		TaskID:         taskID,
-		ProjectID:      projectID,
-		Intent:         intent,
-		ModelID:        modelID,
-		Owner:          owner,
-		Repo:           repoName,
-		Token:          token,
-		IsContinuation: false,
-		ResultCh:       o.resultCh,
-	}
-
-	slog.Info("[ORCHESTRATOR] Submitting job to worker pool", "task_id", taskID)
-	if err := o.workerPool.Submit(func() {
-		o.executeTask(context.Background(), job)
-	}); err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to submit job to worker pool", "error", err, "task_id", taskID)
+	if err := o.submitTaskJob(ctx, taskID, projectID, intent, modelID, owner, repoName, token, false); err != nil {
 		return "", err
 	}
-
-	// Publish agent_run_updated event
-	o.eventBus.Publish(models.Event{
-		TaskID: taskID,
-		Type:   string(EventTypeTaskStarted),
-		Data:   "",
-	})
-	slog.Info("[ORCHESTRATOR] Job submitted successfully", "task_id", taskID)
 
 	return taskID, nil
 }
 
 // ContinueTask continues a task with a follow-up message.
-func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, agentBackend, provider, model string) error {
+func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, modelID string) error {
 	if followUpMsg == "" {
 		return fmt.Errorf("follow-up message cannot be empty")
 	}
@@ -205,8 +180,10 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, ag
 
 	// Get project info
 	var token, owner, repoName string
+	var projectID string
 	if task.RepositoryID != nil {
-		repo, err := o.repo.GetRepository(ctx, *task.RepositoryID)
+		projectID = *task.RepositoryID
+		repo, err := o.repo.GetRepository(ctx, projectID)
 		if err == nil {
 			conn, err := o.repo.GetGithubConnectionByID(ctx, repo.ConnectionID)
 			if err == nil {
@@ -217,68 +194,68 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, ag
 		}
 	}
 
-	// Update status to in_progress
-	if err := o.repo.UpdateStatus(ctx, taskID, "in_progress"); err != nil {
-		return err
-	}
+	return o.submitTaskJob(ctx, taskID, projectID, followUpMsg, modelID, owner, repoName, token, true)
+}
 
-	// Create agent run row
-	runID, err := o.repo.CreateAgentRun(ctx, taskID, followUpMsg, agentBackend, provider, model)
-	if err != nil {
-		return fmt.Errorf("failed to create agent run: %w", err)
-	}
+func (o *Orchestrator) submitTaskJob(ctx context.Context, taskID, projectID, intent, modelID, owner, repoName, token string, isContinuation bool) error {
+	messageHistoryJSON := ""
+	if isContinuation {
+		// Load existing messages for state restoration
+		messages, err := o.repo.GetMessagesByTask(ctx, taskID)
+		if err != nil {
+			return fmt.Errorf("failed to load messages: %w", err)
+		}
 
-	// Append user message to DB immediately
-	if err := o.repo.CreateMessage(ctx, taskID, runID, "user", followUpMsg); err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
-	}
-
-	// Publish agent_run_updated event
-	o.eventBus.Publish(models.Event{
-		TaskID: taskID,
-		Type:   string(EventTypeAgentRunUpdated),
-		Data:   "",
-	})
-
-	// Publish task_updated event
-	o.eventBus.Publish(models.Event{
-		TaskID: taskID,
-		Type:   string(EventTypeTaskUpdated),
-		Data:   "",
-	})
-
-	// Load existing messages for state restoration
-	messages, err := o.repo.GetMessagesByTask(ctx, taskID)
-	if err != nil {
-		return fmt.Errorf("failed to load messages: %w", err)
-	}
-
-	// Convert to JSON for agent state restoration
-	messageHistoryJSON, err := ConvertMessagesToJSON(messages)
-	if err != nil {
-		return fmt.Errorf("failed to convert messages: %w", err)
+		// Convert to JSON for agent state restoration
+		messageHistoryJSON, err = ConvertMessagesToJSON(messages)
+		if err != nil {
+			return fmt.Errorf("failed to convert messages: %w", err)
+		}
 	}
 
 	// Submit job to worker pool
 	job := TaskJob{
 		TaskID:         taskID,
-		ProjectID:      *task.RepositoryID,
-		Intent:         followUpMsg,
-		ModelID:        model,
+		ProjectID:      projectID,
+		Intent:         intent,
+		ModelID:        modelID,
 		Owner:          owner,
 		Repo:           repoName,
 		Token:          token,
 		MessageHistory: messageHistoryJSON,
-		IsContinuation: true,
+		IsContinuation: isContinuation,
 		ResultCh:       o.resultCh,
 	}
 
+	slog.Info("[ORCHESTRATOR] Submitting job to worker pool", "task_id", taskID, "continuation", isContinuation)
 	if err := o.workerPool.Submit(func() {
 		o.executeTask(context.Background(), job)
 	}); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to submit job to worker pool", "error", err, "task_id", taskID)
 		return err
 	}
 
+	// Publish appropriate events
+	eventType := EventTypeTaskStarted
+	if isContinuation {
+		eventType = EventTypeTaskUpdated
+	}
+
+	o.eventBus.Publish(models.Event{
+		TaskID: taskID,
+		Type:   string(eventType),
+		Data:   "",
+	})
+
+	if isContinuation {
+		o.eventBus.Publish(models.Event{
+			TaskID: taskID,
+			Type:   string(EventTypeAgentRunUpdated),
+			Data:   "",
+		})
+	}
+
+	slog.Info("[ORCHESTRATOR] Job submitted successfully", "task_id", taskID)
 	return nil
 }
 
@@ -308,16 +285,14 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		o.mu.Unlock()
 	}()
 
-	// Update task to in_progress if not continuation
-	if !job.IsContinuation {
-		slog.Info("[ORCHESTRATOR] Updating task status to in_progress", "task_id", job.TaskID)
-		if err := o.repo.UpdateStatus(ctx, job.TaskID, "in_progress"); err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to update status", "error", err)
-			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
-			return
-		}
-		slog.Info("[ORCHESTRATOR] Task status updated successfully", "task_id", job.TaskID)
+	// Update task to in_progress
+	slog.Info("[ORCHESTRATOR] Updating task status to in_progress", "task_id", job.TaskID)
+	if err := o.repo.UpdateStatus(ctx, job.TaskID, "in_progress"); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to update status", "error", err)
+		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
+		return
 	}
+	slog.Info("[ORCHESTRATOR] Task status updated successfully", "task_id", job.TaskID)
 
 	// Publish agent_run_started event
 	o.eventBus.Publish(models.Event{
@@ -326,21 +301,19 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		Data:   "",
 	})
 
-	// Create agent run if not continuation
-	if !job.IsContinuation {
-		slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent)
-		runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
-		if err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err, "task_id", job.TaskID)
-			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
-			return
-		}
-		slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID)
+	// Create agent run
+	slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent)
+	runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
+	if err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err, "task_id", job.TaskID)
+		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
+		return
+	}
+	slog.Info("[ORCHESTRATOR] Agent run created successfully", "task_id", job.TaskID)
 
-		// Append user message to DB immediately
-		if err := o.repo.CreateMessage(ctx, job.TaskID, runID, "user", job.Intent); err != nil {
-			slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
-		}
+	// Append user message to DB immediately
+	if err := o.repo.CreateMessage(ctx, job.TaskID, runID, "user", job.Intent); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
 	}
 
 	// Create worktree for isolated execution

@@ -73,8 +73,14 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model", req.Model, "provider", req.Provider)
-	err = orch.ContinueTask(ctx, req.TaskID, req.Intent, "native", req.Provider, req.Model)
+	// Combine provider and model into modelID format: "provider#model"
+	modelID := req.Model
+	if req.Provider != "" {
+		modelID = req.Provider + "#" + req.Model
+	}
+
+	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model_id", modelID)
+	err = orch.ContinueTask(ctx, req.TaskID, req.Intent, modelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))

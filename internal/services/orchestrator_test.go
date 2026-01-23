@@ -53,7 +53,7 @@ func TestSaveMessage_PingPong(t *testing.T) {
 
 	// User: HI
 	userMsg1 := agent.Message{
-		Role: "user",
+		Role:    "user",
 		Content: []agent.ContentBlock{{Type: "text", Text: "HI"}},
 	}
 	orch.saveMessage(taskID, userMsg1)
@@ -61,7 +61,7 @@ func TestSaveMessage_PingPong(t *testing.T) {
 
 	// Agent: HI there
 	assistantMsg1 := agent.Message{
-		Role: "assistant",
+		Role:    "assistant",
 		Content: []agent.ContentBlock{{Type: "text", Text: "HI there"}},
 	}
 	orch.saveMessage(taskID, assistantMsg1)
@@ -69,7 +69,7 @@ func TestSaveMessage_PingPong(t *testing.T) {
 
 	// User: how areyou
 	userMsg2 := agent.Message{
-		Role: "user",
+		Role:    "user",
 		Content: []agent.ContentBlock{{Type: "text", Text: "how areyou"}},
 	}
 	orch.saveMessage(taskID, userMsg2)
@@ -77,7 +77,7 @@ func TestSaveMessage_PingPong(t *testing.T) {
 
 	// Agent: good, and you?
 	assistantMsg2 := agent.Message{
-		Role: "assistant",
+		Role:    "assistant",
 		Content: []agent.ContentBlock{{Type: "text", Text: "good, and you?"}},
 	}
 	orch.saveMessage(taskID, assistantMsg2)
@@ -99,4 +99,28 @@ func TestSaveMessage_PingPong(t *testing.T) {
 
 	assert.Equal(t, "assistant", messages[3].Role)
 	assert.Equal(t, "good, and you?", messages[3].Content)
+}
+
+func TestContinueTask_Validation(t *testing.T) {
+	testDB := setupTestDB(t)
+	defer testDB.Close()
+
+	orch, err := NewOrchestrator(
+		NewRepository(testDB),
+		NewEventBus(),
+		nil, nil, ":memory:",
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Test empty message
+	err = orch.ContinueTask(ctx, "task-1", "", "model-1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be empty")
+
+	// Test task not found
+	err = orch.ContinueTask(ctx, "non-existent", "hi", "model-1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "task not found")
 }
