@@ -29,19 +29,19 @@
   }
 
   const baseClasses =
-    'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-all duration-300 ease-out hover:-translate-y-[2px] active:scale-[0.98] active:translate-y-0';
+    'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-all duration-200 ease-in-out active:scale-[0.98]';
 
   const variantClasses = {
     pending:
-      'border-gray-700/50 hover:border-gray-500/50 hover:bg-gray-900/20 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] focus:ring-gray-500/50',
+      'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-gray-500/50',
     planning:
-      'border-purple-900/50 hover:border-purple-700/50 hover:bg-purple-900/10 hover:shadow-[0_8px_30px_rgb(88,28,135,0.15)] focus:ring-purple-500/50',
+      'border-purple-900/50 hover:border-primary/40 hover:bg-primary/5 focus:ring-purple-500/50',
     active:
-      'border-gray-800/50 hover:border-orange-900/30 hover:bg-orange-900/5 hover:shadow-[0_8px_30px_rgb(154,52,18,0.1)] focus:ring-orange-500/50',
+      'border-gray-800/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-orange-500/50',
     review:
-      'border-gray-800 hover:border-blue-700/50 hover:bg-blue-900/10 hover:shadow-[0_8px_30px_rgb(30,58,138,0.2)] focus:ring-blue-500/50',
+      'border-gray-800 hover:border-primary/30 hover:bg-primary/5 focus:ring-blue-500/50',
     completed:
-      'bg-card border-gray-600/20 flex-row hover:border-green-900/30 hover:bg-green-900/5 hover:shadow-[0_8px_30px_rgb(20,83,45,0.05)] focus:ring-green-500/50',
+      'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 focus:ring-green-500/50',
   };
 </script>
 
