@@ -15,6 +15,7 @@
   import GitMergeIcon from '@lucide/svelte/icons/git-merge';
   import GithubIcon from '@lucide/svelte/icons/github';
   import SparklesIcon from '@lucide/svelte/icons/sparkles';
+  import { tick } from 'svelte';
 
   interface Props {
     task: Task;
@@ -130,11 +131,21 @@
         appState.showToast(response.message || 'Task discarded', 'success');
         goto('/dashboard');
       }
+      appState.showToast(err instanceof Error ? err.message : `Failed to ${action}`, 'error');
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
-      appState.showToast(err instanceof Error ? err.message : `Failed to ${action}`, 'error');
     }
   }
+
+  $effect(() => {
+    // wait for DOM to update
+    tick().then(() => {
+      const container = document.getElementById('content-scroll');
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight });
+      }
+    });
+  });
 </script>
 
 <div class="flex flex-col h-screen">
@@ -170,19 +181,19 @@
     >
       {#if task.status === 'pending'}
         <div class="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-        <span class="text-[9px] uppercase font-bold tracking-wider text-gray-400">Pending</span>
+        <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Pending</span>
       {:else if task.status === 'in_progress'}
         <div class="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-glow"></div>
-        <span class="text-[9px] uppercase font-bold tracking-wider text-orange-400">Running</span>
+        <span class="text-xs uppercase font-bold tracking-wider text-orange-400">Running</span>
       {:else if task.status === 'review'}
         <div class="w-1.5 h-1.5 rounded-full bg-blue-400 pulse-glow"></div>
-        <span class="text-[9px] uppercase font-bold tracking-wider text-blue-400">Ready</span>
+        <span class="text-xs uppercase font-bold tracking-wider text-blue-400">Ready</span>
       {:else if task.status === 'done'}
         <div class="w-1.5 h-1.5 rounded-full bg-green-400"></div>
-        <span class="text-[9px] uppercase font-bold tracking-wider text-green-400">Merged</span>
+        <span class="text-xs uppercase font-bold tracking-wider text-green-400">Merged</span>
       {:else if task.status === 'failed'}
         <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
-        <span class="text-[9px] uppercase font-bold tracking-wider text-red-400">Failed</span>
+        <span class="text-xs uppercase font-bold tracking-wider text-red-400">Failed</span>
       {/if}
     </div>
   </div>
@@ -369,7 +380,7 @@
                       y2="19"
                     /></svg
                   >
-                  <span class="text-xs font-bold text-gray-500 tracking-tight">{item.command}</span>
+                  <span class="text-sm font-bold text-gray-500 tracking-tight">{item.command}</span>
                 </div>
                 <div class="text-gray-700 hover:text-gray-500 transition-colors">
                   <svg
@@ -386,7 +397,7 @@
                 </div>
               </div>
               {#if item.result}
-                <div class="p-3 text-[11px] text-gray-400 overflow-x-auto max-h-[400px]">
+                <div class="p-3 text-xs text-gray-400 overflow-x-auto max-h-[400px]">
                   <pre class="whitespace-pre-wrap leading-tight antialiased">{item.result}</pre>
                 </div>
               {/if}

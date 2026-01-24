@@ -59,17 +59,22 @@
         try {
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
-            messages = parsed;
+            // Update messages in-place
+            messages.push(...parsed); // append only
           }
         } catch (e) {
           console.error('Failed to parse agent update JSON:', e);
         }
       },
+      onRunUpdate: (data: string) => {
+        loadTask();
+      },
       onDiffUpdate: (html: string) => {
         diffContent = html;
       },
       onLog: (html: string) => {
-        logContent = [...logContent, html];
+        // Do nothing
+        // logContent = [...logContent, html];
       },
       onStatus: (html: string) => {},
       onComplete: (status: string) => {
@@ -91,25 +96,16 @@
     for (const line of diff.split('\n')) {
       const escapedLine = escapeHtml(line);
       if (line.startsWith('+')) {
-        html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-xs border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
+        html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-sm border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
       } else if (line.startsWith('-')) {
-        html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-xs border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
+        html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-sm border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
       } else if (line.startsWith('@@')) {
-        html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-xs">${escapedLine}</div>`;
+        html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-sm">${escapedLine}</div>`;
       } else if (line.trim() !== '') {
-        html += `<div class="px-3 py-1 text-gray-400 font-mono text-xs">${escapedLine}</div>`;
+        html += `<div class="px-3 py-1 text-gray-400 font-mono text-sm">${escapedLine}</div>`;
       }
     }
     return html;
-  }
-
-  function renderLogEntryHTML(log: LogEntry): string {
-    return `
-			<div class="ml-4 relative">
-				<div class="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border border-[#0D1117] bg-blue-500"></div>
-				<p class="text-xs text-gray-400">${escapeHtml(log.message)}</p>
-			</div>
-		`;
   }
 
   function escapeHtml(text: string): string {
@@ -178,7 +174,7 @@
           <p class="text-base text-red-400 mb-2">{error}</p>
           <button
             onclick={() => loadTask()}
-            class="px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-xs text-violet-300 hover:bg-violet-500/30 transition-colors"
+            class="px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-sm text-violet-300 hover:bg-violet-500/30 transition-colors"
           >
             Retry
           </button>

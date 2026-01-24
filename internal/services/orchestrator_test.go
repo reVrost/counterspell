@@ -124,6 +124,7 @@ func TestContinueTask_Validation(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "task not found")
 }
+
 func TestExecuteTask_BackendSelection(t *testing.T) {
 	testDB := setupTestDB(t)
 	defer testDB.Close()
@@ -185,3 +186,127 @@ func TestExecuteTask_BackendSelection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "claude-code", run2.AgentBackend, "Should use claude-code backend from settings")
 }
+
+// TestContinueTask_WithMessageHistory tests that continue task loads and passes message history
+func TestContinueTask_WithMessageHistory(t *testing.T) {
+	testDB := setupTestDB(t)
+	defer testDB.Close()
+
+	repo := NewRepository(testDB)
+	orch, err := NewOrchestrator(
+		repo,
+		NewEventBus(),
+		nil, nil, t.TempDir(),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Create task with some message history
+	conn, err := orch.repo.db.Queries.CreateGithubConnection(ctx, sqlc.CreateGithubConnectionParams{
+		ID:           "conn-1",
+		GithubUserID: "user-1",
+		AccessToken:  "token",
+		Username:     "testuser",
+	})
+	require.NoError(t, err)
+
+	repoRow, err := orch.repo.db.Queries.CreateRepository(ctx, sqlc.CreateRepositoryParams{
+		ID:           "repo-1",
+		ConnectionID: conn.ID,
+		Name:         "test-repo",
+		FullName:     "test/test-repo",
+		Owner:        "test",
+	})
+	require.NoError(t, err)
+
+	task, err := repo.Create(ctx, repoRow.ID, "initial intent")
+	require.NoError(t, err)
+
+	runID, err := repo.CreateAgentRun(ctx, task.ID, "initial intent", "native", "anthropic", "claude-3")
+	require.NoError(t, err)
+
+	// Save some messages to DB
+	err = repo.CreateMessage(ctx, task.ID, runID, "user", "Hello, I need help")
+	require.NoError(t, err)
+	err = repo.CreateMessage(ctx, task.ID, runID, "assistant", "Sure, how can I help?")
+	require.NoError(t, err)
+	err = repo.CreateMessage(ctx, task.ID, runID, "user", "Can you write a function?")
+	require.NoError(t, err)
+
+	// Verify messages are in DB
+	messages, err := repo.GetMessagesByTask(ctx, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 3, len(messages), "Should have 3 messages")
+
+	// Test ConvertMessagesToJSON
+	jsonStr, err := ConvertMessagesToJSON(messages)
+	require.NoError(t, err)
+	assert.NotEmpty(t, jsonStr, "JSON should not be empty")
+	assert.Contains(t, jsonStr, "Hello, I need help", "JSON should contain user message")
+	assert.Contains(t, jsonStr, "Sure, how can I help?", "JSON should contain assistant message")
+
+	// Verify JSON structure is correct
+	assert.Contains(t, jsonStr, "user", "Should have user role")
+	assert.Contains(t, jsonStr, "assistant", "Should have assistant role")
+	assert.Contains(t, jsonStr, "text", "Should have text content block")
+
+	// Test that submitTaskJob loads message history correctly
+	// We test this by verifying the job is submitted (async, so no immediate error)
+	// The actual execution will fail due to missing git/API, but loading should work
+	err = orch.submitTaskJob(ctx, task.ID, repoRow.ID, "continue", "model-1", "test", "test", "", true)
+	require.NoError(t, err, "submitTaskJob should successfully load message history")
+}
+
+// TestContinueTask_NoMessages tests continuation with no message history (first continuation)
+func TestContinueTask_NoMessages(t *testing.T) {
+	testDB := setupTestDB(t)
+	defer testDB.Close()
+
+	repo := NewRepository(testDB)
+	orch, err := NewOrchestrator(
+		repo,
+		NewEventBus(),
+		nil, nil, t.TempDir(),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Create task but no messages
+	conn, err := orch.repo.db.Queries.CreateGithubConnection(ctx, sqlc.CreateGithubConnectionParams{
+		ID:           "conn-1",
+		GithubUserID: "user-1",
+		AccessToken:  "token",
+		Username:     "testuser",
+	})
+	require.NoError(t, err)
+
+	repoRow, err := orch.repo.db.Queries.CreateRepository(ctx, sqlc.CreateRepositoryParams{
+		ID:           "repo-1",
+		ConnectionID: conn.ID,
+		Name:         "test-repo",
+		FullName:     "test/test-repo",
+		Owner:        "test",
+	})
+	require.NoError(t, err)
+
+	task, err := repo.Create(ctx, repoRow.ID, "start")
+	require.NoError(t, err)
+
+	// Verify no messages
+	messages, err := repo.GetMessagesByTask(ctx, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(messages), "Should have no messages initially")
+
+	// Test ConvertMessagesToJSON with empty messages
+	jsonStr, err := ConvertMessagesToJSON(messages)
+	require.NoError(t, err)
+	assert.Equal(t, "[]", jsonStr, "Empty messages should produce empty JSON array")
+
+	// ContinueTask should work fine even with no message history
+	// It will fail during execution (no git, no API keys) but the message history loading should succeed
+	err = orch.submitTaskJob(ctx, task.ID, repoRow.ID, "continue", "model-1", "test", "test", "", true)
+	require.NoError(t, err, "submitTaskJob should work even with no message history")
+}
+
