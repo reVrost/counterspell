@@ -3,7 +3,7 @@
   import { tasksAPI } from '$lib/api';
   import { createTaskSSE } from '$lib/utils/sse';
   import type { PageData } from './$types';
-  import type { TaskResponse, Message } from '$lib/types';
+  import type { TaskResponse, Message, Task, LogEntry } from '$lib/types';
   import TaskDetail from '$lib/components/TaskDetail.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
@@ -134,7 +134,7 @@
 </script>
 
 <svelte:head>
-  <title>{task?.title || 'Task'} - Counterspell</title>
+  <title>{task?.task.title || 'Task'} - Counterspell</title>
 </svelte:head>
 
 <div class="min-h-screen bg-background flex flex-col">

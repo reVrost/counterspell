@@ -29,6 +29,8 @@ export interface Task {
 	last_assistant_message?: string | null;
 	created_at: number;
 	updated_at: number;
+	gitDiff?: string;
+	git_diff?: string;
 }
 
 // Task Status Flow: pending → planning → in_progress → review → done (or failed)
@@ -78,10 +80,12 @@ export interface Artifact {
 
 export interface TaskResponse {
 	task: Task;
+	project?: Project;
 	messages: Message[];
 	artifacts: Artifact[];
 	agent_runs?: AgentRun[];
 	git_diff?: string;
+	logs?: LogEntry[];
 }
 
 export interface LogEntry {

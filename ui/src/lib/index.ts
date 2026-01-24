@@ -5,9 +5,6 @@ export { default as Feed } from "./components/Feed.svelte";
 export { default as Task } from "./components/Task.svelte";
 export { default as TaskDetail } from "./components/TaskDetail.svelte";
 export { default as ChatInput } from "./components/ChatInput.svelte";
-export { default as MessageBubble } from "./components/MessageBubble.svelte";
-export { default as DiffView } from "./components/DiffView.svelte";
-export { default as LogEntry } from "./components/LogEntry.svelte";
 export { default as TodoIndicator } from "./components/TodoIndicator.svelte";
 export { default as SettingsModal } from "./components/SettingsModal.svelte";
 
