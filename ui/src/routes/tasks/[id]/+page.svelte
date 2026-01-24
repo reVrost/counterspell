@@ -186,12 +186,12 @@
         </div>
       </div>
     {:else if task}
-      <TaskDetail 
-        task={task.task} 
-        {messages} 
-        {diffContent} 
-        {logContent} 
-        isInProgress={task.task.status === 'in_progress'} 
+      <TaskDetail
+        task={task.task}
+        {messages}
+        {diffContent}
+        {logContent}
+        isInProgress={task.task.status === 'in_progress'}
       />
     {/if}
   </div>
