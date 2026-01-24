@@ -1,22 +1,24 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
 	import { Tabs as TabsPrimitive } from 'bits-ui';
+	import { cn } from '$lib/utils';
 
-	interface Props {
-		class?: string;
-		value?: string;
-		children?: any;
-	}
-
-	let { class: className = '', value, children }: Props = $props();
+	let {
+		ref = $bindable(null),
+		class: className,
+		value,
+		children,
+		...restProps
+	}: TabsPrimitive.ContentProps = $props();
 </script>
 
 <TabsPrimitive.Content
+	bind:ref
 	{value}
 	class={cn(
 		'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
 		className
 	)}
+	{...restProps}
 >
-	{children}
+	{@render children?.()}
 </TabsPrimitive.Content>

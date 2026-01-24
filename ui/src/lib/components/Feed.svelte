@@ -14,21 +14,19 @@
   let view = $state('active');
 
   // Unified Active Tasks (combines reviews, in_progress, planning, pending)
-  const activeTasks = $derived(
-    [
-      ...(feedData?.reviews || []),
-      ...(feedData?.active || []), // this includes in_progress and pending from the active array if structured that way, but looking at previous code 'active' seemed to be the source for filters.
-      // Wait, looking at the previous file:
-      // const activeTasks = $derived(feedData?.active || []);
-      // const planningTasks = $derived(feedData?.planning || []);
-      // const reviewsTasks = $derived(feedData?.reviews || []);
-      // And pending/in_progress were filtered from `activeTasks`.
-      // So I should combine `active` (which has pending/in_progress), `planning`, and `reviews`.
-      ...(feedData?.planning || []),
-    ].sort((a, b) => b.updated_at - a.updated_at)
-  );
 
-  const doneTasks = $derived((feedData?.done || []).sort((a, b) => b.updated_at - a.updated_at));
+  const activeTasks = $derived.by(() => {
+    const all = [
+      ...(feedData?.reviews || []),
+      ...(feedData?.active || []),
+      ...(feedData?.planning || []),
+    ];
+    return all.slice().sort((a, b) => b.updated_at - a.updated_at);
+  });
+
+  const doneTasks = $derived(
+    [...(feedData?.done || [])].sort((a, b) => b.updated_at - a.updated_at)
+  );
 
   const currentTasks = $derived(view === 'active' ? activeTasks : doneTasks);
 </script>
@@ -36,7 +34,7 @@
 <div id="feed-content" class="flex flex-col gap-6">
   <!-- Custom Segmented Control -->
   <div class="flex justify-center">
-    <Tabs.Root value={view} onValueChange={(v) => (view = v)} class="w-full max-w-[400px]">
+    <Tabs.Root bind:value={view} class="w-full max-w-[400px]">
       <Tabs.List
         class="grid w-full grid-cols-2 rounded-full bg-secondary/50 p-1 h-10 border border-border/40 backdrop-blur-sm"
       >
@@ -61,7 +59,7 @@
     {#if currentTasks.length > 0}
       {#each currentTasks as task, index (task.id)}
         <div
-          transition:slide|local={{
+          in:slide|local={{
             direction: 'up',
             duration: DURATIONS.normal,
             delay: index * 50,

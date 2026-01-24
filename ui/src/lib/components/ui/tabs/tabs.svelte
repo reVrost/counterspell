@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { cn } from '$lib/utils';
-  import { Tabs as TabsPrimitive } from 'bits-ui';
+	import { Tabs as TabsPrimitive } from 'bits-ui';
+	import { cn } from '$lib/utils';
 
-  export const Tabs = TabsPrimitive.Root;
-  export const List = TabsPrimitive.List;
-  export const Trigger = TabsPrimitive.Trigger;
-  export const Content = TabsPrimitive.Content;
-
-  let { class: className = '', value, children }: Props = $props();
+	let {
+		ref = $bindable(null),
+		value = $bindable(),
+		class: className,
+		children,
+		...restProps
+	}: TabsPrimitive.RootProps = $props();
 </script>
 
-<TabsPrimitive.Root {value} class={cn('', className)}>
-  {@render children()}
+<TabsPrimitive.Root bind:ref bind:value class={cn(className)} {...restProps}>
+	{@render children?.()}
 </TabsPrimitive.Root>
