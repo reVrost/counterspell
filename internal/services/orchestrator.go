@@ -357,6 +357,7 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			model = parts[0]
 		}
 	}
+	slog.Info("[ORCHESTRATOR] Provider and model determined", "task_id", job.TaskID, "provider", provider, "model", model)
 
 	// Get API key for the provider (or default if provider is empty)
 	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID, "provider", provider)
@@ -392,9 +393,10 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	if backendType == "claude-code" {
 		slog.Info("[ORCHESTRATOR] Initializing Claude Code backend", "task_id", job.TaskID)
 		baseURL := ""
-		if provider == "zai" {
-			baseURL = "https://api.z.ai/api/coding"
-		} else if provider == "openrouter" {
+		switch provider {
+		case "zai":
+			baseURL = "https://api.z.ai/api/anthropic"
+		case "openrouter":
 			baseURL = "https://openrouter.ai/api"
 		}
 

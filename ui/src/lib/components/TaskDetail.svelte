@@ -5,7 +5,7 @@
   import { tasksAPI } from '$lib/api';
   import { cn } from '$lib/utils';
   import { modalSlideUp, backdropFade, slide, DURATIONS } from '$lib/utils/transitions';
-  import type { Task } from '$lib/types';
+  import type { Message, Task } from '$lib/types';
   import ChatInput from './ChatInput.svelte';
   import TodoIndicator from './TodoIndicator.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
@@ -13,7 +13,6 @@
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
   import EraserIcon from '@lucide/svelte/icons/eraser';
   import GitMergeIcon from '@lucide/svelte/icons/git-merge';
-  import MessageSquareIcon from '@lucide/svelte/icons/message-square';
   import GithubIcon from '@lucide/svelte/icons/github';
   import SparklesIcon from '@lucide/svelte/icons/sparkles';
 

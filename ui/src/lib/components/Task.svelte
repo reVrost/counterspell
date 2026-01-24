@@ -1,26 +1,28 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { FolderIcon } from '@lucide/svelte';
+  import { spawn } from '$lib/utils/transitions';
   import { Check, ChevronRight, X } from '@lucide/svelte';
-  import { cn } from 'tailwind-variants';
 
   interface Task {
     id: string;
     title: string;
     repository_name?: string;
-    status?: string;
+    status: TaskStatus;
     last_assistant_message?: string;
     updated_at: number;
   }
 
   import { formatRelativeTime } from '$lib/utils';
+  import type { TaskStatus } from '$lib/types';
 
   interface Props {
     task: Task;
-    variant: 'pending' | 'active' | 'review' | 'completed' | 'planning';
+    delay?: number;
+    variant: 'pending' | 'in_progress' | 'review' | 'done' | 'planning' | 'failed';
   }
 
-  let { task, variant }: Props = $props();
+  let { task, delay, variant }: Props = $props();
 
   let elapsed = $state(0);
 
@@ -32,20 +34,24 @@
     'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-all duration-200 ease-in-out active:scale-[0.98]';
 
   const variantClasses = {
-    pending:
-      'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-gray-500/50',
+    pending: 'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-gray-500/50',
     planning:
       'border-purple-900/50 hover:border-primary/40 hover:bg-primary/5 focus:ring-purple-500/50',
-    active:
+    in_progress:
       'border-gray-800/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-orange-500/50',
-    review:
-      'border-gray-800 hover:border-primary/30 hover:bg-primary/5 focus:ring-blue-500/50',
-    completed:
+    review: 'border-gray-800 hover:border-primary/30 hover:bg-primary/5 focus:ring-blue-500/50',
+    done: 'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 focus:ring-green-500/50',
+    failed:
       'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 focus:ring-green-500/50',
   };
 </script>
 
-<button type="button" class="{baseClasses} {variantClasses[variant]}" onclick={handleClick}>
+<button
+  type="button"
+  in:spawn={{ delay, duration: 180 }}
+  class="{baseClasses} {variantClasses[variant]}"
+  onclick={handleClick}
+>
   <div class="flex justify-between items-start w-full gap-4">
     <!-- Left content (Shared) -->
     <div class="flex-1 min-w-0 space-y-1">
@@ -67,7 +73,7 @@
 
     <!-- Right content (Variant specific) -->
     <div class="shrink-0 flex flex-col items-end gap-1.5 self-start pt-0.5">
-      {#if variant === 'completed'}
+      {#if variant === 'done' || variant === 'failed'}
         <div class="flex flex-col items-end gap-1.5">
           <div class="flex items-center gap-2">
             {#if task.status === 'failed'}
@@ -111,7 +117,7 @@
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
-      {:else if variant === 'active'}
+      {:else if variant === 'in_progress'}
         <div class="flex flex-col items-end gap-1.5">
           <span
             class="text-xs text-orange-400 px-2 py-0.5 rounded-full border border-orange-900/40 bg-orange-950/20 font-semibold uppercase tracking-wider whitespace-nowrap"

@@ -6,7 +6,6 @@
   import type { TaskResponse, Message, Task, LogEntry } from '$lib/types';
   import TaskDetail from '$lib/components/TaskDetail.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
-  import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import { onDestroy } from 'svelte';
 
   interface Props {

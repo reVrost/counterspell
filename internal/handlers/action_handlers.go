@@ -51,10 +51,9 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var req struct {
-		Intent   string `json:"intent"`
-		TaskID   string `json:"task_id"`
-		Model    string `json:"model"`
-		Provider string `json:"provider"`
+		Intent  string `json:"intent"`
+		TaskID  string `json:"task_id"`
+		ModelID string `json:"model_id"`
 	}
 	if err := render.DecodeJSON(r.Body, &req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -73,14 +72,8 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Combine provider and model into modelID format: "provider#model"
-	modelID := req.Model
-	if req.Provider != "" {
-		modelID = req.Provider + "#" + req.Model
-	}
-
-	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model_id", modelID)
-	err = orch.ContinueTask(ctx, req.TaskID, req.Intent, modelID)
+	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model_id", req.ModelID)
+	err = orch.ContinueTask(ctx, req.TaskID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))
