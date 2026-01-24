@@ -2,7 +2,7 @@
 	import { cn } from '$lib/utils';
 	import { Tabs as TabsPrimitive } from 'bits-ui';
 
-	interface Props = {
+	interface Props {
 		class?: string;
 		value?: string;
 		children?: any;
