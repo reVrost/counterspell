@@ -147,10 +147,9 @@ func TestExecuteTask_BackendSelection(t *testing.T) {
 	require.NoError(t, err)
 
 	job1 := TaskJob{
-		TaskID:         task1.ID,
-		Intent:         "test intent 1",
-		ResultCh:       make(chan TaskResult, 1),
-		IsContinuation: false,
+		TaskID:   task1.ID,
+		Intent:   "test intent 1",
+		ResultCh: make(chan TaskResult, 1),
 	}
 
 	// We can't easily intercept the backend instantiation without refactoring more,
@@ -172,10 +171,9 @@ func TestExecuteTask_BackendSelection(t *testing.T) {
 	require.NoError(t, err)
 
 	job2 := TaskJob{
-		TaskID:         task2.ID,
-		Intent:         "test intent 2",
-		ResultCh:       make(chan TaskResult, 1),
-		IsContinuation: false,
+		TaskID:   task2.ID,
+		Intent:   "test intent 2",
+		ResultCh: make(chan TaskResult, 1),
 	}
 
 	// This will likely fail to actually RUN because 'claude' binary isn't there,

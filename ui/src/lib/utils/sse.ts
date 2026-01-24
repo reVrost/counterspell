@@ -36,6 +36,7 @@ export function createTaskSSE(taskId: string, callbacks: SSECallbacks = {}): Eve
 
   eventSource.addEventListener(EventType.TaskUpdated, (event) => {
     callbacks.onRunUpdate?.(event.data);
+    callbacks.onAgentUpdate?.(event.data);
   });
 
   eventSource.addEventListener('diff_update', (event) => {

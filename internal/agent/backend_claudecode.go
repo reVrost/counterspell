@@ -39,6 +39,7 @@ type ClaudeCodeBackend struct {
 	apiKey     string
 	baseURL    string
 	model      string
+	sessionID  string // Claude Code session ID
 
 	mu           sync.Mutex
 	cmd          *exec.Cmd
@@ -93,6 +94,13 @@ func WithModel(model string) ClaudeCodeOption {
 	}
 }
 
+// WithSessionID sets the Claude Code session ID to continue.
+func WithSessionID(sessionID string) ClaudeCodeOption {
+	return func(b *ClaudeCodeBackend) {
+		b.sessionID = sessionID
+	}
+}
+
 // NewClaudeCodeBackend creates a Claude Code CLI backend.
 //
 // Example:
@@ -123,7 +131,7 @@ func NewClaudeCodeBackend(opts ...ClaudeCodeOption) (*ClaudeCodeBackend, error) 
 
 // Run executes a new task via Claude Code CLI.
 func (b *ClaudeCodeBackend) Run(ctx context.Context, task string) error {
-	return b.execute(ctx, task, false)
+	return b.execute(ctx, task)
 }
 
 // // Send continues the conversation with a follow-up message.
@@ -147,7 +155,7 @@ func (b *ClaudeCodeBackend) Close() error {
 
 // --- Internal execution ---
 
-func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContinuation bool) error {
+func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string) error {
 	ctx, cancel := context.WithCancel(ctx)
 
 	b.mu.Lock()
@@ -163,7 +171,7 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 	b.mu.Unlock()
 	b.emitMessages()
 
-	cmd, err := b.buildCmd(ctx, prompt, isContinuation)
+	cmd, err := b.buildCmd(ctx, prompt)
 	if err != nil {
 		return err
 	}
@@ -248,6 +256,19 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 	eventType, _ := event["type"].(string)
 
 	switch eventType {
+	case "system":
+		// Capture session ID from system event
+		if sessionID, ok := event["session_id"].(string); ok && sessionID != "" {
+			b.mu.Lock()
+			if b.sessionID != sessionID {
+				b.sessionID = sessionID
+				slog.Info("[CLAUDE-CODE] Session ID detected", "session_id", sessionID)
+				// Emit session ID for orchestrator to save
+				b.emit(StreamEvent{Type: "session", SessionID: sessionID})
+			}
+			b.mu.Unlock()
+		}
+
 	case "user":
 		// User message from the CLI
 		if message, ok := event["message"].(map[string]any); ok {
@@ -451,6 +472,13 @@ func (b *ClaudeCodeBackend) RestoreState(stateJSON string) error {
 	return nil
 }
 
+// SessionID returns the current Claude Code session ID.
+func (b *ClaudeCodeBackend) SessionID() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.sessionID
+}
+
 // --- IntrospectableBackend interface ---
 
 // Messages returns the raw conversation history.
@@ -477,7 +505,7 @@ func (b *ClaudeCodeBackend) Todos() []tools.TodoItem {
 }
 
 // buildCmd constructs the exec.Cmd for running Claude Code.
-func (b *ClaudeCodeBackend) buildCmd(ctx context.Context, prompt string, isContinuation bool) (*exec.Cmd, error) {
+func (b *ClaudeCodeBackend) buildCmd(ctx context.Context, prompt string) (*exec.Cmd, error) {
 	// Build command args for JSON streaming mode
 	// Note: --verbose is required for stream-json output format
 	args := []string{
@@ -491,8 +519,10 @@ func (b *ClaudeCodeBackend) buildCmd(ctx context.Context, prompt string, isConti
 		args = append(args, "--model", b.model)
 	}
 
-	if isContinuation {
-		args = append(args, "--continue")
+	// Use existing session ID if provided, otherwise use --continue flag
+	if b.sessionID != "" {
+		args = append(args, "-r")
+		args = append(args, b.sessionID)
 	}
 
 	args = append(args, "--", prompt)

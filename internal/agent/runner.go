@@ -52,10 +52,11 @@ type ContentBlock struct {
 
 // StreamEvent represents a single event in the agent execution.
 type StreamEvent struct {
-	Type    string `json:"type"`
-	Content string `json:"content"`
-	Tool    string `json:"tool,omitempty"`
-	Args    string `json:"args,omitempty"`
+	Type       string `json:"type"`
+	Content    string `json:"content"`
+	Tool       string `json:"tool,omitempty"`
+	Args       string `json:"args,omitempty"`
+	SessionID  string `json:"session_id,omitempty"` // Backend session ID (e.g., Claude Code session)
 }
 
 // StreamCallback is called for each event during agent execution.

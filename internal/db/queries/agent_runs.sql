@@ -1,9 +1,12 @@
 -- name: CreateAgentRun :exec
-INSERT INTO agent_runs (id, task_id, prompt, agent_backend, provider, model, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO agent_runs (id, task_id, prompt, agent_backend, provider, model, backend_session_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpdateAgentRunCompleted :exec
 UPDATE agent_runs SET completed_at = ? WHERE id = ?;
+
+-- name: UpdateAgentRunBackendSessionID :exec
+UPDATE agent_runs SET backend_session_id = ? WHERE id = ?;
 
 -- name: GetAgentRun :one
 SELECT * FROM agent_runs WHERE id = ?;

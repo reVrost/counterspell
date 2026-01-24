@@ -275,7 +275,7 @@
     {#if activeTab === 'agent'}
       <div class="pb-32">
         <div id="agent-content" class="mt-1 space-y-1">
-          {#each displayItems as item (item.id)}
+          {#each displayItems as item}
             {#if item.type === 'message'}
               {@render messageSnippet(item.message)}
             {:else if item.type === 'thinking'}

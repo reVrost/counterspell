@@ -381,6 +381,14 @@ func (s *Repository) UpdateAgentRunCompleted(ctx context.Context, runID string) 
 	})
 }
 
+// UpdateAgentRunBackendSessionID saves the backend's session ID.
+func (s *Repository) UpdateAgentRunBackendSessionID(ctx context.Context, runID, sessionID string) error {
+	return s.db.Queries.UpdateAgentRunBackendSessionID(ctx, sqlc.UpdateAgentRunBackendSessionIDParams{
+		BackendSessionID: sql.NullString{String: sessionID, Valid: sessionID != ""},
+		ID:               runID,
+	})
+}
+
 // GetLatestAgentRun retrieves the most recent agent run for a task.
 func (s *Repository) GetLatestAgentRun(ctx context.Context, taskID string) (*sqlc.AgentRun, error) {
 	run, err := s.db.Queries.GetLatestRun(ctx, taskID)

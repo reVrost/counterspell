@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     provider TEXT,
     model TEXT,
     summary_message_id TEXT,
+    backend_session_id TEXT,
     cost REAL NOT NULL DEFAULT 0.0 CHECK (cost >= 0.0),
     message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
     prompt_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),

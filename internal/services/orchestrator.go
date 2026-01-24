@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -43,7 +44,6 @@ type TaskJob struct {
 	Repo           string
 	Token          string
 	MessageHistory string // Only for continuations
-	IsContinuation bool
 	ResultCh       chan<- TaskResult
 }
 
@@ -223,11 +223,10 @@ func (o *Orchestrator) submitTaskJob(ctx context.Context, taskID, projectID, int
 		Repo:           repoName,
 		Token:          token,
 		MessageHistory: messageHistoryJSON,
-		IsContinuation: isContinuation,
 		ResultCh:       o.resultCh,
 	}
 
-	slog.Info("[ORCHESTRATOR] Submitting job to worker pool", "task_id", taskID, "continuation", isContinuation)
+	slog.Info("[ORCHESTRATOR] Submitting job to worker pool", "task_id", taskID)
 	if err := o.workerPool.Submit(func() {
 		o.executeTask(context.Background(), job)
 	}); err != nil {
@@ -237,7 +236,7 @@ func (o *Orchestrator) submitTaskJob(ctx context.Context, taskID, projectID, int
 
 	// Publish appropriate events
 	eventType := EventTypeTaskStarted
-	if isContinuation {
+	if job.MessageHistory != "" {
 		eventType = EventTypeTaskUpdated
 	}
 
@@ -247,13 +246,11 @@ func (o *Orchestrator) submitTaskJob(ctx context.Context, taskID, projectID, int
 		Data:   "",
 	})
 
-	if isContinuation {
-		o.eventBus.Publish(models.Event{
-			TaskID: taskID,
-			Type:   string(EventTypeAgentRunUpdated),
-			Data:   "",
-		})
-	}
+	o.eventBus.Publish(models.Event{
+		TaskID: taskID,
+		Type:   string(EventTypeAgentRunUpdated),
+		Data:   "",
+	})
 
 	slog.Info("[ORCHESTRATOR] Job submitted successfully", "task_id", taskID)
 	return nil
@@ -261,7 +258,7 @@ func (o *Orchestrator) submitTaskJob(ctx context.Context, taskID, projectID, int
 
 // executeTask executes a single task.
 func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
-	slog.Info("[ORCHESTRATOR] Executing task", "task_id", job.TaskID, "intent", job.Intent, "continuation", job.IsContinuation)
+	slog.Info("[ORCHESTRATOR] Executing task", "task_id", job.TaskID, "intent", job.Intent)
 
 	// Check if incoming context is already cancelled
 	if ctx.Err() != nil {
@@ -309,6 +306,18 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	backendType := "native"
 	if settings != nil && settings.AgentBackend != "" {
 		backendType = settings.AgentBackend
+	}
+
+	// Get backend_session_id from previous run BEFORE creating new one
+	var backendSessionID string
+	slog.Info("[ORCHESTRATOR] Getting previous run for session ID", "task_id", job.TaskID)
+	previousRun, err := o.repo.GetLatestAgentRun(ctx, job.TaskID)
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("[ORCHESTRATOR] Failed to get previous agent run", "error", err)
+	}
+	if previousRun != nil && previousRun.BackendSessionID.Valid {
+		backendSessionID = previousRun.BackendSessionID.String
+		slog.Info("[ORCHESTRATOR] Found previous backend session", "task_id", job.TaskID, "session_id", backendSessionID)
 	}
 
 	// Create agent run
@@ -400,7 +409,8 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			baseURL = "https://openrouter.ai/api"
 		}
 
-		backend, err = agent.NewClaudeCodeBackend(
+		// Build Claude Code options
+		claudeOpts := []agent.ClaudeCodeOption{
 			agent.WithAPIKey(apiKey),
 			agent.WithModel(model),
 			agent.WithBaseURL(baseURL),
@@ -408,7 +418,15 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			agent.WithClaudeCallback(func(e agent.StreamEvent) {
 				o.handleAgentEvent(job.TaskID, e)
 			}),
-		)
+		}
+		// Pass session ID if available
+		if backendSessionID != "" {
+			claudeOpts = append(claudeOpts, agent.WithSessionID(backendSessionID))
+		}
+
+		slog.Info("[ORCHESTRATOR] Using existing session ID", "task_id", job.TaskID, "session_id", backendSessionID)
+
+		backend, err = agent.NewClaudeCodeBackend(claudeOpts...)
 	} else {
 		// Default to native
 		slog.Info("[ORCHESTRATOR] Initializing Native backend", "task_id", job.TaskID)
@@ -428,14 +446,14 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 
 	// Restore state if continuing
-	if job.IsContinuation && job.MessageHistory != "" {
+	if job.MessageHistory != "" {
 		if err := backend.RestoreState(job.MessageHistory); err != nil {
 			slog.Error("[ORCHESTRATOR] Failed to restore state", "error", err)
 		}
 	}
 
 	// Execute task
-	slog.Info("[ORCHESTRATOR] Starting agent execution", "task_id", job.TaskID, "is_continuation", job.IsContinuation)
+	slog.Info("[ORCHESTRATOR] Starting agent execution", "task_id", job.TaskID)
 	execErr := backend.Run(ctx, job.Intent)
 	if execErr != nil {
 		slog.Error("[ORCHESTRATOR] Agent execution failed", "error", execErr, "task_id", job.TaskID)
@@ -478,6 +496,11 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 // handleAgentEvent processes agent events and publishes to UI.
 func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) {
 	switch event.Type {
+	case "session":
+		// Save backend session ID when detected
+		if event.SessionID != "" {
+			o.saveBackendSessionID(taskID, event.SessionID)
+		}
 	case agent.EventTool:
 		o.saveMessage(taskID, agent.Message{Role: "tool", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
 	case agent.EventToolResult:
@@ -516,6 +539,21 @@ func (o *Orchestrator) saveMessage(taskID string, msg agent.Message) {
 
 	// Publish agent_run_updated
 	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
+}
+
+// saveBackendSessionID saves the backend session ID to the latest agent run.
+func (o *Orchestrator) saveBackendSessionID(taskID, sessionID string) {
+	// Get latest run ID
+	run, err := o.repo.GetLatestAgentRun(context.Background(), taskID)
+	if err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to get latest run for session ID", "error", err)
+		return
+	}
+
+	slog.Info("[ORCHESTRATOR] Saving backend session ID", "task_id", taskID, "run_id", run.ID, "session_id", sessionID)
+	if err := o.repo.UpdateAgentRunBackendSessionID(context.Background(), run.ID, sessionID); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to save backend session ID", "error", err)
+	}
 }
 
 // processResults processes task results from the worker pool.
@@ -820,14 +858,6 @@ func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query 
 	// Fuzzy search files
 	matches := fuzzySearch(files, query, limit)
 	return matches, nil
-}
-
-// truncate truncates a string to a maximum length.
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
 }
 
 // fuzzySearch performs fuzzy matching on file paths and returns top N matches.

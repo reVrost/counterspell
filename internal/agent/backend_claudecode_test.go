@@ -50,7 +50,7 @@ func TestClaudeCodeBackend_EnvVariables(t *testing.T) {
 				t.Fatalf("Failed to create backend: %v", err)
 			}
 
-			cmd, err := b.buildCmd(ctx, "test prompt", false)
+			cmd, err := b.buildCmd(ctx, "test prompt")
 			if err != nil {
 				t.Fatalf("Failed to build command: %v", err)
 			}

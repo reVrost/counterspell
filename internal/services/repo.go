@@ -305,7 +305,7 @@ func (m *GitManager) GetCurrentBranch(taskID string) (string, error) {
 func (m *GitManager) GetDiff(taskID string) (string, error) {
 	worktreePath := m.worktreePath(taskID)
 
-	slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
+	// slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
 
 	// Get current branch name
 	branchCmd := exec.Command("git", "branch", "--show-current")
@@ -322,13 +322,13 @@ func (m *GitManager) GetDiff(taskID string) (string, error) {
 	cmd.Dir = worktreePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Warn("[GIT] GetDiff origin/main failed, trying main", "error", err)
+		// slog.Warn("[GIT] GetDiff origin/main failed, trying main", "error", err)
 		// Fallback to local main branch
 		cmd = exec.Command("git", "diff", "main", currentBranch)
 		cmd.Dir = worktreePath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
-			slog.Warn("[GIT] GetDiff main failed, trying master", "error", err)
+			// slog.Warn("[GIT] GetDiff main failed, trying master", "error", err)
 			// Try master branch
 			cmd = exec.Command("git", "diff", "master", currentBranch)
 			cmd.Dir = worktreePath

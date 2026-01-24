@@ -193,7 +193,7 @@ class AppState {
   openModal(taskId: string) {
     this.modalTaskId = taskId;
     this.modalOpen = true;
-    pushState({ modal: true }, "");
+    history.pushState({ modal: true }, "");
   }
 
   installPWA() {

@@ -32,7 +32,10 @@ type AgentRun struct {
 	TaskID           string  `json:"task_id"`
 	Prompt           string  `json:"prompt"`
 	AgentBackend     string  `json:"agent_backend"`
+	Provider         *string `json:"provider,omitempty"`
+	Model            *string `json:"model,omitempty"`
 	SummaryMessageID *string `json:"summary_message_id,omitempty"`
+	BackendSessionID *string `json:"backend_session_id,omitempty"`
 	Cost             float64 `json:"cost"`
 	MessageCount     int64   `json:"message_count"`
 	PromptTokens     int64   `json:"prompt_tokens"`
