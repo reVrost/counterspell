@@ -28,9 +28,10 @@
   let { task, messages, diffContent, logContent, isInProgress }: Props = $props();
 
   // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
+  // 1. Update the type to include a mandatory ID
   type DisplayItem =
-    | { type: 'message'; message: Message }
-    | { type: 'thinking'; items: { command: string; result: string }[] };
+    | { type: 'message'; id: string; message: Message }
+    | { type: 'thinking'; id: string; items: { command: string; result: string }[] };
 
   let displayItems = $derived.by(() => {
     const items: DisplayItem[] = [];
@@ -39,6 +40,9 @@
       const msg = messages[i];
       if (msg.role === 'tool' || msg.role === 'tool_result') {
         const thinkingItems: { command: string; result: string }[] = [];
+        // Capture the ID of the first message in this group to use as the group ID
+        const groupId = msg.id || `thinking-${i}`;
+
         while (
           i < messages.length &&
           (messages[i].role === 'tool' || messages[i].role === 'tool_result')
@@ -56,9 +60,10 @@
           }
           i++;
         }
-        items.push({ type: 'thinking', items: thinkingItems });
+        items.push({ type: 'thinking', id: groupId, items: thinkingItems });
       } else {
-        items.push({ type: 'message', message: msg });
+        // Use the message's own ID
+        items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
         i++;
       }
     }
@@ -270,7 +275,7 @@
     {#if activeTab === 'agent'}
       <div class="pb-32">
         <div id="agent-content" class="mt-1 space-y-1">
-          {#each displayItems as item}
+          {#each displayItems as item (item.id)}
             {#if item.type === 'message'}
               {@render messageSnippet(item.message)}
             {:else if item.type === 'thinking'}
