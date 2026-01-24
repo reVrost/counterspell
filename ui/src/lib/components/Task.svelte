@@ -10,7 +10,10 @@
     repository_name?: string;
     status?: string;
     last_assistant_message?: string;
+    updated_at: number;
   }
+
+  import { formatRelativeTime } from '$lib/utils';
 
   interface Props {
     task: Task;
@@ -26,16 +29,19 @@
   }
 
   const baseClasses =
-    'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-transform active:scale-[0.98]';
+    'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-all duration-300 ease-out hover:-translate-y-[2px] active:scale-[0.98] active:translate-y-0';
 
   const variantClasses = {
-    pending: 'border-gray-700/50 hover:border-gray-600/50 hover:shadow-md focus:ring-gray-500/50',
+    pending:
+      'border-gray-700/50 hover:border-gray-500/50 hover:bg-gray-900/20 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] focus:ring-gray-500/50',
     planning:
-      'border-purple-900/50 hover:border-purple-800/50 hover:shadow-md focus:ring-purple-500/50',
-    active: 'border-gray-800/50 hover:border-gray-700/50 hover:shadow-md focus:ring-orange-500/50',
-    review: 'border-gray-800 hover:border-blue-700/50 hover:shadow-lg focus:ring-blue-500/50',
+      'border-purple-900/50 hover:border-purple-700/50 hover:bg-purple-900/10 hover:shadow-[0_8px_30px_rgb(88,28,135,0.15)] focus:ring-purple-500/50',
+    active:
+      'border-gray-800/50 hover:border-orange-900/30 hover:bg-orange-900/5 hover:shadow-[0_8px_30px_rgb(154,52,18,0.1)] focus:ring-orange-500/50',
+    review:
+      'border-gray-800 hover:border-blue-700/50 hover:bg-blue-900/10 hover:shadow-[0_8px_30px_rgb(30,58,138,0.2)] focus:ring-blue-500/50',
     completed:
-      'bg-card border-gray-600/20 flex-row hover:border-gray-500/30 focus:ring-green-500/50',
+      'bg-card border-gray-600/20 flex-row hover:border-green-900/30 hover:bg-green-900/5 hover:shadow-[0_8px_30px_rgb(20,83,45,0.05)] focus:ring-green-500/50',
   };
 </script>
 
@@ -46,7 +52,7 @@
       <h4 class="text-base font-semibold text-gray-100 leading-tight truncate">
         {task.title}
       </h4>
-      
+
       <div class="flex items-center gap-1.5 text-gray-500">
         <FolderIcon class="w-3 h-3" />
         <span class="text-xs font-medium truncate">{task.repository_name || 'Unknown'}</span>
@@ -60,41 +66,78 @@
     </div>
 
     <!-- Right content (Variant specific) -->
-    <div class="shrink-0 flex flex-col items-end gap-2">
+    <div class="shrink-0 flex flex-col items-end gap-1.5 self-start pt-0.5">
       {#if variant === 'completed'}
-        <div class="flex items-center gap-3">
-          {#if task.status === 'failed'}
-            <div class="w-6 h-6 rounded-full bg-red-900/40 text-red-500 flex items-center justify-center text-base shrink-0">
-              <X class="w-3 h-3" />
-            </div>
-          {:else}
-            <div class="w-6 h-6 rounded-full bg-green-900/40 text-green-500 flex items-center justify-center text-base shrink-0">
-              <Check class="w-3 h-3" />
-            </div>
-          {/if}
-          <ChevronRight class="w-4 h-4 text-gray-700 ml-1" />
+        <div class="flex flex-col items-end gap-1.5">
+          <div class="flex items-center gap-2">
+            {#if task.status === 'failed'}
+              <div
+                class="w-5 h-5 rounded-full bg-red-950/40 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0"
+              >
+                <X class="w-2.5 h-2.5" />
+              </div>
+            {:else}
+              <div
+                class="w-5 h-5 rounded-full bg-green-950/40 border border-green-500/20 text-green-500 flex items-center justify-center shrink-0"
+              >
+                <Check class="w-2.5 h-2.5" />
+              </div>
+            {/if}
+            <ChevronRight class="w-3.5 h-3.5 text-gray-700" />
+          </div>
+          <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+            >{formatRelativeTime(task.updated_at)}</span
+          >
         </div>
       {:else if variant === 'pending'}
-        <span class="text-sm text-gray-400 px-2 py-1 rounded-sm border border-gray-800 bg-gray-900/30 font-medium"> 
-          Pending 
-        </span>
+        <div class="flex flex-col items-end gap-1.5">
+          <span
+            class="text-xs text-gray-500 px-2 py-0.5 rounded-full border border-gray-800 bg-gray-900/30 font-semibold uppercase tracking-wider"
+          >
+            Pending
+          </span>
+          <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+            >{formatRelativeTime(task.updated_at)}</span
+          >
+        </div>
       {:else if variant === 'planning'}
-        <span class="text-sm text-purple-400 px-2 py-1 rounded-sm border border-purple-900/50 bg-purple-900/10 font-medium">
-          Planning
-        </span>
+        <div class="flex flex-col items-end gap-1.5">
+          <span
+            class="text-xs text-purple-400 px-2 py-0.5 rounded-full border border-purple-900/40 bg-purple-950/20 font-semibold uppercase tracking-wider"
+          >
+            Planning
+          </span>
+          <span class="text-[10px] text-gray-500/70 font-medium tracking-tight"
+            >{formatRelativeTime(task.updated_at)}</span
+          >
+        </div>
       {:else if variant === 'active'}
-        <div class="flex flex-col items-end gap-1">
-           <span class="text-sm text-orange-400 px-2 py-1 rounded-sm border border-orange-900/50 bg-orange-900/10 font-medium whitespace-nowrap">
+        <div class="flex flex-col items-end gap-1.5">
+          <span
+            class="text-xs text-orange-400 px-2 py-0.5 rounded-full border border-orange-900/40 bg-orange-950/20 font-semibold uppercase tracking-wider whitespace-nowrap"
+          >
             In Progress
           </span>
-          <span class="text-xs text-orange-400/60 font-mono tabular-nums">{elapsed}s</span>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+              >{formatRelativeTime(task.updated_at)}</span
+            >
+            <span class="text-xs text-orange-500/40 font-mono tabular-nums">· {elapsed}s</span>
+          </div>
         </div>
       {:else if variant === 'review'}
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-blue-400 px-2 py-1 rounded-sm border border-blue-900/50 bg-blue-900/10 font-medium">
-            Review
-          </span>
-          <ChevronRight class="w-4 h-4 text-gray-600" />
+        <div class="flex flex-col items-end gap-1.5">
+          <div class="flex items-center gap-2">
+            <span
+              class="text-xs text-blue-400 px-2 py-0.5 rounded-full border border-blue-900/40 bg-blue-950/20 font-semibold uppercase tracking-wider"
+            >
+              Review
+            </span>
+            <ChevronRight class="w-3.5 h-3.5 text-gray-600" />
+          </div>
+          <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+            >{formatRelativeTime(task.updated_at)}</span
+          >
         </div>
       {/if}
     </div>
