@@ -124,3 +124,64 @@ func TestContinueTask_Validation(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "task not found")
 }
+func TestExecuteTask_BackendSelection(t *testing.T) {
+	testDB := setupTestDB(t)
+	defer testDB.Close()
+
+	repo := NewRepository(testDB)
+	settingsSvc := NewSettingsService(testDB)
+	orch, err := NewOrchestrator(
+		repo,
+		NewEventBus(),
+		settingsSvc,
+		nil,
+		t.TempDir(),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 1. Test default backend (native)
+	task1, err := repo.Create(ctx, "", "test intent 1")
+	require.NoError(t, err)
+
+	job1 := TaskJob{
+		TaskID:         task1.ID,
+		Intent:         "test intent 1",
+		ResultCh:       make(chan TaskResult, 1),
+		IsContinuation: false,
+	}
+
+	// We can't easily intercept the backend instantiation without refactoring more,
+	// but we can check what was saved in the agent_runs table.
+	orch.executeTask(ctx, job1)
+
+	run1, err := repo.GetLatestAgentRun(ctx, task1.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "native", run1.AgentBackend, "Should default to native backend")
+
+	// 2. Test explicit claude-code backend
+	err = settingsSvc.UpdateSettings(ctx, &Settings{
+		AgentBackend: "claude-code",
+		AnthropicKey: "test-key",
+	})
+	require.NoError(t, err)
+
+	task2, err := repo.Create(ctx, "", "test intent 2")
+	require.NoError(t, err)
+
+	job2 := TaskJob{
+		TaskID:         task2.ID,
+		Intent:         "test intent 2",
+		ResultCh:       make(chan TaskResult, 1),
+		IsContinuation: false,
+	}
+
+	// This will likely fail to actually RUN because 'claude' binary isn't there,
+	// but it should still CREATE the agent run with the correct backend type.
+	orch.executeTask(ctx, job2)
+
+	run2, err := repo.GetLatestAgentRun(ctx, task2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "claude-code", run2.AgentBackend, "Should use claude-code backend from settings")
+}

@@ -320,7 +320,7 @@
 
   <!-- Bottom Navigation Bar -->
   <div
-    class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-lg grid items-end"
+    class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-4xl grid items-end"
   >
     {#if appState.showChatInput}
       <div class="col-start-1 row-start-1 w-full relative z-50">
@@ -346,7 +346,7 @@
     >
       <div
         transition:modalSlideUp|global={{ duration: DURATIONS.normal }}
-        class="pointer-events-auto bg-popover flex flex-col overflow-hidden w-full h-full sm:h-auto sm:max-w-[600px] sm:max-h-[85vh] sm:rounded-2xl border border-white/10 shadow-2xl"
+        class="pointer-events-auto bg-popover flex flex-col overflow-hidden w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[85vh] sm:rounded-2xl border border-white/10 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

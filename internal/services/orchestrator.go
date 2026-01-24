@@ -301,9 +301,19 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		Data:   "",
 	})
 
+	// Get settings for backend preference
+	settings, err := o.settings.GetSettings(ctx)
+	if err != nil {
+		slog.Warn("[ORCHESTRATOR] Failed to get settings, defaulting to native backend", "error", err)
+	}
+	backendType := "native"
+	if settings != nil && settings.AgentBackend != "" {
+		backendType = settings.AgentBackend
+	}
+
 	// Create agent run
-	slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent)
-	runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, "native", "", "")
+	slog.Info("[ORCHESTRATOR] Creating agent run", "task_id", job.TaskID, "intent", job.Intent, "backend", backendType)
+	runID, err := o.repo.CreateAgentRun(ctx, job.TaskID, job.Intent, backendType, "", "")
 	if err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to create agent run", "error", err, "task_id", job.TaskID)
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
@@ -379,15 +389,38 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 	// Create agent backend
 	var backend agent.Backend
-	backend, err = agent.NewNativeBackend(
-		agent.WithProvider(llmProvider),
-		agent.WithWorkDir(worktreePath),
-		agent.WithCallback(func(e agent.StreamEvent) {
-			o.handleAgentEvent(job.TaskID, e)
-		}),
-	)
+	if backendType == "claude-code" {
+		slog.Info("[ORCHESTRATOR] Initializing Claude Code backend", "task_id", job.TaskID)
+		baseURL := ""
+		if provider == "zai" {
+			baseURL = "https://api.z.ai/api/coding"
+		} else if provider == "openrouter" {
+			baseURL = "https://openrouter.ai/api"
+		}
+
+		backend, err = agent.NewClaudeCodeBackend(
+			agent.WithAPIKey(apiKey),
+			agent.WithModel(model),
+			agent.WithBaseURL(baseURL),
+			agent.WithClaudeWorkDir(worktreePath),
+			agent.WithClaudeCallback(func(e agent.StreamEvent) {
+				o.handleAgentEvent(job.TaskID, e)
+			}),
+		)
+	} else {
+		// Default to native
+		slog.Info("[ORCHESTRATOR] Initializing Native backend", "task_id", job.TaskID)
+		backend, err = agent.NewNativeBackend(
+			agent.WithProvider(llmProvider),
+			agent.WithWorkDir(worktreePath),
+			agent.WithCallback(func(e agent.StreamEvent) {
+				o.handleAgentEvent(job.TaskID, e)
+			}),
+		)
+	}
+
 	if err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to create backend", "error", err)
+		slog.Error("[ORCHESTRATOR] Failed to create backend", "error", err, "backend", backendType)
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 		return
 	}
@@ -410,9 +443,9 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 	slog.Info("[ORCHESTRATOR] Agent execution completed", "task_id", job.TaskID)
 
-	// Commit changes
+	// Commit changes dont push just yet
 	commitMessage := fmt.Sprintf("Task: %s", job.Intent)
-	if err := o.gitReposManager.CommitAndPush(job.TaskID, commitMessage); err != nil {
+	if err := o.gitReposManager.Commit(job.TaskID, commitMessage); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to commit and push", "error", err)
 		// Don't fail task - commit might fail if no changes
 	}

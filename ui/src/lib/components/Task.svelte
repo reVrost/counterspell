@@ -32,7 +32,7 @@
     planning:
       'border-purple-900/50 hover:border-purple-800/50 hover:shadow-md focus:ring-purple-500/50',
     active: 'border-gray-800/50 hover:border-gray-700/50 hover:shadow-md focus:ring-orange-500/50',
-    review: 'border-blue-800 hover:border-blue-700/50 hover:shadow-lg focus:ring-blue-500/50',
+    review: 'border-gray-800 hover:border-blue-700/50 hover:shadow-lg focus:ring-blue-500/50',
     completed:
       'bg-card border-gray-600/20 flex-row hover:border-gray-500/30 focus:ring-green-500/50',
   };

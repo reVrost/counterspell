@@ -256,7 +256,7 @@
   {/if}
 
   <!-- Main Content Area -->
-  <div class="flex-1 overflow-y-auto relative w-full h-screen" id="content-scroll">
+  <div class="flex-1 overflow-y-auto relative w-full h-screen mb-10" id="content-scroll">
     <!-- Agent Tab -->
     {#if activeTab === 'agent'}
       <div class="pb-32">
@@ -419,7 +419,7 @@
     <div
       class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
     ></div>
-    <div class="relative mx-auto max-w-xl">
+    <div class="relative mx-auto max-w-4xl">
       <ChatInput
         mode="chat"
         taskId={task.id}
