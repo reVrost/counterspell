@@ -217,6 +217,13 @@
     <!-- Status Indicator -->
 
     <div class="flex items-center justify-end gap-2">
+      <button
+        onclick={() => (confirmAction = 'discard')}
+        class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-400 transition focus:outline-none rounded-lg"
+        aria-label="Discard task"
+      >
+        <TrashIcon class="w-4 h-4" />
+      </button>
       <!-- Action Buttons -->
       {#if task.status !== 'in_progress' && task.status !== 'done'}
         <div class="flex items-center gap-2">
@@ -239,14 +246,6 @@
           </button>
         </div>
       {/if}
-
-      <!-- <button -->
-      <!--   onclick={() => (confirmAction = 'discard')} -->
-      <!--   class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-400 transition focus:outline-none rounded-lg" -->
-      <!--   aria-label="Discard task" -->
-      <!-- > -->
-      <!--   <TrashIcon class="w-4 h-4" /> -->
-      <!-- </button> -->
     </div>
   </div>
 
