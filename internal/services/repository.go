@@ -159,16 +159,23 @@ func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 
 // sqlcTaskWithRepoToModel converts sqlc task with repository to model.
 func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task {
+	var lastMsg *string
+	if msg, ok := task.LastAssistantMessage.(string); ok && msg != "" {
+		copyMsg := msg
+		lastMsg = &copyMsg
+	}
+
 	return &models.Task{
-		ID:             task.ID,
-		RepositoryID:   nullableString(task.RepositoryID),
-		RepositoryName: nullableString(task.RepositoryName),
-		Title:          task.Title,
-		Intent:         task.Intent,
-		Status:         task.Status,
-		Position:       nullableInt64(task.Position),
-		CreatedAt:      task.CreatedAt,
-		UpdatedAt:      task.UpdatedAt,
+		ID:                   task.ID,
+		RepositoryID:         nullableString(task.RepositoryID),
+		RepositoryName:       nullableString(task.RepositoryName),
+		Title:                task.Title,
+		Intent:               task.Intent,
+		Status:               task.Status,
+		Position:             nullableInt64(task.Position),
+		LastAssistantMessage: lastMsg,
+		CreatedAt:            task.CreatedAt,
+		UpdatedAt:            task.UpdatedAt,
 	}
 }
 

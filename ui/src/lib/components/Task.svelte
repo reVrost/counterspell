@@ -9,6 +9,7 @@
     title: string;
     repository_name?: string;
     status?: string;
+    last_assistant_message?: string;
   }
 
   interface Props {
@@ -68,52 +69,51 @@
       <ChevronRight class="w-4 h-4 text-gray-700 ml-3 shrink-0" />
     </div>
   {:else}
-    <div class="flex justify-between items-start mb-2">
-      <div class="flex items-center gap-2">
-        <span
-          class={cn(
-            'text-gray-400 opacity-80 w-6 h-6 rounded-lg flex items-center justify-center text-base',
-            variant === 'review' && 'bg-gray-800/50 border border-gray-700/50'
-          )}
-        >
+    <div class="flex justify-between items-start w-full gap-4">
+      <!-- Left content -->
+      <div class="flex-1 min-w-0 space-y-1">
+        <h4 class="text-base font-semibold text-gray-100 leading-tight truncate">
+          {task.title}
+        </h4>
+        
+        <div class="flex items-center gap-1.5 text-gray-500">
           <FolderIcon class="w-3 h-3" />
-        </span>
-        <span class="text-sm font-medium text-gray-400">{task.repository_name ?? 'Unknown'}</span>
-      </div>
-
-      {#if variant === 'pending'}
-        <span class="text-sm text-gray-400 px-2.5 py-1 rounded-lg font-medium"> Pending </span>
-      {:else if variant === 'planning'}
-        <span
-          class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium border border-primary/20"
-        >
-          Planning
-        </span>
-      {:else if variant === 'active'}
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-orange-300/80 font-mono tabular-nums">{elapsed}s</span>
-          <span class="text-sm text-orange-300 px-2.5 py-1 rounded-lg font-medium">
-            In Progress
-          </span>
+          <span class="text-xs font-medium truncate">{task.repository_name ?? 'Unknown'}</span>
         </div>
-      {:else if variant === 'review'}
-        <span class="text-sm text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-medium">
-          Review
-        </span>
-      {/if}
-    </div>
 
-    <p
-      class="text-base text-gray-200 font-medium leading-snug line-clamp-2"
-      class:pr-6={variant === 'review'}
-    >
-      {task.title}
-    </p>
-
-    {#if variant === 'review'}
-      <div class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600">
-        <ChevronRight class="w-4 h-4" />
+        {#if task.last_assistant_message}
+          <p class="text-sm text-gray-400 leading-normal line-clamp-3 pt-1">
+            {task.last_assistant_message}
+          </p>
+        {/if}
       </div>
-    {/if}
+
+      <!-- Right content (Badges) -->
+      <div class="shrink-0 flex flex-col items-end gap-2">
+        {#if variant === 'pending'}
+          <span class="text-sm text-gray-400 px-2 py-1 rounded-sm border border-gray-800 bg-gray-900/30 font-medium"> 
+            Pending 
+          </span>
+        {:else if variant === 'planning'}
+          <span class="text-sm text-purple-400 px-2 py-1 rounded-sm border border-purple-900/50 bg-purple-900/10 font-medium">
+            Planning
+          </span>
+        {:else if variant === 'active'}
+          <div class="flex flex-col items-end gap-1">
+             <span class="text-sm text-orange-400 px-2 py-1 rounded-sm border border-orange-900/50 bg-orange-900/10 font-medium whitespace-nowrap">
+              In Progress
+            </span>
+            <span class="text-xs text-orange-400/60 font-mono tabular-nums">{elapsed}s</span>
+          </div>
+        {:else if variant === 'review'}
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-blue-400 px-2 py-1 rounded-sm border border-blue-900/50 bg-blue-900/10 font-medium">
+              Review
+            </span>
+            <ChevronRight class="w-4 h-4 text-gray-600" />
+          </div>
+        {/if}
+      </div>
+    </div>
   {/if}
 </button>

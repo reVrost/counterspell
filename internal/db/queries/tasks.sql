@@ -36,7 +36,8 @@ SELECT
     t.position,
     t.created_at,
     t.updated_at,
-    r.full_name as repository_name
+    r.full_name as repository_name,
+    COALESCE((SELECT m.content FROM messages m WHERE m.task_id = t.id AND m.role = 'assistant' ORDER BY m.created_at DESC LIMIT 1), '') as last_assistant_message
 FROM tasks t
 LEFT JOIN repositories r ON t.repository_id = r.id
 ORDER BY t.status ASC, t.position ASC, t.created_at DESC;

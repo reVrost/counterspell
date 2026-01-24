@@ -14,31 +14,32 @@ const (
 
 // Task represents a work item.
 type Task struct {
-	ID             string  `json:"id"`
-	RepositoryID   *string `json:"repository_id,omitempty"`
-	RepositoryName *string `json:"repository_name,omitempty"`
-	Title          string  `json:"title"`
-	Intent         string  `json:"intent"`
-	Status         string  `json:"status"`
-	Position       *int64  `json:"position,omitempty"`
-	CreatedAt      int64   `json:"created_at"`
-	UpdatedAt      int64   `json:"updated_at"`
+	ID                   string  `json:"id"`
+	RepositoryID         *string `json:"repository_id,omitempty"`
+	RepositoryName       *string `json:"repository_name,omitempty"`
+	Title                string  `json:"title"`
+	Intent               string  `json:"intent"`
+	Status               string  `json:"status"`
+	Position             *int64  `json:"position,omitempty"`
+	LastAssistantMessage *string `json:"last_assistant_message,omitempty"`
+	CreatedAt            int64   `json:"created_at"`
+	UpdatedAt            int64   `json:"updated_at"`
 }
 
 // AgentRun represents an execution of an agent.
 type AgentRun struct {
-	ID               string   `json:"id"`
-	TaskID           string   `json:"task_id"`
-	Prompt           string   `json:"prompt"`
-	AgentBackend     string   `json:"agent_backend"`
-	SummaryMessageID *string  `json:"summary_message_id,omitempty"`
-	Cost             float64  `json:"cost"`
-	MessageCount     int64    `json:"message_count"`
-	PromptTokens     int64    `json:"prompt_tokens"`
-	CompletionTokens int64    `json:"completion_tokens"`
-	CompletedAt      *int64   `json:"completed_at,omitempty"`
-	CreatedAt        int64    `json:"created_at"`
-	UpdatedAt        int64    `json:"updated_at"`
+	ID               string  `json:"id"`
+	TaskID           string  `json:"task_id"`
+	Prompt           string  `json:"prompt"`
+	AgentBackend     string  `json:"agent_backend"`
+	SummaryMessageID *string `json:"summary_message_id,omitempty"`
+	Cost             float64 `json:"cost"`
+	MessageCount     int64   `json:"message_count"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	CompletedAt      *int64  `json:"completed_at,omitempty"`
+	CreatedAt        int64   `json:"created_at"`
+	UpdatedAt        int64   `json:"updated_at"`
 }
 
 // Settings represents application settings.
@@ -81,29 +82,29 @@ type Message struct {
 
 // AgentRunWithDetails represents an agent run with nested messages and artifacts.
 type AgentRunWithDetails struct {
-	ID               string             `json:"id"`
-	TaskID           string             `json:"task_id"`
-	Prompt           string             `json:"prompt"`
-	AgentBackend     string             `json:"agent_backend"`
-	SummaryMessageID *string            `json:"summary_message_id,omitempty"`
-	Cost             float64            `json:"cost"`
-	MessageCount     int64              `json:"message_count"`
-	PromptTokens     int64              `json:"prompt_tokens"`
-	CompletionTokens int64              `json:"completion_tokens"`
-	CompletedAt      *int64             `json:"completed_at,omitempty"`
-	CreatedAt        int64              `json:"created_at"`
-	UpdatedAt        int64              `json:"updated_at"`
-	Messages         []Message          `json:"messages,omitempty"`
-	Artifacts        []Artifact         `json:"artifacts,omitempty"`
+	ID               string     `json:"id"`
+	TaskID           string     `json:"task_id"`
+	Prompt           string     `json:"prompt"`
+	AgentBackend     string     `json:"agent_backend"`
+	SummaryMessageID *string    `json:"summary_message_id,omitempty"`
+	Cost             float64    `json:"cost"`
+	MessageCount     int64      `json:"message_count"`
+	PromptTokens     int64      `json:"prompt_tokens"`
+	CompletionTokens int64      `json:"completion_tokens"`
+	CompletedAt      *int64     `json:"completed_at,omitempty"`
+	CreatedAt        int64      `json:"created_at"`
+	UpdatedAt        int64      `json:"updated_at"`
+	Messages         []Message  `json:"messages,omitempty"`
+	Artifacts        []Artifact `json:"artifacts,omitempty"`
 }
 
 // TaskResponse represents a detailed task response with all related data.
 // Used by the API handler to provide complete task information including messages, git diff, and artifacts.
 type TaskResponse struct {
 	// Task information
-	Task          Task                  `json:"task"`
-	Messages      []Message             `json:"messages"`
-	Artifacts     []Artifact            `json:"artifacts"`
+	Task      Task       `json:"task"`
+	Messages  []Message  `json:"messages"`
+	Artifacts []Artifact `json:"artifacts"`
 
 	// All agent runs with nested messages and artifacts
 	AgentRuns []AgentRunWithDetails `json:"agent_runs,omitempty"`

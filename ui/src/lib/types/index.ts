@@ -26,6 +26,7 @@ export interface Task {
 	intent: string;
 	status: TaskStatus;
 	position?: number | null;
+	last_assistant_message?: string | null;
 	created_at: number;
 	updated_at: number;
 }
