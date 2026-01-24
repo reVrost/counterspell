@@ -34,7 +34,7 @@ type Querier interface {
 	GetRecentMessages(ctx context.Context, arg GetRecentMessagesParams) ([]Message, error)
 	GetRepository(ctx context.Context, id string) (Repository, error)
 	GetSettings(ctx context.Context) (GetSettingsRow, error)
-	GetTask(ctx context.Context, id string) (Task, error)
+	GetTask(ctx context.Context, id string) (GetTaskRow, error)
 	ListAgentRunsByTask(ctx context.Context, taskID string) ([]AgentRun, error)
 	ListRepositories(ctx context.Context, connectionID string) ([]Repository, error)
 	ListTasks(ctx context.Context) ([]Task, error)

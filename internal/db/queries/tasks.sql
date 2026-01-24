@@ -3,7 +3,19 @@ INSERT INTO tasks (id, repository_id, title, intent, status, created_at, updated
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetTask :one
-SELECT * FROM tasks WHERE id = ?;
+SELECT
+    t.id,
+    t.repository_id,
+    t.title,
+    t.intent,
+    t.status,
+    t.position,
+    t.created_at,
+    t.updated_at,
+    r.full_name as repository_name
+FROM tasks t
+LEFT JOIN repositories r ON t.repository_id = r.id
+WHERE t.id = ?;
 
 -- name: ListTasks :many
 SELECT * FROM tasks

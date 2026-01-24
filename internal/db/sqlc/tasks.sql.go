@@ -48,12 +48,36 @@ func (q *Queries) DeleteTask(ctx context.Context, id string) error {
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, repository_id, title, intent, status, position, created_at, updated_at FROM tasks WHERE id = ?
+SELECT
+    t.id,
+    t.repository_id,
+    t.title,
+    t.intent,
+    t.status,
+    t.position,
+    t.created_at,
+    t.updated_at,
+    r.full_name as repository_name
+FROM tasks t
+LEFT JOIN repositories r ON t.repository_id = r.id
+WHERE t.id = ?
 `
 
-func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
+type GetTaskRow struct {
+	ID             string         `json:"id"`
+	RepositoryID   sql.NullString `json:"repository_id"`
+	Title          string         `json:"title"`
+	Intent         string         `json:"intent"`
+	Status         string         `json:"status"`
+	Position       sql.NullInt64  `json:"position"`
+	CreatedAt      int64          `json:"created_at"`
+	UpdatedAt      int64          `json:"updated_at"`
+	RepositoryName sql.NullString `json:"repository_name"`
+}
+
+func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
 	row := q.db.QueryRowContext(ctx, getTask, id)
-	var i Task
+	var i GetTaskRow
 	err := row.Scan(
 		&i.ID,
 		&i.RepositoryID,
@@ -63,6 +87,7 @@ func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RepositoryName,
 	)
 	return i, err
 }

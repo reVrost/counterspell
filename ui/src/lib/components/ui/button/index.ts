@@ -6,7 +6,7 @@ export const buttonVariants = tv({
   variants: {
     variant: {
       default:
-        "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20",
+        "bg-[#1C1C1C] text-gray-200 border border-[#333] hover:bg-[#252525] shadow-sm",
       destructive:
         "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/20",
       outline:

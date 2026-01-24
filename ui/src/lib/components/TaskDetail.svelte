@@ -20,12 +20,11 @@
   interface Props {
     task: Task;
     messages: Message[];
-    diffContent: string;
     logContent: string[];
     isInProgress?: boolean;
   }
 
-  let { task, messages, diffContent, logContent, isInProgress }: Props = $props();
+  let { task, messages, logContent, isInProgress }: Props = $props();
 
   // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
   // 1. Update the type to include a mandatory ID
@@ -81,6 +80,8 @@
 
   let activeTab = $state<'agent' | 'diff'>('agent');
   let confirmAction = $state<string | null>(null);
+  let diffContent = $state<string>('');
+  let isLoadingDiff = $state<boolean>(false);
 
   function handleBack() {
     goto('/dashboard');
@@ -136,9 +137,9 @@
         appState.showToast(response.message || 'Task discarded', 'success');
         goto('/dashboard');
       }
-      appState.showToast(err instanceof Error ? err.message : `Failed to ${action}`, 'error');
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
+      appState.showToast(err instanceof Error ? err.message : `Failed to ${action}`, 'error');
     }
   }
 
@@ -151,6 +152,47 @@
       }
     });
   });
+
+  $effect(() => {
+    if (activeTab === 'diff' && diffContent === '' && !isLoadingDiff) {
+      loadDiff();
+    }
+  });
+
+  async function loadDiff() {
+    isLoadingDiff = true;
+    try {
+      const response = await tasksAPI.getDiff(task.id);
+      const rawDiff = response.git_diff || '';
+      diffContent = rawDiff
+        ? renderDiffHTML(rawDiff)
+        : '<div class="text-gray-500 italic">No changes made</div>';
+    } catch (err) {
+      console.error('Failed to load diff:', err);
+      diffContent = '<div class="p-4 text-red-400">Failed to load diff</div>';
+    } finally {
+      isLoadingDiff = false;
+    }
+  }
+
+  function renderDiffHTML(diff: string): string {
+    if (!diff) return '<div class="text-gray-500 italic">No changes made</div>';
+
+    let html = '';
+    for (const line of diff.split('\n')) {
+      const escapedLine = escapeHtml(line);
+      if (line.startsWith('+')) {
+        html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-sm border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
+      } else if (line.startsWith('-')) {
+        html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-sm border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
+      } else if (line.startsWith('@@')) {
+        html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-sm">${escapedLine}</div>`;
+      } else if (line.trim() !== '') {
+        html += `<div class="px-3 py-1 text-gray-400 font-mono text-sm">${escapedLine}</div>`;
+      }
+    }
+    return html;
+  }
 </script>
 
 <div class="flex flex-col h-screen">
@@ -244,20 +286,20 @@
         <div class="flex items-center gap-2">
           <button
             onclick={() => (confirmAction = 'merge')}
-            class="h-8 px-3 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-gray-300 transition-all flex items-center gap-1.5"
+            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-gray-200 transition-all shadow-sm flex items-center gap-2"
             title="Merge directly to main"
           >
-            <GithubIcon class="w-3.5 h-3.5" />
+            <GithubIcon class="w-3.5 h-3.5 opacity-70" />
             <span class="hidden sm:inline">Merge</span>
           </button>
 
           <button
             onclick={() => (confirmAction = 'pr')}
-            class="h-8 px-3 rounded-md bg-white hover:bg-gray-100 text-black text-[11px] font-bold transition-all shadow-sm flex items-center gap-1.5"
+            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-gray-200 transition-all shadow-sm flex items-center gap-2"
             title="Create a Pull Request"
           >
-            <GitMergeIcon class="w-3.5 h-3.5" />
-            <span>Merge</span>
+            <GitMergeIcon class="w-3.5 h-3.5 opacity-70" />
+            <span>PR</span>
           </button>
         </div>
       {/if}
@@ -422,7 +464,18 @@
           <span class="text-xs text-green-500 font-mono">git diff</span>
         </div>
         <div class="p-3 diff-container">
-          {@html diffContent}
+          {#if isLoadingDiff}
+            <div class="flex items-center justify-center p-8 text-gray-400">
+              <div
+                class="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full mr-2"
+              ></div>
+              <span>Loading diff...</span>
+            </div>
+          {:else if diffContent}
+            {@html diffContent}
+          {:else}
+            <div class="p-4 text-gray-500 italic">No changes</div>
+          {/if}
         </div>
       </div>
     {/if}

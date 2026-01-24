@@ -63,7 +63,7 @@ func (s *Repository) Get(ctx context.Context, id string) (*models.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sqlcTaskToModel(&task), nil
+	return sqlcGetTaskRowToModel(&task), nil
 }
 
 // List retrieves all tasks.
@@ -176,6 +176,21 @@ func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task
 		LastAssistantMessage: lastMsg,
 		CreatedAt:            task.CreatedAt,
 		UpdatedAt:            task.UpdatedAt,
+	}
+}
+
+// sqlcGetTaskRowToModel converts sqlc GetTaskRow to model.
+func sqlcGetTaskRowToModel(task *sqlc.GetTaskRow) *models.Task {
+	return &models.Task{
+		ID:             task.ID,
+		RepositoryID:   nullableString(task.RepositoryID),
+		RepositoryName: nullableString(task.RepositoryName),
+		Title:          task.Title,
+		Intent:         task.Intent,
+		Status:         task.Status,
+		Position:       nullableInt64(task.Position),
+		CreatedAt:      task.CreatedAt,
+		UpdatedAt:      task.UpdatedAt,
 	}
 }
 
@@ -344,7 +359,7 @@ func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*mo
 	}
 
 	return &models.TaskResponse{
-		Task:      *sqlcTaskToModel(&task),
+		Task:      *sqlcGetTaskRowToModel(&task),
 		Messages:  taskMessages,
 		Artifacts: taskArtifacts,
 		AgentRuns: agentRunsWithDetails,

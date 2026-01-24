@@ -126,6 +126,7 @@ func main() {
 		r.Post("/api/v1/tasks", h.HandleAddTask)
 		r.Get("/api/v1/session", h.HandleGetSession)
 		r.Get("/api/v1/task/{id}", h.HandleGetTask)
+		r.Get("/api/v1/task/{id}/diff", h.HandleGetTaskDiff)
 		r.Get("/api/v1/settings", h.HandleGetSettings)
 		r.Get("/api/v1/files/search", h.HandleFileSearch)
 

@@ -205,6 +205,10 @@ export const tasksAPI = {
     return fetchAPI<TaskResponse>(`/api/v1/task/${id}`);
   },
 
+  async getDiff(id: string): Promise<{ git_diff: string }> {
+    return fetchAPI<{ git_diff: string }>(`/api/v1/task/${id}/diff`);
+  },
+
   async create(intent: string, projectId: string, modelId: string): Promise<APIResponse> {
     return postJsonWithResponse('/api/v1/tasks', {
       intent: intent,

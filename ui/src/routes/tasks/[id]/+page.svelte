@@ -184,7 +184,6 @@
       <TaskDetail
         task={task.task}
         {messages}
-        {diffContent}
         {logContent}
         isInProgress={task.task.status === 'in_progress'}
       />

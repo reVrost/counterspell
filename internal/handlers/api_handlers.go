@@ -63,18 +63,25 @@ func (h *Handlers) HandleGetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get git diff if task is in progress or review
-	if taskResp.Task.Status == "in_progress" || taskResp.Task.Status == "review" {
-		gitDiff, err := h.gitReposManager.GetDiff(taskID)
-		if err != nil {
-			slog.Warn("Failed to get git diff", "task_id", taskID, "error", err)
-			// Continue without diff, don't fail the request
-		} else {
-			taskResp.GitDiff = gitDiff
-		}
+	render.JSON(w, r, taskResp)
+}
+
+// HandleGetTaskDiff returns the git diff for a task.
+func (h *Handlers) HandleGetTaskDiff(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "id")
+	if taskID == "" {
+		http.Error(w, "Task ID required", http.StatusBadRequest)
+		return
 	}
 
-	render.JSON(w, r, taskResp)
+	gitDiff, err := h.gitReposManager.GetDiff(taskID)
+	if err != nil {
+		slog.Error("Failed to get git diff", "task_id", taskID, "error", err)
+		http.Error(w, "Failed to get git diff", http.StatusInternalServerError)
+		return
+	}
+
+	render.JSON(w, r, map[string]string{"git_diff": gitDiff})
 }
 
 // HandleGetSession returns session info based on GitHub connection status.

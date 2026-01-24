@@ -26,8 +26,7 @@
   let currentProject = $state<Project | null>(null);
   let loadingTask = $state(false);
   let taskError = $state<string | null>(null);
-  let agentContent = $state("");
-  let diffContent = $state("");
+  let currentMessages = $state<Message[]>([]);
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
 
@@ -64,13 +63,7 @@
       if (!isPrefetch) {
         currentTask = cached.task;
         currentProject = cached.project;
-        agentContent = renderMessagesHTML(
-          cached.messages,
-          cached.task.status === "in_progress",
-        );
-        diffContent = cached.task.gitDiff
-          ? renderDiffHTML(cached.task.gitDiff)
-          : '<div class="text-gray-500 italic">No changes made</div>';
+        currentMessages = cached.messages;
         logContent = cached.logs.map((log) => renderLogEntryHTML(log));
         setupSSE(taskId);
       }
@@ -95,13 +88,7 @@
         currentTask = data.task;
         currentProject = data.project;
         taskStore.currentTask = data.task;
-        agentContent = renderMessagesHTML(
-          data.messages,
-          data.task.status === "in_progress",
-        );
-        diffContent = data.task.gitDiff
-          ? renderDiffHTML(data.task.gitDiff)
-          : '<div class="text-gray-500 italic">No changes made</div>';
+        currentMessages = data.messages || [];
         logContent = data.logs?.map((log) => renderLogEntryHTML(log)) || [];
 
         // Set up SSE for real-time updates
@@ -126,11 +113,18 @@
 
     // Set up SSE for real-time updates
     eventSource = createTaskSSE(taskId, {
-      onAgentUpdate: (html: string) => {
-        agentContent = html;
+      onAgentUpdate: (data: string) => {
+        try {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) {
+            currentMessages.push(...parsed);
+          }
+        } catch (e) {
+          console.error('Failed to parse agent update JSON:', e);
+        }
       },
       onDiffUpdate: (html: string) => {
-        diffContent = html;
+        // Diff is now loaded on-demand in TaskDetail
       },
       onLog: (html: string) => {
         logContent = [...logContent, html];
@@ -413,10 +407,9 @@
         {:else if currentTask && currentProject}
           <TaskDetail
             task={currentTask}
-            project={currentProject}
-            {agentContent}
-            {diffContent}
+            messages={currentMessages}
             {logContent}
+            isInProgress={currentTask.status === 'in_progress'}
           />
         {/if}
       </div>
