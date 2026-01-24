@@ -4,6 +4,7 @@
 	import { tasksAPI } from "$lib/api";
 	import { createFeedSSE } from "$lib/utils/sse";
 	import { appState } from "$lib/stores/app.svelte";
+	import { taskStore } from "$lib/stores/tasks.svelte";
 	import ErrorView from "$lib/components/ErrorView.svelte";
 
 	let feedData = $state<FeedData>({
@@ -40,6 +41,9 @@
 
 			// Update projects in app state
 			appState.projects = Object.values(data.projects || {});
+			
+			// Update review count
+			taskStore.reviewCount = data.reviews.length;
 		} catch (err) {
 			error = err instanceof Error ? err.message : "Failed to load feed";
 			console.error(

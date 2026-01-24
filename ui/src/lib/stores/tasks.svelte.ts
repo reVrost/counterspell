@@ -7,6 +7,7 @@ class TaskStore {
 	// Current task detail (when modal is open)
 	currentTask = $state<Task | null>(null);
 	todos = $state<Todo[]>([]);
+	reviewCount = $state(0);
 
 	get completedCount(): number {
 		return this.todos.filter((t) => t.status === 'completed').length;

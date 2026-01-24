@@ -6,6 +6,7 @@
   import LayersIcon from "@lucide/svelte/icons/layers";
   import SearchIcon from "@lucide/svelte/icons/search";
   import { appState } from "$lib/stores/app.svelte";
+  import { taskStore } from "$lib/stores/tasks.svelte";
 
   interface Props {
     activeTab?: "inbox" | "projects" | "focus" | "layers";
@@ -58,6 +59,13 @@
           class="w-6 h-6"
           strokeWidth={activeTab === "inbox" ? 2.5 : 2}
         />
+        {#if taskStore.reviewCount > 0}
+          <div
+            class="absolute top-2 right-2 flex min-w-[16px] h-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-[#1a1a1a]"
+          >
+            {taskStore.reviewCount}
+          </div>
+        {/if}
       </button>
 
       <!-- Projects -->
