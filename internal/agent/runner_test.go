@@ -70,14 +70,7 @@ func TestRunner_MessagePersistence(t *testing.T) {
 	mockCaller := NewMockLLMCaller(ctrl)
 	mockProvider := &mockLLMProvider{}
 
-	savedMessages := []Message{}
-	callback := func(e StreamEvent) {
-		if e.Type == EventText && e.Message != nil {
-			savedMessages = append(savedMessages, *e.Message)
-		}
-	}
-
-	r := NewRunner(mockProvider, ".", callback)
+	r := NewRunner(mockProvider, ".", nil)
 	r.llmCaller = mockCaller
 
 	ctx := context.Background()
@@ -93,15 +86,15 @@ func TestRunner_MessagePersistence(t *testing.T) {
 		t.Fatalf("Run failed: %v", err)
 	}
 
-	// Should have received 2 EventMessage: user "hello" and assistant "response"
-	if len(savedMessages) != 2 {
-		t.Errorf("expected 2 saved messages, got %d", len(savedMessages))
+	// Should have 2 messages in history: user "hello" and assistant "response"
+	if len(r.messageHistory) != 2 {
+		t.Errorf("expected 2 messages in history, got %d", len(r.messageHistory))
 	}
-	if savedMessages[0].Role != "user" || savedMessages[0].Content[0].Text != "hello" {
-		t.Errorf("first message should be user 'hello', got %v", savedMessages[0])
+	if r.messageHistory[0].Role != "user" || r.messageHistory[0].Content[0].Text != "hello" {
+		t.Errorf("first message should be user 'hello', got %v", r.messageHistory[0])
 	}
-	if savedMessages[1].Role != "assistant" || savedMessages[1].Content[0].Text != "response" {
-		t.Errorf("second message should be assistant 'response', got %v", savedMessages[1])
+	if r.messageHistory[1].Role != "assistant" || r.messageHistory[1].Content[0].Text != "response" {
+		t.Errorf("second message should be assistant 'response', got %v", r.messageHistory[1])
 	}
 }
 

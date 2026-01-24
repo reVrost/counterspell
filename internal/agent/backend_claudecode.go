@@ -163,47 +163,10 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 	b.mu.Unlock()
 	b.emitMessages()
 
-	// Build command args for JSON streaming mode
-	// Note: --verbose is required for stream-json output format
-	args := []string{
-		"--print",
-		"--verbose",
-		"--output-format", "stream-json",
-		"--dangerously-skip-permissions",
+	cmd, err := b.buildCmd(ctx, prompt, isContinuation)
+	if err != nil {
+		return err
 	}
-
-	if b.model != "" {
-		args = append(args, "--model", b.model)
-	}
-
-	if isContinuation {
-		args = append(args, "--continue")
-	}
-
-	args = append(args, "--", prompt)
-
-	// TODO: Wrap with bubblewrap for sandboxing
-	// args = b.wrapWithBubblewrap(args)
-
-	cmd := exec.CommandContext(ctx, b.binaryPath, args...)
-	cmd.Dir = b.workDir
-
-	// Set environment variables for API authentication
-	// For Z.AI/OpenRouter, use ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL
-	env := os.Environ()
-	if b.baseURL != "" {
-		env = append(env, "ANTHROPIC_BASE_URL="+b.baseURL)
-		// Custom providers use ANTHROPIC_AUTH_TOKEN
-		if b.apiKey != "" {
-			env = append(env, "ANTHROPIC_AUTH_TOKEN="+b.apiKey)
-		}
-		// Important: Explicitly blank ANTHROPIC_API_KEY to prevent conflicts (required by OpenRouter)
-		env = append(env, "ANTHROPIC_API_KEY=")
-	} else if b.apiKey != "" {
-		// Standard Anthropic API
-		env = append(env, "ANTHROPIC_API_KEY="+b.apiKey)
-	}
-	cmd.Env = env
 
 	b.mu.Lock()
 	b.cmd = cmd
@@ -219,10 +182,10 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string, isContin
 		return fmt.Errorf("stderr pipe: %w", err)
 	}
 
-	slog.Info("[CLAUDE-CODE] Starting command", "binary", b.binaryPath, "args", args, "workdir", b.workDir, "api_key_len", len(b.apiKey), "base_url", b.baseURL)
+	slog.Info("[CLAUDE-CODE] Starting command", "binary", b.binaryPath, "args", cmd.Args, "workdir", b.workDir, "api_key_len", len(b.apiKey), "base_url", b.baseURL)
 
 	if err := cmd.Start(); err != nil {
-		slog.Error("[CLAUDE-CODE] Failed to start command", "binary", b.binaryPath, "args", args, "workdir", b.workDir, "error", err)
+		slog.Error("[CLAUDE-CODE] Failed to start command", "binary", b.binaryPath, "args", cmd.Args, "workdir", b.workDir, "error", err)
 		return fmt.Errorf("start claude: %w", err)
 	}
 
@@ -511,4 +474,58 @@ func (b *ClaudeCodeBackend) FinalMessage() string {
 func (b *ClaudeCodeBackend) Todos() []tools.TodoItem {
 	// Claude Code manages its own todos internally, we don't track them
 	return nil
+}
+
+// buildCmd constructs the exec.Cmd for running Claude Code.
+func (b *ClaudeCodeBackend) buildCmd(ctx context.Context, prompt string, isContinuation bool) (*exec.Cmd, error) {
+	// Build command args for JSON streaming mode
+	// Note: --verbose is required for stream-json output format
+	args := []string{
+		"--print",
+		"--verbose",
+		"--output-format", "stream-json",
+		"--dangerously-skip-permissions",
+	}
+
+	if b.model != "" {
+		args = append(args, "--model", b.model)
+	}
+
+	if isContinuation {
+		args = append(args, "--continue")
+	}
+
+	args = append(args, "--", prompt)
+
+	// TODO: Wrap with bubblewrap for sandboxing
+	// args = b.wrapWithBubblewrap(args)
+
+	cmd := exec.CommandContext(ctx, b.binaryPath, args...)
+	cmd.Dir = b.workDir
+
+	// Set environment variables for API authentication
+	// For Z.AI/OpenRouter, use ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL
+	env := os.Environ()
+	if b.baseURL != "" {
+		env = append(env, "ANTHROPIC_BASE_URL="+b.baseURL)
+		// Custom providers use ANTHROPIC_AUTH_TOKEN
+		if b.apiKey != "" {
+			env = append(env, "ANTHROPIC_AUTH_TOKEN="+b.apiKey)
+		}
+		// Important: Explicitly blank ANTHROPIC_API_KEY to prevent conflicts (required by OpenRouter)
+		env = append(env, "ANTHROPIC_API_KEY=")
+	} else if b.apiKey != "" {
+		// Standard Anthropic API
+		env = append(env, "ANTHROPIC_API_KEY="+b.apiKey)
+	}
+
+	// Set model environment variables for GLM-4.7 compatibility
+	if b.model == "glm-4.7" {
+		env = append(env, "ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.7")
+		env = append(env, "ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.7")
+		env = append(env, "ANTHROPIC_DEFAULT_OPUS_MODEL=glm-4.7")
+	}
+
+	cmd.Env = env
+	return cmd, nil
 }
