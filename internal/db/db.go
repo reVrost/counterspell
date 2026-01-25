@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/revrost/code/counterspell/internal/db/sqlc"
 )
 
@@ -29,7 +29,7 @@ func Connect(ctx context.Context, dbPath string) (*DB, error) {
 	}
 
 	// Open SQLite database
-	sqlDB, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	sqlDB, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("unable to open database: %w", err)
 	}

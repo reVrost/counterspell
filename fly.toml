@@ -1,37 +1,43 @@
-# Fly.io configuration for Counterspell
-app = "counterspell"
-primary_region = "ord"
+# fly.toml app configuration file generated for counterspell on 2026-01-25T15:37:35+11:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'counterspell'
+primary_region = 'syd'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  strategy = 'immediate'
 
 [env]
-  ENV = "production"
+  ENV = 'production'
+  DATABASE_PATH = '/app/data/counterspell.db'
+  DATA_DIR = '/app/data'
+
+[[mounts]]
+  source = 'counterspell_data'
+  destination = '/app/data'
 
 [http_service]
   internal_port = 8710
   force_https = true
-  auto_stop_machines = false
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
 
-[[http_service.checks]]
-  interval = "15s"
-  timeout = "10s"
-  grace_period = "5s"
-  method = "GET"
-  path = "/"
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '10s'
+    grace_period = '5s'
+    method = 'GET'
+    path = '/'
 
-[deploy]
-  strategy = "immediate"
-
-# Create persistent volume for SQLite database
-[[mounts]]
-  source = "counterspell_data"
-  destination = "/app/data"
-
-# VM configuration (smallest size)
 [[vm]]
-  size = "shared-cpu-1x"
-  memory_mb = 256
+  size = 'shared-cpu-1x'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 256
