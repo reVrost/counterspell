@@ -143,6 +143,43 @@ UPDATE github_connections SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
 
+-- Machines: Devices running counterspell (laptop, cloud, etc.)
+CREATE TABLE IF NOT EXISTS machines (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    mode TEXT CHECK(mode IN ('local', 'cloud')) NOT NULL DEFAULT 'local',
+    capabilities TEXT,  -- JSON: {"os": "darwin", "cpus": 8}
+    last_seen_at INTEGER NOT NULL, -- Unix ms
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL -- Unix ms
+);
+
+CREATE TRIGGER IF NOT EXISTS update_machines_updated_at
+AFTER UPDATE ON machines
+BEGIN
+UPDATE machines SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Auth: Store JWT tokens and user info from Supabase
+CREATE TABLE IF NOT EXISTS auth (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_id TEXT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    jwt_token TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    email TEXT,
+    expires_at INTEGER NOT NULL, -- Unix ms
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL -- Unix ms
+);
+
+CREATE TRIGGER IF NOT EXISTS update_auth_updated_at
+AFTER UPDATE ON auth
+BEGIN
+UPDATE auth SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
 -- Repositories: Available repos for selection
 CREATE TABLE IF NOT EXISTS repositories (
     id TEXT PRIMARY KEY,

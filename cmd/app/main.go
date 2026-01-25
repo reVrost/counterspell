@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/revrost/code/counterspell/internal/cli"
 	"github.com/revrost/code/counterspell/internal/config"
 	"github.com/revrost/code/counterspell/internal/db"
 	"github.com/revrost/code/counterspell/internal/handlers"
@@ -81,6 +82,71 @@ func main() {
 	if err := database.RunMigrations(ctx); err != nil {
 		logger.Error("Failed to run migrations", "error", err)
 		os.Exit(1)
+	}
+
+	// Initialize control plane client (if configured)
+	var controlPlane *services.ControlPlaneClient
+	if cfg.ControlPlaneURL != "" {
+		controlPlane = services.NewControlPlaneClient(cfg.ControlPlaneURL)
+		logger.Info("Control plane configured", "url", cfg.ControlPlaneURL)
+	} else {
+		logger.Info("No control plane configured, running in offline mode")
+	}
+
+	// Create auth service
+	authService := services.NewAuthService(database, controlPlane, cfg.AuthToken)
+
+	// Ensure machine exists in database
+	machineID, err := authService.EnsureMachine(ctx)
+	if err != nil {
+		logger.Error("Failed to ensure machine", "error", err)
+		os.Exit(1)
+	}
+
+	// Check authentication and prompt if needed
+	if controlPlane != nil {
+		// Check if already authenticated
+		authenticated, err := authService.IsAuthenticated(ctx, machineID)
+		if err != nil {
+			logger.Error("Failed to check auth status", "error", err)
+			os.Exit(1)
+		}
+
+		var userID string
+		var exchangeResp *services.ExchangeCodeResponse
+
+		if !authenticated {
+			// Not authenticated - start auth flow with callback
+			authCallback := cli.NewAuthWithCallback(authService, controlPlane, 8711)
+			userID, exchangeResp, err = authCallback.Authenticate(ctx, machineID)
+			if err != nil {
+				logger.Error("Authentication failed", "error", err)
+				os.Exit(1)
+			}
+
+			// Store auth token
+			if err := authService.StoreAuth(ctx, machineID, exchangeResp.JWT, exchangeResp.UserID, exchangeResp.Email, exchangeResp.ExpiresAt); err != nil {
+				logger.Error("Failed to store auth", "error", err)
+				os.Exit(1)
+			}
+
+			// Register machine and get subdomain
+			subdomain, err := authService.RegisterMachine(ctx, exchangeResp.JWT, machineID)
+			if err != nil {
+				logger.Error("Failed to register machine", "error", err)
+				os.Exit(1)
+			}
+			logger.Info("Machine registered", "subdomain", subdomain)
+		} else {
+			// Already authenticated
+			auth, err := authService.GetStoredAuth(ctx, machineID)
+			if err != nil {
+				logger.Error("Failed to get stored auth", "error", err)
+				os.Exit(1)
+			}
+			userID = auth.UserID
+			logger.Info("Already authenticated", "user_id", userID, "machine_id", machineID)
+		}
 	}
 
 	// Create event bus

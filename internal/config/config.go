@@ -32,6 +32,10 @@ type Config struct {
 	// GitHub OAuth
 	GitHubClientID     string
 	GitHubClientSecret string
+
+	// Control Plane (counterspell.io)
+	ControlPlaneURL string
+	AuthToken       string // JWT from control plane
 }
 
 // Load loads configuration from environment variables.
@@ -59,6 +63,10 @@ func Load() *Config {
 		// GitHub OAuth
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+
+		// Control Plane (counterspell.io)
+		ControlPlaneURL: os.Getenv("CONTROL_PLANE_URL"),
+		AuthToken:       os.Getenv("AUTH_TOKEN"),
 	}
 
 	log.Printf("Config loaded: DATABASE_PATH=%s, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",
