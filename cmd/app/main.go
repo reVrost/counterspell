@@ -23,6 +23,10 @@ import (
 	"github.com/revrost/code/counterspell/ui"
 )
 
+type contextKey string
+
+const subdomainKey contextKey = "subdomain"
+
 func main() {
 	// Parse flags
 	addr := flag.String("addr", ":8710", "Server address")
@@ -114,7 +118,7 @@ func main() {
 				subdomain = parts[0]
 			}
 
-			ctx := context.WithValue(r.Context(), "subdomain", subdomain)
+			ctx := context.WithValue(r.Context(), subdomainKey, subdomain)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
@@ -258,7 +262,7 @@ func spaHandler(fsys fs.FS) http.HandlerFunc {
 // SubdomainFromContext extracts the subdomain from the request context.
 // Returns empty string if no subdomain is present.
 func SubdomainFromContext(ctx context.Context) string {
-	if subdomain, ok := ctx.Value("subdomain").(string); ok {
+	if subdomain, ok := ctx.Value(subdomainKey).(string); ok {
 		return subdomain
 	}
 	return ""
