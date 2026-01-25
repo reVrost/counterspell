@@ -41,3 +41,24 @@ primary_region = 'syd'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
+
+# Custom domain configuration for *.yourdomain.bob
+[[services]]
+  http_checks = []
+  internal_port = 8710
+  processes = ['app']
+
+  [[services.ports]]
+    force_https = true
+    handlers = ['http']
+    port = 80
+
+  [[services.ports]]
+    handlers = ['tls', 'http']
+    port = 443
+
+  [[services.tcp_checks]]
+    grace_period = '1s'
+    interval = '15s'
+    restart_limit = 0
+    timeout = '2s'

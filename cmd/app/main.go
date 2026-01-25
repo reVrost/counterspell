@@ -100,11 +100,36 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Timeout(60 * time.Second))
 
+	// Subdomain extraction middleware
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			host := r.Host
+			if idx := strings.Index(host, ":"); idx != -1 {
+				host = host[:idx]
+			}
+
+			parts := strings.Split(host, ".")
+			var subdomain string
+			if len(parts) >= 3 && parts[0] != "www" {
+				subdomain = parts[0]
+			}
+
+			ctx := context.WithValue(r.Context(), "subdomain", subdomain)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+
 	// Public routes (no auth required)
 	r.Group(func(r chi.Router) {
 		// Health check
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			render.JSON(w, r, map[string]string{"status": "ok"})
+		})
+
+		// Debug endpoint to show subdomain
+		r.Get("/debug/subdomain", func(w http.ResponseWriter, r *http.Request) {
+			subdomain := SubdomainFromContext(r.Context())
+			render.JSON(w, r, map[string]string{"subdomain": subdomain})
 		})
 
 		// UI logging - no auth required so errors can be logged even when auth fails
@@ -228,4 +253,13 @@ func spaHandler(fsys fs.FS) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		http.ServeContent(w, r, "index.html", stat.ModTime(), indexFile.(io.ReadSeeker))
 	}
+}
+
+// SubdomainFromContext extracts the subdomain from the request context.
+// Returns empty string if no subdomain is present.
+func SubdomainFromContext(ctx context.Context) string {
+	if subdomain, ok := ctx.Value("subdomain").(string); ok {
+		return subdomain
+	}
+	return ""
 }
