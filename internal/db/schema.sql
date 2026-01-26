@@ -169,6 +169,25 @@ END;
 -- Insert default settings row
 INSERT OR IGNORE INTO settings (id, agent_backend, provider, model) VALUES (1, 'native', 'anthropic', 'claude-opus-4-5');
 
+-- OAuth Login Attempts: Temporary PKCE state for OAuth flow
+CREATE TABLE IF NOT EXISTS oauth_login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    state TEXT NOT NULL UNIQUE,
+    code_verifier TEXT NOT NULL,
+    created_at INTEGER NOT NULL -- Unix ms
+);
+
+-- Machine Identity: Stores machine credentials and tunnel info
+CREATE TABLE IF NOT EXISTS machine_identity (
+    machine_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    subdomain TEXT NOT NULL UNIQUE,
+    tunnel_provider TEXT NOT NULL CHECK(tunnel_provider IN ('cloudflare')),
+    tunnel_token TEXT NOT NULL,
+    created_at INTEGER NOT NULL, -- Unix ms
+    last_seen_at INTEGER -- Unix ms
+);
+
 -- Indices (optimize for common query patterns)
 CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
 CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);

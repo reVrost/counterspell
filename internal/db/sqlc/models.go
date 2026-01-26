@@ -46,6 +46,16 @@ type GithubConnection struct {
 	UpdatedAt    int64          `json:"updated_at"`
 }
 
+type MachineIdentity struct {
+	MachineID      string        `json:"machine_id"`
+	UserID         string        `json:"user_id"`
+	Subdomain      string        `json:"subdomain"`
+	TunnelProvider string        `json:"tunnel_provider"`
+	TunnelToken    string        `json:"tunnel_token"`
+	CreatedAt      int64         `json:"created_at"`
+	LastSeenAt     sql.NullInt64 `json:"last_seen_at"`
+}
+
 type Message struct {
 	ID         string         `json:"id"`
 	TaskID     string         `json:"task_id"`
@@ -59,6 +69,13 @@ type Message struct {
 	CreatedAt  int64          `json:"created_at"`
 	UpdatedAt  int64          `json:"updated_at"`
 	FinishedAt sql.NullInt64  `json:"finished_at"`
+}
+
+type OauthLoginAttempt struct {
+	ID           int64  `json:"id"`
+	State        string `json:"state"`
+	CodeVerifier string `json:"code_verifier"`
+	CreatedAt    int64  `json:"created_at"`
 }
 
 type Repository struct {

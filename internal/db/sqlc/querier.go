@@ -9,16 +9,20 @@ import (
 )
 
 type Querier interface {
+	CleanupExpiredOAuthAttempts(ctx context.Context, createdAt int64) error
 	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) error
 	CreateArtifact(ctx context.Context, arg CreateArtifactParams) error
 	CreateGithubConnection(ctx context.Context, arg CreateGithubConnectionParams) (GithubConnection, error)
+	CreateMachineIdentity(ctx context.Context, arg CreateMachineIdentityParams) error
 	CreateMessage(ctx context.Context, arg CreateMessageParams) error
+	CreateOAuthLoginAttempt(ctx context.Context, arg CreateOAuthLoginAttemptParams) error
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) error
 	DeleteAgentRunsByTask(ctx context.Context, taskID string) error
 	DeleteArtifactsByRun(ctx context.Context, runID string) error
 	DeleteGithubConnection(ctx context.Context, id string) error
 	DeleteMessagesByTask(ctx context.Context, taskID string) error
+	DeleteOAuthLoginAttempt(ctx context.Context, state string) error
 	DeleteRepositoriesByConnection(ctx context.Context, connectionID string) error
 	DeleteTask(ctx context.Context, id string) error
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
@@ -28,9 +32,12 @@ type Querier interface {
 	GetGithubConnection(ctx context.Context) (GithubConnection, error)
 	GetGithubConnectionByID(ctx context.Context, id string) (GithubConnection, error)
 	GetLatestRun(ctx context.Context, taskID string) (AgentRun, error)
+	GetMachineByUserID(ctx context.Context, userID string) (MachineIdentity, error)
+	GetMachineIdentity(ctx context.Context, machineID string) (MachineIdentity, error)
 	GetMessage(ctx context.Context, id string) (Message, error)
 	GetMessagesByRun(ctx context.Context, runID string) ([]Message, error)
 	GetMessagesByTask(ctx context.Context, taskID string) ([]Message, error)
+	GetOAuthLoginAttempt(ctx context.Context, state string) (GetOAuthLoginAttemptRow, error)
 	GetRecentMessages(ctx context.Context, arg GetRecentMessagesParams) ([]Message, error)
 	GetRepository(ctx context.Context, id string) (Repository, error)
 	GetSettings(ctx context.Context) (GetSettingsRow, error)
@@ -43,9 +50,11 @@ type Querier interface {
 	UpdateAgentRunBackendSessionID(ctx context.Context, arg UpdateAgentRunBackendSessionIDParams) error
 	UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error
 	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)
+	UpdateMachineIdentityLastSeen(ctx context.Context, arg UpdateMachineIdentityLastSeenParams) error
 	UpdateTaskPosition(ctx context.Context, arg UpdateTaskPositionParams) error
 	UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error
+	UpsertMachineIdentity(ctx context.Context, arg UpsertMachineIdentityParams) (MachineIdentity, error)
 	UpsertRepository(ctx context.Context, arg UpsertRepositoryParams) (Repository, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) error
 }
