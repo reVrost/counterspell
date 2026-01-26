@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/agent/tools"
-	"github.com/revrost/code/counterspell/internal/llm"
+	"github.com/revrost/counterspell/internal/agent/tools"
+	"github.com/revrost/counterspell/internal/llm"
 )
 
 const (

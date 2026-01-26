@@ -1,4 +1,4 @@
-module github.com/revrost/code/counterspell
+module github.com/revrost/counterspell
 
 go 1.25
 

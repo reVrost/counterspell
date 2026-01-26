@@ -9,7 +9,7 @@ import (
 	"log/slog"
 
 	_ "modernc.org/sqlite"
-	"github.com/revrost/code/counterspell/internal/db/sqlc"
+	"github.com/revrost/counterspell/internal/db/sqlc"
 )
 
 //go:embed schema.sql

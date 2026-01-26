@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/db/sqlc"
+	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/db/sqlc"
 )
 
 type GitHubService struct {

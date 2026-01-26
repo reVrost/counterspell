@@ -24,7 +24,7 @@ package agent
 import (
 	"context"
 
-	"github.com/revrost/code/counterspell/internal/agent/tools"
+	"github.com/revrost/counterspell/internal/agent/tools"
 )
 
 // Backend is the interface for agent task execution.

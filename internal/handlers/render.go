@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/render"
-	"github.com/revrost/code/counterspell/internal/models"
-	"github.com/revrost/code/counterspell/internal/services"
+	"github.com/revrost/counterspell/internal/models"
+	"github.com/revrost/counterspell/internal/services"
 )
 
 // ------------------------------------------------------------------

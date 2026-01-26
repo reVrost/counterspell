@@ -12,7 +12,7 @@ package agent
 import (
 	reflect "reflect"
 
-	tools "github.com/revrost/code/counterspell/internal/agent/tools"
+	tools "github.com/revrost/counterspell/internal/agent/tools"
 	gomock "go.uber.org/mock/gomock"
 )
 

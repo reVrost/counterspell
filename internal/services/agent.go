@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/counterspell/internal/models"
 )
 
 // Message represents a chat message for agents.

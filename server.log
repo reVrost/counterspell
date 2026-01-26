@@ -1,0 +1,13 @@
+time=2026-01-26T20:30:56.567+11:00 level=INFO msg="Config loaded: DATABASE_PATH=./data/counterspell.db, NATIVE_ALLOWLIST=10, DATA_DIR=6"
+time=2026-01-26T20:30:56.568+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:54 msg="Starting server" database_path=./data/counterspell.db data_dir=./data worker_pool_size=20 max_tasks_per_user=5
+time=2026-01-26T20:30:56.568+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/config/dirs.go:29 msg="Directory structure ready" data_dir=./data
+time=2026-01-26T20:30:56.569+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/db/db.go:47 msg="Connected to SQLite database" path=./data/counterspell.db
+time=2026-01-26T20:30:56.573+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/db/db.go:68 msg="Database schema initialized"
+time=2026-01-26T20:30:56.573+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:93 msg="Setting up router"
+time=2026-01-26T20:30:56.573+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:186 msg="Server starting" addr=:8710
+time=2026-01-26T20:30:57.496+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:198 msg="Server shutting down..."
+time=2026-01-26T20:30:57.496+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/handlers/handlers_registration.go:88 msg="[HANDLERS] All orchestrators shut down"
+time=2026-01-26T20:30:57.496+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/services/events.go:182 msg="[EVENTBUS] Shutting down"
+time=2026-01-26T20:30:57.496+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/services/events.go:190 msg="[EVENTBUS] Shutdown complete"
+time=2026-01-26T20:30:57.497+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:215 msg="Server stopped"
+time=2026-01-26T20:30:57.498+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/db/db.go:78 msg="Database connection closed"

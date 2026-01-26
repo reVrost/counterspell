@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/revrost/code/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/config"
 )
 
 // ErrOutputTruncated indicates the output was truncated due to size limits.

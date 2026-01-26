@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/lithammer/shortuuid/v4"
-	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/db/sqlc"
-	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/db/sqlc"
+	"github.com/revrost/counterspell/internal/models"
 )
 
 // Repository handles task persistence.

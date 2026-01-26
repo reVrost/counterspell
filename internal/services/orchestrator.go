@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
-	"github.com/revrost/code/counterspell/internal/agent"
-	"github.com/revrost/code/counterspell/internal/llm"
-	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/counterspell/internal/agent"
+	"github.com/revrost/counterspell/internal/llm"
+	"github.com/revrost/counterspell/internal/models"
 )
 
 // ConflictFile represents a merge conflict.

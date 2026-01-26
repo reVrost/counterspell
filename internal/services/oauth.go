@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/revrost/code/counterspell/internal/config"
-	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/db/sqlc"
+	"github.com/revrost/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/db/sqlc"
 )
 
 // OAuthService handles OAuth login flow for Counterspell.

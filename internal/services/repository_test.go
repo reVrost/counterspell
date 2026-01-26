@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/db/sqlc"
+	"github.com/revrost/counterspell/internal/db/sqlc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

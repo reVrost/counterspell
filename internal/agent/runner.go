@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/revrost/code/counterspell/internal/agent/tools"
-	"github.com/revrost/code/counterspell/internal/llm"
+	"github.com/revrost/counterspell/internal/agent/tools"
+	"github.com/revrost/counterspell/internal/llm"
 )
 
 // Event types for streaming

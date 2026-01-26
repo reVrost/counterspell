@@ -3,7 +3,7 @@ package services
 import (
 	"testing"
 
-	"github.com/revrost/code/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

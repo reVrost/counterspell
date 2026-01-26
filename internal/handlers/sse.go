@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/counterspell/internal/models"
 )
 
 // HandleSSE handles Server-Sent Events for real-time updates.

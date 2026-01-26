@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/revrost/code/counterspell/internal/llm"
+	"github.com/revrost/counterspell/internal/llm"
 	"go.uber.org/mock/gomock"
 )
 

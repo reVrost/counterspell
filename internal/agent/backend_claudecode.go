@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/revrost/code/counterspell/internal/agent/tools"
+	"github.com/revrost/counterspell/internal/agent/tools"
 )
 
 // Compile-time interface check

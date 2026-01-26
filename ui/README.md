@@ -70,7 +70,7 @@ SvelteKit will start at `http://localhost:5173`
 In a separate terminal:
 
 ```bash
-cd /Users/revrost/Code/counterspell
+cd /Users/revrost/counterspell
 go run ./cmd/app
 ```
 

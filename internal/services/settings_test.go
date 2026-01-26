@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/revrost/code/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

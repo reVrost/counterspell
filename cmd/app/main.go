@@ -16,11 +16,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/revrost/code/counterspell/internal/config"
-	"github.com/revrost/code/counterspell/internal/db"
-	"github.com/revrost/code/counterspell/internal/handlers"
-	"github.com/revrost/code/counterspell/internal/services"
-	"github.com/revrost/code/counterspell/ui"
+	"github.com/revrost/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/db"
+	"github.com/revrost/counterspell/internal/handlers"
+	"github.com/revrost/counterspell/internal/services"
+	"github.com/revrost/counterspell/ui"
 )
 
 func main() {

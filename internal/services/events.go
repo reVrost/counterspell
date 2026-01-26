@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/revrost/code/counterspell/internal/models"
+	"github.com/revrost/counterspell/internal/models"
 )
 
 // EventType represents the type of event being published.

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/revrost/code/counterspell/internal/agent/tools"
-	"github.com/revrost/code/counterspell/internal/llm"
+	"github.com/revrost/counterspell/internal/agent/tools"
+	"github.com/revrost/counterspell/internal/llm"
 )
 
 // ErrProviderRequired is returned when a NativeBackend is created without a provider.
