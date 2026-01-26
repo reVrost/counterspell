@@ -1,23 +1,23 @@
 <script lang="ts">
-  import Header from "$lib/components/Header.svelte";
-  import Toast from "$lib/components/Toast.svelte";
-  import SettingsModal from "$lib/components/SettingsModal.svelte";
-  import Navigator from "$lib/components/Navigator.svelte";
-  import TaskDetail from "$lib/components/TaskDetail.svelte";
-  import ChatInput from "$lib/components/ChatInput.svelte";
-  import Skeleton from "$lib/components/Skeleton.svelte";
-  import { appState } from "$lib/stores/app.svelte";
-  import { taskStore } from "$lib/stores/tasks.svelte";
-  import { tasksAPI } from "$lib/api";
-  import { createTaskSSE } from "$lib/utils/sse";
+  import Header from '$lib/components/Header.svelte';
+  import Toast from '$lib/components/Toast.svelte';
+  import SettingsModal from '$lib/components/SettingsModal.svelte';
+  import Navigator from '$lib/components/Navigator.svelte';
+  import TaskDetail from '$lib/components/TaskDetail.svelte';
+  import ChatInput from '$lib/components/ChatInput.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import { appState } from '$lib/stores/app.svelte';
+  import { taskStore } from '$lib/stores/tasks.svelte';
+  import { tasksAPI } from '$lib/api';
+  import { createTaskSSE } from '$lib/utils/sse';
   import {
     modalSlideUp,
     backdropFade,
     DURATIONS,
     prefersReducedMotion,
-  } from "$lib/utils/transitions";
-  import type { Project, Task, Message, LogEntry } from "$lib/types";
-  import { onDestroy, tick } from "svelte";
+  } from '$lib/utils/transitions';
+  import type { Project, Task, Message, LogEntry } from '$lib/types';
+  import { onDestroy, tick } from 'svelte';
 
   let { children } = $props();
 
@@ -96,8 +96,8 @@
       }
     } catch (err) {
       if (!isPrefetch) {
-        taskError = err instanceof Error ? err.message : "Failed to load task";
-        console.error("Task load error:", err);
+        taskError = err instanceof Error ? err.message : 'Failed to load task';
+        console.error('Task load error:', err);
       }
     } finally {
       if (!isPrefetch) loadingTask = false;
@@ -136,22 +136,19 @@
         if (currentTask) {
           currentTask = {
             ...currentTask,
-            status: status as Task["status"],
+            status: status as Task['status'],
           };
           taskStore.currentTask = currentTask;
         }
       },
       onError: (error) => {
-        console.error("Task SSE error:", error);
+        console.error('Task SSE error:', error);
       },
     });
   }
 
   // Helper to render messages as HTML (matches Go backend rendering)
-  function renderMessagesHTML(
-    messages: Message[],
-    isInProgress: boolean,
-  ): string {
+  function renderMessagesHTML(messages: Message[], isInProgress: boolean): string {
     if (messages.length === 0) {
       return '<div class="p-5 text-gray-500 italic text-xs">No agent output</div>';
     }
@@ -160,7 +157,7 @@
     for (const msg of messages) {
       html += renderMessageBubbleHTML(msg);
     }
-    html += "</div>";
+    html += '</div>';
 
     if (isInProgress) {
       html += `
@@ -185,18 +182,18 @@
   }
 
   function renderMessageBubbleHTML(msg: Message): string {
-    const isUser = msg.role === "user";
+    const isUser = msg.role === 'user';
     const bgClass = isUser
-      ? "bg-violet-500/10 border-violet-500/20"
-      : "bg-gray-800/50 border-gray-700/50";
-    const icon = isUser ? "fa-user" : "fa-robot";
-    const iconColor = isUser ? "text-violet-400" : "text-blue-400";
+      ? 'bg-violet-500/10 border-violet-500/20'
+      : 'bg-gray-800/50 border-gray-700/50';
+    const icon = isUser ? 'fa-user' : 'fa-robot';
+    const iconColor = isUser ? 'text-violet-400' : 'text-blue-400';
 
-    let contentHtml = "";
+    let contentHtml = '';
     for (const block of msg.content) {
-      if (block.type === "text" && block.text) {
+      if (block.type === 'text' && block.text) {
         contentHtml += `<p class="text-sm text-gray-300 leading-normal">${escapeHtml(block.text)}</p>`;
-      } else if (block.type === "tool_use" && block.toolName) {
+      } else if (block.type === 'tool_use' && block.toolName) {
         contentHtml += `
 					<div class="flex items-center gap-2 my-2">
 						<span class="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-mono text-blue-300">
@@ -204,8 +201,8 @@
 						</span>
 					</div>
 				`;
-      } else if (block.type === "tool_result") {
-        contentHtml += `<pre class="text-xs text-gray-400 font-mono whitespace-pre-wrap bg-gray-900/50 rounded p-2 my-2">${escapeHtml(block.text || "")}</pre>`;
+      } else if (block.type === 'tool_result') {
+        contentHtml += `<pre class="text-xs text-gray-400 font-mono whitespace-pre-wrap bg-gray-900/50 rounded p-2 my-2">${escapeHtml(block.text || '')}</pre>`;
       }
     }
 
@@ -233,16 +230,16 @@
   function renderDiffHTML(diff: string): string {
     if (!diff) return '<div class="text-gray-500 italic">No changes made</div>';
 
-    let html = "";
-    for (const line of diff.split("\n")) {
+    let html = '';
+    for (const line of diff.split('\n')) {
       const escapedLine = escapeHtml(line);
-      if (line.startsWith("+")) {
+      if (line.startsWith('+')) {
         html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-xs border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith("-")) {
+      } else if (line.startsWith('-')) {
         html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-xs border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith("@@")) {
+      } else if (line.startsWith('@@')) {
         html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-xs">${escapedLine}</div>`;
-      } else if (line.trim() !== "") {
+      } else if (line.trim() !== '') {
         html += `<div class="px-3 py-1 text-gray-400 font-mono text-xs">${escapedLine}</div>`;
       }
     }
@@ -260,11 +257,11 @@
 
   function escapeHtml(text: string): string {
     return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   $effect(() => {
@@ -275,8 +272,8 @@
         eventSource = null;
       }
       currentProject = null;
-      agentContent = "";
-      diffContent = "";
+      // agentContent = '';
+      // diffContent = '';
       logContent = [];
       currentTask = null;
     } else {
@@ -294,10 +291,10 @@
   });
 
   // Expose prefetch function globally for TaskRow
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     (window as any).prefetchTask = prefetchTask;
   }
-  let activeTab = $state<"inbox" | "projects" | "focus" | "layers">("inbox");
+  let activeTab = $state<'inbox' | 'projects' | 'focus' | 'layers'>('inbox');
 </script>
 
 <div class="h-screen flex flex-col overflow-hidden bg-background">
@@ -305,17 +302,12 @@
   <SettingsModal />
   <Header {activeTab} />
 
-  <main
-    class="flex-1 overflow-y-auto bg-background relative pt-14"
-    id="feed-container"
-  >
+  <main class="flex-1 overflow-y-auto bg-background relative pt-14" id="feed-container">
     <div class="px-3 pt-6 pb-40">{@render children()}</div>
   </main>
 
   <!-- Bottom Navigation Bar -->
-  <div
-    class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-4xl grid items-end"
-  >
+  <div class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-4xl grid items-end">
     {#if appState.showChatInput}
       <div class="col-start-1 row-start-1 w-full relative z-50">
         <ChatInput mode="create" onClose={() => appState.closeChatInput()} />
