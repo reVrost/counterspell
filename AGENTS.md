@@ -67,6 +67,7 @@ INVOKER_BASE_URL=https://counterspell.io
 # Auth flow
 HEADLESS=false
 FORCE_DEVICE_CODE=false
+INVOKER_OAUTH_PROVIDER=google
 
 # OAuth callback port (local callback server)
 OAUTH_CALLBACK_PORT=8711

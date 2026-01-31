@@ -48,6 +48,7 @@ type OAuthLoginRequest struct {
 	RedirectURI   string `json:"redirect_uri"`
 	CodeChallenge string `json:"code_challenge"`
 	State         string `json:"state"`
+	Provider      string `json:"provider"`
 }
 
 // OAuthLoginResponse represents the response from the Invoker control plane.
@@ -527,6 +528,7 @@ func (s *OAuthService) callInvokerAuthURL(ctx context.Context, codeChallenge, st
 		RedirectURI:   redirectURI,
 		CodeChallenge: codeChallenge,
 		State:         state,
+		Provider:      s.cfg.InvokerOAuthProvider,
 	}
 	var resp OAuthLoginResponse
 	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/auth/url", req, &resp, nil); err != nil {

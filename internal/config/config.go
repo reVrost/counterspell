@@ -37,7 +37,8 @@ type Config struct {
 	OAuthCallbackPort string
 
 	// Invoker control plane
-	InvokerBaseURL string
+	InvokerBaseURL       string
+	InvokerOAuthProvider string
 
 	// Auth flow
 	Headless        bool
@@ -74,7 +75,8 @@ func Load() *Config {
 		OAuthCallbackPort: getEnvString("OAUTH_CALLBACK_PORT", "8711"),
 
 		// Invoker control plane
-		InvokerBaseURL: getEnvString("INVOKER_BASE_URL", "https://counterspell.io"),
+		InvokerBaseURL:       getEnvString("INVOKER_BASE_URL", "https://counterspell.io"),
+		InvokerOAuthProvider: getEnvString("INVOKER_OAUTH_PROVIDER", "google"),
 
 		// Auth flow
 		Headless:        getEnvBool("HEADLESS", false),

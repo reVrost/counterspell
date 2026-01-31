@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"io"
+	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -185,19 +186,7 @@ func main() {
 	if err != nil {
 		log.Printf("Failed to load Svelte UI: %v, running without static assets", err)
 	} else {
-		fileServer := http.FileServer(http.FS(svelteFS))
-		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-			// Normalize path and try to open file
-			cleanPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-			f, err := svelteFS.Open(cleanPath)
-			if err == nil {
-				f.Close()
-			} else if os.IsNotExist(err) {
-				// File doesn't exist - serve index.html for SPA routing
-				r.URL.Path = "/"
-			}
-			fileServer.ServeHTTP(w, r)
-		})
+		r.Get("/*", spaHandler(svelteFS))
 	}
 
 	// Start server
@@ -286,4 +275,21 @@ func SubdomainFromContext(ctx context.Context) string {
 		return subdomain
 	}
 	return ""
+}
+
+// spaHandler returns an http.Handler that serves the SPA with client-side routing.
+// If the requested file exists, it serves it directly. Otherwise, it serves index.html
+// to enable client-side routing.
+func spaHandler(svelteFS fs.FS) http.HandlerFunc {
+	fileServer := http.FileServer(http.FS(svelteFS))
+	return func(w http.ResponseWriter, r *http.Request) {
+		cleanPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		f, err := svelteFS.Open(cleanPath)
+		if err == nil {
+			f.Close()
+		} else if os.IsNotExist(err) {
+			r.URL.Path = "/"
+		}
+		fileServer.ServeHTTP(w, r)
+	}
 }
