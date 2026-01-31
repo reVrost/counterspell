@@ -200,15 +200,15 @@ func TestOAuthService_GetMachineID(t *testing.T) {
 	service := NewOAuthService(nil, cfg)
 
 	// Get machine ID twice
-	id1 := service.getMachineID()
-	id2 := service.getMachineID()
+	id1, err1 := service.getMachineID()
+	id2, err2 := service.getMachineID()
 
 	// Should generate IDs
+	assert.NoError(t, err1, "machine ID should not error")
+	assert.NoError(t, err2, "machine ID should not error")
 	assert.NotEmpty(t, id1, "machine ID should not be empty")
 	assert.NotEmpty(t, id2, "machine ID should not be empty")
-
-	// TODO: Should be persistent across restarts - need to implement persistence
-	// For now, they're different (new UUID each time)
+	assert.Equal(t, id1, id2, "machine ID should be stable within the same process")
 }
 
 // TestOAuthService_OpenBrowser tests browser opening (doesn't actually open).

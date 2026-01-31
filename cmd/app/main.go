@@ -82,7 +82,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Ensure auth + machine identity before starting server
+	// Ensure auth + machine identity before starting server (Handshake starts here)
 	authService := services.NewOAuthService(database, cfg)
 	authResult, err := authService.EnsureAuthenticated(ctx)
 	if err != nil {

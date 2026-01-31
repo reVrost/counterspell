@@ -583,7 +583,10 @@ func (s *OAuthService) getOrCreateMachineID(ctx context.Context) (string, error)
 		return row.String, nil
 	}
 
-	id := uuid.New().String()
+	id, err := s.getMachineID()
+	if err != nil {
+		return "", err
+	}
 	if err := s.db.Queries.UpdateMachineID(ctx, sqlc.UpdateMachineIDParams{
 		MachineID: sql.NullString{String: id, Valid: true},
 		UpdatedAt: time.Now().UnixMilli(),
@@ -608,11 +611,13 @@ func (s *OAuthService) generateCodeChallenge(codeVerifier string) string {
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
-// getMachineID returns a persistent machine ID.
-func (s *OAuthService) getMachineID() string {
-	// TODO: Load from persistent storage or generate once
-	// For now, generate a new UUID
-	return uuid.New().String()
+// getMachineID returns a stable machine identifier derived from hardware IDs.
+func (s *OAuthService) getMachineID() (string, error) {
+	id, err := stableMachineID()
+	if err != nil || id == "" {
+		return "", fmt.Errorf("failed to derive stable machine id: %w", err)
+	}
+	return id, nil
 }
 
 // callInvokerAuthURL calls the Invoker control plane to get the auth URL.
