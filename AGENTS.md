@@ -9,7 +9,7 @@ Task orchestration platform running AI agents on user codebases.
 
 - **Invoker control plane:** `counterspell.io` (auth, machine registry, tunnel provisioning)
 - **Data plane / tunnel domain:** `*.counterspell.app` (public URL points at local machine via Cloudflare tunnel)
-- **Auth flow (CLI startup):** browser OAuth by default; device-code flow when `HEADLESS=true` or `FORCE_DEVICE_CODE=true`
+- **Auth flow (CLI startup):** browser OAuth by default (auth code polled via `/api/v1/auth/poll`); device-code flow when `HEADLESS=true` or `FORCE_DEVICE_CODE=true`
 - **Device approval UI:** `https://counterspell.io/device` (enters `user_code`, calls `/api/v1/auth/device/approve`)
 
 ## Quick Commands
@@ -71,6 +71,9 @@ INVOKER_OAUTH_PROVIDER=google
 
 # OAuth callback port (local callback server)
 OAUTH_CALLBACK_PORT=8711
+
+# OAuth redirect URI (prod default hits Invoker callback)
+OAUTH_REDIRECT_URI=https://counterspell.io/api/v1/auth/callback
 ```
 
 ## Change Size Heuristic

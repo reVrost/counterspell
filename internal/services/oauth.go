@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -56,6 +57,13 @@ type OAuthLoginResponse struct {
 	AuthURL string `json:"auth_url"`
 }
 
+// OAuthLoginAttempt bundles login metadata for the CLI flow.
+type OAuthLoginAttempt struct {
+	AuthURL     string
+	State       string
+	RedirectURI string
+}
+
 // OAuthExchangeRequest represents a request to exchange OAuth code.
 type OAuthExchangeRequest struct {
 	Code         string `json:"code"`
@@ -68,6 +76,17 @@ type OAuthExchangeResponse struct {
 	MachineJWT string `json:"machine_jwt"`
 	UserID     string `json:"user_id"`
 	UserEmail  string `json:"user_email"`
+}
+
+// OAuthPollRequest represents a request to poll for an OAuth code.
+type OAuthPollRequest struct {
+	State string `json:"state"`
+}
+
+// OAuthPollResponse represents a poll response from Invoker.
+type OAuthPollResponse struct {
+	Status string `json:"status"`
+	Code   string `json:"code,omitempty"`
 }
 
 // Device flow (headless) types.
@@ -119,6 +138,11 @@ type AuthResult struct {
 	TunnelToken string
 }
 
+const (
+	oauthAttemptTTL   = 10 * time.Minute
+	oauthPollInterval = 2 * time.Second
+)
+
 // NewOAuthService creates a new OAuth service.
 func NewOAuthService(database *db.DB, cfg *config.Config) *OAuthService {
 	return &OAuthService{
@@ -131,7 +155,7 @@ func NewOAuthService(database *db.DB, cfg *config.Config) *OAuthService {
 
 // StartLoginFlow initiates the OAuth 2.0 Authorization Code Flow with PKCE.
 // This is called during CLI startup (not an HTTP handler).
-func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginResponse, error) {
+func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginAttempt, error) {
 	// 1. Generate PKCE code_verifier
 	codeVerifier, err := s.generateCodeVerifier()
 	if err != nil {
@@ -157,13 +181,26 @@ func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginResponse,
 	slog.Info("OAuth login attempt created", "state", state)
 
 	// 5. Call Invoker POST /api/v1/auth/url
-	redirectURI := fmt.Sprintf("http://localhost:%s/auth/callback", s.cfg.OAuthCallbackPort)
+	redirectURI := s.cfg.OAuthRedirectURI
+	if redirectURI == "" {
+		redirectURI = fmt.Sprintf("http://localhost:%s/auth/callback", s.cfg.OAuthCallbackPort)
+	}
+	if parsedRedirect, err := url.Parse(redirectURI); err == nil {
+		q := parsedRedirect.Query()
+		if q.Get("cs_state") == "" {
+			q.Set("cs_state", state)
+			parsedRedirect.RawQuery = q.Encode()
+			redirectURI = parsedRedirect.String()
+		}
+	}
+	slog.Info("OAuth login start", "redirect_uri", redirectURI, "invoker_base", s.cfg.InvokerBaseURL)
 	authURL, err := s.callInvokerAuthURL(ctx, codeChallenge, state, redirectURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth url from invoker: %w", err)
 	}
+	slog.Info("OAuth auth_url received", "auth_url", authURL)
 
-	return &OAuthLoginResponse{AuthURL: authURL}, nil
+	return &OAuthLoginAttempt{AuthURL: authURL, State: state, RedirectURI: redirectURI}, nil
 }
 
 // StartCallbackServer starts a temporary HTTP server to handle OAuth callback.
@@ -225,35 +262,15 @@ func (s *OAuthService) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Lookup stored state + code_verifier from SQLite
-	attempt, err := s.db.Queries.GetOAuthLoginAttempt(ctx, state)
-	if err != nil {
-		slog.Error("Failed to get OAuth login attempt", "error", err, "state", state)
-		http.Error(w, "Invalid state", http.StatusBadRequest)
-		return
-	}
-
-	// Check if attempt is expired (5 minutes)
-	if time.Since(time.UnixMilli(attempt.CreatedAt)) > 5*time.Minute {
-		slog.Warn("OAuth login attempt expired", "state", state)
-		http.Error(w, "State expired", http.StatusBadRequest)
-		return
-	}
-
-	// 4. Call Invoker POST /api/v1/auth/exchange
-	exchangeResp, err := s.callInvokerExchange(ctx, code, state, attempt.CodeVerifier)
+	// 2. Exchange code for machine JWT
+	exchangeResp, err := s.exchangeWithState(ctx, code, state)
 	if err != nil {
 		slog.Error("Failed to exchange OAuth code", "error", err)
 		http.Error(w, "Failed to exchange code", http.StatusInternalServerError)
 		return
 	}
 
-	// 5. Delete the oauth attempt
-	if err := s.db.Queries.DeleteOAuthLoginAttempt(ctx, state); err != nil {
-		slog.Error("Failed to delete OAuth login attempt", "error", err)
-	}
-
-	// 6. Send success response to browser
+	// 3. Send success response to browser
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`
@@ -266,12 +283,34 @@ func (s *OAuthService) handleCallback(w http.ResponseWriter, r *http.Request) {
 		</html>
 	`))
 
-	// 7. Notify main process via channel
+	// 4. Notify main process via channel
 	s.callbackCh <- &OAuthCallbackResult{
 		MachineJWT: exchangeResp.MachineJWT,
 		UserID:     exchangeResp.UserID,
 		UserEmail:  exchangeResp.UserEmail,
 	}
+}
+
+func (s *OAuthService) exchangeWithState(ctx context.Context, code, state string) (*OAuthExchangeResponse, error) {
+	attempt, err := s.db.Queries.GetOAuthLoginAttempt(ctx, state)
+	if err != nil {
+		return nil, fmt.Errorf("invalid state: %w", err)
+	}
+
+	if time.Since(time.UnixMilli(attempt.CreatedAt)) > oauthAttemptTTL {
+		return nil, fmt.Errorf("state expired")
+	}
+
+	exchangeResp, err := s.callInvokerExchange(ctx, code, state, attempt.CodeVerifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.db.Queries.DeleteOAuthLoginAttempt(ctx, state); err != nil {
+		slog.Error("Failed to delete OAuth login attempt", "error", err)
+	}
+
+	return exchangeResp, nil
 }
 
 // RegisterMachine associates the local machine with the authenticated user.
@@ -377,32 +416,41 @@ func (s *OAuthService) login(ctx context.Context) (string, error) {
 	}
 
 	// Try browser-based flow first.
-	loginResp, err := s.StartLoginFlow(ctx)
+	loginAttempt, err := s.StartLoginFlow(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.StartCallbackServer(ctx, s.cfg.OAuthCallbackPort); err != nil {
-		return "", err
+	isLoopback := isLoopbackRedirectURI(loginAttempt.RedirectURI)
+	callbackPort := s.cfg.OAuthCallbackPort
+	if isLoopback {
+		callbackPort = callbackPortFromRedirectURI(loginAttempt.RedirectURI, callbackPort)
+		if err := s.StartCallbackServer(ctx, callbackPort); err != nil {
+			return "", err
+		}
+		defer func() {
+			_ = s.StopCallbackServer(context.Background())
+		}()
 	}
-	defer func() {
-		_ = s.StopCallbackServer(context.Background())
-	}()
 
-	if err := s.OpenBrowser(loginResp.AuthURL); err != nil {
+	if err := s.OpenBrowser(loginAttempt.AuthURL); err != nil {
 		slog.Warn("Failed to open browser, falling back to device flow", "error", err)
 		return s.deviceFlow(ctx)
 	}
 
-	result, err := s.WaitForCallback(ctx)
-	if err != nil {
-		return "", err
-	}
-	if result.Error != nil {
-		return "", result.Error
+	if isLoopback {
+		result, err := s.WaitForCallback(ctx)
+		if err != nil {
+			return "", err
+		}
+		if result.Error != nil {
+			return "", result.Error
+		}
+
+		return result.MachineJWT, nil
 	}
 
-	return result.MachineJWT, nil
+	return s.pollForAuthCodeAndExchange(ctx, loginAttempt.State)
 }
 
 func (s *OAuthService) deviceFlow(ctx context.Context) (string, error) {
@@ -434,6 +482,51 @@ func (s *OAuthService) deviceFlow(ctx context.Context) (string, error) {
 			}
 		}
 	}
+}
+
+func (s *OAuthService) pollForAuthCodeAndExchange(ctx context.Context, state string) (string, error) {
+	attempt, err := s.db.Queries.GetOAuthLoginAttempt(ctx, state)
+	if err != nil {
+		return "", fmt.Errorf("failed to load login attempt: %w", err)
+	}
+
+	deadline := time.UnixMilli(attempt.CreatedAt).Add(oauthAttemptTTL)
+	if time.Now().After(deadline) {
+		return "", fmt.Errorf("oauth login attempt expired")
+	}
+	pollCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+
+	ticker := time.NewTicker(oauthPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-pollCtx.Done():
+			return "", fmt.Errorf("oauth login expired or canceled")
+		case <-ticker.C:
+			resp, err := s.pollOAuthCode(pollCtx, state)
+			if err != nil {
+				return "", err
+			}
+			if resp.Status == "ready" && resp.Code != "" {
+				exchangeResp, err := s.exchangeWithState(pollCtx, resp.Code, state)
+				if err != nil {
+					return "", err
+				}
+				return exchangeResp.MachineJWT, nil
+			}
+		}
+	}
+}
+
+func (s *OAuthService) pollOAuthCode(ctx context.Context, state string) (*OAuthPollResponse, error) {
+	req := OAuthPollRequest{State: state}
+	var resp OAuthPollResponse
+	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/auth/poll", req, &resp, nil); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 func (s *OAuthService) getMachineIdentity(ctx context.Context, machineID string) (*sqlc.MachineIdentity, error) {
@@ -655,6 +748,38 @@ func (s *OAuthService) OpenBrowser(url string) error {
 	return exec.Command(cmd, args...).Start()
 }
 
+func isLoopbackRedirectURI(redirectURI string) bool {
+	if redirectURI == "" {
+		return false
+	}
+	parsed, err := url.Parse(redirectURI)
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	if host != "localhost" && host != "127.0.0.1" {
+		return false
+	}
+	if parsed.Path != "" && parsed.Path != "/auth/callback" {
+		return false
+	}
+	return true
+}
+
+func callbackPortFromRedirectURI(redirectURI, fallback string) string {
+	if redirectURI == "" {
+		return fallback
+	}
+	parsed, err := url.Parse(redirectURI)
+	if err != nil {
+		return fallback
+	}
+	if port := parsed.Port(); port != "" {
+		return port
+	}
+	return fallback
+}
+
 // isLoopback checks if the remote address is from loopback.
 func isLoopback(addr string) bool {
 	// Simple check - in production, parse the IP properly
@@ -663,6 +788,6 @@ func isLoopback(addr string) bool {
 
 // CleanupExpiredOAuthAttempts removes expired OAuth login attempts.
 func (s *OAuthService) CleanupExpiredOAuthAttempts(ctx context.Context) error {
-	cutoff := time.Now().Add(-5 * time.Minute).UnixMilli()
+	cutoff := time.Now().Add(-oauthAttemptTTL).UnixMilli()
 	return s.db.Queries.CleanupExpiredOAuthAttempts(ctx, cutoff)
 }

@@ -35,6 +35,7 @@ type Config struct {
 
 	// OAuth callback configuration
 	OAuthCallbackPort string
+	OAuthRedirectURI  string
 
 	// Invoker control plane
 	InvokerBaseURL       string
@@ -73,6 +74,7 @@ func Load() *Config {
 
 		// OAuth callback
 		OAuthCallbackPort: getEnvString("OAUTH_CALLBACK_PORT", "8711"),
+		OAuthRedirectURI:  getEnvString("OAUTH_REDIRECT_URI", "https://counterspell.io/api/v1/auth/callback"),
 
 		// Invoker control plane
 		InvokerBaseURL:       getEnvString("INVOKER_BASE_URL", "https://counterspell.io"),
