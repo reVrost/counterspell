@@ -4,11 +4,12 @@ import (
 	"context"
 	"flag"
 	"io"
-	"io/fs"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -84,7 +85,7 @@ func main() {
 	authService := services.NewOAuthService(database, cfg)
 	authResult, err := authService.EnsureAuthenticated(ctx)
 	if err != nil {
-		logger.Error("Authentication failed", "error", err)
+		logger.Error("Authentication failed. Exiting application", "error", err)
 		os.Exit(1)
 	}
 	logger.Info("Authenticated", "subdomain", authResult.Subdomain, "machine_id", authResult.MachineID)
@@ -179,9 +180,25 @@ func main() {
 
 	})
 
-	// Serve SvelteKit SPA from embedded filesystem
-	// This must come after API routes - it's a catch-all for the SPA
-	r.Get("/*", spaHandler(ui.DistDirFs))
+	// Serve Svelte UI (embedded SPA build) - MUST BE LAST
+	svelteFS, err := ui.Static()
+	if err != nil {
+		log.Printf("Failed to load Svelte UI: %v, running without static assets", err)
+	} else {
+		fileServer := http.FileServer(http.FS(svelteFS))
+		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+			// Normalize path and try to open file
+			cleanPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+			f, err := svelteFS.Open(cleanPath)
+			if err == nil {
+				f.Close()
+			} else if os.IsNotExist(err) {
+				// File doesn't exist - serve index.html for SPA routing
+				r.URL.Path = "/"
+			}
+			fileServer.ServeHTTP(w, r)
+		})
+	}
 
 	// Start server
 	server := &http.Server{
@@ -260,46 +277,6 @@ func localURLFromAddr(addr string) string {
 		return addr
 	}
 	return "http://" + addr
-}
-
-// spaHandler serves the SvelteKit SPA from an embedded filesystem.
-// It serves static assets directly and falls back to index.html for client-side routing.
-func spaHandler(fsys fs.FS) http.HandlerFunc {
-	fileServer := http.FileServer(http.FS(fsys))
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/")
-
-		// Try to serve the file directly
-		f, err := fsys.Open(path)
-		if err == nil {
-			_ = f.Close()
-			// File exists - serve it with caching for immutable assets
-			if strings.HasPrefix(path, "_app/immutable/") {
-				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-			}
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-
-		// File not found - serve index.html for SPA routing
-		indexFile, err := fsys.Open("index.html")
-		if err != nil {
-			http.Error(w, "index.html not found", http.StatusInternalServerError)
-			return
-		}
-		defer func() { _ = indexFile.Close() }()
-
-		stat, err := indexFile.Stat()
-		if err != nil {
-			http.Error(w, "Failed to stat index.html", http.StatusInternalServerError)
-			return
-		}
-
-		// Serve index.html
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		http.ServeContent(w, r, "index.html", stat.ModTime(), indexFile.(io.ReadSeeker))
-	}
 }
 
 // SubdomainFromContext extracts the subdomain from the request context.

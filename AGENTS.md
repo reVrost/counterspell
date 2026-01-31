@@ -7,10 +7,10 @@ Task orchestration platform running AI agents on user codebases.
 
 ## Control Plane + Tunnel Context (2026-01)
 
-- **Invoker control plane:** `invoker.counterspell.io` (auth, machine registry, tunnel provisioning)
+- **Invoker control plane:** `counterspell.io` (auth, machine registry, tunnel provisioning)
 - **Data plane / tunnel domain:** `*.counterspell.app` (public URL points at local machine via Cloudflare tunnel)
 - **Auth flow (CLI startup):** browser OAuth by default; device-code flow when `HEADLESS=true` or `FORCE_DEVICE_CODE=true`
-- **Device approval UI:** `https://invoker.counterspell.io/device` (enters `user_code`, calls `/api/v1/auth/device/approve`)
+- **Device approval UI:** `https://counterspell.io/device` (enters `user_code`, calls `/api/v1/auth/device/approve`)
 
 ## Quick Commands
 
@@ -62,7 +62,7 @@ Use `make verify` (runs `scripts/verify.sh`) to automatically select checks base
 
 ```bash
 # Control plane base URL
-INVOKER_BASE_URL=https://invoker.counterspell.io
+INVOKER_BASE_URL=https://counterspell.io
 
 # Auth flow
 HEADLESS=false

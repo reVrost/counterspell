@@ -74,7 +74,7 @@ func Load() *Config {
 		OAuthCallbackPort: getEnvString("OAUTH_CALLBACK_PORT", "8711"),
 
 		// Invoker control plane
-		InvokerBaseURL: getEnvString("INVOKER_BASE_URL", "https://invoker.counterspell.io"),
+		InvokerBaseURL: getEnvString("INVOKER_BASE_URL", "https://counterspell.io"),
 
 		// Auth flow
 		Headless:        getEnvBool("HEADLESS", false),
