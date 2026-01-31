@@ -52,6 +52,25 @@ Use `make verify` (runs `scripts/verify.sh`) to automatically select checks base
 | Structured Logging | `slog.Info("msg", "key", value)` |
 | Use sqlc Queries | Always use sqlc-generated queries, not raw SQL or JSON operations |
 
+## Layering Guide (Repository → Service → Transport)
+
+**Repository (Persistence Gateway)**
+- Abstracts storage (SQL/Redis/etc); returns **domain structs only**
+- No business logic; `context.Context` first argument
+- Never leak DB types (`sql.NullString`, `pgtype.Text`)
+
+**Service (Business Logic Core)**
+- Orchestrates rules + repositories; no `net/http` or protocol deps
+- Map storage errors to domain errors (don’t return raw SQL errors)
+- Unit-testable without infra
+
+**Transport (HTTP / RPC handlers)**
+- Decode/validate → call Service → map domain errors → encode response
+- No business logic, no direct repository calls
+- For Chi handlers, use `github.com/go-chi/render` for JSON + errors
+
+**Implementation order:** Service interface → Repository query → Service logic → Transport handler.
+
 ## Local Auth Storage (Counterspell)
 
 - **SQLite (local):** `settings.machine_jwt` and `settings.machine_id`
