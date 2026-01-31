@@ -275,9 +275,8 @@
         eventSource = null;
       }
       currentProject = null;
-      agentContent = "";
-      diffContent = "";
       logContent = [];
+      currentMessages = [];
       currentTask = null;
     } else {
       loadTaskDetail(appState.modalTaskId);
