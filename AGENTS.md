@@ -5,6 +5,13 @@ Task orchestration platform running AI agents on user codebases.
 
 **Stack:** Go (Chi) + SvelteKit 5 + SQLite/PostgreSQL + Supabase auth
 
+## Control Plane + Tunnel Context (2026-01)
+
+- **Invoker control plane:** `invoker.counterspell.io` (auth, machine registry, tunnel provisioning)
+- **Data plane / tunnel domain:** `*.counterspell.app` (public URL points at local machine via Cloudflare tunnel)
+- **Auth flow (CLI startup):** browser OAuth by default; device-code flow when `HEADLESS=true` or `FORCE_DEVICE_CODE=true`
+- **Device approval UI:** `https://invoker.counterspell.io/device` (enters `user_code`, calls `/api/v1/auth/device/approve`)
+
 ## Quick Commands
 
 ```bash
@@ -31,6 +38,26 @@ cd ui && npm run build  # Build frontend (required before testing Go changes)
 | Wrap Errors | `fmt.Errorf("context: %w", err)` |
 | Structured Logging | `slog.Info("msg", "key", value)` |
 | Use sqlc Queries | Always use sqlc-generated queries, not raw SQL or JSON operations |
+
+## Local Auth Storage (Counterspell)
+
+- **SQLite (local):** `settings.machine_jwt` and `settings.machine_id`
+- **Machine metadata:** `machine_identity` (subdomain, tunnel_token, etc.)
+- **Do not expose** `machine_jwt` via public settings APIs
+
+## Auth + Tunnel Environment Variables
+
+```bash
+# Control plane base URL
+INVOKER_BASE_URL=https://invoker.counterspell.io
+
+# Auth flow
+HEADLESS=false
+FORCE_DEVICE_CODE=false
+
+# OAuth callback port (local callback server)
+OAUTH_CALLBACK_PORT=8711
+```
 
 ## Change Size Heuristic
 
@@ -116,6 +143,8 @@ let { taskId, onClose = () => {} }: { taskId: string; onClose?: () => void } = $
 | `internal/handlers/handlers_registration.go` | Handler struct, service injection |
 | `internal/handlers/sse.go` | SSE streaming |
 | `internal/services/orchestrator.go` | Task execution, agent coordination |
+| `internal/services/oauth.go` | Invoker auth + device flow + machine registration |
+| `internal/tunnel/cloudflare.go` | Cloudflare tunnel runner |
 | `internal/db/schema.sql` | Database schema |
 | `ui/src/lib/stores/tasks.svelte.ts` | Task state management |
 | `ui/src/lib/api.ts` | API client |

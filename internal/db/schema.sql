@@ -112,6 +112,8 @@ CREATE TABLE IF NOT EXISTS settings (
     zai_key TEXT,
     anthropic_key TEXT,
     openai_key TEXT,
+    machine_id TEXT,
+    machine_jwt TEXT,
     agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
     provider TEXT,
     model TEXT,

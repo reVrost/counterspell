@@ -1,17 +1,21 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,7 +45,9 @@ type OAuthCallbackResult struct {
 
 // OAuthLoginRequest represents a request to start login.
 type OAuthLoginRequest struct {
-	RedirectURI string `json:"redirect_uri"`
+	RedirectURI   string `json:"redirect_uri"`
+	CodeChallenge string `json:"code_challenge"`
+	State         string `json:"state"`
 }
 
 // OAuthLoginResponse represents the response from the Invoker control plane.
@@ -63,6 +69,30 @@ type OAuthExchangeResponse struct {
 	UserEmail  string `json:"user_email"`
 }
 
+// Device flow (headless) types.
+type DeviceStartRequest struct {
+	ClientID string `json:"client_id,omitempty"`
+}
+
+type DeviceStartResponse struct {
+	DeviceCode      string `json:"device_code"`
+	UserCode        string `json:"user_code"`
+	VerificationURL string `json:"verification_url"`
+	Interval        int    `json:"interval"`
+	ExpiresIn       int    `json:"expires_in"`
+}
+
+type DevicePollRequest struct {
+	DeviceCode string `json:"device_code"`
+}
+
+type DevicePollResponse struct {
+	Status     string `json:"status"`
+	MachineJWT string `json:"machine_jwt,omitempty"`
+	UserID     string `json:"user_id,omitempty"`
+	UserEmail  string `json:"user_email,omitempty"`
+}
+
 // MachineRegisterRequest represents a request to register a machine.
 type MachineRegisterRequest struct {
 	MachineID string `json:"machine_id"`
@@ -75,8 +105,17 @@ type MachineRegisterRequest struct {
 // MachineRegisterResponse represents the response from the Invoker control plane.
 type MachineRegisterResponse struct {
 	UserID      string `json:"user_id"`
-	Subdomain    string `json:"subdomain"`
-	TunnelToken  string `json:"tunnel_token"`
+	Subdomain   string `json:"subdomain"`
+	TunnelToken string `json:"tunnel_token"`
+}
+
+// AuthResult captures the machine auth + tunnel metadata for startup.
+type AuthResult struct {
+	MachineJWT  string
+	MachineID   string
+	UserID      string
+	Subdomain   string
+	TunnelToken string
 }
 
 // NewOAuthService creates a new OAuth service.
@@ -106,9 +145,9 @@ func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginResponse,
 
 	// 4. Persist {state, code_verifier, created_at} in SQLite
 	err = s.db.Queries.CreateOAuthLoginAttempt(ctx, sqlc.CreateOAuthLoginAttemptParams{
-		State:         state,
-		CodeVerifier:  codeVerifier,
-		CreatedAt:     time.Now().UnixMilli(),
+		State:        state,
+		CodeVerifier: codeVerifier,
+		CreatedAt:    time.Now().UnixMilli(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to store oauth attempt: %w", err)
@@ -117,7 +156,7 @@ func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginResponse,
 	slog.Info("OAuth login attempt created", "state", state)
 
 	// 5. Call Invoker POST /api/v1/auth/url
-	redirectURI := "http://localhost:8711/auth/callback"
+	redirectURI := fmt.Sprintf("http://localhost:%s/auth/callback", s.cfg.OAuthCallbackPort)
 	authURL, err := s.callInvokerAuthURL(ctx, codeChallenge, state, redirectURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth url from invoker: %w", err)
@@ -235,9 +274,10 @@ func (s *OAuthService) handleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 // RegisterMachine associates the local machine with the authenticated user.
-func (s *OAuthService) RegisterMachine(ctx context.Context, machineJWT string) (*MachineRegisterResponse, error) {
-	// 1. Generate or load persistent machine_id
-	machineID := s.getMachineID()
+func (s *OAuthService) RegisterMachine(ctx context.Context, machineJWT string, machineID string) (*MachineRegisterResponse, error) {
+	if machineID == "" {
+		return nil, fmt.Errorf("machine_id is required")
+	}
 
 	// 2. Collect system metadata
 	hostname, _ := os.Hostname()
@@ -275,6 +315,190 @@ func (s *OAuthService) RegisterMachine(ctx context.Context, machineJWT string) (
 	return resp, nil
 }
 
+// EnsureAuthenticated ensures machine JWT + machine identity exist, prompting login if needed.
+func (s *OAuthService) EnsureAuthenticated(ctx context.Context) (*AuthResult, error) {
+	machineJWT, err := s.getMachineJWT(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load machine jwt: %w", err)
+	}
+
+	if machineJWT == "" {
+		machineJWT, err = s.login(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.storeMachineJWT(ctx, machineJWT); err != nil {
+			return nil, fmt.Errorf("failed to store machine jwt: %w", err)
+		}
+	}
+
+	machineID, err := s.getOrCreateMachineID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get machine id: %w", err)
+	}
+
+	identity, err := s.getMachineIdentity(ctx, machineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get machine identity: %w", err)
+	}
+	if identity != nil {
+		if err := s.updateMachineIdentityLastSeen(ctx, machineID); err != nil {
+			slog.Warn("Failed to update machine last_seen", "error", err)
+		}
+		return &AuthResult{
+			MachineJWT:  machineJWT,
+			MachineID:   machineID,
+			UserID:      identity.UserID,
+			Subdomain:   identity.Subdomain,
+			TunnelToken: identity.TunnelToken,
+		}, nil
+	}
+
+	// Register with Invoker if no local identity exists.
+	reg, err := s.RegisterMachine(ctx, machineJWT, machineID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthResult{
+		MachineJWT:  machineJWT,
+		MachineID:   machineID,
+		UserID:      reg.UserID,
+		Subdomain:   reg.Subdomain,
+		TunnelToken: reg.TunnelToken,
+	}, nil
+}
+
+func (s *OAuthService) login(ctx context.Context) (string, error) {
+	// Prefer device flow when running headless or forced.
+	if s.cfg.ForceDeviceCode || s.cfg.Headless {
+		return s.deviceFlow(ctx)
+	}
+
+	// Try browser-based flow first.
+	loginResp, err := s.StartLoginFlow(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.StartCallbackServer(ctx, s.cfg.OAuthCallbackPort); err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = s.StopCallbackServer(context.Background())
+	}()
+
+	if err := s.OpenBrowser(loginResp.AuthURL); err != nil {
+		slog.Warn("Failed to open browser, falling back to device flow", "error", err)
+		return s.deviceFlow(ctx)
+	}
+
+	result, err := s.WaitForCallback(ctx)
+	if err != nil {
+		return "", err
+	}
+	if result.Error != nil {
+		return "", result.Error
+	}
+
+	return result.MachineJWT, nil
+}
+
+func (s *OAuthService) deviceFlow(ctx context.Context) (string, error) {
+	startResp, err := s.StartDeviceFlow(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	slog.Info("Device login required", "verification_url", startResp.VerificationURL, "user_code", startResp.UserCode)
+
+	timeout := time.Duration(startResp.ExpiresIn) * time.Second
+	pollCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Duration(startResp.Interval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-pollCtx.Done():
+			return "", fmt.Errorf("device login expired or canceled")
+		case <-ticker.C:
+			pollResp, err := s.PollDeviceFlow(pollCtx, startResp.DeviceCode)
+			if err != nil {
+				return "", err
+			}
+			if pollResp.Status == "approved" && pollResp.MachineJWT != "" {
+				return pollResp.MachineJWT, nil
+			}
+		}
+	}
+}
+
+func (s *OAuthService) getMachineIdentity(ctx context.Context, machineID string) (*sqlc.MachineIdentity, error) {
+	if machineID == "" {
+		return nil, nil
+	}
+	identity, err := s.db.Queries.GetMachineIdentity(ctx, machineID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &identity, nil
+}
+
+func (s *OAuthService) updateMachineIdentityLastSeen(ctx context.Context, machineID string) error {
+	if machineID == "" {
+		return nil
+	}
+	return s.db.Queries.UpdateMachineIdentityLastSeen(ctx, sqlc.UpdateMachineIdentityLastSeenParams{
+		LastSeenAt: sql.NullInt64{Int64: time.Now().UnixMilli(), Valid: true},
+		MachineID:  machineID,
+	})
+}
+
+func (s *OAuthService) getMachineJWT(ctx context.Context) (string, error) {
+	row, err := s.db.Queries.GetMachineJWT(ctx)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	if row.Valid {
+		return row.String, nil
+	}
+	return "", nil
+}
+
+func (s *OAuthService) storeMachineJWT(ctx context.Context, jwt string) error {
+	return s.db.Queries.UpdateMachineJWT(ctx, sqlc.UpdateMachineJWTParams{
+		MachineJwt: sql.NullString{String: jwt, Valid: jwt != ""},
+		UpdatedAt:  time.Now().UnixMilli(),
+	})
+}
+
+func (s *OAuthService) getOrCreateMachineID(ctx context.Context) (string, error) {
+	row, err := s.db.Queries.GetMachineID(ctx)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+	if err == nil && row.Valid && row.String != "" {
+		return row.String, nil
+	}
+
+	id := uuid.New().String()
+	if err := s.db.Queries.UpdateMachineID(ctx, sqlc.UpdateMachineIDParams{
+		MachineID: sql.NullString{String: id, Valid: true},
+		UpdatedAt: time.Now().UnixMilli(),
+	}); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // generateCodeVerifier generates a PKCE code_verifier (RFC 7636).
 func (s *OAuthService) generateCodeVerifier() (string, error) {
 	bytes := make([]byte, 32)
@@ -299,31 +523,112 @@ func (s *OAuthService) getMachineID() string {
 
 // callInvokerAuthURL calls the Invoker control plane to get the auth URL.
 func (s *OAuthService) callInvokerAuthURL(ctx context.Context, codeChallenge, state, redirectURI string) (string, error) {
-	// TODO: Implement actual HTTP call to Invoker
-	// For now, return a placeholder URL
-	return "https://invoker.counterspell.app/auth?code_challenge=" + codeChallenge + "&state=" + state, nil
+	req := OAuthLoginRequest{
+		RedirectURI:   redirectURI,
+		CodeChallenge: codeChallenge,
+		State:         state,
+	}
+	var resp OAuthLoginResponse
+	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/auth/url", req, &resp, nil); err != nil {
+		return "", err
+	}
+	return resp.AuthURL, nil
 }
 
 // callInvokerExchange calls the Invoker control plane to exchange the OAuth code.
 func (s *OAuthService) callInvokerExchange(ctx context.Context, code, state, codeVerifier string) (*OAuthExchangeResponse, error) {
-	// TODO: Implement actual HTTP call to Invoker
-	// For now, return a placeholder response
-	return &OAuthExchangeResponse{
-		MachineJWT: "placeholder.jwt.token",
-		UserID:    "user-123",
-		UserEmail: "user@example.com",
-	}, nil
+	req := OAuthExchangeRequest{
+		Code:         code,
+		State:        state,
+		CodeVerifier: codeVerifier,
+	}
+	var resp OAuthExchangeResponse
+	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/auth/exchange", req, &resp, nil); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 // callInvokerRegisterMachine calls the Invoker control plane to register the machine.
 func (s *OAuthService) callInvokerRegisterMachine(ctx context.Context, machineJWT string, req MachineRegisterRequest) (*MachineRegisterResponse, error) {
-	// TODO: Implement actual HTTP call to Invoker
-	// For now, return a placeholder response
-	return &MachineRegisterResponse{
-		UserID:     "user-123",
-		Subdomain:   "alice",
-		TunnelToken: "placeholder-tunnel-token",
-	}, nil
+	headers := map[string]string{
+		"Authorization": "Bearer " + machineJWT,
+	}
+	var resp MachineRegisterResponse
+	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/machines/register", req, &resp, headers); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// StartDeviceFlow initiates the device-code auth flow.
+func (s *OAuthService) StartDeviceFlow(ctx context.Context) (*DeviceStartResponse, error) {
+	req := DeviceStartRequest{ClientID: "counterspell-cli"}
+	var resp DeviceStartResponse
+	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/auth/device/start", req, &resp, nil); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// PollDeviceFlow polls the device-code auth flow for approval.
+func (s *OAuthService) PollDeviceFlow(ctx context.Context, deviceCode string) (*DevicePollResponse, error) {
+	req := DevicePollRequest{DeviceCode: deviceCode}
+	var resp DevicePollResponse
+	if err := s.doInvokerJSON(ctx, http.MethodPost, "/api/v1/auth/device/poll", req, &resp, nil); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (s *OAuthService) invokerURL(path string) string {
+	base := strings.TrimRight(s.cfg.InvokerBaseURL, "/")
+	if strings.HasPrefix(path, "/") {
+		return base + path
+	}
+	return base + "/" + path
+}
+
+func (s *OAuthService) doInvokerJSON(ctx context.Context, method, path string, reqBody any, respBody any, headers map[string]string) error {
+	var body io.Reader
+	if reqBody != nil {
+		buf := &bytes.Buffer{}
+		if err := json.NewEncoder(buf).Encode(reqBody); err != nil {
+			return err
+		}
+		body = buf
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, s.invokerURL(path), body)
+	if err != nil {
+		return err
+	}
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		data, _ := io.ReadAll(resp.Body)
+		msg := strings.TrimSpace(string(data))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return fmt.Errorf("invoker %s %s failed: %s", method, path, msg)
+	}
+
+	if respBody == nil {
+		return nil
+	}
+	return json.NewDecoder(resp.Body).Decode(respBody)
 }
 
 // OpenBrowser opens the system browser to the specified URL.

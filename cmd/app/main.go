@@ -20,6 +20,7 @@ import (
 	"github.com/revrost/counterspell/internal/db"
 	"github.com/revrost/counterspell/internal/handlers"
 	"github.com/revrost/counterspell/internal/services"
+	"github.com/revrost/counterspell/internal/tunnel"
 	"github.com/revrost/counterspell/ui"
 )
 
@@ -78,6 +79,15 @@ func main() {
 		logger.Error("Failed to run migrations", "error", err)
 		os.Exit(1)
 	}
+
+	// Ensure auth + machine identity before starting server
+	authService := services.NewOAuthService(database, cfg)
+	authResult, err := authService.EnsureAuthenticated(ctx)
+	if err != nil {
+		logger.Error("Authentication failed", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("Authenticated", "subdomain", authResult.Subdomain, "machine_id", authResult.MachineID)
 
 	// Create event bus
 	eventBus := services.NewEventBus()
@@ -190,6 +200,19 @@ func main() {
 		}
 	}()
 
+	// Start Cloudflare tunnel (best effort)
+	localURL := localURLFromAddr(*addr)
+	var tunnelProc *tunnel.CloudflareTunnel
+	if authResult.TunnelToken != "" {
+		proc, err := tunnel.StartCloudflare(ctx, authResult.TunnelToken, localURL, "", logger)
+		if err != nil {
+			logger.Warn("Failed to start tunnel", "error", err)
+		} else {
+			tunnelProc = proc
+			logger.Info("Tunnel started", "url", "https://"+authResult.Subdomain+".counterspell.app", "local_url", localURL)
+		}
+	}
+
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -203,6 +226,10 @@ func main() {
 	// Shutdown event bus (stops cleanup goroutine)
 	eventBus.Shutdown()
 
+	if tunnelProc != nil {
+		_ = tunnelProc.Stop()
+	}
+
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -213,6 +240,26 @@ func main() {
 	}
 
 	logger.Info("Server stopped")
+}
+
+func localURLFromAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if strings.HasPrefix(addr, ":") {
+		return "http://localhost" + addr
+	}
+	if strings.HasPrefix(addr, "0.0.0.0") {
+		parts := strings.Split(addr, ":")
+		if len(parts) == 2 && parts[1] != "" {
+			return "http://localhost:" + parts[1]
+		}
+	}
+	if strings.HasPrefix(addr, "127.0.0.1") || strings.HasPrefix(addr, "localhost") {
+		return "http://" + addr
+	}
+	if strings.HasPrefix(addr, "http://") || strings.HasPrefix(addr, "https://") {
+		return addr
+	}
+	return "http://" + addr
 }
 
 // spaHandler serves the SvelteKit SPA from an embedded filesystem.

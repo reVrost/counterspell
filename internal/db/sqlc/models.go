@@ -98,6 +98,8 @@ type Setting struct {
 	ZaiKey        sql.NullString `json:"zai_key"`
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
+	MachineID     sql.NullString `json:"machine_id"`
+	MachineJwt    sql.NullString `json:"machine_jwt"`
 	AgentBackend  string         `json:"agent_backend"`
 	Provider      sql.NullString `json:"provider"`
 	Model         sql.NullString `json:"model"`

@@ -6,6 +6,7 @@ package sqlc
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
@@ -33,7 +34,9 @@ type Querier interface {
 	GetGithubConnectionByID(ctx context.Context, id string) (GithubConnection, error)
 	GetLatestRun(ctx context.Context, taskID string) (AgentRun, error)
 	GetMachineByUserID(ctx context.Context, userID string) (MachineIdentity, error)
+	GetMachineID(ctx context.Context) (sql.NullString, error)
 	GetMachineIdentity(ctx context.Context, machineID string) (MachineIdentity, error)
+	GetMachineJWT(ctx context.Context) (sql.NullString, error)
 	GetMessage(ctx context.Context, id string) (Message, error)
 	GetMessagesByRun(ctx context.Context, runID string) ([]Message, error)
 	GetMessagesByTask(ctx context.Context, taskID string) ([]Message, error)
@@ -50,7 +53,9 @@ type Querier interface {
 	UpdateAgentRunBackendSessionID(ctx context.Context, arg UpdateAgentRunBackendSessionIDParams) error
 	UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error
 	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)
+	UpdateMachineID(ctx context.Context, arg UpdateMachineIDParams) error
 	UpdateMachineIdentityLastSeen(ctx context.Context, arg UpdateMachineIdentityLastSeenParams) error
+	UpdateMachineJWT(ctx context.Context, arg UpdateMachineJWTParams) error
 	UpdateTaskPosition(ctx context.Context, arg UpdateTaskPositionParams) error
 	UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error

@@ -35,6 +35,13 @@ type Config struct {
 
 	// OAuth callback configuration
 	OAuthCallbackPort string
+
+	// Invoker control plane
+	InvokerBaseURL string
+
+	// Auth flow
+	Headless        bool
+	ForceDeviceCode bool
 }
 
 // Load loads configuration from environment variables.
@@ -65,6 +72,13 @@ func Load() *Config {
 
 		// OAuth callback
 		OAuthCallbackPort: getEnvString("OAUTH_CALLBACK_PORT", "8711"),
+
+		// Invoker control plane
+		InvokerBaseURL: getEnvString("INVOKER_BASE_URL", "https://invoker.counterspell.io"),
+
+		// Auth flow
+		Headless:        getEnvBool("HEADLESS", false),
+		ForceDeviceCode: getEnvBool("FORCE_DEVICE_CODE", false),
 	}
 
 	log.Printf("Config loaded: DATABASE_PATH=%s, NATIVE_ALLOWLIST=%d, DATA_DIR=%d",
@@ -154,6 +168,21 @@ func getEnvStringSlice(key string, defaultVal []string) []string {
 		}
 	}
 	return result
+}
+
+func getEnvBool(key string, defaultVal bool) bool {
+	val := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if val == "" {
+		return defaultVal
+	}
+	switch val {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return defaultVal
+	}
 }
 
 // IsCommandAllowed checks if a command is in the native allowlist.
