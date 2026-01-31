@@ -1,4 +1,4 @@
-.PHONY: dev build test clean tidy generate lint docker-build docker-run run ui preprod kill-dev
+.PHONY: dev build test clean tidy generate lint docker-build docker-run run ui preprod kill-dev verify
 
 # Variables
 PROJECT_NAME := counterspell
@@ -65,6 +65,9 @@ test-cover:
 test-e2e:
 	@echo "Running E2E tests..."
 	@cd ui && npm run test:e2e
+
+verify: ## Run change-aware verification (sqlc/build/tests/e2e)
+	@./scripts/verify.sh
 
 lint:
 	@echo "Running linter..."

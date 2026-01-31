@@ -1,8 +1,0 @@
-time=2026-01-31T13:27:19.449+11:00 level=INFO msg="Config loaded: DATABASE_PATH=./data/counterspell.db, NATIVE_ALLOWLIST=10, DATA_DIR=6"
-time=2026-01-31T13:27:19.451+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:54 msg="Starting server" database_path=./data/counterspell.db data_dir=./data worker_pool_size=20 max_tasks_per_user=5
-time=2026-01-31T13:27:19.451+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/config/dirs.go:29 msg="Directory structure ready" data_dir=./data
-time=2026-01-31T13:27:19.452+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/db/db.go:47 msg="Connected to SQLite database" path=./data/counterspell.db
-time=2026-01-31T13:27:19.452+11:00 level=INFO source=/Users/revrost/Code/counterspell/internal/db/db.go:68 msg="Database schema initialized"
-time=2026-01-31T13:27:19.452+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:93 msg="Setting up router"
-time=2026-01-31T13:27:19.453+11:00 level=INFO source=/Users/revrost/Code/counterspell/cmd/app/main.go:186 msg="Server starting" addr=:8710
-time=2026-01-31T13:27:19.454+11:00 level=ERROR source=/Users/revrost/Code/counterspell/cmd/app/main.go:188 msg="Server failed" error="listen tcp :8710: bind: address already in use"

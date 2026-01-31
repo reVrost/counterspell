@@ -19,6 +19,7 @@ make dev          # Start backend (:8710)
 make ui           # Start frontend dev server (:5173)
 make test         # Run Go tests
 make test-e2e     # Run Playwright E2E tests
+make verify       # Change-aware verification (sqlc/build/tests/e2e)
 make sqlc         # Regenerate DB code after schema changes
 make format       # Format all code (Go + Svelte)
 make check-all    # Run all linters and type checks
@@ -26,6 +27,18 @@ cd ui && npm run build  # Build frontend (required before testing Go changes)
 ```
 
 **Logs:** `tail -f server.log` (root directory)
+
+## Verification Matrix
+
+Use `make verify` (runs `scripts/verify.sh`) to automatically select checks based on local changes:
+
+| Change Type | Commands |
+|-------------|----------|
+| Go only | `cd ui && npm run build` → `make test` |
+| UI only | `cd ui && npm run build` → `make test-e2e` |
+| SQL / schema | `make sqlc` → `cd ui && npm run build` → `make test` |
+| Go + UI | `cd ui && npm run build` → `make test` → `make test-e2e` |
+| Docs only | No tests |
 
 ## Development Principles
 

@@ -42,3 +42,4 @@ worktree-*/
 playwright-report/
 test-results/
 playwright/.cache/
+server.log
