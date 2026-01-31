@@ -10,32 +10,6 @@ import (
 	"database/sql"
 )
 
-const getMachineID = `-- name: GetMachineID :one
-SELECT machine_id
-FROM settings
-WHERE id = 1
-`
-
-func (q *Queries) GetMachineID(ctx context.Context) (sql.NullString, error) {
-	row := q.db.QueryRowContext(ctx, getMachineID)
-	var machine_id sql.NullString
-	err := row.Scan(&machine_id)
-	return machine_id, err
-}
-
-const getMachineJWT = `-- name: GetMachineJWT :one
-SELECT machine_jwt
-FROM settings
-WHERE id = 1
-`
-
-func (q *Queries) GetMachineJWT(ctx context.Context) (sql.NullString, error) {
-	row := q.db.QueryRowContext(ctx, getMachineJWT)
-	var machine_jwt sql.NullString
-	err := row.Scan(&machine_jwt)
-	return machine_jwt, err
-}
-
 const getSettings = `-- name: GetSettings :one
 SELECT openrouter_key, zai_key, anthropic_key, openai_key,
        COALESCE(agent_backend, 'native') as agent_backend,
@@ -70,40 +44,6 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const updateMachineID = `-- name: UpdateMachineID :exec
-UPDATE settings
-SET machine_id = ?,
-    updated_at = ?
-WHERE id = 1
-`
-
-type UpdateMachineIDParams struct {
-	MachineID sql.NullString `json:"machine_id"`
-	UpdatedAt int64          `json:"updated_at"`
-}
-
-func (q *Queries) UpdateMachineID(ctx context.Context, arg UpdateMachineIDParams) error {
-	_, err := q.db.ExecContext(ctx, updateMachineID, arg.MachineID, arg.UpdatedAt)
-	return err
-}
-
-const updateMachineJWT = `-- name: UpdateMachineJWT :exec
-UPDATE settings
-SET machine_jwt = ?,
-    updated_at = ?
-WHERE id = 1
-`
-
-type UpdateMachineJWTParams struct {
-	MachineJwt sql.NullString `json:"machine_jwt"`
-	UpdatedAt  int64          `json:"updated_at"`
-}
-
-func (q *Queries) UpdateMachineJWT(ctx context.Context, arg UpdateMachineJWTParams) error {
-	_, err := q.db.ExecContext(ctx, updateMachineJWT, arg.MachineJwt, arg.UpdatedAt)
-	return err
 }
 
 const upsertSettings = `-- name: UpsertSettings :exec

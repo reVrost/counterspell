@@ -112,8 +112,6 @@ CREATE TABLE IF NOT EXISTS settings (
     zai_key TEXT,
     anthropic_key TEXT,
     openai_key TEXT,
-    machine_id TEXT,
-    machine_jwt TEXT,
     agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
     provider TEXT,
     model TEXT,
@@ -182,6 +180,7 @@ CREATE TABLE IF NOT EXISTS oauth_login_attempts (
 -- Machine Identity: Stores machine credentials and tunnel info
 CREATE TABLE IF NOT EXISTS machine_identity (
     machine_id TEXT PRIMARY KEY,
+    machine_jwt TEXT,
     user_id TEXT NOT NULL,
     subdomain TEXT NOT NULL UNIQUE,
     tunnel_provider TEXT NOT NULL CHECK(tunnel_provider IN ('cloudflare')),

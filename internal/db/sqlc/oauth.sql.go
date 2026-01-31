@@ -20,22 +20,24 @@ func (q *Queries) CleanupExpiredOAuthAttempts(ctx context.Context, createdAt int
 }
 
 const createMachineIdentity = `-- name: CreateMachineIdentity :exec
-INSERT INTO machine_identity (machine_id, user_id, subdomain, tunnel_provider, tunnel_token, created_at)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO machine_identity (machine_id, machine_jwt, user_id, subdomain, tunnel_provider, tunnel_token, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateMachineIdentityParams struct {
-	MachineID      string `json:"machine_id"`
-	UserID         string `json:"user_id"`
-	Subdomain      string `json:"subdomain"`
-	TunnelProvider string `json:"tunnel_provider"`
-	TunnelToken    string `json:"tunnel_token"`
-	CreatedAt      int64  `json:"created_at"`
+	MachineID      string         `json:"machine_id"`
+	MachineJwt     sql.NullString `json:"machine_jwt"`
+	UserID         string         `json:"user_id"`
+	Subdomain      string         `json:"subdomain"`
+	TunnelProvider string         `json:"tunnel_provider"`
+	TunnelToken    string         `json:"tunnel_token"`
+	CreatedAt      int64          `json:"created_at"`
 }
 
 func (q *Queries) CreateMachineIdentity(ctx context.Context, arg CreateMachineIdentityParams) error {
 	_, err := q.db.ExecContext(ctx, createMachineIdentity,
 		arg.MachineID,
+		arg.MachineJwt,
 		arg.UserID,
 		arg.Subdomain,
 		arg.TunnelProvider,
@@ -71,7 +73,7 @@ func (q *Queries) DeleteOAuthLoginAttempt(ctx context.Context, state string) err
 }
 
 const getMachineByUserID = `-- name: GetMachineByUserID :one
-SELECT machine_id, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at
+SELECT machine_id, machine_jwt, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at
 FROM machine_identity
 WHERE user_id = ?
 `
@@ -81,6 +83,7 @@ func (q *Queries) GetMachineByUserID(ctx context.Context, userID string) (Machin
 	var i MachineIdentity
 	err := row.Scan(
 		&i.MachineID,
+		&i.MachineJwt,
 		&i.UserID,
 		&i.Subdomain,
 		&i.TunnelProvider,
@@ -92,7 +95,7 @@ func (q *Queries) GetMachineByUserID(ctx context.Context, userID string) (Machin
 }
 
 const getMachineIdentity = `-- name: GetMachineIdentity :one
-SELECT machine_id, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at
+SELECT machine_id, machine_jwt, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at
 FROM machine_identity
 WHERE machine_id = ?
 `
@@ -102,6 +105,7 @@ func (q *Queries) GetMachineIdentity(ctx context.Context, machineID string) (Mac
 	var i MachineIdentity
 	err := row.Scan(
 		&i.MachineID,
+		&i.MachineJwt,
 		&i.UserID,
 		&i.Subdomain,
 		&i.TunnelProvider,
@@ -145,31 +149,48 @@ func (q *Queries) UpdateMachineIdentityLastSeen(ctx context.Context, arg UpdateM
 	return err
 }
 
+const updateMachineIdentityJWT = `-- name: UpdateMachineIdentityJWT :exec
+UPDATE machine_identity SET machine_jwt = ? WHERE machine_id = ?
+`
+
+type UpdateMachineIdentityJWTParams struct {
+	MachineJwt sql.NullString `json:"machine_jwt"`
+	MachineID  string         `json:"machine_id"`
+}
+
+func (q *Queries) UpdateMachineIdentityJWT(ctx context.Context, arg UpdateMachineIdentityJWTParams) error {
+	_, err := q.db.ExecContext(ctx, updateMachineIdentityJWT, arg.MachineJwt, arg.MachineID)
+	return err
+}
+
 const upsertMachineIdentity = `-- name: UpsertMachineIdentity :one
-INSERT INTO machine_identity (machine_id, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO machine_identity (machine_id, machine_jwt, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(machine_id) DO UPDATE SET
+    machine_jwt = excluded.machine_jwt,
     user_id = excluded.user_id,
     subdomain = excluded.subdomain,
     tunnel_provider = excluded.tunnel_provider,
     tunnel_token = excluded.tunnel_token,
     last_seen_at = excluded.last_seen_at
-RETURNING machine_id, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at
+RETURNING machine_id, machine_jwt, user_id, subdomain, tunnel_provider, tunnel_token, created_at, last_seen_at
 `
 
 type UpsertMachineIdentityParams struct {
-	MachineID      string        `json:"machine_id"`
-	UserID         string        `json:"user_id"`
-	Subdomain      string        `json:"subdomain"`
-	TunnelProvider string        `json:"tunnel_provider"`
-	TunnelToken    string        `json:"tunnel_token"`
-	CreatedAt      int64         `json:"created_at"`
-	LastSeenAt     sql.NullInt64 `json:"last_seen_at"`
+	MachineID      string         `json:"machine_id"`
+	MachineJwt     sql.NullString `json:"machine_jwt"`
+	UserID         string         `json:"user_id"`
+	Subdomain      string         `json:"subdomain"`
+	TunnelProvider string         `json:"tunnel_provider"`
+	TunnelToken    string         `json:"tunnel_token"`
+	CreatedAt      int64          `json:"created_at"`
+	LastSeenAt     sql.NullInt64  `json:"last_seen_at"`
 }
 
 func (q *Queries) UpsertMachineIdentity(ctx context.Context, arg UpsertMachineIdentityParams) (MachineIdentity, error) {
 	row := q.db.QueryRowContext(ctx, upsertMachineIdentity,
 		arg.MachineID,
+		arg.MachineJwt,
 		arg.UserID,
 		arg.Subdomain,
 		arg.TunnelProvider,
@@ -180,6 +201,7 @@ func (q *Queries) UpsertMachineIdentity(ctx context.Context, arg UpsertMachineId
 	var i MachineIdentity
 	err := row.Scan(
 		&i.MachineID,
+		&i.MachineJwt,
 		&i.UserID,
 		&i.Subdomain,
 		&i.TunnelProvider,

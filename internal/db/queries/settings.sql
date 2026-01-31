@@ -37,25 +37,3 @@ ON CONFLICT(id) DO UPDATE SET
     provider = excluded.provider,
     model = excluded.model,
     updated_at = excluded.updated_at;
-
--- name: GetMachineJWT :one
-SELECT machine_jwt
-FROM settings
-WHERE id = 1;
-
--- name: UpdateMachineJWT :exec
-UPDATE settings
-SET machine_jwt = ?,
-    updated_at = ?
-WHERE id = 1;
-
--- name: GetMachineID :one
-SELECT machine_id
-FROM settings
-WHERE id = 1;
-
--- name: UpdateMachineID :exec
-UPDATE settings
-SET machine_id = ?,
-    updated_at = ?
-WHERE id = 1;

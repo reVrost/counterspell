@@ -48,6 +48,7 @@ type GithubConnection struct {
 
 type MachineIdentity struct {
 	MachineID      string        `json:"machine_id"`
+	MachineJwt     sql.NullString `json:"machine_jwt"`
 	UserID         string        `json:"user_id"`
 	Subdomain      string        `json:"subdomain"`
 	TunnelProvider string        `json:"tunnel_provider"`
@@ -98,8 +99,6 @@ type Setting struct {
 	ZaiKey        sql.NullString `json:"zai_key"`
 	AnthropicKey  sql.NullString `json:"anthropic_key"`
 	OpenaiKey     sql.NullString `json:"openai_key"`
-	MachineID     sql.NullString `json:"machine_id"`
-	MachineJwt    sql.NullString `json:"machine_jwt"`
 	AgentBackend  string         `json:"agent_backend"`
 	Provider      sql.NullString `json:"provider"`
 	Model         sql.NullString `json:"model"`
