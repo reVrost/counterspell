@@ -358,6 +358,10 @@ func parseCodexSession(path string) (string, []importedMessage, error) {
 		return sessionID, messages, nil
 	}
 
+	if strings.ToLower(filepath.Ext(path)) == ".jsonl" {
+		return sessionID, messages, nil
+	}
+
 	return parseCodexJSON(path)
 }
 
