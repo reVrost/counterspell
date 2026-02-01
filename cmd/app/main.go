@@ -26,6 +26,11 @@ import (
 	"github.com/revrost/counterspell/ui"
 )
 
+// Context key for subdomain
+type contextKey string
+
+const subdomainKey contextKey = "subdomain"
+
 func main() {
 	// Parse flags
 	addr := flag.String("addr", ":8710", "Server address")
@@ -126,7 +131,7 @@ func main() {
 				subdomain = parts[0]
 			}
 
-			ctx := context.WithValue(r.Context(), "subdomain", subdomain)
+			ctx := context.WithValue(r.Context(), subdomainKey, subdomain)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
@@ -286,7 +291,7 @@ func spaHandler(svelteFS fs.FS) http.HandlerFunc {
 		cleanPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 		f, err := svelteFS.Open(cleanPath)
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 		} else if os.IsNotExist(err) {
 			r.URL.Path = "/"
 		}

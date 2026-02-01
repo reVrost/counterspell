@@ -29,7 +29,7 @@ func (h *OAuthHandlers) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 	// Return error page
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusBadRequest)
-	w.Write([]byte(`
+	_, _ = w.Write([]byte(`
 		<html>
 			<head><title>OAuth Error</title></head>
 			<body style="font-family: sans-serif; text-align: center; padding-top: 50px;">

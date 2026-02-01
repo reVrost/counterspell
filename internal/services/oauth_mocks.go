@@ -78,21 +78,3 @@ func (mr *MockInvokerAPIClientMockRecorder) RegisterMachine(ctx, machineJWT, req
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterMachine", reflect.TypeOf((*MockInvokerAPIClient)(nil).RegisterMachine), ctx, machineJWT, req)
 }
-
-// testableOAuthService extends OAuthService with injectable Invoker client for testing.
-type testableOAuthService struct {
-	*OAuthService
-	invokerClient InvokerAPIClient
-}
-
-func (s *testableOAuthService) callInvokerAuthURL(ctx context.Context, codeChallenge, state, redirectURI string) (string, error) {
-	return s.invokerClient.GetAuthURL(ctx, codeChallenge, state, redirectURI)
-}
-
-func (s *testableOAuthService) callInvokerExchange(ctx context.Context, code, state, codeVerifier string) (*OAuthExchangeResponse, error) {
-	return s.invokerClient.ExchangeCode(ctx, code, state, codeVerifier)
-}
-
-func (s *testableOAuthService) callInvokerRegisterMachine(ctx context.Context, machineJWT string, req MachineRegisterRequest) (*MachineRegisterResponse, error) {
-	return s.invokerClient.RegisterMachine(ctx, machineJWT, req)
-}
