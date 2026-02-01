@@ -1,0 +1,18 @@
+# Counterspell Environment Configuration (for direnv)
+# Copy to .envrc and run: direnv allow
+
+# Database (Required)
+export DATABASE_URL=postgres://postgres:dev@localhost:5432/counterspell?sslmode=disable
+
+# GitHub OAuth (Required for repo access)
+export GITHUB_CLIENT_ID=your_github_client_id_here
+export GITHUB_CLIENT_SECRET=your_github_client_secret_here
+export GITHUB_REDIRECT_URI=http://localhost:8710/github/callback
+
+# Supabase Auth (Optional - leave empty for single-user mode)
+# export SUPABASE_URL=https://your-project.supabase.co
+# export SUPABASE_ANON_KEY=your_supabase_anon_key_here
+# export SUPABASE_JWT_SECRET=your_jwt_secret_here
+
+# Environment
+export ENV=development
