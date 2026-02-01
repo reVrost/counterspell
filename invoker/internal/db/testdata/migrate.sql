@@ -1,1 +1,0 @@
--- Migrations for pgtestdb to set up test database
