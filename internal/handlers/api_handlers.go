@@ -84,14 +84,13 @@ func (h *Handlers) HandleGetTaskDiff(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, map[string]string{"git_diff": gitDiff})
 }
 
-// HandleGetSession returns session info based on GitHub connection status.
+// HandleGetSession returns session info based on machine auth status.
 func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Check if there's a GitHub connection
-	conn, err := h.githubService.GetConnection(ctx)
-	if err != nil {
-		// No connection found - not authenticated
+	authenticated, identity, err := h.oauthService.IsAuthenticated(ctx)
+	if err != nil || !authenticated {
+		// No machine JWT found - not authenticated
 		render.JSON(w, r, map[string]any{
 			"authenticated":   false,
 			"githubConnected": false,
@@ -100,11 +99,20 @@ func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// User is authenticated via GitHub
+	login := ""
+	if identity != nil {
+		if identity.Subdomain != "" {
+			login = identity.Subdomain
+		} else if identity.UserID != "" {
+			login = identity.UserID
+		}
+	}
+
+	// User is authenticated via control plane
 	render.JSON(w, r, map[string]any{
 		"authenticated":   true,
 		"githubConnected": true,
-		"githubLogin":     conn.Username,
+		"githubLogin":     login,
 		"needsGitHubAuth": false,
 	})
 }

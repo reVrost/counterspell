@@ -20,6 +20,7 @@ type Handlers struct {
 	settingsService *services.SettingsService
 	fileService     *services.FileService
 	githubService   *services.GitHubService
+	oauthService    *services.OAuthService
 	gitReposManager *services.GitManager
 
 	// Track active orchestrators for shutdown
@@ -41,6 +42,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		settingsService: services.NewSettingsService(database),
 		fileService:     services.NewFileService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
+		oauthService:    services.NewOAuthService(database, cfg),
 		gitReposManager: services.NewGitManager(cfg.DataDir),
 
 		// Initialize orchestrator tracking
