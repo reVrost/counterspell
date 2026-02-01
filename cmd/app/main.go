@@ -151,10 +151,15 @@ func main() {
 
 		// UI logging - no auth required so errors can be logged even when auth fails
 		// r.Post("/api/v1/log", h.HandleUILog)
+
+		// Auth + session endpoints (needed before auth)
+		r.Get("/api/v1/session", h.HandleGetSession)
+		r.Get("/api/v1/auth/login", h.HandleAuthLogin)
 	})
 
-	// Protected routes (auth not required for local-first)
+	// Protected routes (require machine auth)
 	r.Group(func(r chi.Router) {
+		r.Use(h.RequireMachineAuth)
 		// GitHub OAuth routes
 		r.Get("/api/v1/github/authorize", h.HandleGitHubLogin)
 		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
@@ -166,7 +171,6 @@ func main() {
 		// Home page actions, tasks are like inbox
 		r.Get("/api/v1/tasks", h.HandleListTask)
 		r.Post("/api/v1/tasks", h.HandleAddTask)
-		r.Get("/api/v1/session", h.HandleGetSession)
 		r.Get("/api/v1/task/{id}", h.HandleGetTask)
 		r.Get("/api/v1/task/{id}/diff", h.HandleGetTaskDiff)
 		r.Get("/api/v1/settings", h.HandleGetSettings)

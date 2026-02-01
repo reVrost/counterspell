@@ -179,6 +179,34 @@ func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginAttempt, 
 	return &OAuthLoginAttempt{AuthURL: authURL, State: state, RedirectURI: redirectURI}, nil
 }
 
+// StartWebLogin starts a browser-driven OAuth flow without opening a local browser.
+// It returns the auth URL and completes the login asynchronously via polling.
+func (s *OAuthService) StartWebLogin(ctx context.Context) (*OAuthLoginAttempt, error) {
+	attempt, err := s.StartLoginFlow(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	go func(state string) {
+		pollCtx, cancel := context.WithTimeout(context.Background(), oauthAttemptTTL)
+		defer cancel()
+
+		machineJWT, err := s.pollForAuthCodeAndExchange(pollCtx, state)
+		if err != nil {
+			slog.Error("OAuth web login poll failed", "error", err, "state", state)
+			return
+		}
+
+		if _, err := s.CompleteLoginWithJWT(pollCtx, machineJWT); err != nil {
+			slog.Error("OAuth web login completion failed", "error", err)
+			return
+		}
+		slog.Info("OAuth web login completed")
+	}(attempt.State)
+
+	return attempt, nil
+}
+
 // StartCallbackServer starts a temporary HTTP server to handle OAuth callback.
 func (s *OAuthService) StartCallbackServer(ctx context.Context, callbackPort string) error {
 	mux := http.NewServeMux()
@@ -332,6 +360,52 @@ func (s *OAuthService) RegisterMachine(ctx context.Context, machineJWT string, m
 	return resp, nil
 }
 
+// CompleteLoginWithJWT stores machine auth locally and registers the machine if needed.
+func (s *OAuthService) CompleteLoginWithJWT(ctx context.Context, machineJWT string) (*AuthResult, error) {
+	if machineJWT == "" {
+		return nil, fmt.Errorf("machine_jwt is required")
+	}
+
+	machineID, err := s.getOrCreateMachineID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get machine id: %w", err)
+	}
+
+	identity, err := s.getMachineIdentity(ctx, machineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get machine identity: %w", err)
+	}
+
+	if identity != nil {
+		if err := s.storeMachineJWT(ctx, machineID, machineJWT); err != nil {
+			return nil, fmt.Errorf("failed to store machine jwt: %w", err)
+		}
+		if err := s.updateMachineIdentityLastSeen(ctx, machineID); err != nil {
+			slog.Warn("Failed to update machine last_seen", "error", err)
+		}
+		return &AuthResult{
+			MachineJWT:  machineJWT,
+			MachineID:   machineID,
+			UserID:      identity.UserID,
+			Subdomain:   identity.Subdomain,
+			TunnelToken: identity.TunnelToken,
+		}, nil
+	}
+
+	reg, err := s.RegisterMachine(ctx, machineJWT, machineID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthResult{
+		MachineJWT:  machineJWT,
+		MachineID:   machineID,
+		UserID:      reg.UserID,
+		Subdomain:   reg.Subdomain,
+		TunnelToken: reg.TunnelToken,
+	}, nil
+}
+
 // EnsureAuthenticated ensures machine JWT + machine identity exist, prompting login if needed.
 func (s *OAuthService) EnsureAuthenticated(ctx context.Context) (*AuthResult, error) {
 	machineID, err := s.getOrCreateMachineID(ctx)
@@ -384,6 +458,27 @@ func (s *OAuthService) EnsureAuthenticated(ctx context.Context) (*AuthResult, er
 		Subdomain:   reg.Subdomain,
 		TunnelToken: reg.TunnelToken,
 	}, nil
+}
+
+// GetLocalIdentity returns the stored machine identity for this machine, if any.
+func (s *OAuthService) GetLocalIdentity(ctx context.Context) (*sqlc.MachineIdentity, error) {
+	machineID, err := s.getMachineID()
+	if err != nil {
+		return nil, err
+	}
+	return s.getMachineIdentity(ctx, machineID)
+}
+
+// IsAuthenticated returns true when a machine JWT is present for this machine.
+func (s *OAuthService) IsAuthenticated(ctx context.Context) (bool, *sqlc.MachineIdentity, error) {
+	identity, err := s.GetLocalIdentity(ctx)
+	if err != nil {
+		return false, nil, err
+	}
+	if identity == nil || !identity.MachineJwt.Valid || strings.TrimSpace(identity.MachineJwt.String) == "" {
+		return false, identity, nil
+	}
+	return true, identity, nil
 }
 
 func (s *OAuthService) login(ctx context.Context) (string, error) {

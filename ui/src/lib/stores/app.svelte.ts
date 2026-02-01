@@ -69,6 +69,9 @@ class AppState {
   async init() {
     // Load auth status
     await this.checkAuth();
+    if (!this.isAuthenticated) {
+      return;
+    }
     // Load projects
     await this.loadProjects();
     // Load repos
