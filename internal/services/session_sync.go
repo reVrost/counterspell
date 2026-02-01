@@ -388,7 +388,11 @@ func parseCodexJSONL(path string) (string, []importedMessage, error) {
 			continue
 		}
 		if sessionID == "" {
-			sessionID = extractSessionID(payload)
+			sessionID = extractCodexSessionID(payload)
+		}
+		if msg, ok := extractCodexMessage(payload); ok {
+			messages = append(messages, msg)
+			continue
 		}
 		if msg, ok := extractMessage(payload); ok {
 			messages = append(messages, msg)
@@ -431,6 +435,48 @@ func parseCodexJSON(path string) (string, []importedMessage, error) {
 	}
 
 	return sessionID, messages, nil
+}
+
+
+func extractCodexSessionID(event map[string]any) string {
+	if eventType, ok := event["type"].(string); ok && eventType == "session_meta" {
+		if payload, ok := event["payload"].(map[string]any); ok {
+			if id, ok := payload["id"].(string); ok && id != "" {
+				return id
+			}
+		}
+	}
+	return extractSessionID(event)
+}
+
+func extractCodexMessage(event map[string]any) (importedMessage, bool) {
+	eventType, _ := event["type"].(string)
+	if eventType != "response_item" {
+		return importedMessage{}, false
+	}
+
+	payload, ok := event["payload"].(map[string]any)
+	if !ok {
+		return importedMessage{}, false
+	}
+
+	itemType, _ := payload["type"].(string)
+	if itemType != "message" {
+		return importedMessage{}, false
+	}
+
+	role, _ := payload["role"].(string)
+	if role == "" {
+		role = "assistant"
+	}
+
+	content := extractTextFromContent(payload["content"])
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return importedMessage{}, false
+	}
+
+	return importedMessage{Role: role, Content: content}, true
 }
 
 func extractMessage(payload map[string]any) (importedMessage, bool) {
@@ -511,7 +557,7 @@ func extractTextFromBlock(block map[string]any) string {
 
 	if blockType, ok := block["type"].(string); ok {
 		switch blockType {
-		case "text", "output_text":
+		case "text", "output_text", "input_text":
 			if text, ok := block["text"].(string); ok {
 				return text
 			}
