@@ -81,7 +81,7 @@
 	});
 
 	// Auth guard - handle authentication
-	// With GitHub-only auth, isAuthenticated = githubConnected
+	// With control-plane auth, isAuthenticated = githubConnected
 	let hasRedirected = false;
 	$effect(() => {
 		if (!isInitialized || !browser || hasRedirected) return;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { authAPI } from "$lib/api";
   import GithubIcon from "@lucide/svelte/icons/github";
+  import KeyIcon from "@lucide/svelte/icons/key";
   import XIcon from "@lucide/svelte/icons/x";
   import { browser } from "$app/environment";
 
@@ -10,15 +11,15 @@
   let checkingAuth = $state(true);
   let needsReset = $state(false);
 
-  async function handleGitHubLogin() {
+  async function handleLogin() {
     loading = true;
     showError = false;
     try {
-      await authAPI.loginWithGitHub();
+      await authAPI.loginWithInvoker();
     } catch (err) {
       console.error("Login failed:", err);
       loading = false;
-      errorMsg = "Failed to initiate GitHub login";
+      errorMsg = "Failed to initiate login";
       showError = true;
     }
   }
@@ -169,7 +170,7 @@
           <div
             class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6"
           >
-            <GithubIcon class="w-8 h-8 text-white" />
+            <KeyIcon class="w-8 h-8 text-white" />
           </div>
           <h1 class="text-3xl font-bold text-white tracking-tight">
             Welcome to Counterspell
@@ -181,15 +182,15 @@
           </p>
         </div>
 
-        <!-- GitHub Login Button -->
+        <!-- Login Button -->
         {#if !loading}
           <div>
             <button
-              onclick={handleGitHubLogin}
+              onclick={handleLogin}
               class="w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2"
             >
-              <GithubIcon class="w-5 h-5" />
-              Continue with GitHub
+              <KeyIcon class="w-5 h-5" />
+              Continue with Counterspell
             </button>
             <p class="mt-4 text-[10px] text-gray-600">
               By continuing, you agree to Developer Protocol v2.1
@@ -207,7 +208,7 @@
                 >
                   <i class="fas fa-circle-notch fa-spin"></i>
                 </div>
-                <span class="text-gray-200">Redirecting to GitHub...</span>
+                <span class="text-gray-200">Redirecting to Counterspell...</span>
               </div>
             </div>
           </div>
