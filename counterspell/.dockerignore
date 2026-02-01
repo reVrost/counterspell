@@ -1,0 +1,74 @@
+# flyctl launch added from .crush/.gitignore
+.crush/**/*
+
+# flyctl launch added from .gitignore
+# Environment variables
+**/.env
+**/.envrc
+**/.envrc.multi
+**/.envrc.single
+**/tmp
+**/node_modules
+**/dist
+**/.svelte-kit
+**/ui/.svelte-kit
+
+# Database
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/data
+
+# Binaries
+**/local
+**/deploy
+**/counterspell
+
+# IDE
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Go
+**/*.exe
+**/*.test
+**/*.out
+
+# Worktrees
+**/worktree-*
+
+# Playwright
+**/playwright-report
+**/test-results
+**/playwright/.cache
+
+# flyctl launch added from ui/.gitignore
+ui/**/node_modules
+
+# Output
+ui/**/.output
+ui/**/.vercel
+ui/**/.netlify
+ui/**/.wrangler
+ui/.svelte-kit
+ui/build
+
+# OS
+ui/**/.DS_Store
+ui/**/Thumbs.db
+
+# Env
+ui/**/.env
+ui/**/.env.*
+!ui/**/.env.example
+!ui/**/.env.test
+
+# Vite
+ui/**/vite.config.js.timestamp-*
+ui/**/vite.config.ts.timestamp-*
+fly.toml
