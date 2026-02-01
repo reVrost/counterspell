@@ -5,7 +5,6 @@
 .envrc.single
 tmp
 node_modules
-dist
 .svelte-kit
 ui/.svelte-kit
 
@@ -44,3 +43,4 @@ test-results/
 playwright/.cache/
 server.log
 /main
+dist
