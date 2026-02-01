@@ -249,7 +249,7 @@ func (s *OAuthService) handleCallback(w http.ResponseWriter, r *http.Request) {
 	// 3. Send success response to browser
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`
+	_, _ = w.Write([]byte(`
 		<html>
 			<head><title>Authentication Successful</title></head>
 			<body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
