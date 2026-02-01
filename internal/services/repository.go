@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -409,6 +410,50 @@ func (s *Repository) GetLatestAgentRun(ctx context.Context, taskID string) (*sql
 	run, err := s.db.Queries.GetLatestRun(ctx, taskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &run, nil
+}
+
+
+// GetAgentRun retrieves an agent run by ID.
+func (s *Repository) GetAgentRun(ctx context.Context, runID string) (*sqlc.AgentRun, error) {
+	run, err := s.db.Queries.GetAgentRun(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	return &run, nil
+}
+
+// GetAgentRunByBackendSessionID retrieves an agent run by backend session ID.
+func (s *Repository) GetAgentRunByBackendSessionID(ctx context.Context, backend, sessionID string) (*sqlc.AgentRun, error) {
+	if backend == "" || sessionID == "" {
+		return nil, nil
+	}
+
+	row := s.db.DB.QueryRowContext(ctx, `SELECT id, task_id, prompt, agent_backend, provider, model, summary_message_id, backend_session_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs WHERE agent_backend = ? AND backend_session_id = ? ORDER BY created_at DESC LIMIT 1`, backend, sessionID)
+	var run sqlc.AgentRun
+	err := row.Scan(
+		&run.ID,
+		&run.TaskID,
+		&run.Prompt,
+		&run.AgentBackend,
+		&run.Provider,
+		&run.Model,
+		&run.SummaryMessageID,
+		&run.BackendSessionID,
+		&run.Cost,
+		&run.MessageCount,
+		&run.PromptTokens,
+		&run.CompletionTokens,
+		&run.CompletedAt,
+		&run.CreatedAt,
+		&run.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

@@ -99,6 +99,12 @@ func main() {
 	// Create event bus
 	eventBus := services.NewEventBus()
 
+	// Start session syncer (imports existing CLI sessions and tails for updates)
+	repo := services.NewRepository(database)
+	syncCtx, syncCancel := context.WithCancel(ctx)
+	syncer := services.NewSessionSyncer(repo, eventBus)
+	syncer.Start(syncCtx)
+
 	// Create handlers with shared database
 	h, err := handlers.NewHandlers(database, eventBus, cfg)
 	if err != nil {
@@ -234,6 +240,10 @@ func main() {
 	<-quit
 
 	logger.Info("Server shutting down...")
+
+	// Stop session syncer
+	syncCancel()
+	syncer.Shutdown()
 
 	// Shutdown handlers (stops all active orchestrators)
 	h.Shutdown()
