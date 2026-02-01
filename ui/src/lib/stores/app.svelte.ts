@@ -245,11 +245,7 @@ class AppState {
   // ==================== AUTH ACTIONS ====================
 
   async login() {
-    await authAPI.loginWithGitHub();
-  }
-
-  async connectGitHub() {
-    await authAPI.connectGitHub();
+    await authAPI.loginWithInvoker();
   }
 
   async logout() {

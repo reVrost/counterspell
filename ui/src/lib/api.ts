@@ -132,18 +132,13 @@ export const authAPI = {
       return {
         authenticated: false,
         githubConnected: false,
-        needsGitHubAuth: false,
+        needsGitHubAuth: true,
       };
     }
   },
 
-  async loginWithGitHub() {
-    window.location.href =
-      '/api/v1/github/authorize?redirect_url=' + window.location.origin + '/dashboard';
-  },
-
-  async connectGitHub() {
-    window.location.href = '/api/v1/github/authorize';
+  async loginWithInvoker() {
+    window.location.href = '/api/v1/auth/login';
   },
 
   async logout() {
