@@ -197,11 +197,11 @@ export const tasksAPI = {
   },
 
   async get(id: string): Promise<TaskResponse> {
-    return fetchAPI<TaskResponse>(`/api/v1/task/${id}`);
+    return fetchAPI<TaskResponse>(`/api/v1/tasks/${id}`);
   },
 
   async getDiff(id: string): Promise<{ git_diff: string }> {
-    return fetchAPI<{ git_diff: string }>(`/api/v1/task/${id}/diff`);
+    return fetchAPI<{ git_diff: string }>(`/api/v1/tasks/${id}/diff`);
   },
 
   async create(intent: string, projectId: string, modelId: string): Promise<APIResponse> {
