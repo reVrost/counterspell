@@ -16,6 +16,7 @@
   import GithubIcon from '@lucide/svelte/icons/github';
   import SparklesIcon from '@lucide/svelte/icons/sparkles';
   import { tick } from 'svelte';
+  import MarkdownIt from 'markdown-it';
 
   interface Props {
     task: Task;
@@ -25,6 +26,61 @@
   }
 
   let { task, messages, logContent, isInProgress }: Props = $props();
+
+  const allowedProtocols = new Set(['http:', 'https:', 'mailto:']);
+  const markdown = new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true,
+  });
+
+  function isAllowedLink(url: string): boolean {
+    if (!url) return false;
+    const trimmed = url.trim();
+    if (trimmed.startsWith('#')) return true;
+    try {
+      const parsed = new URL(trimmed, 'https://counterspell.io');
+      return allowedProtocols.has(parsed.protocol);
+    } catch {
+      return false;
+    }
+  }
+
+  markdown.validateLink = (url: string) => isAllowedLink(url);
+
+  const defaultLinkRenderer =
+    markdown.renderer.rules.link_open ??
+    ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+
+  markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    const hrefIndex = tokens[idx].attrIndex('href');
+    if (hrefIndex >= 0) {
+      const href = tokens[idx].attrs?.[hrefIndex]?.[1] ?? '';
+      if (!isAllowedLink(href)) {
+        tokens[idx].attrSet('href', '#');
+      }
+    }
+    tokens[idx].attrSet('target', '_blank');
+    tokens[idx].attrSet('rel', 'noopener noreferrer');
+    return defaultLinkRenderer(tokens, idx, options, env, self);
+  };
+
+  const defaultImageRenderer =
+    markdown.renderer.rules.image ??
+    ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+
+  markdown.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const srcIndex = tokens[idx].attrIndex('src');
+    if (srcIndex >= 0) {
+      const src = tokens[idx].attrs?.[srcIndex]?.[1] ?? '';
+      if (!isAllowedLink(src)) {
+        tokens[idx].attrSet('src', '');
+      }
+    }
+    tokens[idx].attrSet('loading', 'lazy');
+    tokens[idx].attrSet('decoding', 'async');
+    return defaultImageRenderer(tokens, idx, options, env, self);
+  };
 
   // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
   // 1. Update the type to include a mandatory ID
@@ -76,6 +132,10 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function renderAssistantMarkdown(content: string): string {
+    return markdown.render(content || '');
   }
 
   let activeTab = $state<'agent' | 'diff'>('agent');
@@ -360,6 +420,12 @@
             class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-[#FFFFFF] shadow-lg"
           >
             <p class="text-base font-medium leading-relaxed">{msg.content}</p>
+          </div>
+        </div>
+      {:else if msg.role === 'assistant'}
+        <div class="px-12 py-2 pr-4">
+          <div class="assistant-markdown text-base text-gray-200 leading-relaxed font-sans">
+            {@html renderAssistantMarkdown(msg.content)}
           </div>
         </div>
       {:else}
@@ -685,3 +751,92 @@
     </div>
   {/if}
 </div>
+<style>
+  .assistant-markdown :global(p) {
+    margin: 0 0 0.75rem;
+  }
+
+  .assistant-markdown :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .assistant-markdown :global(ul),
+  .assistant-markdown :global(ol) {
+    margin: 0.5rem 0 0.75rem 1.25rem;
+    padding: 0;
+  }
+
+  .assistant-markdown :global(li) {
+    margin: 0.25rem 0;
+  }
+
+  .assistant-markdown :global(a) {
+    color: #a78bfa;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .assistant-markdown :global(code) {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875em;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.25rem;
+    padding: 0.1rem 0.35rem;
+  }
+
+  .assistant-markdown :global(pre) {
+    background: #0b0f17;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+  }
+
+  .assistant-markdown :global(pre code) {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font-size: 0.85em;
+    color: #d1d5db;
+  }
+
+  .assistant-markdown :global(blockquote) {
+    border-left: 3px solid rgba(148, 163, 184, 0.35);
+    padding-left: 0.75rem;
+    color: #9ca3af;
+    margin: 0.75rem 0;
+  }
+
+  .assistant-markdown :global(h1),
+  .assistant-markdown :global(h2),
+  .assistant-markdown :global(h3),
+  .assistant-markdown :global(h4) {
+    margin: 1rem 0 0.5rem;
+    font-weight: 600;
+    color: #f3f4f6;
+  }
+
+  .assistant-markdown :global(hr) {
+    border: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    margin: 1rem 0;
+  }
+
+  .assistant-markdown :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.75rem 0;
+  }
+
+  .assistant-markdown :global(th),
+  .assistant-markdown :global(td) {
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 0.4rem 0.6rem;
+  }
+
+  .assistant-markdown :global(th) {
+    background: rgba(15, 23, 42, 0.5);
+  }
+</style>
