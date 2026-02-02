@@ -216,7 +216,7 @@
           </span>
           <span class="text-[10px] text-gray-600 font-mono">#{task.id}</span>
         </div>
-        <h2 class="text-sm font-bold text-gray-200 line-clamp-1 w-48">
+        <h2 class="text-sm font-bold text-[#FFFFFF] line-clamp-1 w-48">
           {task.title}
         </h2>
       </div>
@@ -255,7 +255,7 @@
           onclick={() => (activeTab = tab as typeof activeTab)}
           class={cn(
             'px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 relative overflow-hidden',
-            activeTab === tab ? 'bg-gray-800 text-white shadow' : 'text-gray-500'
+            activeTab === tab ? 'bg-gray-800 text-[#FFFFFF] shadow' : 'text-gray-500'
           )}
         >
           {#if activeTab === tab}
@@ -286,7 +286,7 @@
         <div class="flex items-center gap-2">
           <button
             onclick={() => (confirmAction = 'merge')}
-            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-gray-200 transition-all shadow-sm flex items-center gap-2"
+            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-[#FFFFFF] transition-all shadow-sm flex items-center gap-2"
             title="Merge directly to main"
           >
             <GithubIcon class="w-3.5 h-3.5 opacity-70" />
@@ -295,7 +295,7 @@
 
           <button
             onclick={() => (confirmAction = 'pr')}
-            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-gray-200 transition-all shadow-sm flex items-center gap-2"
+            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-[#FFFFFF] transition-all shadow-sm flex items-center gap-2"
             title="Create a Pull Request"
           >
             <GitMergeIcon class="w-3.5 h-3.5 opacity-70" />
@@ -357,23 +357,16 @@
       {#if msg.role === 'user'}
         <div class="flex gap-4 px-4 py-2 items-start">
           <div
-            class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 overflow-hidden border border-white/5"
+            class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-[#FFFFFF] shadow-lg"
           >
-            <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=user&backgroundColor=b6e3f4"
-              alt="User"
-              class="w-full h-full"
-            />
-          </div>
-          <div
-            class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-white shadow-lg"
-          >
-            <p class="text-base leading-relaxed">{msg.content}</p>
+            <p class="text-base font-medium leading-relaxed">{msg.content}</p>
           </div>
         </div>
       {:else}
         <div class="px-12 py-2 pr-4">
-          <p class="text-base text-gray-200 leading-relaxed font-sans">{msg.content}</p>
+          <p class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans">
+            {msg.content}
+          </p>
         </div>
       {/if}
     {/snippet}
@@ -518,7 +511,7 @@
                 <RotateCcwIcon class="w-5 h-5 text-amber-500" />
               </div>
               <div>
-                <h3 class="font-semibold text-white">Retry Task</h3>
+                <h3 class="font-semibold text-[#FFFFFF]">Retry Task</h3>
                 <p class="text-xs text-gray-400">Re-run with the same prompt</p>
               </div>
             </div>
@@ -534,7 +527,7 @@
               </button>
               <button
                 onclick={() => handleAction('retry')}
-                class="flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-amber-600 hover:bg-amber-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Retry
               </button>
@@ -547,7 +540,7 @@
                 <EraserIcon class="w-5 h-5 text-red-500" />
               </div>
               <div>
-                <h3 class="font-semibold text-white">Clear History</h3>
+                <h3 class="font-semibold text-[#FFFFFF]">Clear History</h3>
                 <p class="text-xs text-gray-400">Reset memory and context</p>
               </div>
             </div>
@@ -564,7 +557,7 @@
               </button>
               <button
                 onclick={() => handleAction('clear')}
-                class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Clear
               </button>
@@ -577,7 +570,7 @@
                 <GithubIcon class="w-5 h-5 text-purple-500" />
               </div>
               <div>
-                <h3 class="font-semibold text-white">Create Pull Request</h3>
+                <h3 class="font-semibold text-[#FFFFFF]">Create Pull Request</h3>
                 <p class="text-xs text-gray-400">Push changes to GitHub</p>
               </div>
             </div>
@@ -593,7 +586,7 @@
               </button>
               <button
                 onclick={() => handleAction('pr')}
-                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Create PR
               </button>
@@ -606,7 +599,7 @@
                 <GitMergeIcon class="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <h3 class="font-semibold text-white">Merge to Main</h3>
+                <h3 class="font-semibold text-[#FFFFFF]">Merge to Main</h3>
                 <p class="text-xs text-gray-400">Apply changes directly</p>
               </div>
             </div>
@@ -623,7 +616,7 @@
               </button>
               <button
                 onclick={() => handleAction('merge')}
-                class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-green-600 hover:bg-green-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Merge
               </button>
@@ -636,7 +629,7 @@
                 <SparklesIcon class="w-5 h-5 text-purple-500" />
               </div>
               <div>
-                <h3 class="font-semibold text-white">Request AI Review</h3>
+                <h3 class="font-semibold text-[#FFFFFF]">Request AI Review</h3>
                 <p class="text-xs text-gray-400">Get code review feedback</p>
               </div>
             </div>
@@ -652,7 +645,7 @@
               </button>
               <button
                 onclick={() => handleAction('review')}
-                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Request Review
               </button>
@@ -665,7 +658,7 @@
                 <TrashIcon class="w-5 h-5 text-red-500" />
               </div>
               <div>
-                <h3 class="font-semibold text-white">Discard Task</h3>
+                <h3 class="font-semibold text-[#FFFFFF]">Discard Task</h3>
                 <p class="text-xs text-gray-400">Permanently delete task</p>
               </div>
             </div>
@@ -681,7 +674,7 @@
               </button>
               <button
                 onclick={() => handleAction('discard')}
-                class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Discard
               </button>
