@@ -368,6 +368,10 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 	slog.Info("[ORCHESTRATOR] Provider and model determined", "task_id", job.TaskID, "provider", provider, "model", model)
 
+	if backendType == "codex" && provider == "" {
+		provider = "openai"
+	}
+
 	// Get API key for the provider (or default if provider is empty)
 	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID, "provider", provider)
 	apiKey, actualProvider, actualModel, err := o.settings.GetAPIKeyForProvider(ctx, provider)
@@ -382,24 +386,54 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
 
-	// Create LLM provider
-	var llmProvider llm.Provider
-	switch provider {
-	case "anthropic":
-		llmProvider = llm.NewAnthropicProvider(apiKey)
-	case "openrouter":
-		llmProvider = llm.NewOpenRouterProvider(apiKey)
-	case "zai":
-		llmProvider = llm.NewZaiProvider(apiKey)
-	default:
-		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: fmt.Sprintf("unsupported provider: %s", provider)}
-		return
-	}
-	llmProvider.SetModel(model)
-
 	// Create agent backend
 	var backend agent.Backend
-	if backendType == "claude-code" {
+	if backendType == "codex" {
+		slog.Info("[ORCHESTRATOR] Initializing Codex backend", "task_id", job.TaskID)
+		baseURL := ""
+		switch provider {
+		case "openrouter":
+			baseURL = "https://openrouter.ai/api/v1"
+		case "openai":
+		default:
+			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: fmt.Sprintf("unsupported provider for codex backend: %s", provider)}
+			return
+		}
+
+		codexOpts := []agent.CodexOption{
+			agent.WithCodexAPIKey(apiKey),
+			agent.WithCodexModel(model),
+			agent.WithCodexWorkDir(worktreePath),
+			agent.WithCodexCallback(func(e agent.StreamEvent) {
+				o.handleAgentEvent(job.TaskID, e)
+			}),
+		}
+		if baseURL != "" {
+			codexOpts = append(codexOpts, agent.WithCodexBaseURL(baseURL))
+		}
+		if backendSessionID != "" {
+			codexOpts = append(codexOpts, agent.WithCodexSessionID(backendSessionID))
+		}
+
+		slog.Info("[ORCHESTRATOR] Using existing session ID", "task_id", job.TaskID, "session_id", backendSessionID)
+
+		backend, err = agent.NewCodexBackend(codexOpts...)
+	} else if backendType == "claude-code" {
+		// Create LLM provider
+		var llmProvider llm.Provider
+		switch provider {
+		case "anthropic":
+			llmProvider = llm.NewAnthropicProvider(apiKey)
+		case "openrouter":
+			llmProvider = llm.NewOpenRouterProvider(apiKey)
+		case "zai":
+			llmProvider = llm.NewZaiProvider(apiKey)
+		default:
+			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: fmt.Sprintf("unsupported provider: %s", provider)}
+			return
+		}
+		llmProvider.SetModel(model)
+
 		slog.Info("[ORCHESTRATOR] Initializing Claude Code backend", "task_id", job.TaskID)
 		baseURL := ""
 		switch provider {
@@ -428,6 +462,21 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 		backend, err = agent.NewClaudeCodeBackend(claudeOpts...)
 	} else {
+		// Create LLM provider
+		var llmProvider llm.Provider
+		switch provider {
+		case "anthropic":
+			llmProvider = llm.NewAnthropicProvider(apiKey)
+		case "openrouter":
+			llmProvider = llm.NewOpenRouterProvider(apiKey)
+		case "zai":
+			llmProvider = llm.NewZaiProvider(apiKey)
+		default:
+			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: fmt.Sprintf("unsupported provider: %s", provider)}
+			return
+		}
+		llmProvider.SetModel(model)
+
 		// Default to native
 		slog.Info("[ORCHESTRATOR] Initializing Native backend", "task_id", job.TaskID)
 		backend, err = agent.NewNativeBackend(
