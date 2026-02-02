@@ -17,8 +17,10 @@ type Task struct {
 	ID                   string  `json:"id"`
 	RepositoryID         *string `json:"repository_id,omitempty"`
 	RepositoryName       *string `json:"repository_name,omitempty"`
+	SessionID            *string `json:"session_id,omitempty"`
 	Title                string  `json:"title"`
 	Intent               string  `json:"intent"`
+	PromotedSnapshot     *string `json:"promoted_snapshot,omitempty"`
 	Status               string  `json:"status"`
 	Position             *int64  `json:"position,omitempty"`
 	LastAssistantMessage *string `json:"last_assistant_message,omitempty"`

@@ -102,7 +102,7 @@ func main() {
 	// Start session syncer (imports existing CLI sessions and tails for updates)
 	repo := services.NewRepository(database)
 	syncCtx, syncCancel := context.WithCancel(ctx)
-	syncer := services.NewSessionSyncer(repo, eventBus)
+	syncer := services.NewSessionSyncer(repo)
 	syncer.Start(syncCtx)
 
 	// Create handlers with shared database
@@ -179,6 +179,11 @@ func main() {
 		r.Post("/api/v1/tasks", h.HandleAddTask)
 		r.Get("/api/v1/tasks/{id}", h.HandleGetTask)
 		r.Get("/api/v1/tasks/{id}/diff", h.HandleGetTaskDiff)
+		r.Get("/api/v1/sessions", h.HandleListSessions)
+		r.Post("/api/v1/sessions", h.HandleCreateSession)
+		r.Get("/api/v1/sessions/{id}", h.HandleGetSessionDetail)
+		r.Post("/api/v1/sessions/{id}/chat", h.HandleSessionChat)
+		r.Post("/api/v1/sessions/{id}/promote", h.HandlePromoteSession)
 		r.Get("/api/v1/settings", h.HandleGetSettings)
 		r.Get("/api/v1/files/search", h.HandleFileSearch)
 

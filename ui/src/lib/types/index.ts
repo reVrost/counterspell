@@ -101,11 +101,41 @@ export interface Todo {
 }
 
 export interface UserSettings {
-  agentBackend: 'native' | 'claude-code';
+  agentBackend: 'native' | 'claude-code' | 'codex';
   openRouterKey?: string;
   zaiKey?: string;
   anthropicKey?: string;
   openAiKey?: string;
+}
+
+export interface Session {
+  id: string;
+  agent_backend: string;
+  external_id?: string | null;
+  backend_session_id?: string | null;
+  title?: string | null;
+  message_count: number;
+  last_message_at?: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SessionMessage {
+  id: string;
+  session_id: string;
+  sequence: number;
+  role: string;
+  kind: string;
+  content?: string | null;
+  tool_name?: string | null;
+  tool_call_id?: string | null;
+  raw_json: string;
+  created_at: number;
+}
+
+export interface SessionResponse {
+  session: Session;
+  messages: SessionMessage[];
 }
 
 export interface SessionInfo {

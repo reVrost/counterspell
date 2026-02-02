@@ -135,20 +135,6 @@ func (q *Queries) GetOAuthLoginAttempt(ctx context.Context, state string) (GetOA
 	return i, err
 }
 
-const updateMachineIdentityLastSeen = `-- name: UpdateMachineIdentityLastSeen :exec
-UPDATE machine_identity SET last_seen_at = ? WHERE machine_id = ?
-`
-
-type UpdateMachineIdentityLastSeenParams struct {
-	LastSeenAt sql.NullInt64 `json:"last_seen_at"`
-	MachineID  string        `json:"machine_id"`
-}
-
-func (q *Queries) UpdateMachineIdentityLastSeen(ctx context.Context, arg UpdateMachineIdentityLastSeenParams) error {
-	_, err := q.db.ExecContext(ctx, updateMachineIdentityLastSeen, arg.LastSeenAt, arg.MachineID)
-	return err
-}
-
 const updateMachineIdentityJWT = `-- name: UpdateMachineIdentityJWT :exec
 UPDATE machine_identity SET machine_jwt = ? WHERE machine_id = ?
 `
@@ -160,6 +146,20 @@ type UpdateMachineIdentityJWTParams struct {
 
 func (q *Queries) UpdateMachineIdentityJWT(ctx context.Context, arg UpdateMachineIdentityJWTParams) error {
 	_, err := q.db.ExecContext(ctx, updateMachineIdentityJWT, arg.MachineJwt, arg.MachineID)
+	return err
+}
+
+const updateMachineIdentityLastSeen = `-- name: UpdateMachineIdentityLastSeen :exec
+UPDATE machine_identity SET last_seen_at = ? WHERE machine_id = ?
+`
+
+type UpdateMachineIdentityLastSeenParams struct {
+	LastSeenAt sql.NullInt64 `json:"last_seen_at"`
+	MachineID  string        `json:"machine_id"`
+}
+
+func (q *Queries) UpdateMachineIdentityLastSeen(ctx context.Context, arg UpdateMachineIdentityLastSeenParams) error {
+	_, err := q.db.ExecContext(ctx, updateMachineIdentityLastSeen, arg.LastSeenAt, arg.MachineID)
 	return err
 }
 

@@ -83,6 +83,7 @@ type BackendType string
 const (
 	BackendNative     BackendType = "native"      // Go-based agent loop
 	BackendClaudeCode BackendType = "claude-code" // Claude Code CLI
+	BackendCodex      BackendType = "codex"       // OpenAI Codex CLI
 )
 
 // BackendInfo describes a backend implementation.
