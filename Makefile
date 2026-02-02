@@ -20,6 +20,9 @@ kill-dev:
 dev: build
 	ENV=dev ./$(PROJECT_NAME) -addr :8710
 
+build-ui:
+	cd ui && npm run build
+
 ui: ## Run Vite dev server (frontend on :5173, proxies to Go on :8710)
 	@echo "Starting Vite dev server..."
 	@FRONTEND_URL=http://localhost:5173 cd ui && npm run dev
