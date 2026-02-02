@@ -60,10 +60,11 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => {
-          return (
-            caches.match("/") ||
-            new Response(
-              `<!DOCTYPE html>
+          return caches.match("/").then(
+            (cached) =>
+              cached ||
+              new Response(
+                `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -94,8 +95,8 @@ self.addEventListener("fetch", (event) => {
   </div>
 </body>
 </html>`,
-              { headers: { "Content-Type": "text/html" } },
-            )
+                { headers: { "Content-Type": "text/html" } },
+              ),
           );
         }),
     );

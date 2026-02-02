@@ -15,6 +15,7 @@
   let diffContent = $state('');
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
+  let sseTaskId = $state<string | null>(null);
 
   function applyTaskData(taskData: TaskResponse) {
     task = taskData;
@@ -26,28 +27,49 @@
     taskStore.currentTask = taskData.task;
   }
 
-  async function loadTask(taskId: string) {
-    loading = true;
-    error = null;
+  async function loadTask(
+    taskId: string,
+    options: { showLoading?: boolean; showError?: boolean } = {},
+  ) {
+    const showLoading = options.showLoading ?? true;
+    const showError = options.showError ?? showLoading;
+
+    if (showLoading) {
+      loading = true;
+      error = null;
+    } else if (showError) {
+      error = null;
+    }
 
     try {
       const taskData = await tasksAPI.get(taskId);
       applyTaskData(taskData);
-      setupSSE(taskId);
+      if (!eventSource || sseTaskId !== taskId) {
+        setupSSE(taskId);
+      }
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load task';
+      if (showError) {
+        error = err instanceof Error ? err.message : 'Failed to load task';
+      }
       console.error('Task load error:', err);
     } finally {
-      loading = false;
+      if (showLoading) {
+        loading = false;
+      }
     }
   }
 
   function setupSSE(taskId: string) {
+    if (eventSource && sseTaskId === taskId) {
+      return;
+    }
+
     if (eventSource) {
       eventSource.close();
       eventSource = null;
     }
 
+    sseTaskId = taskId;
     eventSource = createTaskSSE(taskId, {
       onAgentUpdate: (data: string) => {
         try {
@@ -61,7 +83,7 @@
         }
       },
       onRunUpdate: () => {
-        loadTask(taskId);
+        loadTask(taskId, { showLoading: false, showError: false });
       },
       onDiffUpdate: (html: string) => {
         diffContent = html;
@@ -126,6 +148,7 @@
     if (eventSource) {
       eventSource.close();
     }
+    sseTaskId = null;
   });
 </script>
 
@@ -174,7 +197,7 @@
         <div class="text-center">
           <p class="text-base text-red-400 mb-2">{error}</p>
           <button
-            onclick={() => loadTask()}
+            onclick={() => loadTask($page.params.id)}
             class="px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-sm text-violet-300 hover:bg-violet-500/30 transition-colors"
           >
             Retry

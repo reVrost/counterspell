@@ -17,11 +17,15 @@ interface LogEntry {
 }
 
 const API_BASE = import.meta.env.DEV ? "" : "";
+const ENABLE_REMOTE_LOGGING = false;
 
 async function sendLog(entry: LogEntry): Promise<void> {
   entry.url = window.location.href;
 
   try {
+    if (!ENABLE_REMOTE_LOGGING) {
+      return;
+    }
     await fetch(`${API_BASE}/api/v1/log`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
