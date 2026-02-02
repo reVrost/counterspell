@@ -6,7 +6,12 @@ export default defineConfig({
 	server: {
 		port: 5173,
 		host: '0.0.0.0',
-		allowedHosts: ['dan-severe-overly.ngrok-free.dev', 'host.docker.internal']
+		allowedHosts: [
+			'dan-severe-overly.ngrok-free.dev',
+			'host.docker.internal',
+			'counterspell.app',
+			'.counterspell.app'
+		]
 		// Note: Proxy is handled in hooks.server.ts for SvelteKit
 	}
 });

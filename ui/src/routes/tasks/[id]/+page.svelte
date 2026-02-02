@@ -2,17 +2,11 @@
   import { taskStore } from '$lib/stores/tasks.svelte';
   import { tasksAPI } from '$lib/api';
   import { createTaskSSE } from '$lib/utils/sse';
-  import type { PageData } from './$types';
   import type { TaskResponse, Message, Task, LogEntry } from '$lib/types';
   import TaskDetail from '$lib/components/TaskDetail.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
+  import { page } from '$app/stores';
   import { onDestroy } from 'svelte';
-
-  interface Props {
-    data: PageData;
-  }
-
-  let { data }: Props = $props();
 
   let task = $state<TaskResponse | null>(null);
   let loading = $state(true);
@@ -22,24 +16,24 @@
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
 
-  async function loadTask() {
-    if (!data.taskId) return;
+  function applyTaskData(taskData: TaskResponse) {
+    task = taskData;
+    messages = taskData.messages || [];
+    diffContent = taskData.git_diff
+      ? renderDiffHTML(taskData.git_diff)
+      : '<div class="text-gray-500 italic">No changes made</div>';
+    logContent = [];
+    taskStore.currentTask = taskData.task;
+  }
 
+  async function loadTask(taskId: string) {
     loading = true;
     error = null;
 
     try {
-      const taskData = await tasksAPI.get(data.taskId);
-      task = taskData;
-      messages = taskData.messages || [];
-      diffContent = taskData.git_diff
-        ? renderDiffHTML(taskData.git_diff)
-        : '<div class="text-gray-500 italic">No changes made</div>';
-      logContent = [];
-
-      taskStore.currentTask = taskData.task;
-
-      setupSSE(data.taskId);
+      const taskData = await tasksAPI.get(taskId);
+      applyTaskData(taskData);
+      setupSSE(taskId);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load task';
       console.error('Task load error:', err);
@@ -66,8 +60,8 @@
           console.error('Failed to parse agent update JSON:', e);
         }
       },
-      onRunUpdate: (data: string) => {
-        loadTask();
+      onRunUpdate: () => {
+        loadTask(taskId);
       },
       onDiffUpdate: (html: string) => {
         diffContent = html;
@@ -118,7 +112,14 @@
   }
 
   $effect(() => {
-    loadTask();
+    const taskId = $page.params.id;
+    if (!taskId) {
+      loading = false;
+      error = 'Missing task id';
+      return;
+    }
+
+    loadTask(taskId);
   });
 
   onDestroy(() => {
