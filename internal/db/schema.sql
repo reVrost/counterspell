@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK(role IN ('system', 'user', 'assistant', 'tool')),
+    role TEXT NOT NULL CHECK(role IN ('system', 'developer', 'user', 'assistant', 'tool')),
     parts TEXT NOT NULL default '[]',
     model TEXT,
     provider TEXT,

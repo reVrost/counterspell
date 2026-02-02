@@ -30,7 +30,7 @@ func StartCloudflare(ctx context.Context, token, localURL, binaryPath string, lo
 		path = p
 	}
 
-	args := []string{"tunnel", "--no-autoupdate", "run", "--token", token}
+	args := []string{"tunnel", "--protocol", "http2", "--no-autoupdate", "run", "--token", token}
 	if localURL != "" {
 		args = append(args, "--url", localURL)
 	}
