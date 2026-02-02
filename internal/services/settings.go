@@ -25,7 +25,7 @@ type Settings struct {
 	ZaiKey        string    `json:"zai_key,omitempty"`
 	AnthropicKey  string    `json:"anthropic_key,omitempty"`
 	OpenAIKey     string    `json:"openai_key,omitempty"`
-	AgentBackend  string    `json:"agent_backend"` // "native", "openai", "anthropic", "openrouter", "zai"
+	AgentBackend  string    `json:"agent_backend"` // "native", "claude-code", "codex"
 	Provider      *string   `json:"provider"`      // "anthropic", "openrouter", etc.
 	Model         *string   `json:"model"`         // "claude-opus-4-5", etc.
 	UpdatedAt     time.Time `json:"updated_at"`
