@@ -47,14 +47,14 @@ type GithubConnection struct {
 }
 
 type MachineIdentity struct {
-	MachineID      string        `json:"machine_id"`
+	MachineID      string         `json:"machine_id"`
 	MachineJwt     sql.NullString `json:"machine_jwt"`
-	UserID         string        `json:"user_id"`
-	Subdomain      string        `json:"subdomain"`
-	TunnelProvider string        `json:"tunnel_provider"`
-	TunnelToken    string        `json:"tunnel_token"`
-	CreatedAt      int64         `json:"created_at"`
-	LastSeenAt     sql.NullInt64 `json:"last_seen_at"`
+	UserID         string         `json:"user_id"`
+	Subdomain      string         `json:"subdomain"`
+	TunnelProvider string         `json:"tunnel_provider"`
+	TunnelToken    string         `json:"tunnel_token"`
+	CreatedAt      int64          `json:"created_at"`
+	LastSeenAt     sql.NullInt64  `json:"last_seen_at"`
 }
 
 type Message struct {
@@ -93,6 +93,31 @@ type Repository struct {
 	UpdatedAt    int64          `json:"updated_at"`
 }
 
+type Session struct {
+	ID               string         `json:"id"`
+	AgentBackend     string         `json:"agent_backend"`
+	ExternalID       sql.NullString `json:"external_id"`
+	BackendSessionID sql.NullString `json:"backend_session_id"`
+	Title            sql.NullString `json:"title"`
+	MessageCount     int64          `json:"message_count"`
+	LastMessageAt    sql.NullInt64  `json:"last_message_at"`
+	CreatedAt        int64          `json:"created_at"`
+	UpdatedAt        int64          `json:"updated_at"`
+}
+
+type SessionMessage struct {
+	ID         string         `json:"id"`
+	SessionID  string         `json:"session_id"`
+	Sequence   int64          `json:"sequence"`
+	Role       string         `json:"role"`
+	Kind       string         `json:"kind"`
+	Content    sql.NullString `json:"content"`
+	ToolName   sql.NullString `json:"tool_name"`
+	ToolCallID sql.NullString `json:"tool_call_id"`
+	RawJson    string         `json:"raw_json"`
+	CreatedAt  int64          `json:"created_at"`
+}
+
 type Setting struct {
 	ID            int64          `json:"id"`
 	OpenrouterKey sql.NullString `json:"openrouter_key"`
@@ -106,12 +131,14 @@ type Setting struct {
 }
 
 type Task struct {
-	ID           string         `json:"id"`
-	RepositoryID sql.NullString `json:"repository_id"`
-	Title        string         `json:"title"`
-	Intent       string         `json:"intent"`
-	Status       string         `json:"status"`
-	Position     sql.NullInt64  `json:"position"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
+	ID               string         `json:"id"`
+	RepositoryID     sql.NullString `json:"repository_id"`
+	SessionID        sql.NullString `json:"session_id"`
+	Title            string         `json:"title"`
+	Intent           string         `json:"intent"`
+	PromotedSnapshot sql.NullString `json:"promoted_snapshot"`
+	Status           string         `json:"status"`
+	Position         sql.NullInt64  `json:"position"`
+	CreatedAt        int64          `json:"created_at"`
+	UpdatedAt        int64          `json:"updated_at"`
 }

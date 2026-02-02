@@ -11,26 +11,30 @@ import (
 )
 
 const createTask = `-- name: CreateTask :exec
-INSERT INTO tasks (id, repository_id, title, intent, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO tasks (id, repository_id, session_id, title, intent, promoted_snapshot, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
-	ID           string         `json:"id"`
-	RepositoryID sql.NullString `json:"repository_id"`
-	Title        string         `json:"title"`
-	Intent       string         `json:"intent"`
-	Status       string         `json:"status"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
+	ID               string         `json:"id"`
+	RepositoryID     sql.NullString `json:"repository_id"`
+	SessionID        sql.NullString `json:"session_id"`
+	Title            string         `json:"title"`
+	Intent           string         `json:"intent"`
+	PromotedSnapshot sql.NullString `json:"promoted_snapshot"`
+	Status           string         `json:"status"`
+	CreatedAt        int64          `json:"created_at"`
+	UpdatedAt        int64          `json:"updated_at"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) error {
 	_, err := q.db.ExecContext(ctx, createTask,
 		arg.ID,
 		arg.RepositoryID,
+		arg.SessionID,
 		arg.Title,
 		arg.Intent,
+		arg.PromotedSnapshot,
 		arg.Status,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -51,8 +55,10 @@ const getTask = `-- name: GetTask :one
 SELECT
     t.id,
     t.repository_id,
+    t.session_id,
     t.title,
     t.intent,
+    t.promoted_snapshot,
     t.status,
     t.position,
     t.created_at,
@@ -64,15 +70,17 @@ WHERE t.id = ?
 `
 
 type GetTaskRow struct {
-	ID             string         `json:"id"`
-	RepositoryID   sql.NullString `json:"repository_id"`
-	Title          string         `json:"title"`
-	Intent         string         `json:"intent"`
-	Status         string         `json:"status"`
-	Position       sql.NullInt64  `json:"position"`
-	CreatedAt      int64          `json:"created_at"`
-	UpdatedAt      int64          `json:"updated_at"`
-	RepositoryName sql.NullString `json:"repository_name"`
+	ID               string         `json:"id"`
+	RepositoryID     sql.NullString `json:"repository_id"`
+	SessionID        sql.NullString `json:"session_id"`
+	Title            string         `json:"title"`
+	Intent           string         `json:"intent"`
+	PromotedSnapshot sql.NullString `json:"promoted_snapshot"`
+	Status           string         `json:"status"`
+	Position         sql.NullInt64  `json:"position"`
+	CreatedAt        int64          `json:"created_at"`
+	UpdatedAt        int64          `json:"updated_at"`
+	RepositoryName   sql.NullString `json:"repository_name"`
 }
 
 func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
@@ -81,8 +89,10 @@ func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.RepositoryID,
+		&i.SessionID,
 		&i.Title,
 		&i.Intent,
+		&i.PromotedSnapshot,
 		&i.Status,
 		&i.Position,
 		&i.CreatedAt,
@@ -92,8 +102,30 @@ func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
 	return i, err
 }
 
+const getTaskBySessionID = `-- name: GetTaskBySessionID :one
+SELECT id, repository_id, session_id, title, intent, promoted_snapshot, status, position, created_at, updated_at FROM tasks WHERE session_id = ?
+`
+
+func (q *Queries) GetTaskBySessionID(ctx context.Context, sessionID sql.NullString) (Task, error) {
+	row := q.db.QueryRowContext(ctx, getTaskBySessionID, sessionID)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.RepositoryID,
+		&i.SessionID,
+		&i.Title,
+		&i.Intent,
+		&i.PromotedSnapshot,
+		&i.Status,
+		&i.Position,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listTasks = `-- name: ListTasks :many
-SELECT id, repository_id, title, intent, status, position, created_at, updated_at FROM tasks
+SELECT id, repository_id, session_id, title, intent, promoted_snapshot, status, position, created_at, updated_at FROM tasks
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
@@ -109,8 +141,10 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.RepositoryID,
+			&i.SessionID,
 			&i.Title,
 			&i.Intent,
+			&i.PromotedSnapshot,
 			&i.Status,
 			&i.Position,
 			&i.CreatedAt,
@@ -130,7 +164,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, repository_id, title, intent, status, position, created_at, updated_at FROM tasks
+SELECT id, repository_id, session_id, title, intent, promoted_snapshot, status, position, created_at, updated_at FROM tasks
 WHERE status = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -147,8 +181,10 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 		if err := rows.Scan(
 			&i.ID,
 			&i.RepositoryID,
+			&i.SessionID,
 			&i.Title,
 			&i.Intent,
+			&i.PromotedSnapshot,
 			&i.Status,
 			&i.Position,
 			&i.CreatedAt,
@@ -171,8 +207,10 @@ const listTasksWithRepository = `-- name: ListTasksWithRepository :many
 SELECT
     t.id,
     t.repository_id,
+    t.session_id,
     t.title,
     t.intent,
+    t.promoted_snapshot,
     t.status,
     t.position,
     t.created_at,
@@ -187,8 +225,10 @@ ORDER BY t.status ASC, t.position ASC, t.created_at DESC
 type ListTasksWithRepositoryRow struct {
 	ID                   string         `json:"id"`
 	RepositoryID         sql.NullString `json:"repository_id"`
+	SessionID            sql.NullString `json:"session_id"`
 	Title                string         `json:"title"`
 	Intent               string         `json:"intent"`
+	PromotedSnapshot     sql.NullString `json:"promoted_snapshot"`
 	Status               string         `json:"status"`
 	Position             sql.NullInt64  `json:"position"`
 	CreatedAt            int64          `json:"created_at"`
@@ -209,8 +249,10 @@ func (q *Queries) ListTasksWithRepository(ctx context.Context) ([]ListTasksWithR
 		if err := rows.Scan(
 			&i.ID,
 			&i.RepositoryID,
+			&i.SessionID,
 			&i.Title,
 			&i.Intent,
+			&i.PromotedSnapshot,
 			&i.Status,
 			&i.Position,
 			&i.CreatedAt,
@@ -271,5 +313,20 @@ type UpdateTaskStatusParams struct {
 
 func (q *Queries) UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error {
 	_, err := q.db.ExecContext(ctx, updateTaskStatus, arg.Status, arg.ID)
+	return err
+}
+
+const updateTaskTitleIntent = `-- name: UpdateTaskTitleIntent :exec
+UPDATE tasks SET title = ?, intent = ? WHERE id = ?
+`
+
+type UpdateTaskTitleIntentParams struct {
+	Title  string `json:"title"`
+	Intent string `json:"intent"`
+	ID     string `json:"id"`
+}
+
+func (q *Queries) UpdateTaskTitleIntent(ctx context.Context, arg UpdateTaskTitleIntentParams) error {
+	_, err := q.db.ExecContext(ctx, updateTaskTitleIntent, arg.Title, arg.Intent, arg.ID)
 	return err
 }

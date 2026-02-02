@@ -10,6 +10,8 @@ import type {
   SessionInfo,
   APIResponse,
   ConflictResponse,
+  Session,
+  SessionResponse,
 } from '$lib/types';
 
 // API base URL - uses proxy in dev, relative path in prod
@@ -238,6 +240,38 @@ export const tasksAPI = {
 
   async discard(taskId: string): Promise<APIResponse> {
     return postAction(`/api/v1/tasks/${taskId}/discard`);
+  },
+};
+
+// ==================== SESSIONS ====================
+
+export const sessionsAPI = {
+  async list(): Promise<Session[]> {
+    return fetchAPI<Session[]>('/api/v1/sessions');
+  },
+
+  async get(id: string): Promise<SessionResponse> {
+    return fetchAPI<SessionResponse>(`/api/v1/sessions/${id}`);
+  },
+
+  async create(agentBackend?: string): Promise<Session> {
+    return fetchAPI<Session>('/api/v1/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ agent_backend: agentBackend || '' }),
+    });
+  },
+
+  async chat(id: string, message: string, modelId?: string): Promise<APIResponse> {
+    return postJsonWithResponse(`/api/v1/sessions/${id}/chat`, {
+      message: message,
+      model_id: modelId,
+    });
+  },
+
+  async promote(id: string): Promise<{ task_id: string }> {
+    return fetchAPI<{ task_id: string }>(`/api/v1/sessions/${id}/promote`, {
+      method: 'POST',
+    });
   },
 };
 

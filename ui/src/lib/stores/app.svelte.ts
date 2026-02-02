@@ -18,6 +18,7 @@ class AppState {
   projectMenuOpen = $state(false);
   inputProjectMenuOpen = $state(false);
   showChatInput = $state(false);
+  activeTab = $state<'inbox' | 'sessions' | 'projects' | 'focus' | 'layers'>('inbox');
 
   // Toast
   toastOpen = $state(false);

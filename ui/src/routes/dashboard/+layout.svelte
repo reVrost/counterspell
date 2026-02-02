@@ -296,13 +296,12 @@
   if (typeof window !== "undefined") {
     (window as any).prefetchTask = prefetchTask;
   }
-  let activeTab = $state<"inbox" | "projects" | "focus" | "layers">("inbox");
 </script>
 
 <div class="h-screen flex flex-col overflow-hidden bg-background">
   <Toast />
   <SettingsModal />
-  <Header {activeTab} />
+  <Header activeTab={appState.activeTab} />
 
   <main
     class="flex-1 overflow-y-auto bg-background relative pt-14"
@@ -321,7 +320,10 @@
       </div>
     {:else}
       <div class="col-start-1 row-start-1 w-full relative z-10">
-        <Navigator {activeTab} onNavigate={(tab) => (activeTab = tab as any)} />
+        <Navigator
+          activeTab={appState.activeTab}
+          onNavigate={(tab) => (appState.activeTab = tab as any)}
+        />
       </div>
     {/if}
   </div>

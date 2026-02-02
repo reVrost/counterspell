@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -44,13 +44,43 @@ func (s *Repository) Create(ctx context.Context, repositoryID, intent string) (*
 
 	now := time.Now().UnixMilli()
 	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
-		ID:           id,
-		RepositoryID: sql.NullString{String: repositoryID, Valid: repositoryID != ""},
-		Title:        intent, // Use intent as title for now
-		Intent:       intent,
-		Status:       "pending",
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:               id,
+		RepositoryID:     sql.NullString{String: repositoryID, Valid: repositoryID != ""},
+		SessionID:        sql.NullString{},
+		Title:            intent, // Use intent as title for now
+		Intent:           intent,
+		PromotedSnapshot: sql.NullString{},
+		Status:           "pending",
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to create task with id %s: %w", id, err)
+	}
+
+	return s.Get(ctx, id)
+}
+
+// CreateFromSession creates a task from a session promotion.
+func (s *Repository) CreateFromSession(ctx context.Context, sessionID, title, intent, snapshot string) (*models.Task, error) {
+	id := shortuuid.New()
+	if title == "" {
+		title = "Promoted session"
+	}
+	if intent == "" {
+		intent = title
+	}
+
+	now := time.Now().UnixMilli()
+	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
+		ID:               id,
+		RepositoryID:     sql.NullString{},
+		SessionID:        sql.NullString{String: sessionID, Valid: sessionID != ""},
+		Title:            title,
+		Intent:           intent,
+		PromotedSnapshot: sql.NullString{String: snapshot, Valid: snapshot != ""},
+		Status:           "pending",
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to create task with id %s: %w", id, err)
 	}
@@ -126,6 +156,33 @@ func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error 
 	return nil
 }
 
+// GetTaskBySessionID retrieves a task by session ID.
+func (s *Repository) GetTaskBySessionID(ctx context.Context, sessionID string) (*models.Task, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+	task, err := s.db.Queries.GetTaskBySessionID(ctx, sql.NullString{String: sessionID, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return sqlcTaskToModel(&task), nil
+}
+
+// UpdateTaskTitleIntent updates a task title and intent.
+func (s *Repository) UpdateTaskTitleIntent(ctx context.Context, taskID, title, intent string) error {
+	if taskID == "" {
+		return fmt.Errorf("task id is required")
+	}
+	return s.db.Queries.UpdateTaskTitleIntent(ctx, sqlc.UpdateTaskTitleIntentParams{
+		Title:  title,
+		Intent: intent,
+		ID:     taskID,
+	})
+}
+
 // Delete removes a task.
 func (s *Repository) Delete(ctx context.Context, id string) error {
 	if err := s.db.Queries.DeleteTask(ctx, id); err != nil {
@@ -147,14 +204,16 @@ func (s *Repository) GetInProgressTasks(ctx context.Context) ([]*models.Task, er
 // sqlcTaskToModel converts sqlc task to model.
 func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 	return &models.Task{
-		ID:           task.ID,
-		RepositoryID: nullableString(task.RepositoryID),
-		Title:        task.Title,
-		Intent:       task.Intent,
-		Status:       task.Status,
-		Position:     nullableInt64(task.Position),
-		CreatedAt:    task.CreatedAt,
-		UpdatedAt:    task.UpdatedAt,
+		ID:               task.ID,
+		RepositoryID:     nullableString(task.RepositoryID),
+		SessionID:        nullableString(task.SessionID),
+		Title:            task.Title,
+		Intent:           task.Intent,
+		PromotedSnapshot: nullableString(task.PromotedSnapshot),
+		Status:           task.Status,
+		Position:         nullableInt64(task.Position),
+		CreatedAt:        task.CreatedAt,
+		UpdatedAt:        task.UpdatedAt,
 	}
 }
 
@@ -170,8 +229,10 @@ func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task
 		ID:                   task.ID,
 		RepositoryID:         nullableString(task.RepositoryID),
 		RepositoryName:       nullableString(task.RepositoryName),
+		SessionID:            nullableString(task.SessionID),
 		Title:                task.Title,
 		Intent:               task.Intent,
+		PromotedSnapshot:     nullableString(task.PromotedSnapshot),
 		Status:               task.Status,
 		Position:             nullableInt64(task.Position),
 		LastAssistantMessage: lastMsg,
@@ -183,15 +244,17 @@ func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task
 // sqlcGetTaskRowToModel converts sqlc GetTaskRow to model.
 func sqlcGetTaskRowToModel(task *sqlc.GetTaskRow) *models.Task {
 	return &models.Task{
-		ID:             task.ID,
-		RepositoryID:   nullableString(task.RepositoryID),
-		RepositoryName: nullableString(task.RepositoryName),
-		Title:          task.Title,
-		Intent:         task.Intent,
-		Status:         task.Status,
-		Position:       nullableInt64(task.Position),
-		CreatedAt:      task.CreatedAt,
-		UpdatedAt:      task.UpdatedAt,
+		ID:               task.ID,
+		RepositoryID:     nullableString(task.RepositoryID),
+		RepositoryName:   nullableString(task.RepositoryName),
+		SessionID:        nullableString(task.SessionID),
+		Title:            task.Title,
+		Intent:           task.Intent,
+		PromotedSnapshot: nullableString(task.PromotedSnapshot),
+		Status:           task.Status,
+		Position:         nullableInt64(task.Position),
+		CreatedAt:        task.CreatedAt,
+		UpdatedAt:        task.UpdatedAt,
 	}
 }
 
@@ -417,7 +480,6 @@ func (s *Repository) GetLatestAgentRun(ctx context.Context, taskID string) (*sql
 	return &run, nil
 }
 
-
 // GetAgentRun retrieves an agent run by ID.
 func (s *Repository) GetAgentRun(ctx context.Context, runID string) (*sqlc.AgentRun, error) {
 	run, err := s.db.Queries.GetAgentRun(ctx, runID)
@@ -496,4 +558,191 @@ func nullableInt64FromTime(t sql.NullTime) *int64 {
 		return &unixMillis
 	}
 	return nil
+}
+
+// --- Session Operations ---
+
+// CreateSession inserts a new session.
+func (s *Repository) CreateSession(ctx context.Context, session *models.Session) (*models.Session, error) {
+	if session == nil {
+		return nil, fmt.Errorf("session is required")
+	}
+
+	if err := s.db.Queries.CreateSession(ctx, sqlc.CreateSessionParams{
+		ID:               session.ID,
+		AgentBackend:     session.AgentBackend,
+		ExternalID:       sql.NullString{String: valueOrEmpty(session.ExternalID), Valid: session.ExternalID != nil},
+		BackendSessionID: sql.NullString{String: valueOrEmpty(session.BackendSessionID), Valid: session.BackendSessionID != nil},
+		Title:            sql.NullString{String: valueOrEmpty(session.Title), Valid: session.Title != nil},
+		MessageCount:     session.MessageCount,
+		LastMessageAt:    sql.NullInt64{Int64: valueOrZero(session.LastMessageAt), Valid: session.LastMessageAt != nil},
+		CreatedAt:        session.CreatedAt,
+		UpdatedAt:        session.UpdatedAt,
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.GetSession(ctx, session.ID)
+}
+
+// GetSession retrieves a session by ID.
+func (s *Repository) GetSession(ctx context.Context, sessionID string) (*models.Session, error) {
+	row, err := s.db.Queries.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sqlcSessionToModel(&row), nil
+}
+
+// GetSessionByBackendExternal retrieves a session by backend/external ID.
+func (s *Repository) GetSessionByBackendExternal(ctx context.Context, backend, externalID string) (*models.Session, error) {
+	if backend == "" || externalID == "" {
+		return nil, nil
+	}
+	row, err := s.db.Queries.GetSessionByBackendExternal(ctx, sqlc.GetSessionByBackendExternalParams{
+		AgentBackend: backend,
+		ExternalID:   sql.NullString{String: externalID, Valid: externalID != ""},
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return sqlcSessionToModel(&row), nil
+}
+
+// ListSessions retrieves all sessions.
+func (s *Repository) ListSessions(ctx context.Context) ([]*models.Session, error) {
+	rows, err := s.db.Queries.ListSessions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*models.Session, len(rows))
+	for i := range rows {
+		result[i] = sqlcSessionToModel(&rows[i])
+	}
+	return result, nil
+}
+
+// UpdateSession updates session metadata.
+func (s *Repository) UpdateSession(ctx context.Context, sessionID, backendSessionID, title string, lastMessageAt *int64) error {
+	return s.db.Queries.UpdateSession(ctx, sqlc.UpdateSessionParams{
+		BackendSessionID: sql.NullString{String: backendSessionID, Valid: backendSessionID != ""},
+		Title:            sql.NullString{String: title, Valid: title != ""},
+		LastMessageAt:    sql.NullInt64{Int64: valueOrZero(lastMessageAt), Valid: lastMessageAt != nil},
+		UpdatedAt:        time.Now().UnixMilli(),
+		ID:               sessionID,
+	})
+}
+
+// UpdateSessionBackendSessionID updates session backend session id.
+func (s *Repository) UpdateSessionBackendSessionID(ctx context.Context, sessionID, backendSessionID string) error {
+	return s.db.Queries.UpdateSessionBackendSessionID(ctx, sqlc.UpdateSessionBackendSessionIDParams{
+		BackendSessionID: sql.NullString{String: backendSessionID, Valid: backendSessionID != ""},
+		UpdatedAt:        time.Now().UnixMilli(),
+		ID:               sessionID,
+	})
+}
+
+// UpdateSessionTitle updates session title.
+func (s *Repository) UpdateSessionTitle(ctx context.Context, sessionID, title string) error {
+	return s.db.Queries.UpdateSessionTitle(ctx, sqlc.UpdateSessionTitleParams{
+		Title:     sql.NullString{String: title, Valid: title != ""},
+		UpdatedAt: time.Now().UnixMilli(),
+		ID:        sessionID,
+	})
+}
+
+// GetSessionNextSequence returns the next sequence number for a session message.
+func (s *Repository) GetSessionNextSequence(ctx context.Context, sessionID string) (int64, error) {
+	next, err := s.db.Queries.GetSessionNextSequence(ctx, sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return next, nil
+}
+
+// CreateSessionMessage inserts a session message.
+func (s *Repository) CreateSessionMessage(
+	ctx context.Context,
+	sessionID string,
+	sequence int64,
+	role string,
+	kind string,
+	content string,
+	toolName string,
+	toolCallID string,
+	rawJSON string,
+	createdAt int64,
+) error {
+	id := shortuuid.New()
+	return s.db.Queries.CreateSessionMessage(ctx, sqlc.CreateSessionMessageParams{
+		ID:         id,
+		SessionID:  sessionID,
+		Sequence:   sequence,
+		Role:       role,
+		Kind:       kind,
+		Content:    sql.NullString{String: content, Valid: content != ""},
+		ToolName:   sql.NullString{String: toolName, Valid: toolName != ""},
+		ToolCallID: sql.NullString{String: toolCallID, Valid: toolCallID != ""},
+		RawJson:    rawJSON,
+		CreatedAt:  createdAt,
+	})
+}
+
+// ListSessionMessages retrieves messages for a session.
+func (s *Repository) ListSessionMessages(ctx context.Context, sessionID string) ([]models.SessionMessage, error) {
+	rows, err := s.db.Queries.ListSessionMessages(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]models.SessionMessage, len(rows))
+	for i := range rows {
+		result[i] = sqlcSessionMessageToModel(&rows[i])
+	}
+	return result, nil
+}
+
+func sqlcSessionToModel(session *sqlc.Session) *models.Session {
+	return &models.Session{
+		ID:               session.ID,
+		AgentBackend:     session.AgentBackend,
+		ExternalID:       nullableString(session.ExternalID),
+		BackendSessionID: nullableString(session.BackendSessionID),
+		Title:            nullableString(session.Title),
+		MessageCount:     session.MessageCount,
+		LastMessageAt:    nullableInt64(session.LastMessageAt),
+		CreatedAt:        session.CreatedAt,
+		UpdatedAt:        session.UpdatedAt,
+	}
+}
+
+func sqlcSessionMessageToModel(msg *sqlc.SessionMessage) models.SessionMessage {
+	return models.SessionMessage{
+		ID:         msg.ID,
+		SessionID:  msg.SessionID,
+		Sequence:   msg.Sequence,
+		Role:       msg.Role,
+		Kind:       msg.Kind,
+		Content:    nullableString(msg.Content),
+		ToolName:   nullableString(msg.ToolName),
+		ToolCallID: nullableString(msg.ToolCallID),
+		RawJSON:    msg.RawJson,
+		CreatedAt:  msg.CreatedAt,
+	}
+}
+
+func valueOrEmpty(val *string) string {
+	if val == nil {
+		return ""
+	}
+	return *val
+}
+
+func valueOrZero(val *int64) int64 {
+	if val == nil {
+		return 0
+	}
+	return *val
 }

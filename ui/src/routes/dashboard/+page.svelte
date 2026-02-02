@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Feed from "$lib/components/Feed.svelte";
+	import SessionsView from "$lib/components/SessionsView.svelte";
 	import type { FeedData } from "$lib/types";
 	import { tasksAPI } from "$lib/api";
 	import { createFeedSSE } from "$lib/utils/sse";
@@ -78,7 +79,9 @@
 	<title>Dashboard | Counterspell</title>
 </svelte:head>
 
-{#if loading}
+{#if appState.activeTab === "sessions"}
+	<SessionsView />
+{:else if loading}
 	<div data-testid="loading-state" class="flex items-center justify-center h-64">
 		<div class="flex flex-col items-center gap-3">
 			<div

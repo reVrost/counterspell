@@ -17,6 +17,7 @@ type Handlers struct {
 	// Shared services (created once at startup)
 	transcription   *services.TranscriptionService
 	taskService     *services.Repository
+	sessionService  *services.SessionService
 	settingsService *services.SettingsService
 	fileService     *services.FileService
 	githubService   *services.GitHubService
@@ -31,6 +32,8 @@ type Handlers struct {
 // NewHandlers creates new HTTP handlers.
 func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config) (*Handlers, error) {
 	transcriptionService := services.NewTranscriptionService()
+	repo := services.NewRepository(database)
+	settingsService := services.NewSettingsService(database)
 
 	return &Handlers{
 		events:        events,
@@ -38,8 +41,9 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		cfg:           cfg,
 
 		// Create shared services
-		taskService:     services.NewRepository(database),
-		settingsService: services.NewSettingsService(database),
+		taskService:     repo,
+		sessionService:  services.NewSessionService(repo, settingsService, cfg.DataDir),
+		settingsService: settingsService,
 		fileService:     services.NewFileService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
 		oauthService:    services.NewOAuthService(database, cfg),

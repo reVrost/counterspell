@@ -11,10 +11,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/counterspell/internal/models"
 )
 
@@ -22,16 +24,21 @@ const (
 	defaultSessionSyncInterval = 5 * time.Second
 	backendClaudeCode          = "claude-code"
 	backendCodex               = "codex"
+	sessionImportWindow        = 7 * 24 * time.Hour
 )
 
 type importedMessage struct {
-	Role    string
-	Content string
+	Role       string
+	Kind       string
+	Content    string
+	ToolName   string
+	ToolCallID string
+	RawJSON    string
+	CreatedAt  int64
 }
 
 type SessionSyncer struct {
-	repo   *Repository
-	events *EventBus
+	repo *Repository
 
 	pollInterval time.Duration
 	stopCh       chan struct{}
@@ -42,10 +49,9 @@ type SessionSyncer struct {
 	scanMu sync.Mutex
 }
 
-func NewSessionSyncer(repo *Repository, events *EventBus) *SessionSyncer {
+func NewSessionSyncer(repo *Repository) *SessionSyncer {
 	return &SessionSyncer{
 		repo:         repo,
-		events:       events,
 		pollInterval: defaultSessionSyncInterval,
 		stopCh:       make(chan struct{}),
 		lastSeen:     make(map[string]time.Time),
@@ -132,7 +138,20 @@ func (s *SessionSyncer) importFiles(ctx context.Context, backend string, files [
 			continue
 		}
 
-		if err := s.syncSession(ctx, backend, sessionID, messages); err != nil {
+		minAt, maxAt := sessionTimeBounds(messages)
+		if maxAt == 0 {
+			maxAt = info.ModTime().UnixMilli()
+		}
+		if minAt == 0 {
+			minAt = maxAt
+		}
+
+		if !withinImportWindow(maxAt) {
+			s.markFileSeen(path, info.ModTime())
+			continue
+		}
+
+		if err := s.syncSession(ctx, backend, sessionID, messages, minAt, maxAt); err != nil {
 			slog.Warn("[SESSION-SYNC] failed to sync session", "backend", backend, "session_id", sessionID, "error", err)
 			continue
 		}
@@ -158,38 +177,67 @@ func (s *SessionSyncer) markFileSeen(path string, modTime time.Time) {
 	s.lastSeen[path] = modTime
 }
 
-func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID string, messages []importedMessage) error {
-	run, err := s.repo.GetAgentRunByBackendSessionID(ctx, backend, sessionID)
+func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID string, messages []importedMessage, createdAt, lastMessageAt int64) error {
+	session, err := s.repo.GetSessionByBackendExternal(ctx, backend, sessionID)
 	if err != nil {
 		return err
 	}
 
-	created := false
-	if run == nil {
-		intent := sessionIntent(messages)
-		task, err := s.repo.Create(ctx, "", intent)
+	if session == nil {
+		now := time.Now().UnixMilli()
+		title := sessionTitle(messages)
+		if title == "" {
+			title = "Imported session"
+		}
+		newSession := &models.Session{
+			ID:               shortuuid.New(),
+			AgentBackend:     backend,
+			ExternalID:       &sessionID,
+			BackendSessionID: &sessionID,
+			Title:            &title,
+			MessageCount:     0,
+			LastMessageAt:    &lastMessageAt,
+			CreatedAt:        createdAt,
+			UpdatedAt:        now,
+		}
+		session, err = s.repo.CreateSession(ctx, newSession)
 		if err != nil {
 			return err
 		}
-
-		runID, err := s.repo.CreateAgentRun(ctx, task.ID, intent, backend, "", "")
-		if err != nil {
-			return err
+	} else {
+		needsUpdate := false
+		updateTitle := ""
+		if session.Title == nil || strings.TrimSpace(*session.Title) == "" {
+			updateTitle = sessionTitle(messages)
+			if updateTitle != "" {
+				needsUpdate = true
+			}
+		}
+		updateBackendSessionID := ""
+		if session.BackendSessionID == nil || *session.BackendSessionID == "" {
+			updateBackendSessionID = sessionID
+			needsUpdate = true
 		}
 
-		if err := s.repo.UpdateAgentRunBackendSessionID(ctx, runID, sessionID); err != nil {
-			return err
+		updatedLast := lastMessageAt
+		if session.LastMessageAt != nil && *session.LastMessageAt > updatedLast {
+			updatedLast = *session.LastMessageAt
 		}
 
-		run, err = s.repo.GetAgentRun(ctx, runID)
-		if err != nil {
-			return err
+		if needsUpdate || session.LastMessageAt == nil || updatedLast != valueOrZero(session.LastMessageAt) {
+			if updateTitle == "" && session.Title != nil {
+				updateTitle = *session.Title
+			}
+			if updateBackendSessionID == "" && session.BackendSessionID != nil {
+				updateBackendSessionID = *session.BackendSessionID
+			}
+			if err := s.repo.UpdateSession(ctx, session.ID, updateBackendSessionID, updateTitle, &updatedLast); err != nil {
+				return err
+			}
 		}
-
-		created = true
 	}
 
-	start := int(run.MessageCount)
+	start := int(session.MessageCount)
 	if start < 0 {
 		start = 0
 	}
@@ -197,38 +245,40 @@ func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID stri
 		return nil
 	}
 
-	for _, msg := range messages[start:] {
-		if strings.TrimSpace(msg.Content) == "" {
-			continue
+	for i, msg := range messages[start:] {
+		sequence := int64(start + i)
+		if msg.Kind == "" {
+			msg.Kind = "text"
 		}
-		if err := s.repo.CreateMessage(ctx, run.TaskID, run.ID, msg.Role, msg.Content); err != nil {
+		if strings.TrimSpace(msg.RawJSON) == "" {
+			raw, _ := json.Marshal(map[string]any{
+				"role":    msg.Role,
+				"kind":    msg.Kind,
+				"content": msg.Content,
+			})
+			msg.RawJSON = string(raw)
+		}
+		created := msg.CreatedAt
+		if created == 0 {
+			created = lastMessageAt
+		}
+		if err := s.repo.CreateSessionMessage(
+			ctx,
+			session.ID,
+			sequence,
+			msg.Role,
+			msg.Kind,
+			msg.Content,
+			msg.ToolName,
+			msg.ToolCallID,
+			msg.RawJSON,
+			created,
+		); err != nil {
 			return err
 		}
 	}
 
-	s.publishUpdates(run.TaskID, created)
 	return nil
-}
-
-func (s *SessionSyncer) publishUpdates(taskID string, created bool) {
-	eventType := EventTypeTaskUpdated
-	if created {
-		eventType = EventTypeTaskStarted
-	}
-
-	s.events.Publish(models.Event{
-		TaskID:    taskID,
-		Type:      string(eventType),
-		Data:      "",
-		CreatedAt: time.Now(),
-	})
-
-	s.events.Publish(models.Event{
-		TaskID:    taskID,
-		Type:      string(EventTypeAgentRunUpdated),
-		Data:      "",
-		CreatedAt: time.Now(),
-	})
 }
 
 func discoverClaudeTranscripts(root string) ([]string, error) {
@@ -306,6 +356,7 @@ func parseClaudeTranscript(path string) (string, []importedMessage, error) {
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			continue
 		}
+		timestamp := extractTimestamp(event)
 
 		if sessionID == "" {
 			if value, ok := event["session_id"].(string); ok && value != "" {
@@ -321,6 +372,15 @@ func parseClaudeTranscript(path string) (string, []importedMessage, error) {
 					sessionID = value
 				}
 			}
+			if content := strings.TrimSpace(extractTextFromContent(event["content"])); content != "" {
+				messages = append(messages, importedMessage{
+					Role:      "system",
+					Kind:      "system",
+					Content:   content,
+					RawJSON:   line,
+					CreatedAt: timestamp,
+				})
+			}
 		case "user", "assistant":
 			role := eventType
 			content := ""
@@ -332,13 +392,54 @@ func parseClaudeTranscript(path string) (string, []importedMessage, error) {
 			}
 			content = strings.TrimSpace(content)
 			if content != "" {
-				messages = append(messages, importedMessage{Role: role, Content: content})
+				messages = append(messages, importedMessage{
+					Role:      role,
+					Kind:      "text",
+					Content:   content,
+					RawJSON:   line,
+					CreatedAt: timestamp,
+				})
 			}
 		case "user_text":
 			content := strings.TrimSpace(extractTextFromContent(event["content"]))
 			if content != "" {
-				messages = append(messages, importedMessage{Role: "user", Content: content})
+				messages = append(messages, importedMessage{
+					Role:      "user",
+					Kind:      "text",
+					Content:   content,
+					RawJSON:   line,
+					CreatedAt: timestamp,
+				})
 			}
+		case "tool_use":
+			name, _ := event["name"].(string)
+			id, _ := event["id"].(string)
+			inputJSON := ""
+			if input, ok := event["input"]; ok {
+				if raw, err := json.Marshal(input); err == nil {
+					inputJSON = string(raw)
+				}
+			}
+			messages = append(messages, importedMessage{
+				Role:       "assistant",
+				Kind:       "tool_use",
+				Content:    inputJSON,
+				ToolName:   name,
+				ToolCallID: id,
+				RawJSON:    line,
+				CreatedAt:  timestamp,
+			})
+		case "tool_result":
+			content := strings.TrimSpace(extractTextFromContent(event["content"]))
+			toolUseID, _ := event["tool_use_id"].(string)
+			messages = append(messages, importedMessage{
+				Role:       "tool",
+				Kind:       "tool_result",
+				Content:    content,
+				ToolCallID: toolUseID,
+				RawJSON:    line,
+				CreatedAt:  timestamp,
+			})
 		}
 	}
 
@@ -391,10 +492,18 @@ func parseCodexJSONL(path string) (string, []importedMessage, error) {
 			sessionID = extractCodexSessionID(payload)
 		}
 		if msg, ok := extractCodexMessage(payload); ok {
+			msg.RawJSON = line
+			if msg.CreatedAt == 0 {
+				msg.CreatedAt = extractTimestamp(payload)
+			}
 			messages = append(messages, msg)
 			continue
 		}
 		if msg, ok := extractMessage(payload); ok {
+			msg.RawJSON = line
+			if msg.CreatedAt == 0 {
+				msg.CreatedAt = extractTimestamp(payload)
+			}
 			messages = append(messages, msg)
 		}
 	}
@@ -429,6 +538,11 @@ func parseCodexJSON(path string) (string, []importedMessage, error) {
 	for _, raw := range rawMessages {
 		if msgMap, ok := raw.(map[string]any); ok {
 			if msg, ok := extractMessage(msgMap); ok {
+				rawJSON, _ := json.Marshal(msgMap)
+				msg.RawJSON = string(rawJSON)
+				if msg.CreatedAt == 0 {
+					msg.CreatedAt = extractTimestamp(msgMap)
+				}
 				messages = append(messages, msg)
 			}
 		}
@@ -436,7 +550,6 @@ func parseCodexJSON(path string) (string, []importedMessage, error) {
 
 	return sessionID, messages, nil
 }
-
 
 func extractCodexSessionID(event map[string]any) string {
 	if eventType, ok := event["type"].(string); ok && eventType == "session_meta" {
@@ -461,22 +574,67 @@ func extractCodexMessage(event map[string]any) (importedMessage, bool) {
 	}
 
 	itemType, _ := payload["type"].(string)
-	if itemType != "message" {
-		return importedMessage{}, false
+	switch itemType {
+	case "message":
+		role, _ := payload["role"].(string)
+		if role == "" {
+			role = "assistant"
+		}
+
+		content := extractTextFromContent(payload["content"])
+		content = strings.TrimSpace(content)
+		if content == "" {
+			// Some messages may only contain tool calls
+			if toolCalls, ok := payload["tool_calls"].([]any); ok && len(toolCalls) > 0 {
+				if toolMsg := extractToolCallMessage(toolCalls); toolMsg.Kind != "" {
+					toolMsg.CreatedAt = extractTimestamp(payload)
+					return toolMsg, true
+				}
+			}
+			return importedMessage{}, false
+		}
+
+		return importedMessage{
+			Role:      role,
+			Kind:      "text",
+			Content:   content,
+			CreatedAt: extractTimestamp(payload),
+		}, true
+	case "tool_call", "function_call":
+		name, _ := payload["name"].(string)
+		id, _ := payload["id"].(string)
+		args := ""
+		if argVal, ok := payload["arguments"]; ok {
+			if raw, err := json.Marshal(argVal); err == nil {
+				args = string(raw)
+			}
+		}
+		return importedMessage{
+			Role:       "assistant",
+			Kind:       "tool_use",
+			Content:    args,
+			ToolName:   name,
+			ToolCallID: id,
+			CreatedAt:  extractTimestamp(payload),
+		}, true
+	case "tool_result", "function_call_output":
+		content := extractTextFromContent(payload["content"])
+		if content == "" {
+			if output, ok := payload["output"].(string); ok {
+				content = output
+			}
+		}
+		toolUseID, _ := payload["tool_call_id"].(string)
+		return importedMessage{
+			Role:       "tool",
+			Kind:       "tool_result",
+			Content:    strings.TrimSpace(content),
+			ToolCallID: toolUseID,
+			CreatedAt:  extractTimestamp(payload),
+		}, true
 	}
 
-	role, _ := payload["role"].(string)
-	if role == "" {
-		role = "assistant"
-	}
-
-	content := extractTextFromContent(payload["content"])
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return importedMessage{}, false
-	}
-
-	return importedMessage{Role: role, Content: content}, true
+	return importedMessage{}, false
 }
 
 func extractMessage(payload map[string]any) (importedMessage, bool) {
@@ -503,10 +661,26 @@ func extractMessage(payload map[string]any) (importedMessage, bool) {
 	}
 	content = strings.TrimSpace(content)
 	if content == "" {
+		if toolCalls, ok := payload["tool_calls"].([]any); ok && len(toolCalls) > 0 {
+			toolMsg := extractToolCallMessage(toolCalls)
+			if toolMsg.Kind != "" {
+				toolMsg.CreatedAt = extractTimestamp(payload)
+				return toolMsg, true
+			}
+		}
 		return importedMessage{}, false
 	}
 
-	return importedMessage{Role: role, Content: content}, true
+	kind := "text"
+	if role == "tool" {
+		kind = "tool_result"
+	}
+	return importedMessage{
+		Role:      role,
+		Kind:      kind,
+		Content:   content,
+		CreatedAt: extractTimestamp(payload),
+	}, true
 }
 
 func extractSessionID(payload map[string]any) string {
@@ -575,6 +749,125 @@ func extractTextFromBlock(block map[string]any) string {
 	return ""
 }
 
+func extractTimestamp(payload map[string]any) int64 {
+	if payload == nil {
+		return 0
+	}
+
+	keys := []string{"created_at", "createdAt", "timestamp", "ts", "time", "date"}
+	for _, key := range keys {
+		if val, ok := payload[key]; ok {
+			if ts := parseTimestamp(val); ts != 0 {
+				return ts
+			}
+		}
+	}
+
+	if msg, ok := payload["message"].(map[string]any); ok {
+		if ts := extractTimestamp(msg); ts != 0 {
+			return ts
+		}
+	}
+
+	return 0
+}
+
+func parseTimestamp(val any) int64 {
+	switch v := val.(type) {
+	case int64:
+		return normalizeEpoch(v)
+	case int:
+		return normalizeEpoch(int64(v))
+	case float64:
+		return normalizeEpoch(int64(v))
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return normalizeEpoch(i)
+		}
+		if f, err := v.Float64(); err == nil {
+			return normalizeEpoch(int64(f))
+		}
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return 0
+		}
+		if num, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+			return normalizeEpoch(num)
+		}
+		if t, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+			return t.UnixMilli()
+		}
+		if t, err := time.Parse(time.RFC3339, trimmed); err == nil {
+			return t.UnixMilli()
+		}
+	}
+	return 0
+}
+
+func normalizeEpoch(val int64) int64 {
+	if val <= 0 {
+		return 0
+	}
+	if val > 1_000_000_000_000 {
+		return val
+	}
+	if val > 1_000_000_000 {
+		return val * 1000
+	}
+	return 0
+}
+
+func extractToolCallMessage(toolCalls []any) importedMessage {
+	if len(toolCalls) == 0 {
+		return importedMessage{}
+	}
+	callMap, ok := toolCalls[0].(map[string]any)
+	if !ok {
+		return importedMessage{}
+	}
+
+	toolName := ""
+	toolCallID := ""
+	args := ""
+
+	if id, ok := callMap["id"].(string); ok {
+		toolCallID = id
+	}
+	if name, ok := callMap["name"].(string); ok {
+		toolName = name
+	}
+	if fn, ok := callMap["function"].(map[string]any); ok {
+		if name, ok := fn["name"].(string); ok && name != "" {
+			toolName = name
+		}
+		if arguments, ok := fn["arguments"]; ok {
+			if raw, err := json.Marshal(arguments); err == nil {
+				args = string(raw)
+			}
+		}
+	}
+	if args == "" {
+		if arguments, ok := callMap["arguments"]; ok {
+			if raw, err := json.Marshal(arguments); err == nil {
+				args = string(raw)
+			}
+		}
+	}
+
+	if toolName == "" && args == "" && toolCallID == "" {
+		return importedMessage{}
+	}
+
+	return importedMessage{
+		Role:       "assistant",
+		Kind:       "tool_use",
+		Content:    args,
+		ToolName:   toolName,
+		ToolCallID: toolCallID,
+	}
+}
+
 func normalizeSessionID(sessionID, path string) string {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID != "" {
@@ -587,18 +880,52 @@ func normalizeSessionID(sessionID, path string) string {
 	return hashPath(path)
 }
 
-func sessionIntent(messages []importedMessage) string {
+func sessionTitle(messages []importedMessage) string {
 	for _, msg := range messages {
 		if msg.Role == "user" && strings.TrimSpace(msg.Content) != "" {
-			return msg.Content
+			return truncateTitle(msg.Content)
 		}
 	}
 	for _, msg := range messages {
 		if strings.TrimSpace(msg.Content) != "" {
-			return msg.Content
+			return truncateTitle(msg.Content)
 		}
 	}
 	return "Imported session"
+}
+
+func sessionTimeBounds(messages []importedMessage) (int64, int64) {
+	var minAt int64
+	var maxAt int64
+	for _, msg := range messages {
+		if msg.CreatedAt == 0 {
+			continue
+		}
+		if minAt == 0 || msg.CreatedAt < minAt {
+			minAt = msg.CreatedAt
+		}
+		if maxAt == 0 || msg.CreatedAt > maxAt {
+			maxAt = msg.CreatedAt
+		}
+	}
+	return minAt, maxAt
+}
+
+func withinImportWindow(lastMessageAt int64) bool {
+	if lastMessageAt == 0 {
+		return false
+	}
+	cutoff := time.Now().Add(-sessionImportWindow).UnixMilli()
+	return lastMessageAt >= cutoff
+}
+
+func truncateTitle(title string) string {
+	const maxLen = 120
+	trimmed := strings.TrimSpace(title)
+	if len(trimmed) <= maxLen {
+		return trimmed
+	}
+	return strings.TrimSpace(trimmed[:maxLen]) + "..."
 }
 
 func envPath(key, fallback string) string {

@@ -1,21 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-if [[ -z "${root}" ]]; then
-  echo "verify: not inside a git repo" >&2
+repo_root="$(jj root 2>/dev/null || true)"
+if [[ -z "${repo_root}" ]]; then
+  echo "verify: not inside a jj repo" >&2
   exit 1
 fi
 
-cd "${root}"
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-mapfile -d '' files < <(
-  {
-    git diff --name-only -z --diff-filter=ACMRTUXB
-    git diff --name-only -z --diff-filter=ACMRTUXB --cached
-    git ls-files --others --exclude-standard -z
-  } | sort -zu
-)
+cd "${repo_root}"
+
+diff_output="$(jj diff --name-only)" || {
+  echo "verify: failed to read jj diff" >&2
+  exit 1
+}
+
+mapfile -t files < <(printf "%s\n" "${diff_output}" | sort -u)
+
+if [[ "${project_root}" != "${repo_root}" ]]; then
+  filtered=()
+  for file in "${files[@]}"; do
+    if [[ "${file}" == counterspell/* ]]; then
+      filtered+=( "${file#counterspell/}" )
+    fi
+  done
+  files=("${filtered[@]}")
+fi
+
+cd "${project_root}"
 
 if (( ${#files[@]} == 0 )); then
   echo "verify: no local changes detected; skipping."
