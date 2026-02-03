@@ -16,6 +16,9 @@ linters:
     - depguard
 
   settings:
+    staticcheck:
+      checks:
+        - "-QF1003"
     errcheck:
       exclude-functions:
         - (*.Close)
