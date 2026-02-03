@@ -242,15 +242,15 @@ func (s *SessionService) buildBackend(
 		}
 		model := codexChatModel
 		baseURL := ""
-		switch provider {
-		case "openrouter":
-			baseURL = "https://openrouter.ai/api/v1"
-		case "zai":
-			baseURL = "https://api.z.ai/api/coding/paas/v4"
-		case "openai", "":
-			if provider == "" {
-				provider = "openai"
-			}
+	switch provider {
+	case "openrouter":
+		baseURL = "https://openrouter.ai/api/v1"
+	case "zai":
+		baseURL = "https://api.z.ai/api/coding/paas/v4"
+	case "openai", "":
+		if provider == "" {
+			provider = "openai"
+		}
 		default:
 			return nil, func() {}, fmt.Errorf("unsupported provider for codex backend: %s", provider)
 		}
@@ -289,7 +289,7 @@ func (s *SessionService) buildBackend(
 		baseURL := ""
 		switch provider {
 		case "zai":
-			baseURL = "https://api.z.ai/api/anthropic"
+			baseURL = "https://api.z.ai/api/coding/paas/v4"
 		case "openrouter":
 			baseURL = "https://openrouter.ai/api"
 		}

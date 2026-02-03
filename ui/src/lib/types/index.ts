@@ -187,6 +187,9 @@ export const MODELS: Model[] = [
   { id: 'o#google/gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
   { id: 'o#google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
   { id: 'o#openai/gpt-5.2', name: 'GPT 5.2' },
+  { id: 'o#openai/gpt-5.2-codex-xhigh', name: 'GPT 5.2 Codex XHigh' },
+  { id: 'o#openai/gpt-5.2-codex-high', name: 'GPT 5.2 Codex High' },
+  { id: 'o#openai/gpt-5.2-codex-medium', name: 'GPT 5.2 Codex Medium' },
   { id: 'o#openai/gpt-5.1-codex-max', name: 'GPT 5.1 Codex Max' },
   { id: 'zai#glm-4.7', name: 'GLM 4.7' },
 ];
