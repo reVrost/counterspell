@@ -47,7 +47,7 @@ func isCodexSetupMessage(role, kind, content string) bool {
 	if strings.ToLower(kind) == "setup" {
 		return true
 	}
-	if strings.ToLower(role) == "user" && isCodexSetupContent(content) {
+	if isCodexSetupContent(content) {
 		return true
 	}
 	return false

@@ -211,7 +211,11 @@ func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID stri
 	} else {
 		needsUpdate := false
 		updateTitle := ""
-		if session.Title == nil || strings.TrimSpace(*session.Title) == "" {
+		titleIsSetup := false
+		if backend == backendCodex && session.Title != nil {
+			titleIsSetup = isCodexSetupContent(*session.Title)
+		}
+		if session.Title == nil || strings.TrimSpace(*session.Title) == "" || titleIsSetup {
 			titleMessages := messages
 			if backend == backendCodex {
 				titleMessages = filterCodexSetupImportedMessages(messages)
