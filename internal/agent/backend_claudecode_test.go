@@ -82,14 +82,10 @@ func TestClaudeCodeBackend_EnvVariables(t *testing.T) {
 }
 
 func TestClaudeCodeBackend_EventParsing(t *testing.T) {
-	var receivedEvents []StreamEvent
-	callback := func(e StreamEvent) {
-		receivedEvents = append(receivedEvents, e)
-	}
-
-	b := &ClaudeCodeBackend{
-		callback: callback,
-	}
+	b := &ClaudeCodeBackend{}
+	events := make(chan StreamEvent, 64)
+	b.setStream(context.Background(), events)
+	defer b.clearStream()
 
 	rawEvents := []string{
 		`{"type": "user", "message": {"content": [{"type": "text", "text": "hello"}]}}`,
@@ -103,20 +99,21 @@ func TestClaudeCodeBackend_EventParsing(t *testing.T) {
 
 	b.parseOutput(scanner)
 
-	expectedTypes := []string{
-		EventText,       // Assistant text
-		EventTool,       // Tool use
-		EventToolResult, // Tool result
-		EventDone,       // Final result
+	var receivedEvents []StreamEvent
+	for len(events) > 0 {
+		receivedEvents = append(receivedEvents, <-events)
 	}
 
-	if len(receivedEvents) != len(expectedTypes) {
-		t.Errorf("expected %d events, got %d", len(expectedTypes), len(receivedEvents))
+	if !hasBlockType(receivedEvents, "text") {
+		t.Errorf("expected text content block")
 	}
-
-	for i, eventType := range expectedTypes {
-		if i < len(receivedEvents) && receivedEvents[i].Type != eventType {
-			t.Errorf("event %d: expected type %s, got %s", i, eventType, receivedEvents[i].Type)
-		}
+	if !hasBlockType(receivedEvents, "tool_use") {
+		t.Errorf("expected tool_use content block")
+	}
+	if !hasBlockType(receivedEvents, "tool_result") {
+		t.Errorf("expected tool_result content block")
+	}
+	if !hasEventType(receivedEvents, EventDone) {
+		t.Errorf("expected done event")
 	}
 }
