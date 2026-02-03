@@ -3,6 +3,7 @@
   import type { ContentBlock, Message, SessionMessage } from '$lib/types';
   import MarkdownRenderer from './MarkdownRenderer.svelte';
   import ToolBlock from './ToolBlock.svelte';
+  import { tick } from 'svelte';
 
   interface Props {
     mode: 'task' | 'session';
@@ -10,6 +11,7 @@
     emptyText?: string;
     emptyClass?: string;
     class?: string;
+    scrollContainerId?: string;
   }
 
   let {
@@ -18,6 +20,7 @@
     emptyText = 'No messages yet.',
     emptyClass = 'text-xs text-gray-500',
     class: className = '',
+    scrollContainerId,
   }: Props = $props();
 
   type ThinkingItem = { tool: string; call: string; result: string };
@@ -273,6 +276,17 @@
   const isEmpty = $derived.by(() =>
     mode === 'task' ? taskItems.length == 0 : sessionItems.length == 0
   );
+
+  $effect(() => {
+    if (scrollContainerId) {
+      tick().then(() => {
+        const container = document.getElementById(scrollContainerId);
+        if (container) {
+          container.scrollTo({ top: container.scrollHeight });
+        }
+      });
+    }
+  });
 </script>
 
 {#if mode === 'task'}
