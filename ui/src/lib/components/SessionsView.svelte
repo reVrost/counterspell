@@ -159,95 +159,95 @@
 
       <div
         class={cn(
-          'min-w-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 min-h-[60vh] md:min-h-[320px] flex flex-col',
-          selectedSession ? 'block' : 'hidden md:flex'
+          'relative min-w-0 rounded-xl border border-white/10 bg-white/[0.02] min-h-[50vh] md:min-h-[420px] max-h-[calc(100vh-240px)] flex flex-col overflow-hidden',
+          selectedSession ? 'flex' : 'hidden md:flex'
         )}
       >
         {#if !selectedSession}
-          <div class="text-sm text-gray-500">Select a session to view.</div>
+          <div class="p-4 text-sm text-gray-500">Select a session to view.</div>
         {:else if detailLoading}
-          <div class="text-sm text-gray-500">Loading session...</div>
+          <div class="p-4 text-sm text-gray-500">Loading session...</div>
         {:else}
-          <div class="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
-            <div class="flex items-center gap-2 md:hidden">
+          <div
+            class="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-3 py-3"
+          >
+            <div class="flex min-w-0 items-center gap-2">
               <button
                 type="button"
                 onclick={() => (selectedSession = null)}
-                class="px-3 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+                class="px-3 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition md:hidden"
               >
                 Back
               </button>
-              <div class="text-xs font-medium uppercase text-gray-500">
-                {selectedSession.agent_backend}
-              </div>
-            </div>
-            <div>
-              <div class="text-base md:text-sm font-semibold text-gray-100">
-                {selectedSession.title || 'Untitled session'}
-              </div>
-              <div class="text-xs font-medium text-gray-500">
-                {selectedSession.agent_backend} - {formatTimestamp(selectedSession.last_message_at)}
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-gray-100 truncate">
+                  {selectedSession.title || 'Untitled session'}
+                </div>
+                <div class="text-xs font-medium text-gray-500 truncate">
+                  {selectedSession.agent_backend} • {formatTimestamp(selectedSession.last_message_at)}
+                </div>
               </div>
             </div>
             <button
               type="button"
               onclick={promoteSession}
-              class="w-full md:w-auto px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+              class="shrink-0 px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
             >
               Promote
             </button>
           </div>
 
-          <div class="flex-1 overflow-y-auto space-y-2 pr-1">
-            {#if messages.length === 0}
-              <div class="text-xs font-medium text-gray-500">No messages yet.</div>
-            {:else}
-              {#each messages as msg}
-                <div
-                  class={cn(
-                    'rounded-lg border px-3 py-2 text-xs font-medium',
-                    msg.role === 'user'
-                      ? 'border-violet-500/30 bg-violet-500/10 text-gray-200'
-                      : 'border-white/10 bg-white/5 text-gray-300'
-                  )}
-                >
+          <div class="flex-1 overflow-y-auto relative">
+            <div class="space-y-2 px-3 py-3 pb-28">
+              {#if messages.length === 0}
+                <div class="text-xs font-medium text-gray-500">No messages yet.</div>
+              {:else}
+                {#each messages as msg}
                   <div
-                    class="flex items-center justify-between text-[10px] uppercase text-gray-500 mb-1"
+                    class={cn(
+                      'rounded-lg border px-3 py-2 text-xs font-medium',
+                      msg.role === 'user'
+                        ? 'border-violet-500/30 bg-violet-500/10 text-gray-200'
+                        : 'border-white/10 bg-white/5 text-gray-300'
+                    )}
                   >
-                    <span>{msg.role}</span>
-                    <span>{msg.kind}</span>
+                    <div
+                      class="flex items-center justify-between text-[10px] uppercase text-gray-500 mb-1"
+                    >
+                      <span>{msg.role}</span>
+                      <span>{msg.kind}</span>
+                    </div>
+                    {#if msg.kind === 'tool_use'}
+                      <div class="text-[10px] uppercase text-blue-300 mb-1">
+                        {msg.tool_name || 'tool'}
+                      </div>
+                      <pre class="whitespace-pre-wrap break-words text-[11px] text-gray-400">{msg.content ||
+                          ''}</pre>
+                    {:else if msg.kind === 'tool_result'}
+                      <pre class="whitespace-pre-wrap break-words text-[11px] text-gray-400">{msg.content ||
+                          ''}</pre>
+                    {:else}
+                      <div class="text-[12px] whitespace-pre-wrap break-words">
+                        {msg.content || ''}
+                      </div>
+                    {/if}
                   </div>
-                  {#if msg.kind === 'tool_use'}
-                    <div class="text-[10px] uppercase text-blue-300 mb-1">
-                      {msg.tool_name || 'tool'}
-                    </div>
-                    <pre class="whitespace-pre-wrap break-words text-[11px] text-gray-400">{msg.content ||
-                        ''}</pre>
-                  {:else if msg.kind === 'tool_result'}
-                    <pre class="whitespace-pre-wrap break-words text-[11px] text-gray-400">{msg.content ||
-                        ''}</pre>
-                  {:else}
-                    <div class="text-[12px] whitespace-pre-wrap break-words">
-                      {msg.content || ''}
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-            {/if}
+                {/each}
+              {/if}
+            </div>
           </div>
 
-          <div class="mt-4 md:hidden">
-            <button
-              type="button"
-              onclick={promoteSession}
-              class="w-full px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
-            >
-              Promote to Task
-            </button>
-          </div>
-
-          <div class="mt-4">
-            <ChatInput mode="chat" placeholder="Message this session..." onSubmit={sendMessage} />
+          <div class="absolute bottom-0 inset-x-0 z-10 pb-4 px-3">
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
+            ></div>
+            <div class="relative mx-auto max-w-3xl">
+              <ChatInput
+                mode="chat"
+                placeholder="Message this session..."
+                onSubmit={sendMessage}
+              />
+            </div>
           </div>
         {/if}
       </div>
