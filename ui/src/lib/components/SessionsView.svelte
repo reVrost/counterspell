@@ -90,14 +90,14 @@
 </script>
 
 <div class="flex flex-col gap-6">
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <div class="flex items-center gap-2">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
       {#each ['all', 'native', 'claude-code', 'codex'] as option}
         <button
           type="button"
           onclick={() => (filter = option as any)}
           class={cn(
-            'px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide border transition',
+            'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide border transition',
             filter === option
               ? 'bg-white/10 border-white/20 text-white'
               : 'bg-transparent border-white/10 text-gray-500 hover:text-gray-300'
@@ -110,7 +110,7 @@
     <button
       type="button"
       onclick={createSession}
-      class="px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+      class="w-full sm:w-auto px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
     >
       New Session
     </button>
@@ -122,7 +122,7 @@
     <div class="text-sm text-red-400">{error}</div>
   {:else}
     <div class="grid gap-4 md:grid-cols-2">
-      <div class="space-y-2">
+      <div class={cn('space-y-2', selectedSession ? 'hidden md:block' : '')}>
         {#if filteredSessions.length === 0}
           <div class="text-sm text-gray-500">No sessions yet.</div>
         {:else}
@@ -131,7 +131,7 @@
               type="button"
               onclick={() => openSession(session.id)}
               class={cn(
-                'w-full text-left rounded-xl border p-3 transition',
+                'w-full text-left rounded-xl border p-4 md:p-3 transition',
                 selectedSession?.id === session.id
                   ? 'border-white/30 bg-white/5'
                   : 'border-white/10 hover:border-white/20'
@@ -154,16 +154,31 @@
       </div>
 
       <div
-        class="rounded-xl border border-white/10 bg-white/[0.02] p-4 min-h-[320px] flex flex-col"
+        class={cn(
+          'rounded-xl border border-white/10 bg-white/[0.02] p-4 min-h-[60vh] md:min-h-[320px] flex flex-col',
+          selectedSession ? 'block' : 'hidden md:flex'
+        )}
       >
         {#if !selectedSession}
           <div class="text-sm text-gray-500">Select a session to view.</div>
         {:else if detailLoading}
           <div class="text-sm text-gray-500">Loading session...</div>
         {:else}
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center gap-2 md:hidden">
+              <button
+                type="button"
+                onclick={() => (selectedSession = null)}
+                class="px-3 py-1.5 rounded-full text-[11px] font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+              >
+                Back
+              </button>
+              <div class="text-xs font-medium uppercase text-gray-500">
+                {selectedSession.agent_backend}
+              </div>
+            </div>
             <div>
-              <div class="text-sm font-semibold text-gray-100">
+              <div class="text-base md:text-sm font-semibold text-gray-100">
                 {selectedSession.title || 'Untitled session'}
               </div>
               <div class="text-xs font-medium text-gray-500">
@@ -173,7 +188,7 @@
             <button
               type="button"
               onclick={promoteSession}
-              class="px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+              class="w-full md:w-auto px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
             >
               Promote
             </button>
@@ -215,6 +230,16 @@
                 </div>
               {/each}
             {/if}
+          </div>
+
+          <div class="mt-4 md:hidden">
+            <button
+              type="button"
+              onclick={promoteSession}
+              class="w-full px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+            >
+              Promote to Task
+            </button>
           </div>
 
           <div class="mt-4">
