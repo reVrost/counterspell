@@ -27,6 +27,14 @@ const (
 	sessionImportWindow        = 7 * 24 * time.Hour
 )
 
+var codexSetupMarkers = []string{
+	"agents.md",
+	"<environment_context>",
+	"<collaboration_mode>",
+	"<instructions>",
+	"<permissions instructions>",
+}
+
 type importedMessage struct {
 	Role       string
 	Kind       string
@@ -492,6 +500,7 @@ func parseCodexJSONL(path string) (string, []importedMessage, error) {
 			sessionID = extractCodexSessionID(payload)
 		}
 		if msg, ok := extractCodexMessage(payload); ok {
+			markCodexSetupMessage(&msg)
 			msg.RawJSON = line
 			if msg.CreatedAt == 0 {
 				msg.CreatedAt = extractTimestamp(payload)
@@ -500,6 +509,7 @@ func parseCodexJSONL(path string) (string, []importedMessage, error) {
 			continue
 		}
 		if msg, ok := extractMessage(payload); ok {
+			markCodexSetupMessage(&msg)
 			msg.RawJSON = line
 			if msg.CreatedAt == 0 {
 				msg.CreatedAt = extractTimestamp(payload)
@@ -538,6 +548,7 @@ func parseCodexJSON(path string) (string, []importedMessage, error) {
 	for _, raw := range rawMessages {
 		if msgMap, ok := raw.(map[string]any); ok {
 			if msg, ok := extractMessage(msgMap); ok {
+				markCodexSetupMessage(&msg)
 				rawJSON, _ := json.Marshal(msgMap)
 				msg.RawJSON = string(rawJSON)
 				if msg.CreatedAt == 0 {
@@ -722,6 +733,33 @@ func extractTextFromContent(content any) string {
 		}
 	}
 	return ""
+}
+
+func markCodexSetupMessage(msg *importedMessage) {
+	if msg == nil {
+		return
+	}
+	if strings.ToLower(msg.Role) != "user" {
+		return
+	}
+	if !isCodexSetupContent(msg.Content) {
+		return
+	}
+	msg.Role = "system"
+	msg.Kind = "setup"
+}
+
+func isCodexSetupContent(content string) bool {
+	if strings.TrimSpace(content) == "" {
+		return false
+	}
+	lower := strings.ToLower(content)
+	for _, marker := range codexSetupMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractTextFromBlock(block map[string]any) string {
