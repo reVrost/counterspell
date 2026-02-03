@@ -91,25 +91,25 @@
             {/if}
             <ChevronRight class="w-3.5 h-3.5 text-gray-700" />
           </div>
-          <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+          <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
       {:else if variant === 'pending'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs text-gray-500 px-2 py-0.5 rounded-full border border-gray-800 bg-gray-900/30 font-semibold uppercase tracking-wider"
+            class="text-xs font-medium text-gray-500 px-2 py-0.5 rounded-full border border-gray-800 bg-gray-900/30 font-semibold uppercase tracking-wider"
           >
             Pending
           </span>
-          <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+          <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
       {:else if variant === 'planning'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs text-purple-400 px-2 py-0.5 rounded-full border border-purple-900/40 bg-purple-950/20 font-semibold uppercase tracking-wider"
+            class="text-xs font-medium text-purple-400 px-2 py-0.5 rounded-full border border-purple-900/40 bg-purple-950/20 font-semibold uppercase tracking-wider"
           >
             Planning
           </span>
@@ -120,28 +120,30 @@
       {:else if variant === 'in_progress'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs text-orange-400 px-2 py-0.5 rounded-full border border-orange-900/40 bg-orange-950/20 font-semibold uppercase tracking-wider whitespace-nowrap"
+            class="text-xs font-medium text-orange-400 px-2 py-0.5 rounded-full border border-orange-900/40 bg-orange-950/20 font-semibold uppercase tracking-wider whitespace-nowrap"
           >
             In Progress
           </span>
           <div class="flex items-center gap-1.5">
-            <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+            <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
               >{formatRelativeTime(task.updated_at)}</span
             >
-            <span class="text-xs text-orange-500/40 font-mono tabular-nums">· {elapsed}s</span>
+            <span class="text-xs font-medium text-orange-500/40 font-mono tabular-nums"
+              >· {elapsed}s</span
+            >
           </div>
         </div>
       {:else if variant === 'review'}
         <div class="flex flex-col items-end gap-1.5">
           <div class="flex items-center gap-2">
             <span
-              class="text-xs text-blue-400 px-2 py-0.5 rounded-full border border-blue-900/40 bg-blue-950/20 font-semibold uppercase tracking-wider"
+              class="text-xs font-medium text-blue-400 px-2 py-0.5 rounded-full border border-blue-900/40 bg-blue-950/20 font-semibold uppercase tracking-wider"
             >
               Review
             </span>
             <ChevronRight class="w-3.5 h-3.5 text-gray-600" />
           </div>
-          <span class="text-xs text-gray-500/70 font-medium tracking-tight"
+          <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
