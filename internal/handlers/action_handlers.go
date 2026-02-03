@@ -95,7 +95,7 @@ func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := orch.CleanupTask(taskID); err != nil {
+	if err := orch.CleanupTask(r.Context(), taskID); err != nil {
 		slog.Error("Failed to clear task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to clear task", err))
 		return
@@ -192,7 +192,7 @@ func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := orch.CleanupTask(taskID); err != nil {
+	if err := orch.CleanupTask(r.Context(), taskID); err != nil {
 		slog.Error("Failed to discard task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to discard task", err))
 		return

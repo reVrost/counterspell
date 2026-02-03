@@ -42,6 +42,18 @@ type ContentBlock struct {
 	Content   string `json:"content,omitempty"`     // Tool output
 }
 
+// RunnerOption customizes Runner behavior.
+type RunnerOption func(*Runner)
+
+// WithRunnerSystemPrompt overrides the default system prompt.
+func WithRunnerSystemPrompt(prompt string) RunnerOption {
+	return func(r *Runner) {
+		if prompt != "" {
+			r.systemPrompt = prompt
+		}
+	}
+}
+
 // Runner executes agent tasks with streaming output.
 type Runner struct {
 	provider       llm.Provider
@@ -56,13 +68,17 @@ type Runner struct {
 }
 
 // NewRunner creates a new agent runner.
-func NewRunner(provider llm.Provider, workDir string) *Runner {
+func NewRunner(provider llm.Provider, workDir string, opts ...RunnerOption) *Runner {
 	r := &Runner{
 		provider:     provider,
 		llmCaller:    NewLLMCaller(provider),
 		workDir:      workDir,
 		systemPrompt: fmt.Sprintf("You are a coding assistant. Work directory: %s. Be concise. Make changes directly.", workDir),
 		todoState:    tools.NewTodoState(),
+	}
+
+	for _, opt := range opts {
+		opt(r)
 	}
 
 	// Create tool registry with context

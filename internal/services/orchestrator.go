@@ -50,16 +50,15 @@ type TaskJob struct {
 
 // Orchestrator manages task execution with agents.
 type Orchestrator struct {
-	repo            *Repository
-	gitReposManager *GitManager
-	eventBus        *EventBus
-	settings        *SettingsService
-	github          *GitHubService
-	dataDir         string
-	workerPool      *ants.Pool
-	resultCh        chan TaskResult
-	running         map[string]context.CancelFunc
-	mu              sync.Mutex
+	repo        *Repository
+	repoManager RepoManager
+	eventBus    *EventBus
+	settings    *SettingsService
+	github      *GitHubService
+	workerPool  *ants.Pool
+	resultCh    chan TaskResult
+	running     map[string]context.CancelFunc
+	mu          sync.Mutex
 }
 
 // NewOrchestrator creates a new orchestrator.
@@ -68,10 +67,13 @@ func NewOrchestrator(
 	eventBus *EventBus,
 	settings *SettingsService,
 	github *GitHubService,
-	dataDir string,
+	repoManager RepoManager,
 ) (*Orchestrator, error) {
 	userID := "default" // Hardcoded for local-first single-tenant mode
-	slog.Info("[ORCHESTRATOR] Creating new orchestrator", "data_dir", dataDir, "user_id", userID)
+	if repoManager == nil {
+		return nil, fmt.Errorf("repo manager is required")
+	}
+	slog.Info("[ORCHESTRATOR] Creating new orchestrator", "user_id", userID, "repo_kind", repoManager.Kind())
 	// Create worker pool with 5 workers
 	pool, err := ants.NewPool(5, ants.WithPreAlloc(false))
 	if err != nil {
@@ -84,8 +86,7 @@ func NewOrchestrator(
 		settings: settings,
 		github:   github,
 
-		gitReposManager: NewGitManager(dataDir),
-		dataDir:         dataDir,
+		repoManager: repoManager,
 
 		// Worker related fields
 		workerPool: pool,
@@ -143,11 +144,6 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 			repoName = repo.Name
 			slog.Info("[ORCHESTRATOR] Found repository and connection", "repo", repo.FullName, "owner", owner)
 
-			// Ensure repo exists
-			_, err = o.gitReposManager.EnsureRepo(owner, repoName, token)
-			if err != nil {
-				return "", fmt.Errorf("failed to ensure repo: %w", err)
-			}
 		}
 	}
 
@@ -336,15 +332,18 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		slog.Error("[ORCHESTRATOR] Failed to create user message", "error", err)
 	}
 
-	// Create worktree for isolated execution
-	slog.Info("[ORCHESTRATOR] Creating worktree", "task_id", job.TaskID, "owner", job.Owner, "repo", job.Repo)
-	worktreePath, err := o.gitReposManager.CreateWorktree(job.Owner, job.Repo, job.TaskID, "agent/task-"+job.TaskID)
+	// Create workspace for isolated execution
+	branchName := TaskBranchName(job.TaskID)
+	slog.Info("[ORCHESTRATOR] Creating workspace", "task_id", job.TaskID, "branch", branchName)
+	workspacePath, err := o.repoManager.CreateWorkspace(ctx, job.TaskID, branchName)
 	if err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to create worktree", "error", err)
+		slog.Error("[ORCHESTRATOR] Failed to create workspace", "error", err)
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
 		return
 	}
-	slog.Info("[ORCHESTRATOR] Worktree created", "task_id", job.TaskID, "path", worktreePath)
+	slog.Info("[ORCHESTRATOR] Workspace created", "task_id", job.TaskID, "path", workspacePath)
+
+	systemPrompt := buildSystemPrompt(o.repoManager, workspacePath)
 
 	// Parse ModelID first to determine provider (format: "provider#model" e.g., "zai#glm-4.7" or "o#anthropic/claude-sonnet-4.5")
 	provider := ""
@@ -422,7 +421,8 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		codexOpts := []agent.CodexOption{
 			agent.WithCodexAPIKey(apiKey),
 			agent.WithCodexModel(model),
-			agent.WithCodexWorkDir(worktreePath),
+			agent.WithCodexWorkDir(workspacePath),
+			agent.WithCodexSystemPrompt(systemPrompt),
 		}
 		if baseURL != "" {
 			codexOpts = append(codexOpts, agent.WithCodexBaseURL(baseURL))
@@ -464,7 +464,8 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			agent.WithAPIKey(apiKey),
 			agent.WithModel(model),
 			agent.WithBaseURL(baseURL),
-			agent.WithClaudeWorkDir(worktreePath),
+			agent.WithClaudeWorkDir(workspacePath),
+			agent.WithClaudeSystemPrompt(systemPrompt),
 		}
 		// Pass session ID if available
 		if backendSessionID != "" {
@@ -494,7 +495,8 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		slog.Info("[ORCHESTRATOR] Initializing Native backend", "task_id", job.TaskID)
 		backend, err = agent.NewNativeBackend(
 			agent.WithProvider(llmProvider),
-			agent.WithWorkDir(worktreePath),
+			agent.WithWorkDir(workspacePath),
+			agent.WithSystemPrompt(systemPrompt),
 		)
 	}
 
@@ -525,13 +527,13 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 	// Commit changes dont push just yet
 	commitMessage := fmt.Sprintf("Task: %s", job.Intent)
-	if err := o.gitReposManager.Commit(job.TaskID, commitMessage); err != nil {
+	if err := o.repoManager.Commit(ctx, job.TaskID, commitMessage); err != nil {
 		slog.Error("[ORCHESTRATOR] Failed to commit and push", "error", err)
 		// Don't fail task - commit might fail if no changes
 	}
 
 	// Get git diff
-	gitDiff, err := o.gitReposManager.GetDiff(job.TaskID)
+	gitDiff, err := o.repoManager.GetDiff(ctx, job.TaskID)
 	if err != nil {
 		slog.Warn("[ORCHESTRATOR] Failed to get git diff", "task_id", job.TaskID, "error", err)
 	}
@@ -706,23 +708,12 @@ func (o *Orchestrator) processResults() {
 // MergeTask merges task branch to main and pushes.
 func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 	// Get task info
-	taskInfo, err := o.repo.Get(ctx, taskID)
-	if err != nil {
+	if _, err := o.repo.Get(ctx, taskID); err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
-	// Get repo info
-	var owner, repoName string
-	if taskInfo.RepositoryID != nil {
-		repo, err := o.repo.GetRepository(ctx, *taskInfo.RepositoryID)
-		if err == nil {
-			owner = repo.Owner
-			repoName = repo.Name
-		}
-	}
-
 	// Merge to main
-	_, err = o.gitReposManager.MergeToMain(owner, repoName, taskID)
+	_, err := o.repoManager.MergeToMain(ctx, taskID)
 	if err != nil {
 		// Check for merge conflict
 		if _, isConflict := err.(*ErrMergeConflict); isConflict {
@@ -744,13 +735,13 @@ func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
 
 // GetConflictDetails returns conflict details for a task.
 func (o *Orchestrator) GetConflictDetails(ctx context.Context, taskID string) ([]ConflictFile, error) {
-	// Get worktree path
-	worktreePath := o.gitReposManager.WorktreePath(taskID)
+	// Get workspace path
+	workspacePath := o.repoManager.WorkspacePath(taskID)
 
-	// Read all files in worktree
+	// Read all files in workspace
 	var conflicts []ConflictFile
 
-	err := filepath.Walk(worktreePath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(workspacePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
@@ -766,7 +757,7 @@ func (o *Orchestrator) GetConflictDetails(ctx context.Context, taskID string) ([
 
 		// Check for conflict markers
 		if strings.Contains(string(content), "<<<<<<<") {
-			relPath, _ := filepath.Rel(worktreePath, path)
+			relPath, _ := filepath.Rel(workspacePath, path)
 			conflictFile, err := parseConflictFile(path, string(content))
 			if err == nil {
 				conflictFile.Path = relPath
@@ -785,9 +776,9 @@ func (o *Orchestrator) GetConflictDetails(ctx context.Context, taskID string) ([
 
 // ResolveConflict resolves a merge conflict for a specific file.
 func (o *Orchestrator) ResolveConflict(ctx context.Context, taskID, filePath, resolution string) error {
-	// Get worktree path
-	worktreePath := o.gitReposManager.WorktreePath(taskID)
-	fullPath := filepath.Join(worktreePath, filePath)
+	// Get workspace path
+	workspacePath := o.repoManager.WorkspacePath(taskID)
+	fullPath := filepath.Join(workspacePath, filePath)
 
 	// Write resolved content
 	if err := os.WriteFile(fullPath, []byte(resolution), 0644); err != nil {
@@ -800,28 +791,17 @@ func (o *Orchestrator) ResolveConflict(ctx context.Context, taskID, filePath, re
 // CompleteMergeResolution completes merge conflict resolution and merges to main.
 func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID string) error {
 	// Get task info
-	task, err := o.repo.Get(ctx, taskID)
-	if err != nil {
+	if _, err := o.repo.Get(ctx, taskID); err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
-	// Get repo info
-	var owner, repoName string
-	if task.RepositoryID != nil {
-		repo, err := o.repo.GetRepository(ctx, *task.RepositoryID)
-		if err == nil {
-			owner = repo.Owner
-			repoName = repo.Name
-		}
-	}
-
 	// Commit resolution
-	if err := o.gitReposManager.CommitMergeResolution(taskID, "Resolved merge conflicts"); err != nil {
+	if err := o.repoManager.CommitMergeResolution(ctx, taskID, "Resolved merge conflicts"); err != nil {
 		return fmt.Errorf("failed to commit resolution: %w", err)
 	}
 
 	// Merge to main
-	if _, err := o.gitReposManager.MergeToMain(owner, repoName, taskID); err != nil {
+	if _, err := o.repoManager.MergeToMain(ctx, taskID); err != nil {
 		return fmt.Errorf("failed to merge: %w", err)
 	}
 
@@ -838,7 +818,7 @@ func (o *Orchestrator) CompleteMergeResolution(ctx context.Context, taskID strin
 
 // AbortMerge aborts an in-progress merge.
 func (o *Orchestrator) AbortMerge(ctx context.Context, taskID string) error {
-	return o.gitReposManager.AbortMerge(taskID)
+	return o.repoManager.AbortMerge(ctx, taskID)
 }
 
 // CreatePR creates a pull request for a task.
@@ -868,15 +848,15 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 		return "", fmt.Errorf("project not found for task")
 	}
 
-	// Get branch name from worktree
-	branchName, err := o.gitReposManager.GetCurrentBranch(taskID)
+	// Get branch name from workspace
+	branchName, err := o.repoManager.GetCurrentBranch(ctx, taskID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get branch name: %w", err)
 	}
 	branchName = strings.TrimSpace(branchName)
 
 	// Push branch to remote before creating PR
-	if err := o.gitReposManager.PushBranch(taskID); err != nil {
+	if err := o.repoManager.PushBranch(ctx, taskID); err != nil {
 		return "", fmt.Errorf("failed to push branch: %w", err)
 	}
 
@@ -910,9 +890,9 @@ func (o *Orchestrator) CancelTask(taskID string) {
 	}
 }
 
-// CleanupTask removes the worktree for a task.
-func (o *Orchestrator) CleanupTask(taskID string) error {
-	return o.gitReposManager.RemoveWorktree(taskID)
+// CleanupTask removes the workspace for a task.
+func (o *Orchestrator) CleanupTask(ctx context.Context, taskID string) error {
+	return o.repoManager.RemoveWorkspace(ctx, taskID)
 }
 
 // SearchProjectFiles searches for files in a project using fuzzy matching.
@@ -922,23 +902,12 @@ func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query 
 		limit = 20
 	}
 
-	// Get project info
-	var owner, repoName string
-	if projectID != "" {
-		repo, err := o.repo.GetRepository(ctx, projectID)
-		if err == nil {
-			owner = repo.Owner
-			repoName = repo.Name
-		}
+	repoPath := o.repoManager.RootPath()
+	if repoPath == "" {
+		return nil, fmt.Errorf("repository root not found")
 	}
-
-	if owner == "" {
-		return nil, fmt.Errorf("project not found")
-	}
-
-	repoPath := o.gitReposManager.RepoPath(owner, repoName)
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("repository not cloned yet")
+	if _, err := os.Stat(repoPath); err != nil {
+		return nil, fmt.Errorf("repository root not found: %w", err)
 	}
 
 	// Collect all file paths

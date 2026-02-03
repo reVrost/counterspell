@@ -32,8 +32,9 @@ type NativeBackend struct {
 type NativeBackendOption func(*nativeBackendConfig)
 
 type nativeBackendConfig struct {
-	provider llm.Provider
-	workDir  string
+	provider     llm.Provider
+	workDir      string
+	systemPrompt string
 }
 
 // WithProvider sets the LLM provider.
@@ -47,6 +48,13 @@ func WithProvider(p llm.Provider) NativeBackendOption {
 func WithWorkDir(dir string) NativeBackendOption {
 	return func(c *nativeBackendConfig) {
 		c.workDir = dir
+	}
+}
+
+// WithSystemPrompt overrides the default system prompt.
+func WithSystemPrompt(prompt string) NativeBackendOption {
+	return func(c *nativeBackendConfig) {
+		c.systemPrompt = prompt
 	}
 }
 
@@ -70,7 +78,8 @@ func NewNativeBackend(opts ...NativeBackendOption) (*NativeBackend, error) {
 		return nil, ErrProviderRequired
 	}
 
-	runner := NewRunner(cfg.provider, cfg.workDir)
+	runner := NewRunner(cfg.provider, cfg.workDir, WithRunnerSystemPrompt(cfg.systemPrompt))
+
 	return &NativeBackend{runner: runner}, nil
 }
 

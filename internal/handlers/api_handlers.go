@@ -74,7 +74,7 @@ func (h *Handlers) HandleGetTaskDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gitDiff, err := h.gitReposManager.GetDiff(taskID)
+	gitDiff, err := h.repoManager.GetDiff(r.Context(), taskID)
 	if err != nil {
 		slog.Error("Failed to get git diff", "task_id", taskID, "error", err)
 		http.Error(w, "Failed to get git diff", http.StatusInternalServerError)
