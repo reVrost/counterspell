@@ -35,14 +35,14 @@
     if (!call) return '';
     if (callIsDiff) return 'max-h-[496px] overflow-y-auto bg-[#0D1117]';
     if (isShellTool) return 'max-h-[228px] overflow-y-auto';
-    return '';
+    return 'max-h-[360px] overflow-y-auto';
   });
 
   const resultClass = $derived.by(() => {
     if (!result) return '';
     if (resultIsDiff) return 'max-h-[496px] overflow-y-auto bg-[#0D1117]';
     if (isShellTool) return 'max-h-[228px] overflow-y-auto';
-    return '';
+    return 'max-h-[360px] overflow-y-auto';
   });
 
   const toolLabel = $derived.by(() => (tool && tool.trim() ? tool.trim() : 'tool'));

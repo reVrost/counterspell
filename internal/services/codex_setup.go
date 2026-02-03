@@ -7,10 +7,11 @@ import (
 )
 
 var codexSetupMarkers = []string{
-	"agents.md",
+	"# AGENTS.md",
 	"<environment_context>",
 	"<collaboration_mode>",
 	"<instructions>",
+	"<INSTRUCTIONS>",
 	"<permissions instructions>",
 }
 
