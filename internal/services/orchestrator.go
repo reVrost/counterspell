@@ -349,7 +349,7 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	// Parse ModelID first to determine provider (format: "provider#model" e.g., "zai#glm-4.7" or "o#anthropic/claude-sonnet-4.5")
 	provider := ""
 	model := ""
-	if job.ModelID != "" {
+	if job.ModelID != "" && backendType == "native" {
 		parts := strings.SplitN(job.ModelID, "#", 2)
 		if len(parts) == 2 {
 			providerPrefix := parts[0]
@@ -369,10 +369,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	}
 	slog.Info("[ORCHESTRATOR] Provider and model determined", "task_id", job.TaskID, "provider", provider, "model", model)
 
-	if backendType == "codex" && provider == "" {
-		provider = "openai"
-	}
-
 	// Get API key for the provider (or default if provider is empty)
 	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID, "provider", provider)
 	apiKey, actualProvider, actualModel, err := o.settings.GetAPIKeyForProvider(ctx, provider)
@@ -389,14 +385,23 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	if actualProvider != "" {
 		provider = actualProvider
 	}
-	if model == "" && actualModel != "" {
+	if backendType == "native" && model == "" && actualModel != "" {
 		model = actualModel
 	}
-	if backendType == "codex" && model != "" {
-		lowerModel := strings.ToLower(model)
-		if strings.Contains(lowerModel, "claude") || strings.Contains(lowerModel, "anthropic") || strings.Contains(lowerModel, "glm") {
-			model = ""
+	if backendType == "codex" {
+		if provider != "openai" && provider != "openrouter" {
+			apiKey, _, _, err = o.settings.GetAPIKeyForProvider(ctx, "openai")
+			if err != nil && backendType != "codex" {
+				slog.Error("[ORCHESTRATOR] Failed to get OpenAI API key", "error", err)
+				job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
+				return
+			}
+			provider = "openai"
 		}
+		model = "gpt-5.2-codex-high"
+	}
+	if backendType == "claude-code" {
+		model = fixedClaudeCodeModel(provider)
 	}
 	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
 

@@ -243,13 +243,19 @@ func (s *SessionService) buildBackend(
 		return nil, func() {}, ErrCodexUnsupported
 	}
 
-	apiKey, provider, model, err := s.resolveProvider(ctx, modelID)
+	resolutionModelID := modelID
+	if session.AgentBackend == "claude-code" {
+		resolutionModelID = ""
+	}
+
+	apiKey, provider, model, err := s.resolveProvider(ctx, resolutionModelID)
 	if err != nil {
 		return nil, func() {}, err
 	}
 
 	switch session.AgentBackend {
 	case "claude-code":
+		model = fixedClaudeCodeModel(provider)
 		baseURL := ""
 		switch provider {
 		case "zai":
@@ -320,6 +326,13 @@ func (s *SessionService) resolveProvider(ctx context.Context, modelID string) (s
 		model = actualModel
 	}
 	return apiKey, actualProvider, model, nil
+}
+
+func fixedClaudeCodeModel(provider string) string {
+	if provider == "openrouter" {
+		return "anthropic/claude-opus-4.5"
+	}
+	return "claude-opus-4-5"
 }
 
 func newLLMProvider(provider, apiKey string) (llm.Provider, error) {
