@@ -27,13 +27,15 @@ var ErrCodexBinaryPath = errors.New("agent: codex binary not found in PATH")
 // It executes `codex exec --json` and normalizes the JSON event stream into
 // StreamEvents for the UI.
 type CodexBackend struct {
-	binaryPath    string
-	workDir       string
-	apiKey        string
-	baseURL       string
-	model         string
-	sessionID     string
-	extraArgs     []string
+	binaryPath   string
+	workDir      string
+	apiKey       string
+	baseURL      string
+	model        string
+	sessionID    string
+	extraArgs    []string
+	systemPrompt string
+
 	streamCtx     context.Context
 	events        chan<- StreamEvent
 	streamMsgID   string
@@ -97,6 +99,13 @@ func WithCodexSessionID(sessionID string) CodexOption {
 func WithCodexExtraArgs(args ...string) CodexOption {
 	return func(b *CodexBackend) {
 		b.extraArgs = append(b.extraArgs, args...)
+	}
+}
+
+// WithCodexSystemPrompt sets an initial system prompt prefix.
+func WithCodexSystemPrompt(prompt string) CodexOption {
+	return func(b *CodexBackend) {
+		b.systemPrompt = prompt
 	}
 }
 
@@ -181,6 +190,10 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 	b.mu.Unlock()
 
 	// Add user message to history and emit immediately
+	execPrompt := prompt
+	if b.systemPrompt != "" && b.sessionID == "" {
+		execPrompt = b.systemPrompt + "\n\n" + prompt
+	}
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{
 		Role:    "user",
@@ -188,7 +201,7 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 	})
 	b.mu.Unlock()
 
-	cmd, err := b.buildCmd(ctx, prompt)
+	cmd, err := b.buildCmd(ctx, execPrompt)
 	if err != nil {
 		return err
 	}

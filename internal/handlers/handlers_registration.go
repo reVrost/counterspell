@@ -22,7 +22,7 @@ type Handlers struct {
 	fileService     *services.FileService
 	githubService   *services.GitHubService
 	oauthService    *services.OAuthService
-	gitReposManager *services.GitManager
+	repoManager     services.RepoManager
 
 	// Track active orchestrators for shutdown
 	orchestrators map[string]*services.Orchestrator
@@ -34,6 +34,11 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 	transcriptionService := services.NewTranscriptionService()
 	repo := services.NewRepository(database)
 	settingsService := services.NewSettingsService(database)
+
+	repoManager, err := services.NewRepoManager(cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Handlers{
 		events:        events,
@@ -47,7 +52,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 		fileService:     services.NewFileService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
 		oauthService:    services.NewOAuthService(database, cfg),
-		gitReposManager: services.NewGitManager(cfg.DataDir),
+		repoManager:     repoManager,
 
 		// Initialize orchestrator tracking
 		orchestrators: make(map[string]*services.Orchestrator),
@@ -72,7 +77,7 @@ func (h *Handlers) getOrchestrator() (*services.Orchestrator, error) {
 		h.events,
 		h.settingsService,
 		h.githubService,
-		h.cfg.DataDir,
+		h.repoManager,
 	)
 	if err != nil {
 		return nil, err

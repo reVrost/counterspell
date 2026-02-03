@@ -19,7 +19,8 @@ func TestConsumeAgentStream_PersistsMessages(t *testing.T) {
 	orch, err := NewOrchestrator(
 		NewRepository(testDB),
 		NewEventBus(),
-		nil, nil, ":memory:",
+		nil, nil,
+		stubRepoManager{},
 	)
 	require.NoError(t, err)
 
@@ -138,7 +139,8 @@ func TestContinueTask_Validation(t *testing.T) {
 	orch, err := NewOrchestrator(
 		NewRepository(testDB),
 		NewEventBus(),
-		nil, nil, ":memory:",
+		nil, nil,
+		stubRepoManager{},
 	)
 	require.NoError(t, err)
 
@@ -166,7 +168,7 @@ func TestExecuteTask_BackendSelection(t *testing.T) {
 		NewEventBus(),
 		settingsSvc,
 		nil,
-		t.TempDir(),
+		stubRepoManager{},
 	)
 	require.NoError(t, err)
 
@@ -224,7 +226,7 @@ func TestContinueTask_WithMessageHistory(t *testing.T) {
 	orch, err := NewOrchestrator(
 		repo,
 		NewEventBus(),
-		nil, nil, t.TempDir(),
+		nil, nil, stubRepoManager{},
 	)
 	require.NoError(t, err)
 
@@ -295,7 +297,7 @@ func TestContinueTask_NoMessages(t *testing.T) {
 	orch, err := NewOrchestrator(
 		repo,
 		NewEventBus(),
-		nil, nil, t.TempDir(),
+		nil, nil, stubRepoManager{},
 	)
 	require.NoError(t, err)
 

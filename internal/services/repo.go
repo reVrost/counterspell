@@ -1,9 +1,9 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +21,7 @@ func (e *ErrMergeConflict) Error() string {
 	return fmt.Sprintf("merge conflict in %d files: %s", len(e.ConflictedFiles), strings.Join(e.ConflictedFiles, ", "))
 }
 
-// GitManager handles git workspace operations.
+// GitManager handles git worktree operations.
 type GitManager struct {
 	repoRoot string
 	dataDir  string
@@ -29,36 +29,25 @@ type GitManager struct {
 }
 
 // NewGitManager creates a new repo manager.
-// dataDir is the base directory for storing repositories and workspaces (e.g., "./data").
-func NewGitManager(dataDir string) *GitManager {
+// dataDir is the base directory for storing workspaces (e.g., "./data")
+func NewGitManager(repoRoot, dataDir string) *GitManager {
+	absRoot, err := filepath.Abs(repoRoot)
+	if err != nil {
+		absRoot = repoRoot
+	}
 	absDir, err := filepath.Abs(dataDir)
 	if err != nil {
 		absDir = dataDir // fallback if conversion fails
 	}
-	repoRoot := filepath.Join(absDir, "repos")
-	return &GitManager{repoRoot: repoRoot, dataDir: absDir}
+	return &GitManager{repoRoot: absRoot, dataDir: absDir}
+}
+
+func (m *GitManager) Kind() RepoKind {
+	return RepoKindGit
 }
 
 func (m *GitManager) RootPath() string {
 	return m.repoRoot
-}
-
-func (m *GitManager) repoPath(owner, repo string) string {
-	return filepath.Join(m.repoRoot, owner, repo)
-}
-
-func (m *GitManager) worktreePath(taskID string) string {
-	return m.workspacePath(taskID)
-}
-
-// RepoPath returns the local path for a repository.
-func (m *GitManager) RepoPath(owner, repo string) string {
-	return m.repoPath(owner, repo)
-}
-
-// WorktreePath returns the worktree path for a task (exported).
-func (m *GitManager) WorktreePath(taskID string) string {
-	return m.worktreePath(taskID)
 }
 
 // workspacePath returns the workspace path for a given task.
@@ -71,69 +60,35 @@ func (m *GitManager) WorkspacePath(taskID string) string {
 	return m.workspacePath(taskID)
 }
 
-// EnsureRepo clones a repo if it doesn't exist locally and returns its path.
-func (m *GitManager) EnsureRepo(owner, repo, token string) (string, error) {
-	if owner == "" || repo == "" {
-		return "", fmt.Errorf("owner and repo are required")
-	}
-
-	repoPath := m.repoPath(owner, repo)
-	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-		return repoPath, nil
-	}
-	if _, err := os.Stat(repoPath); err == nil {
-		return "", fmt.Errorf("repo path exists but is not a git repo: %s", repoPath)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(repoPath), 0755); err != nil {
-		return "", fmt.Errorf("failed to create repos dir: %w", err)
-	}
-
-	cloneURL := fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
-	if token != "" {
-		cloneURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", url.PathEscape(token), owner, repo)
-	}
-
-	slog.Info("[GIT] Cloning repository", "owner", owner, "repo", repo, "path", repoPath, "has_token", token != "")
-	cmd := exec.Command("git", "clone", cloneURL, repoPath)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
-	}
-
-	slog.Info("[GIT] Repository cloned", "owner", owner, "repo", repo, "path", repoPath)
-	return repoPath, nil
-}
-
 // CreateWorkspace creates an isolated workspace for a task.
-// Returns the worktree path.
-func (m *GitManager) CreateWorktree(owner, repo, taskID, branchName string) (string, error) {
-	repoPath := m.repoPath(owner, repo)
-	worktreePath := m.worktreePath(taskID)
+// Returns the workspace path.
+func (m *GitManager) CreateWorkspace(ctx context.Context, taskID, branchName string) (string, error) {
+	repoPath := m.repoRoot
+	workspacePath := m.workspacePath(taskID)
 
-	slog.Info("[GIT] Creating worktree", "task_id", taskID, "repo_path", repoPath, "worktree_path", worktreePath, "branch", branchName)
+	slog.Info("[GIT] Creating workspace", "task_id", taskID, "repo_path", repoPath, "workspace_path", workspacePath, "branch", branchName)
 
-	// Check if worktree already exists
-	if _, err := os.Stat(worktreePath); err == nil {
-		slog.Info("[GIT] Worktree already exists", "path", worktreePath)
-		return worktreePath, nil
+	// Check if workspace already exists
+	if _, err := os.Stat(workspacePath); err == nil {
+		slog.Info("[GIT] Workspace already exists", "path", workspacePath)
+		return workspacePath, nil
 	}
 
 	// Ensure worktrees directory exists
-	if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(workspacePath), 0755); err != nil {
 		return "", fmt.Errorf("failed to create worktrees dir: %w", err)
 	}
 
-	slog.Info("[GIT] Executing: git worktree add -b", "branch", branchName, "path", worktreePath, "dir", repoPath)
+	slog.Info("[GIT] Executing: git worktree add -b", "branch", branchName, "path", workspacePath, "dir", repoPath)
 
-	// Create new branch and worktree
-	cmd := exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+	// Create new branch and workspace
+	cmd := exec.CommandContext(ctx, "git", "worktree", "add", "-b", branchName, workspacePath)
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Warn("[GIT] First attempt failed, trying without -b", "error", err, "output", string(output))
 		// Branch might already exist, try without -b
-		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+		cmd = exec.CommandContext(ctx, "git", "worktree", "add", workspacePath, branchName)
 		cmd.Dir = repoPath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
@@ -142,36 +97,20 @@ func (m *GitManager) CreateWorktree(owner, repo, taskID, branchName string) (str
 		}
 	}
 
-	slog.Info("[GIT] Created worktree successfully", "task_id", taskID, "path", worktreePath, "branch", branchName)
-	return worktreePath, nil
-}
-
-// CleanupWorktree removes a worktree.
-func (m *GitManager) CleanupWorktree(owner, repo, taskID string) error {
-	repoPath := m.repoPath(owner, repo)
-	worktreePath := m.worktreePath(taskID)
-
-	cmd := exec.Command("git", "worktree", "remove", "--force", worktreePath)
-	cmd.Dir = repoPath
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git worktree remove failed: %w\nOutput: %s", err, string(output))
-	}
-
-	slog.Info("Removed worktree", "task_id", taskID)
-	return nil
+	slog.Info("[GIT] Created workspace successfully", "task_id", taskID, "path", workspacePath, "branch", branchName)
+	return workspacePath, nil
 }
 
 // Commit stages and commits changes without pushing.
-func (m *GitManager) Commit(taskID, message string) error {
-	worktreePath := m.worktreePath(taskID)
+func (m *GitManager) Commit(ctx context.Context, taskID, message string) error {
+	workspacePath := m.workspacePath(taskID)
 
-	slog.Info("[GIT] Commit called", "task_id", taskID, "worktree_path", worktreePath)
+	slog.Info("[GIT] Commit called", "task_id", taskID, "workspace_path", workspacePath)
 
 	// Stage all changes
-	cmd := exec.Command("git", "add", "-A")
-	cmd.Dir = worktreePath
-	slog.Info("[GIT] Executing: git add -A", "dir", worktreePath)
+	cmd := exec.CommandContext(ctx, "git", "add", "-A")
+	cmd.Dir = workspacePath
+	slog.Info("[GIT] Executing: git add -A", "dir", workspacePath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Error("[GIT] git add failed", "error", err, "output", string(output))
 		return fmt.Errorf("git add failed: %w\nOutput: %s", err, string(output))
@@ -179,17 +118,17 @@ func (m *GitManager) Commit(taskID, message string) error {
 	slog.Info("[GIT] git add successful")
 
 	// Check if there are changes to commit
-	cmd = exec.Command("git", "diff", "--cached", "--quiet")
-	cmd.Dir = worktreePath
+	cmd = exec.CommandContext(ctx, "git", "diff", "--cached", "--quiet")
+	cmd.Dir = workspacePath
 	if err := cmd.Run(); err == nil {
 		slog.Info("No changes to commit", "task_id", taskID)
 		return nil
 	}
 
 	// Commit
-	cmd = exec.Command("git", "commit", "-m", message)
-	cmd.Dir = worktreePath
-	slog.Info("[GIT] Executing: git commit", "dir", worktreePath)
+	cmd = exec.CommandContext(ctx, "git", "commit", "-m", message)
+	cmd.Dir = workspacePath
+	slog.Info("[GIT] Executing: git commit", "dir", workspacePath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Error("[GIT] git commit failed", "error", err, "output", string(output))
 		return fmt.Errorf("git commit failed: %w\nOutput: %s", err, string(output))
@@ -200,20 +139,20 @@ func (m *GitManager) Commit(taskID, message string) error {
 }
 
 // CommitAndPush commits changes and pushes the branch.
-func (m *GitManager) CommitAndPush(taskID, message string) error {
-	if err := m.Commit(taskID, message); err != nil {
+func (m *GitManager) CommitAndPush(ctx context.Context, taskID, message string) error {
+	if err := m.Commit(ctx, taskID, message); err != nil {
 		return err
 	}
-	return m.PushBranch(taskID)
+	return m.PushBranch(ctx, taskID)
 }
 
 // PushBranch pushes the current branch to remote without committing.
-func (m *GitManager) PushBranch(taskID string) error {
-	worktreePath := m.worktreePath(taskID)
+func (m *GitManager) PushBranch(ctx context.Context, taskID string) error {
+	workspacePath := m.workspacePath(taskID)
 
-	cmd := exec.Command("git", "push", "-u", "origin", "HEAD")
-	cmd.Dir = worktreePath
-	slog.Info("[GIT] Executing: git push -u origin HEAD", "dir", worktreePath)
+	cmd := exec.CommandContext(ctx, "git", "push", "-u", "origin", "HEAD")
+	cmd.Dir = workspacePath
+	slog.Info("[GIT] Executing: git push -u origin HEAD", "dir", workspacePath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Error("[GIT] git push failed", "error", err, "output", string(output))
 		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
@@ -223,12 +162,12 @@ func (m *GitManager) PushBranch(taskID string) error {
 	return nil
 }
 
-// GetCurrentBranch returns the current branch name in a worktree.
-func (m *GitManager) GetCurrentBranch(taskID string) (string, error) {
-	worktreePath := m.worktreePath(taskID)
+// GetCurrentBranch returns the current branch name in a workspace.
+func (m *GitManager) GetCurrentBranch(ctx context.Context, taskID string) (string, error) {
+	workspacePath := m.workspacePath(taskID)
 
-	cmd := exec.Command("git", "branch", "--show-current")
-	cmd.Dir = worktreePath
+	cmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
+	cmd.Dir = workspacePath
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git branch failed: %w", err)
@@ -237,16 +176,20 @@ func (m *GitManager) GetCurrentBranch(taskID string) (string, error) {
 	return string(output), nil
 }
 
-// GetDiff returns the git diff for a task's worktree.
+// GetDiff returns the git diff for a task's workspace.
 // Shows diff between main branch and HEAD (all changes on the feature branch).
-func (m *GitManager) GetDiff(taskID string) (string, error) {
-	worktreePath := m.worktreePath(taskID)
+func (m *GitManager) GetDiff(ctx context.Context, taskID string) (string, error) {
+	workspacePath := m.workspacePath(taskID)
+	if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
+		slog.Warn("[GIT] Workspace missing, returning empty diff", "task_id", taskID, "path", workspacePath)
+		return "", nil
+	}
 
-	// slog.Info("[GIT] GetDiff called", "task_id", taskID, "worktree_path", worktreePath)
+	// slog.Info("[GIT] GetDiff called", "task_id", taskID, "workspace_path", workspacePath)
 
 	// Get current branch name
-	branchCmd := exec.Command("git", "branch", "--show-current")
-	branchCmd.Dir = worktreePath
+	branchCmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
+	branchCmd.Dir = workspacePath
 	branchOutput, err := branchCmd.Output()
 	if err != nil {
 		slog.Error("[GIT] Failed to get branch name", "error", err)
@@ -255,20 +198,20 @@ func (m *GitManager) GetDiff(taskID string) (string, error) {
 	currentBranch := strings.TrimSpace(string(branchOutput))
 
 	// Try origin/main first (remote tracking branch)
-	cmd := exec.Command("git", "diff", "origin/main", currentBranch)
-	cmd.Dir = worktreePath
+	cmd := exec.CommandContext(ctx, "git", "diff", "origin/main", currentBranch)
+	cmd.Dir = workspacePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// slog.Warn("[GIT] GetDiff origin/main failed, trying main", "error", err)
 		// Fallback to local main branch
-		cmd = exec.Command("git", "diff", "main", currentBranch)
-		cmd.Dir = worktreePath
+		cmd = exec.CommandContext(ctx, "git", "diff", "main", currentBranch)
+		cmd.Dir = workspacePath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			// slog.Warn("[GIT] GetDiff main failed, trying master", "error", err)
 			// Try master branch
-			cmd = exec.Command("git", "diff", "master", currentBranch)
-			cmd.Dir = worktreePath
+			cmd = exec.CommandContext(ctx, "git", "diff", "master", currentBranch)
+			cmd.Dir = workspacePath
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				slog.Error("[GIT] GetDiff failed for all branches", "error", err)
@@ -281,21 +224,21 @@ func (m *GitManager) GetDiff(taskID string) (string, error) {
 	return string(output), nil
 }
 
-// PullMainIntoWorktree pulls the latest main into the worktree and merges.
+// PullMainIntoWorktree pulls the latest main into the workspace and merges.
 // If there's a merge conflict, returns ErrMergeConflict with the conflicted files.
-func (m *GitManager) PullMainIntoWorktree(owner, repo, taskID string) error {
-	worktreePath := m.worktreePath(taskID)
-	repoPath := m.repoPath(owner, repo)
+func (m *GitManager) PullMainIntoWorktree(ctx context.Context, taskID string) error {
+	workspacePath := m.workspacePath(taskID)
+	repoPath := m.repoRoot
 
-	slog.Info("[GIT] PullMainIntoWorktree called", "task_id", taskID, "worktree_path", worktreePath)
+	slog.Info("[GIT] PullMainIntoWorktree called", "task_id", taskID, "workspace_path", workspacePath)
 
-	// Fetch latest from origin in worktree
-	cmd := exec.Command("git", "fetch", "origin", "main")
-	cmd.Dir = worktreePath
+	// Fetch latest from origin in workspace
+	cmd := exec.CommandContext(ctx, "git", "fetch", "origin", "main")
+	cmd.Dir = workspacePath
 	if _, err := cmd.CombinedOutput(); err != nil {
 		// Try master
-		cmd = exec.Command("git", "fetch", "origin", "master")
-		cmd.Dir = worktreePath
+		cmd = exec.CommandContext(ctx, "git", "fetch", "origin", "master")
+		cmd.Dir = workspacePath
 		if output, err := cmd.CombinedOutput(); err != nil {
 			slog.Warn("[GIT] Fetch failed", "error", err, "output", string(output))
 		}
@@ -303,20 +246,20 @@ func (m *GitManager) PullMainIntoWorktree(owner, repo, taskID string) error {
 	slog.Info("[GIT] Fetched latest from origin")
 
 	// Also fetch in main repo to keep it updated
-	cmd = exec.Command("git", "fetch", "origin")
+	cmd = exec.CommandContext(ctx, "git", "fetch", "origin")
 	cmd.Dir = repoPath
 	_ = cmd.Run()
 
-	// Try to merge origin/main into the worktree
-	cmd = exec.Command("git", "merge", "origin/main", "--no-edit")
-	cmd.Dir = worktreePath
+	// Try to merge origin/main into the workspace
+	cmd = exec.CommandContext(ctx, "git", "merge", "origin/main", "--no-edit")
+	cmd.Dir = workspacePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Check if it's a merge conflict
 		if strings.Contains(string(output), "CONFLICT") || strings.Contains(string(output), "Automatic merge failed") {
 			// Get list of conflicted files
-			cmd = exec.Command("git", "diff", "--name-only", "--diff-filter=U")
-			cmd.Dir = worktreePath
+			cmd = exec.CommandContext(ctx, "git", "diff", "--name-only", "--diff-filter=U")
+			cmd.Dir = workspacePath
 			conflictOutput, _ := cmd.Output()
 			conflictedFiles := []string{}
 			for _, f := range strings.Split(strings.TrimSpace(string(conflictOutput)), "\n") {
@@ -327,37 +270,37 @@ func (m *GitManager) PullMainIntoWorktree(owner, repo, taskID string) error {
 			slog.Info("[GIT] Merge conflict detected", "files", conflictedFiles)
 			return &ErrMergeConflict{
 				ConflictedFiles: conflictedFiles,
-				RepoPath:        worktreePath,
+				RepoPath:        workspacePath,
 			}
 		}
 		return fmt.Errorf("failed to merge origin/main: %w\nOutput: %s", err, string(output))
 	}
 
-	slog.Info("[GIT] Merged origin/main into worktree successfully")
+	slog.Info("[GIT] Merged origin/main into workspace successfully")
 	return nil
 }
 
 // CommitMergeResolution commits after merge conflict resolution.
-func (m *GitManager) CommitMergeResolution(taskID, message string) error {
-	worktreePath := m.worktreePath(taskID)
+func (m *GitManager) CommitMergeResolution(ctx context.Context, taskID, message string) error {
+	workspacePath := m.workspacePath(taskID)
 
 	// Stage all changes
-	cmd := exec.Command("git", "add", "-A")
-	cmd.Dir = worktreePath
+	cmd := exec.CommandContext(ctx, "git", "add", "-A")
+	cmd.Dir = workspacePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add failed: %w\nOutput: %s", err, string(output))
 	}
 
 	// Commit
-	cmd = exec.Command("git", "commit", "-m", message)
-	cmd.Dir = worktreePath
+	cmd = exec.CommandContext(ctx, "git", "commit", "-m", message)
+	cmd.Dir = workspacePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %w\nOutput: %s", err, string(output))
 	}
 
 	// Push
-	cmd = exec.Command("git", "push", "-u", "origin", "HEAD")
-	cmd.Dir = worktreePath
+	cmd = exec.CommandContext(ctx, "git", "push", "-u", "origin", "HEAD")
+	cmd.Dir = workspacePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push failed: %w\nOutput: %s", err, string(output))
 	}
@@ -367,11 +310,11 @@ func (m *GitManager) CommitMergeResolution(taskID, message string) error {
 }
 
 // AbortMerge aborts an in-progress merge.
-func (m *GitManager) AbortMerge(taskID string) error {
-	worktreePath := m.worktreePath(taskID)
+func (m *GitManager) AbortMerge(ctx context.Context, taskID string) error {
+	workspacePath := m.workspacePath(taskID)
 
-	cmd := exec.Command("git", "merge", "--abort")
-	cmd.Dir = worktreePath
+	cmd := exec.CommandContext(ctx, "git", "merge", "--abort")
+	cmd.Dir = workspacePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git merge --abort failed: %w\nOutput: %s", err, string(output))
 	}
@@ -382,35 +325,31 @@ func (m *GitManager) AbortMerge(taskID string) error {
 
 // MergeToMain merges the task branch to main and pushes.
 // Returns the branch name that was merged.
-func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
+func (m *GitManager) MergeToMain(ctx context.Context, taskID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	repoPath := m.repoPath(owner, repo)
-	worktreePath := m.worktreePath(taskID)
+	repoPath := m.repoRoot
+	workspacePath := m.workspacePath(taskID)
 
-	slog.Info("[GIT] MergeToMain called", "task_id", taskID, "repo_path", repoPath, "worktree_path", worktreePath)
+	slog.Info("[GIT] MergeToMain called", "task_id", taskID, "repo_path", repoPath, "workspace_path", workspacePath)
 
-	// Get the branch name from the worktree
-	cmd := exec.Command("git", "branch", "--show-current")
-	cmd.Dir = worktreePath
+	// Get the branch name from the workspace
+	cmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
+	cmd.Dir = workspacePath
 	branchOutput, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get branch name: %w", err)
 	}
-	branchName := string(branchOutput)
-	// Trim newline
-	if len(branchName) > 0 && branchName[len(branchName)-1] == '\n' {
-		branchName = branchName[:len(branchName)-1]
-	}
+	branchName := strings.TrimSpace(string(branchOutput))
 	slog.Info("[GIT] Task branch", "branch", branchName)
 
 	// Checkout main in the main repo
-	cmd = exec.Command("git", "checkout", "main")
+	cmd = exec.CommandContext(ctx, "git", "checkout", "main")
 	cmd.Dir = repoPath
 	if _, err := cmd.CombinedOutput(); err != nil {
 		// Try master
-		cmd = exec.Command("git", "checkout", "master")
+		cmd = exec.CommandContext(ctx, "git", "checkout", "master")
 		cmd.Dir = repoPath
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return "", fmt.Errorf("failed to checkout main/master: %w\nOutput: %s", err, string(output))
@@ -419,11 +358,11 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 	slog.Info("[GIT] Checked out main branch")
 
 	// Pull latest main
-	cmd = exec.Command("git", "pull", "origin", "main")
+	cmd = exec.CommandContext(ctx, "git", "pull", "origin", "main")
 	cmd.Dir = repoPath
 	if _, err := cmd.CombinedOutput(); err != nil {
 		// Try master
-		cmd = exec.Command("git", "pull", "origin", "master")
+		cmd = exec.CommandContext(ctx, "git", "pull", "origin", "master")
 		cmd.Dir = repoPath
 		if output, err := cmd.CombinedOutput(); err != nil {
 			slog.Warn("[GIT] Pull failed, continuing anyway", "error", err, "output", string(output))
@@ -432,13 +371,13 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 	slog.Info("[GIT] Pulled latest main")
 
 	// Merge the task branch
-	cmd = exec.Command("git", "merge", branchName, "--no-edit")
+	cmd = exec.CommandContext(ctx, "git", "merge", branchName, "--no-edit")
 	cmd.Dir = repoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// Check for merge conflict
 		if strings.Contains(string(output), "CONFLICT") || strings.Contains(string(output), "Automatic merge failed") {
 			// Abort the merge in main repo
-			abortCmd := exec.Command("git", "merge", "--abort")
+			abortCmd := exec.CommandContext(ctx, "git", "merge", "--abort")
 			abortCmd.Dir = repoPath
 			_ = abortCmd.Run()
 
@@ -456,7 +395,7 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 			slog.Info("[GIT] Merge conflict detected in MergeToMain", "files", conflictedFiles)
 			return "", &ErrMergeConflict{
 				ConflictedFiles: conflictedFiles,
-				RepoPath:        worktreePath,
+				RepoPath:        workspacePath,
 			}
 		}
 		return "", fmt.Errorf("failed to merge branch %s: %w\nOutput: %s", branchName, err, string(output))
@@ -464,11 +403,11 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 	slog.Info("[GIT] Merged branch", "branch", branchName)
 
 	// Push to origin
-	cmd = exec.Command("git", "push", "origin", "main")
+	cmd = exec.CommandContext(ctx, "git", "push", "origin", "main")
 	cmd.Dir = repoPath
 	if _, err := cmd.CombinedOutput(); err != nil {
 		// Try master
-		cmd = exec.Command("git", "push", "origin", "master")
+		cmd = exec.CommandContext(ctx, "git", "push", "origin", "master")
 		cmd.Dir = repoPath
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return "", fmt.Errorf("failed to push to main: %w\nOutput: %s", err, string(output))
@@ -477,7 +416,7 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 	slog.Info("[GIT] Pushed to origin main")
 
 	// Delete the remote branch (optional, don't fail if this errors)
-	cmd = exec.Command("git", "push", "origin", "--delete", branchName)
+	cmd = exec.CommandContext(ctx, "git", "push", "origin", "--delete", branchName)
 	cmd.Dir = repoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Warn("[GIT] Failed to delete remote branch (may not exist)", "branch", branchName, "error", err, "output", string(output))
@@ -485,24 +424,24 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 		slog.Info("[GIT] Deleted remote branch", "branch", branchName)
 	}
 
-	// Remove the worktree first (branch cannot be deleted while used by worktree)
-	if err := os.RemoveAll(worktreePath); err != nil {
-		slog.Warn("[GIT] Failed to remove worktree directory", "error", err)
+	// Remove the workspace first (branch cannot be deleted while used by workspace)
+	if err := os.RemoveAll(workspacePath); err != nil {
+		slog.Warn("[GIT] Failed to remove workspace directory", "error", err)
 	} else {
-		slog.Info("[GIT] Removed worktree directory", "path", worktreePath)
+		slog.Info("[GIT] Removed workspace directory", "path", workspacePath)
 	}
 
-	// Prune worktrees to clean up git's internal state
-	cmd = exec.Command("git", "worktree", "prune")
+	// Prune workspaces to clean up git's internal state
+	cmd = exec.CommandContext(ctx, "git", "worktree", "prune")
 	cmd.Dir = repoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
-		slog.Warn("[GIT] Failed to prune worktrees", "error", err, "output", string(output))
+		slog.Warn("[GIT] Failed to prune workspaces", "error", err, "output", string(output))
 	} else {
-		slog.Info("[GIT] Pruned worktrees")
+		slog.Info("[GIT] Pruned workspaces")
 	}
 
 	// Delete the local branch
-	cmd = exec.Command("git", "branch", "-d", branchName)
+	cmd = exec.CommandContext(ctx, "git", "branch", "-d", branchName)
 	cmd.Dir = repoPath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		slog.Warn("[GIT] Failed to delete local branch", "branch", branchName, "error", err, "output", string(output))
@@ -514,42 +453,33 @@ func (m *GitManager) MergeToMain(owner, repo, taskID string) (string, error) {
 	return branchName, nil
 }
 
-// RemoveWorktree removes the worktree for a task.
-func (m *GitManager) RemoveWorktree(taskID string) error {
+// RemoveWorkspace removes the workspace for a task.
+func (m *GitManager) RemoveWorkspace(ctx context.Context, taskID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	worktreePath := m.worktreePath(taskID)
-	slog.Info("[GIT] Removing worktree", "task_id", taskID, "path", worktreePath)
+	workspacePath := m.workspacePath(taskID)
+	slog.Info("[GIT] Removing workspace", "task_id", taskID, "path", workspacePath)
 
-	// Check if worktree exists
-	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
-		slog.Info("[GIT] Worktree does not exist, nothing to remove", "task_id", taskID)
+	// Check if workspace exists
+	if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
+		slog.Info("[GIT] Workspace does not exist, nothing to remove", "task_id", taskID)
 		return nil
 	}
 
-	// Remove the worktree directory first
-	if err := os.RemoveAll(worktreePath); err != nil {
-		slog.Error("[GIT] Failed to remove worktree directory", "error", err)
-		return fmt.Errorf("failed to remove worktree directory: %w", err)
+	// Remove the workspace directory first
+	if err := os.RemoveAll(workspacePath); err != nil {
+		slog.Error("[GIT] Failed to remove workspace directory", "error", err)
+		return fmt.Errorf("failed to remove workspace directory: %w", err)
 	}
 
-	// Prune worktrees to clean up git's internal state
-	// Find the parent repo by looking for any repo in the repos directory
-	reposDir := filepath.Join(m.dataDir, "repos")
-	_ = filepath.Walk(reposDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if info.IsDir() && info.Name() == ".git" {
-			parentRepo := filepath.Dir(path)
-			cmd := exec.Command("git", "worktree", "prune")
-			cmd.Dir = parentRepo
-			_ = cmd.Run() // Ignore errors
-		}
-		return nil
-	})
+	// Prune workspaces to clean up git's internal state
+	cmd := exec.CommandContext(ctx, "git", "worktree", "prune")
+	cmd.Dir = m.repoRoot
+	if output, err := cmd.CombinedOutput(); err != nil {
+		slog.Warn("[GIT] Failed to prune workspaces", "error", err, "output", string(output))
+	}
 
-	slog.Info("[GIT] Worktree removed", "task_id", taskID)
+	slog.Info("[GIT] Workspace removed", "task_id", taskID)
 	return nil
 }

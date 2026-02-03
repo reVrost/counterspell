@@ -34,12 +34,14 @@ var ErrNoBinaryPath = errors.New("agent: claude binary not found in PATH")
 //   - State management is limited (CLI manages its own state)
 //   - IntrospectableBackend not fully supported
 type ClaudeCodeBackend struct {
-	binaryPath    string
-	workDir       string
-	apiKey        string
-	baseURL       string
-	model         string
-	sessionID     string // Claude Code session ID
+	binaryPath   string
+	workDir      string
+	apiKey       string
+	baseURL      string
+	model        string
+	sessionID    string // Claude Code session ID
+	systemPrompt string
+
 	streamCtx     context.Context
 	events        chan<- StreamEvent
 	streamMsgID   string
@@ -96,6 +98,12 @@ func WithModel(model string) ClaudeCodeOption {
 func WithSessionID(sessionID string) ClaudeCodeOption {
 	return func(b *ClaudeCodeBackend) {
 		b.sessionID = sessionID
+	}
+}
+
+func WithClaudeSystemPrompt(prompt string) ClaudeCodeOption {
+	return func(b *ClaudeCodeBackend) {
+		b.systemPrompt = prompt
 	}
 }
 
@@ -192,6 +200,10 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string) error {
 	b.mu.Unlock()
 
 	// Add user message to history and emit immediately
+	execPrompt := prompt
+	if b.systemPrompt != "" && b.sessionID == "" {
+		execPrompt = b.systemPrompt + "\n\n" + prompt
+	}
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{
 		Role:    "user",
@@ -199,7 +211,7 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string) error {
 	})
 	b.mu.Unlock()
 
-	cmd, err := b.buildCmd(ctx, prompt)
+	cmd, err := b.buildCmd(ctx, execPrompt)
 	if err != nil {
 		return err
 	}
