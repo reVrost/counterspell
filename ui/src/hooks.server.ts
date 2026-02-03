@@ -12,10 +12,27 @@ const proxyApi: Handle = async ({ event, resolve }) => {
 			headers.set(key, value);
 		});
 
+		const method = event.request.method.toUpperCase();
+		if (method === 'GET' || method === 'HEAD') {
+			const response = await fetch(apiUrl.toString(), {
+				method,
+				headers,
+				credentials: 'include'
+			});
+
+			return new Response(response.body, {
+				status: response.status,
+				headers: response.headers
+			});
+		}
+
+		const body = await event.request.arrayBuffer();
+		headers.delete('content-length');
+
 		const response = await fetch(apiUrl.toString(), {
-			method: event.request.method,
+			method,
 			headers,
-			body: event.request.body,
+			body,
 			credentials: 'include'
 		});
 
