@@ -6,6 +6,7 @@
   import Thread from './Thread.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import type { Session, SessionMessage } from '$lib/types';
+  import { tick } from 'svelte';
 
   interface Props {
     session: Session;
@@ -14,6 +15,15 @@
   }
 
   let { session, messages, onRefresh }: Props = $props();
+
+  $effect(() => {
+    tick().then(() => {
+      const container = document.getElementById('content-scroll');
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight });
+      }
+    });
+  });
 
   function formatRelativeTimestamp(value?: number | null): string {
     if (!value) return 'No messages yet';
@@ -60,7 +70,7 @@
   }
 </script>
 
-<div class="flex flex-col h-screen">
+<div class="flex flex-col h-screen content-scroll">
   <div
     class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-popover"
   >
@@ -100,7 +110,7 @@
     </div>
 
     <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3">
-      <Thread mode="session" messages={messages} emptyText="No messages yet." />
+      <Thread mode="session" {messages} emptyText="No messages yet." />
     </div>
 
     <div class="absolute bottom-0 inset-x-0 z-10 pb-4 px-4">
@@ -108,11 +118,7 @@
         class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
       ></div>
       <div class="relative mx-auto max-w-3xl">
-        <ChatInput
-          mode="chat"
-          placeholder="Message this session..."
-          onSubmit={handleChatSubmit}
-        />
+        <ChatInput mode="chat" placeholder="Message this session..." onSubmit={handleChatSubmit} />
       </div>
     </div>
   </div>
