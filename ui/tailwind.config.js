@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin';
+
 /** @type {import('tailwindcss').Config} */
 export default {
 	darkMode: ['class', 'class'],
@@ -144,5 +146,20 @@ export default {
     		}
     	}
     },
-	plugins: [require("tailwindcss-animate")]
+	plugins: [
+		require("tailwindcss-animate"),
+		plugin(({ addBase }) => {
+			addBase({
+				'.text-10, .text-11, .text-12, .text-xs': {
+					fontWeight: '500'
+				},
+				'.font-mono.text-10, .font-mono.text-11, .font-mono.text-12, .font-mono.text-xs': {
+					fontWeight: '400'
+				},
+				'.font-mono .text-10, .font-mono .text-11, .font-mono .text-12, .font-mono .text-xs': {
+					fontWeight: '400'
+				}
+			});
+		})
+	]
 };
