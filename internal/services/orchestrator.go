@@ -376,13 +376,26 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	slog.Info("[ORCHESTRATOR] Getting API key from settings", "task_id", job.TaskID, "provider", provider)
 	apiKey, actualProvider, actualModel, err := o.settings.GetAPIKeyForProvider(ctx, provider)
 	if err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to get API key", "error", err)
-		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
-		return
+		if backendType != "codex" {
+			slog.Error("[ORCHESTRATOR] Failed to get API key", "error", err)
+			job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: err.Error()}
+			return
+		}
+		slog.Warn("[ORCHESTRATOR] Codex backend proceeding without settings API key", "error", err)
+		actualProvider = provider
+		actualModel = model
 	}
-	provider = actualProvider
-	if model == "" {
+	if actualProvider != "" {
+		provider = actualProvider
+	}
+	if model == "" && actualModel != "" {
 		model = actualModel
+	}
+	if backendType == "codex" && model != "" {
+		lowerModel := strings.ToLower(model)
+		if strings.Contains(lowerModel, "claude") || strings.Contains(lowerModel, "anthropic") || strings.Contains(lowerModel, "glm") {
+			model = ""
+		}
 	}
 	slog.Info("[ORCHESTRATOR] Retrieved API settings", "task_id", job.TaskID, "provider", provider, "model", model)
 
