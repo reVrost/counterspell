@@ -30,15 +30,19 @@ import (
 // Backend is the interface for agent task execution.
 // All methods are required - the UI depends on full implementation.
 //
-// Lifecycle: New() -> RestoreState? -> Run/Send -> (repeat) -> Close
+// Lifecycle: New() -> RestoreState? -> Stream/SendStream -> (repeat) -> Close
 //
 // Thread safety: Implementations must be safe for concurrent method calls,
-// but callers should not call Run/Send concurrently on the same backend.
+// but callers should not call Stream/SendStream concurrently on the same backend.
 type Backend interface {
 	// --- Core execution ---
 
-	// Run executes a task and streams events via the configured callback.
-	// Blocks until completion; cancel via context.
+	// Stream executes a task and returns a stream of events.
+	// The caller must drain Events until Done is received.
+	Stream(ctx context.Context, task string) *Stream
+
+	// Run executes a task and blocks until completion.
+	// It drains the stream internally; prefer Stream for responsiveness.
 	Run(ctx context.Context, task string) error
 
 	// // Send continues the conversation with a follow-up message.

@@ -1,23 +1,21 @@
 package agent
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/revrost/counterspell/internal/agent/tools"
 	"github.com/revrost/counterspell/internal/llm"
 )
 
 const (
-	// apiURL   = "https://api.anthropic.com/v1/messages"
-	// model    = "claude-opus-4-5"
-	// apiVer   = "2023-06-01"
 	maxToken = 8192
 )
 
@@ -25,20 +23,44 @@ const (
 type APIRequest struct {
 	Model     string          `json:"model"`
 	MaxTokens int             `json:"max_tokens"`
-	System    string          `json:"system"`   // System prompt (context for the assistant)
-	Messages  []Message       `json:"messages"` // Conversation history
-	Tools     []tools.ToolDef `json:"tools"`    // Tools available to the assistant
+	System    string          `json:"system"`
+	Messages  []Message       `json:"messages"`
+	Tools     []tools.ToolDef `json:"tools"`
+	Stream    bool            `json:"stream,omitempty"`
 }
 
 // APIResponse is what we get back from Anthropic's API.
 type APIResponse struct {
-	Content []ContentBlock `json:"content"` // Assistant's response
+	Content []ContentBlock `json:"content"`
+}
+
+// LLMEventType identifies the type of streaming event from the LLM.
+type LLMEventType string
+
+const (
+	LLMContentStart LLMEventType = "content_start"
+	LLMContentDelta LLMEventType = "content_delta"
+	LLMContentEnd   LLMEventType = "content_end"
+	LLMMessageEnd   LLMEventType = "message_end"
+)
+
+// LLMEvent represents a single streaming event from the LLM.
+type LLMEvent struct {
+	Type      LLMEventType
+	BlockType string
+	Delta     string
+	Block     *ContentBlock
+}
+
+// LLMStream represents an asynchronous stream of LLM events.
+type LLMStream struct {
+	Events <-chan LLMEvent
+	Done   <-chan error
 }
 
 // LLMCaller is an interface for calling LLM APIs.
-// Implementations handle the specific protocol (Anthropic vs OpenAI).
 type LLMCaller interface {
-	Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error)
+	Stream(ctx context.Context, messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*LLMStream, error)
 }
 
 // NewLLMCaller creates an LLMCaller based on the provider type.
@@ -56,13 +78,14 @@ type AnthropicCaller struct {
 	provider llm.Provider
 }
 
-func (c *AnthropicCaller) Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error) {
+func (c *AnthropicCaller) Stream(ctx context.Context, messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*LLMStream, error) {
 	req := APIRequest{
 		Model:     c.provider.Model(),
 		MaxTokens: maxToken,
 		System:    systemPrompt,
 		Messages:  messages,
 		Tools:     tools.MakeSchema(allTools),
+		Stream:    true,
 	}
 
 	body, err := json.Marshal(req)
@@ -71,15 +94,15 @@ func (c *AnthropicCaller) Call(messages []Message, allTools map[string]tools.Too
 	}
 
 	prettyBody, _ := json.MarshalIndent(req, "", "  ")
-	slog.Info("[LLM REQUEST] Sending to API",
+	slog.Info("[LLM STREAM] Sending to API",
 		"url", c.provider.APIURL(),
 		"model", c.provider.Model(),
 		"message_count", len(messages),
 		"tool_count", len(allTools),
 	)
-	slog.Debug("[LLM REQUEST] Full payload", "body", string(prettyBody))
+	slog.Debug("[LLM STREAM] Full payload", "body", string(prettyBody))
 
-	httpReq, err := http.NewRequest("POST", c.provider.APIURL(), bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.provider.APIURL(), bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -96,27 +119,153 @@ func (c *AnthropicCaller) Call(messages []Message, allTools map[string]tools.Too
 		httpReq.Header.Set("HTTP-Referer", "https://counterspell.dev")
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var apiResp APIResponse
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
-	}
-	return &apiResp, nil
+	events := make(chan LLMEvent, 32)
+	done := make(chan error, 1)
+
+	go func() {
+		defer close(events)
+		defer close(done)
+		defer resp.Body.Close()
+
+		blockTypes := map[int]string{}
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		var eventName string
+		var data strings.Builder
+
+		emit := func(ev LLMEvent) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case events <- ev:
+				return true
+			}
+		}
+
+		flush := func() bool {
+			payload := strings.TrimSpace(data.String())
+			name := eventName
+			eventName = ""
+			data.Reset()
+			if payload == "" {
+				return true
+			}
+
+			switch name {
+			case "content_block_start":
+				var evt struct {
+					Index        int `json:"index"`
+					ContentBlock struct {
+						Type     string         `json:"type"`
+						Text     string         `json:"text,omitempty"`
+						Thinking string         `json:"thinking,omitempty"`
+						Name     string         `json:"name,omitempty"`
+						ID       string         `json:"id,omitempty"`
+						Input    map[string]any `json:"input,omitempty"`
+					} `json:"content_block"`
+				}
+				if err := json.Unmarshal([]byte(payload), &evt); err != nil {
+					return true
+				}
+				blockTypes[evt.Index] = evt.ContentBlock.Type
+				block := &ContentBlock{Type: evt.ContentBlock.Type}
+				switch evt.ContentBlock.Type {
+				case "text":
+					block.Text = evt.ContentBlock.Text
+				case "thinking":
+					block.Text = evt.ContentBlock.Thinking
+				case "tool_use":
+					block.Name = evt.ContentBlock.Name
+					block.ID = evt.ContentBlock.ID
+					block.Input = evt.ContentBlock.Input
+				}
+				return emit(LLMEvent{Type: LLMContentStart, BlockType: evt.ContentBlock.Type, Block: block})
+			case "content_block_delta":
+				var evt struct {
+					Index int `json:"index"`
+					Delta struct {
+						Type        string `json:"type"`
+						Text        string `json:"text,omitempty"`
+						Thinking    string `json:"thinking,omitempty"`
+						PartialJSON string `json:"partial_json,omitempty"`
+					} `json:"delta"`
+				}
+				if err := json.Unmarshal([]byte(payload), &evt); err != nil {
+					return true
+				}
+				if evt.Delta.Text != "" {
+					return emit(LLMEvent{Type: LLMContentDelta, BlockType: "text", Delta: evt.Delta.Text})
+				}
+				if evt.Delta.Thinking != "" {
+					return emit(LLMEvent{Type: LLMContentDelta, BlockType: "thinking", Delta: evt.Delta.Thinking})
+				}
+				if evt.Delta.PartialJSON != "" {
+					return emit(LLMEvent{Type: LLMContentDelta, BlockType: "tool_use", Delta: evt.Delta.PartialJSON})
+				}
+			case "content_block_stop":
+				var evt struct {
+					Index int `json:"index"`
+				}
+				if err := json.Unmarshal([]byte(payload), &evt); err != nil {
+					return true
+				}
+				blockType := blockTypes[evt.Index]
+				return emit(LLMEvent{Type: LLMContentEnd, BlockType: blockType})
+			case "message_stop":
+				return emit(LLMEvent{Type: LLMMessageEnd})
+			case "error":
+				var evt struct {
+					Error struct {
+						Message string `json:"message"`
+					} `json:"error"`
+				}
+				if err := json.Unmarshal([]byte(payload), &evt); err == nil {
+					done <- fmt.Errorf("llm error: %s", evt.Error.Message)
+					return false
+				}
+			}
+			return true
+		}
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				if !flush() {
+					return
+				}
+				continue
+			}
+			if strings.HasPrefix(line, "event:") {
+				eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+				continue
+			}
+			if strings.HasPrefix(line, "data:") {
+				if data.Len() > 0 {
+					data.WriteByte('\n')
+				}
+				data.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			done <- err
+			return
+		}
+		done <- nil
+	}()
+
+	return &LLMStream{Events: events, Done: done}, nil
 }
 
 // OpenAICaller implements LLMCaller for OpenAI-compatible APIs.
@@ -131,6 +280,7 @@ type OpenAIRequest struct {
 	Messages   []OpenAIMessage `json:"messages"`
 	Tools      []OpenAIToolDef `json:"tools,omitempty"`
 	ToolChoice string          `json:"tool_choice,omitempty"`
+	Stream     bool            `json:"stream,omitempty"`
 }
 
 type OpenAIMessage struct {
@@ -167,13 +317,7 @@ type FunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
-type OpenAIResponse struct {
-	Choices []struct {
-		Message OpenAIMessage `json:"message"`
-	} `json:"choices"`
-}
-
-func (c *OpenAICaller) Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error) {
+func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*LLMStream, error) {
 	openAIMessages := []OpenAIMessage{}
 
 	openAIMessages = append(openAIMessages, OpenAIMessage{
@@ -182,38 +326,37 @@ func (c *OpenAICaller) Call(messages []Message, allTools map[string]tools.Tool, 
 	})
 
 	for _, msg := range messages {
-		if msg.Role == "user" {
-			isToolResult := false
-			for _, block := range msg.Content {
-				if block.Type == "tool_result" {
-					isToolResult = true
-					openAIMessages = append(openAIMessages, OpenAIMessage{
-						Role:       "tool",
-						ToolCallID: block.ToolUseID,
-						Content:    block.Content,
-					})
-				}
-			}
-
-			if !isToolResult {
-				var contentBuilder strings.Builder
-				for _, block := range msg.Content {
-					if block.Type == "text" {
-						contentBuilder.WriteString(block.Text)
-					}
-				}
+		isToolResult := false
+		for _, block := range msg.Content {
+			if block.Type == "tool_result" {
+				isToolResult = true
 				openAIMessages = append(openAIMessages, OpenAIMessage{
-					Role:    "user",
-					Content: contentBuilder.String(),
+					Role:       "tool",
+					ToolCallID: block.ToolUseID,
+					Content:    block.Content,
 				})
 			}
 		}
 
-		if msg.Role == "assistant" {
-			oaMsg := OpenAIMessage{
-				Role: "assistant",
-			}
+		if isToolResult {
+			continue
+		}
 
+		if msg.Role == "user" {
+			var contentBuilder strings.Builder
+			for _, block := range msg.Content {
+				if block.Type == "text" {
+					contentBuilder.WriteString(block.Text)
+				}
+			}
+			openAIMessages = append(openAIMessages, OpenAIMessage{
+				Role:    "user",
+				Content: contentBuilder.String(),
+			})
+		}
+
+		if msg.Role == "assistant" {
+			oaMsg := OpenAIMessage{Role: "assistant"}
 			var contentBuilder strings.Builder
 			for _, block := range msg.Content {
 				if block.Type == "text" {
@@ -252,6 +395,7 @@ func (c *OpenAICaller) Call(messages []Message, allTools map[string]tools.Tool, 
 		Model:    c.provider.Model(),
 		Messages: openAIMessages,
 		Tools:    openAITools,
+		Stream:   true,
 	}
 
 	body, err := json.Marshal(req)
@@ -259,7 +403,7 @@ func (c *OpenAICaller) Call(messages []Message, allTools map[string]tools.Tool, 
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequest("POST", c.provider.APIURL(), bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.provider.APIURL(), bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -267,57 +411,116 @@ func (c *OpenAICaller) Call(messages []Message, allTools map[string]tools.Tool, 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.provider.APIKey())
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("api error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var oaResp OpenAIResponse
-	if err := json.Unmarshal(respBody, &oaResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
-	}
+	events := make(chan LLMEvent, 32)
+	done := make(chan error, 1)
 
-	apiResp := APIResponse{
-		Content: []ContentBlock{},
-	}
+	go func() {
+		defer close(events)
+		defer close(done)
+		defer resp.Body.Close()
 
-	if len(oaResp.Choices) > 0 {
-		choice := oaResp.Choices[0]
+		textActive := false
+		toolActive := map[int]OpenAIToolCall{}
 
-		if contentStr, ok := choice.Message.Content.(string); ok && contentStr != "" {
-			apiResp.Content = append(apiResp.Content, ContentBlock{
-				Type: "text",
-				Text: contentStr,
-			})
+		emit := func(ev LLMEvent) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case events <- ev:
+				return true
+			}
 		}
 
-		for _, toolCall := range choice.Message.ToolCalls {
-			var input map[string]any
-			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &input); err != nil {
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, ":") {
+				continue
+			}
+			if !strings.HasPrefix(line, "data:") {
+				continue
+			}
+			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			if data == "[DONE]" {
+				break
+			}
+
+			var payload struct {
+				Choices []struct {
+					Delta struct {
+						Content   string `json:"content"`
+						ToolCalls []struct {
+							Index    int    `json:"index"`
+							ID       string `json:"id"`
+							Type     string `json:"type"`
+							Function struct {
+								Name      string `json:"name"`
+								Arguments string `json:"arguments"`
+							} `json:"function"`
+						} `json:"tool_calls"`
+					} `json:"delta"`
+					FinishReason *string `json:"finish_reason"`
+				} `json:"choices"`
+			}
+			if err := json.Unmarshal([]byte(data), &payload); err != nil {
 				continue
 			}
 
-			apiResp.Content = append(apiResp.Content, ContentBlock{
-				Type:  "tool_use",
-				ID:    toolCall.ID,
-				Name:  toolCall.Function.Name,
-				Input: input,
-			})
-		}
-	}
+			for _, choice := range payload.Choices {
+				if choice.Delta.Content != "" {
+					if !textActive {
+						emit(LLMEvent{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}})
+						textActive = true
+					}
+					emit(LLMEvent{Type: LLMContentDelta, BlockType: "text", Delta: choice.Delta.Content})
+				}
 
-	return &apiResp, nil
+				for _, tc := range choice.Delta.ToolCalls {
+					if _, ok := toolActive[tc.Index]; !ok {
+						toolActive[tc.Index] = OpenAIToolCall{ID: tc.ID, Function: FunctionCall{Name: tc.Function.Name}}
+						emit(LLMEvent{Type: LLMContentStart, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: tc.Function.Name, ID: tc.ID}})
+					}
+					if tc.Function.Arguments != "" {
+						emit(LLMEvent{Type: LLMContentDelta, BlockType: "tool_use", Delta: tc.Function.Arguments})
+					}
+				}
+
+				if choice.FinishReason != nil {
+					if textActive {
+						emit(LLMEvent{Type: LLMContentEnd, BlockType: "text"})
+						textActive = false
+					}
+					if len(toolActive) > 0 {
+						for range toolActive {
+							emit(LLMEvent{Type: LLMContentEnd, BlockType: "tool_use"})
+						}
+						toolActive = map[int]OpenAIToolCall{}
+					}
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			done <- err
+			return
+		}
+		emit(LLMEvent{Type: LLMMessageEnd})
+		done <- nil
+	}()
+
+	return &LLMStream{Events: events, Done: done}, nil
 }
 
 // detectProviderType determines the provider type from the API URL.

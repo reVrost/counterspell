@@ -179,7 +179,7 @@ func (s *AgentService) ExecuteWithTool(ctx context.Context, taskID string, messa
 	// Add tools to system message
 	toolsJSON, _ := json.Marshal(tools)
 	systemContent := fmt.Sprintf("You are a helpful coding assistant with access to these tools: %s. Use them to accomplish tasks.", string(toolsJSON))
-	
+
 	messages = append([]Message{
 		{
 			Role:    "system",

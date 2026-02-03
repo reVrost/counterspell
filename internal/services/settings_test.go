@@ -26,19 +26,19 @@ func strPtr(s string) *string {
 
 func TestGetAPIKeyForProvider(t *testing.T) {
 	tests := []struct {
-		name           string
-		settings       *Settings
-		requestedProv  string
-		expectedKey    string
-		expectedProv   string
-		expectedModel  string
-		expectedErr    bool
+		name          string
+		settings      *Settings
+		requestedProv string
+		expectedKey   string
+		expectedProv  string
+		expectedModel string
+		expectedErr   bool
 	}{
 		{
 			name: "uses default anthropic when no settings provider and empty requested provider",
 			settings: &Settings{
 				AnthropicKey: "sk-ant-test",
-				AgentBackend:  "native",
+				AgentBackend: "native",
 			},
 			requestedProv: "",
 			expectedKey:   "sk-ant-test",
@@ -50,7 +50,7 @@ func TestGetAPIKeyForProvider(t *testing.T) {
 			settings: &Settings{
 				AnthropicKey: "sk-ant-test",
 				ZaiKey:       "zai-test-key",
-				AgentBackend:  "native",
+				AgentBackend: "native",
 			},
 			requestedProv: "zai",
 			expectedKey:   "zai-test-key",
@@ -62,7 +62,7 @@ func TestGetAPIKeyForProvider(t *testing.T) {
 			settings: &Settings{
 				AnthropicKey:  "sk-ant-test",
 				OpenRouterKey: "or-test-key",
-				AgentBackend:   "native",
+				AgentBackend:  "native",
 			},
 			requestedProv: "openrouter",
 			expectedKey:   "or-test-key",
@@ -73,8 +73,8 @@ func TestGetAPIKeyForProvider(t *testing.T) {
 			name: "uses openai provider when explicitly requested",
 			settings: &Settings{
 				AnthropicKey: "sk-ant-test",
-				OpenAIKey:     "sk-openai-test",
-				AgentBackend:  "native",
+				OpenAIKey:    "sk-openai-test",
+				AgentBackend: "native",
 			},
 			requestedProv: "openai",
 			expectedKey:   "sk-openai-test",
@@ -98,7 +98,7 @@ func TestGetAPIKeyForProvider(t *testing.T) {
 			name: "uses custom model from settings",
 			settings: &Settings{
 				AnthropicKey: "sk-ant-test",
-				Model:         strPtr("custom-model-v1"),
+				Model:        strPtr("custom-model-v1"),
 				AgentBackend: "native",
 			},
 			requestedProv: "",

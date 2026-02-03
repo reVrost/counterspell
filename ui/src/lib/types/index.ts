@@ -51,6 +51,28 @@ export interface Message {
   finished_at?: number | null;
 }
 
+export interface ContentBlock {
+  type: 'text' | 'thinking' | 'tool_use' | 'tool_result';
+  text?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  id?: string;
+  tool_use_id?: string;
+  content?: string;
+}
+
+export interface AgentStreamEvent {
+  type: string;
+  message_id?: string;
+  role?: string;
+  block_type?: string;
+  delta?: string;
+  block?: ContentBlock;
+  session_id?: string;
+  todos?: Todo[];
+  error?: string;
+}
+
 export interface AgentRun {
   id: string;
   task_id: string;
