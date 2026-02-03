@@ -17,7 +17,7 @@
     messages,
     emptyText = 'No messages yet.',
     emptyClass = 'text-xs text-gray-500',
-    class: className = ''
+    class: className = '',
   }: Props = $props();
 
   type ThinkingItem = { tool: string; call: string; result: string };
@@ -55,7 +55,12 @@
     if (!tool) return null;
 
     const call = formatToolInput(
-      record.input ?? record.arguments ?? record.args ?? record.content ?? record.command ?? record.data
+      record.input ??
+        record.arguments ??
+        record.args ??
+        record.content ??
+        record.command ??
+        record.data
     );
     return { tool: String(tool), call };
   }
@@ -76,23 +81,36 @@
     const trimmed = text.trim();
     if (!trimmed) return { tool: 'tool', call: '' };
 
+    // 1. Try JSON first
     const fromJson = parseToolFromJson(trimmed);
     if (fromJson) return fromJson;
 
-    const lines = trimmed.split('
-');
-    const firstLine = lines[0]?.trim() ?? '';
-    const prefixed = firstLine.match(/^([a-zA-Z0-9_-]{2,})(?:\s+|:)(.+)$/);
+    const lines = trimmed.split('\n');
+    const firstLine = lines[0].trim();
+
+    // 2. Match "toolName: call content" or "toolName call content"
+    // Improved regex to handle colons and whitespace more strictly
+    const prefixed = firstLine.match(/^([a-zA-Z0-9_-]{2,})[:\s]+(.+)$/);
+
     if (prefixed) {
-      const remainder = [prefixed[2], ...lines.slice(1)].filter(Boolean).join('
-').trim();
-      return { tool: prefixed[1], call: remainder };
-    }
-    if (lines.length > 1 && /^[a-zA-Z0-9_-]{2,}$/.test(firstLine)) {
-      return { tool: firstLine, call: lines.slice(1).join('
-').trim() };
+      const tool = prefixed[1];
+      const firstLineContent = prefixed[2];
+      const remainingLines = lines.slice(1);
+
+      // Reconstruct the call: take the rest of the first line + all subsequent lines
+      const call = [firstLineContent, ...remainingLines].join('\n').trim();
+      return { tool, call };
     }
 
+    // 3. Match "toolName\ncall content" (Tool name on its own line)
+    if (lines.length > 1 && /^[a-zA-Z0-9_-]{2,}$/.test(firstLine)) {
+      return {
+        tool: firstLine,
+        call: lines.slice(1).join('\n').trim(),
+      };
+    }
+
+    // 4. Fallback: treat the whole thing as the call for a generic 'tool'
     return { tool: 'tool', call: trimmed };
   }
 
@@ -118,7 +136,10 @@
   }
 
   function concatText(blocks: ContentBlock[]): string {
-    return blocks.filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('');
+    return blocks
+      .filter((b) => b.type === 'text' && b.text)
+      .map((b) => b.text)
+      .join('');
   }
 
   function isSystemLikeMessage(message: SessionMessage): boolean {
@@ -203,7 +224,9 @@
 
   const sessionItems = $derived.by(() => {
     if (mode !== 'session') return [] as SessionDisplayItem[];
-    const sessionMessages = (messages as SessionMessage[]).filter((msg) => !isSystemLikeMessage(msg));
+    const sessionMessages = (messages as SessionMessage[]).filter(
+      (msg) => !isSystemLikeMessage(msg)
+    );
     const items: SessionDisplayItem[] = [];
     let i = 0;
 
@@ -226,7 +249,7 @@
             id: msg.id,
             tool: msg.tool_name || 'tool',
             call: msg.content || '',
-            result
+            result,
           });
         } else {
           items.push({
@@ -234,7 +257,7 @@
             id: msg.id,
             tool: msg.tool_name || 'tool result',
             call: '',
-            result: msg.content || ''
+            result: msg.content || '',
           });
         }
         i++;
@@ -264,7 +287,7 @@
               <div
                 class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-[#FFFFFF] shadow-lg"
               >
-                <p class="text-base font-medium leading-relaxed">{item.message.content}</p>
+                <p class="text-lg font-medium leading-relaxed">{item.message.content}</p>
               </div>
             </div>
           {:else if item.message.role === 'assistant'}
@@ -298,8 +321,7 @@
                   stroke="currentColor"
                   stroke-width="2.5"
                   stroke-linecap="round"
-                  stroke-linejoin="round"
-                  ><path d="m9 18 6-6-6-6" /></svg
+                  stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
                 >
               </div>
               <span class="text-xs font-bold tracking-widest uppercase">Thinking</span>
@@ -314,33 +336,31 @@
       {/each}
     </div>
   {/if}
+{:else if isEmpty}
+  <div class={cn('text-xs font-medium text-gray-500', emptyClass)}>{emptyText}</div>
 {:else}
-  {#if isEmpty}
-    <div class={cn('text-xs font-medium text-gray-500', emptyClass)}>{emptyText}</div>
-  {:else}
-    <div class={cn('space-y-2', className)}>
-      {#each sessionItems as item}
-        {#if item.type === 'tool'}
-          <ToolBlock tool={item.tool} call={item.call} result={item.result} />
-        {:else}
-          <div
-            class={cn(
-              'rounded-lg border px-3 py-2 text-xs font-medium',
-              item.message.role === 'user'
-                ? 'border-violet-500/30 bg-violet-500/10 text-gray-200'
-                : 'border-white/10 bg-white/5 text-gray-300'
-            )}
-          >
-            <div class="flex items-center justify-between text-[10px] uppercase text-gray-500 mb-1">
-              <span>{item.message.role}</span>
-              <span>{item.message.kind}</span>
-            </div>
-            <div class="text-[12px] whitespace-pre-wrap break-words">
-              {item.message.content || ''}
-            </div>
+  <div class={cn('space-y-2', className)}>
+    {#each sessionItems as item}
+      {#if item.type === 'tool'}
+        <ToolBlock tool={item.tool} call={item.call} result={item.result} />
+      {:else}
+        <div
+          class={cn(
+            'rounded-lg border px-3 py-2 text-xs font-medium',
+            item.message.role === 'user'
+              ? 'border-violet-500/30 bg-violet-500/10 '
+              : 'border-white/10 bg-white/5 '
+          )}
+        >
+          <div class="flex items-center justify-between text-sm uppercase text-gray-500 mb-1">
+            <span>{item.message.role}</span>
+            <span>{item.message.kind}</span>
           </div>
-        {/if}
-      {/each}
-    </div>
-  {/if}
+          <div class="text-base whitespace-pre-wrap break-words">
+            {item.message.content || ''}
+          </div>
+        </div>
+      {/if}
+    {/each}
+  </div>
 {/if}

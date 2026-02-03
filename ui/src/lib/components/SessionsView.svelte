@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { goto } from '$app/navigation';
   import { sessionsAPI } from '$lib/api';
   import { appState } from '$lib/stores/app.svelte';
