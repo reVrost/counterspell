@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/revrost/counterspell/internal/agent/tools"
 	"github.com/revrost/counterspell/internal/llm"
 	"go.uber.org/mock/gomock"
 )
@@ -21,7 +22,7 @@ func TestRunner_EmptyUserMessage(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("New run with empty message should error", func(t *testing.T) {
-		err := r.runWithMessage(ctx, "", false)
+		err := r.runWithMessage(ctx, "", false, make(chan StreamEvent, 1), make(chan []tools.TodoItem, 1))
 		if err == nil {
 			t.Error("expected error for empty message on new run, got nil")
 		}
@@ -35,12 +36,15 @@ func TestRunner_EmptyUserMessage(t *testing.T) {
 
 		// Expect LLM call with NO new user message added to the input
 		mockCaller.EXPECT().
-			Call(gomock.Len(2), gomock.Any(), gomock.Any()).
-			Return(&APIResponse{
-				Content: []ContentBlock{{Type: "text", Text: "next"}},
-			}, nil)
+			Stream(gomock.Any(), gomock.Len(2), gomock.Any(), gomock.Any()).
+			Return(makeLLMStream([]LLMEvent{
+				{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}},
+				{Type: LLMContentDelta, BlockType: "text", Delta: "next"},
+				{Type: LLMContentEnd, BlockType: "text"},
+				{Type: LLMMessageEnd},
+			}), nil)
 
-		err := r.runWithMessage(ctx, "", true)
+		err := r.runWithMessage(ctx, "", true, make(chan StreamEvent, 4), make(chan []tools.TodoItem, 1))
 		if err != nil {
 			t.Errorf("expected no error for empty message on continuation, got %v", err)
 		}
@@ -76,10 +80,13 @@ func TestRunner_MessagePersistence(t *testing.T) {
 	ctx := context.Background()
 
 	mockCaller.EXPECT().
-		Call(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&APIResponse{
-			Content: []ContentBlock{{Type: "text", Text: "response"}},
-		}, nil)
+		Stream(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(makeLLMStream([]LLMEvent{
+			{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}},
+			{Type: LLMContentDelta, BlockType: "text", Delta: "response"},
+			{Type: LLMContentEnd, BlockType: "text"},
+			{Type: LLMMessageEnd},
+		}), nil)
 
 	err := r.Run(ctx, "hello")
 	if err != nil {

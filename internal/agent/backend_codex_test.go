@@ -2,19 +2,16 @@ package agent
 
 import (
 	"bufio"
+	"context"
 	"strings"
 	"testing"
 )
 
 func TestCodexBackend_EventParsing(t *testing.T) {
-	var receivedEvents []StreamEvent
-	callback := func(e StreamEvent) {
-		receivedEvents = append(receivedEvents, e)
-	}
-
-	b := &CodexBackend{
-		callback: callback,
-	}
+	b := &CodexBackend{}
+	events := make(chan StreamEvent, 64)
+	b.setStream(context.Background(), events)
+	defer b.clearStream()
 
 	rawEvents := []string{
 		`{"type":"thread.started","thread_id":"thread_123"}`,
@@ -29,21 +26,24 @@ func TestCodexBackend_EventParsing(t *testing.T) {
 
 	b.parseOutput(scanner)
 
-	expectedTypes := []string{
-		"session",
-		EventTool,
-		EventToolResult,
-		EventText,
-		EventDone,
+	var receivedEvents []StreamEvent
+	for len(events) > 0 {
+		receivedEvents = append(receivedEvents, <-events)
 	}
 
-	if len(receivedEvents) != len(expectedTypes) {
-		t.Fatalf("expected %d events, got %d", len(expectedTypes), len(receivedEvents))
+	if !hasEventType(receivedEvents, EventSession) {
+		t.Fatalf("expected session event")
 	}
-
-	for i, eventType := range expectedTypes {
-		if receivedEvents[i].Type != eventType {
-			t.Errorf("event %d: expected type %s, got %s", i, eventType, receivedEvents[i].Type)
-		}
+	if !hasBlockType(receivedEvents, "tool_use") {
+		t.Errorf("expected tool_use content block")
+	}
+	if !hasBlockType(receivedEvents, "tool_result") {
+		t.Errorf("expected tool_result content block")
+	}
+	if !hasBlockType(receivedEvents, "text") {
+		t.Errorf("expected text content block")
+	}
+	if !hasEventType(receivedEvents, EventDone) {
+		t.Fatalf("expected done event")
 	}
 }

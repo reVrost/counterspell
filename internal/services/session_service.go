@@ -72,34 +72,6 @@ func filterCodexSetupMessages(messages []models.SessionMessage) []models.Session
 	return filtered
 }
 
-func valueOrEmpty(val *string) string {
-	if val == nil {
-		return ""
-	}
-	return *val
-}
-
-func isCodexSetupContent(content string) bool {
-	if strings.TrimSpace(content) == "" {
-		return false
-	}
-	lower := strings.ToLower(content)
-	for _, marker := range codexSetupMarkers {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
-}
-
-var codexSetupMarkers = []string{
-	"agents.md",
-	"<environment_context>",
-	"<collaboration_mode>",
-	"<instructions>",
-	"<permissions instructions>",
-}
-
 // Create creates a new empty session.
 func (s *SessionService) Create(ctx context.Context, backend string) (*models.Session, error) {
 	backend = strings.TrimSpace(backend)
@@ -214,9 +186,6 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 	if err != nil {
 		return nil, err
 	}
-	if session.AgentBackend == "codex" {
-		return nil, ErrCodexUnsupported
-	}
 
 	existing, err := s.repo.GetTaskBySessionID(ctx, sessionID)
 	if err != nil {
@@ -243,6 +212,10 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 	task, err := s.repo.CreateFromSession(ctx, sessionID, title, title, string(snapshot))
 	if err != nil {
 		return nil, err
+	}
+
+	if session.AgentBackend == "codex" {
+		return task, nil
 	}
 
 	summaryTitle, summaryIntent, err := s.summarizeSession(ctx, session, messages)

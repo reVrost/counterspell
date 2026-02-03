@@ -27,14 +27,6 @@ const (
 	sessionImportWindow        = 7 * 24 * time.Hour
 )
 
-var codexSetupMarkers = []string{
-	"agents.md",
-	"<environment_context>",
-	"<collaboration_mode>",
-	"<instructions>",
-	"<permissions instructions>",
-}
-
 type importedMessage struct {
 	Role       string
 	Kind       string
@@ -193,7 +185,11 @@ func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID stri
 
 	if session == nil {
 		now := time.Now().UnixMilli()
-		title := sessionTitle(messages)
+		titleMessages := messages
+		if backend == backendCodex {
+			titleMessages = filterCodexSetupImportedMessages(messages)
+		}
+		title := sessionTitle(titleMessages)
 		if title == "" {
 			title = "Imported session"
 		}
@@ -216,7 +212,11 @@ func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID stri
 		needsUpdate := false
 		updateTitle := ""
 		if session.Title == nil || strings.TrimSpace(*session.Title) == "" {
-			updateTitle = sessionTitle(messages)
+			titleMessages := messages
+			if backend == backendCodex {
+				titleMessages = filterCodexSetupImportedMessages(messages)
+			}
+			updateTitle = sessionTitle(titleMessages)
 			if updateTitle != "" {
 				needsUpdate = true
 			}
@@ -747,19 +747,6 @@ func markCodexSetupMessage(msg *importedMessage) {
 	}
 	msg.Role = "system"
 	msg.Kind = "setup"
-}
-
-func isCodexSetupContent(content string) bool {
-	if strings.TrimSpace(content) == "" {
-		return false
-	}
-	lower := strings.ToLower(content)
-	for _, marker := range codexSetupMarkers {
-		if strings.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
 }
 
 func extractTextFromBlock(block map[string]any) string {
