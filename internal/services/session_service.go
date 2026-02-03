@@ -245,6 +245,8 @@ func (s *SessionService) buildBackend(
 		switch provider {
 		case "openrouter":
 			baseURL = "https://openrouter.ai/api/v1"
+		case "zai":
+			baseURL = "https://api.z.ai/api/coding/paas/v4"
 		case "openai", "":
 			if provider == "" {
 				provider = "openai"
@@ -371,6 +373,8 @@ func codexProviderHint(modelID string) string {
 		return "openrouter"
 	case "openai":
 		return "openai"
+	case "zai":
+		return "zai"
 	default:
 		return ""
 	}

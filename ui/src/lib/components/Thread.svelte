@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { cn } from '$lib/utils';
+  import { cn, getInitial } from '$lib/utils';
   import type { ContentBlock, Message, SessionMessage } from '$lib/types';
   import MarkdownRenderer from './MarkdownRenderer.svelte';
   import ToolBlock from './ToolBlock.svelte';
   import { tick } from 'svelte';
+  import { appState } from '$lib/stores/app.svelte';
 
   interface Props {
     mode: 'task' | 'session';
@@ -22,6 +23,11 @@
     class: className = '',
     scrollContainerId,
   }: Props = $props();
+
+  const userAvatarUrl = $derived(
+    appState.githubLogin ? `https://github.com/${appState.githubLogin}.png` : null
+  );
+  const userInitial = $derived(getInitial(appState.githubLogin || appState.userEmail));
 
   type ThinkingItem = { tool: string; call: string; result: string };
   type TaskDisplayItem =
@@ -297,23 +303,38 @@
       {#each taskItems as item}
         {#if item.type === 'message'}
           {#if item.message.role === 'user'}
-            <div class="flex gap-4 px-4 py-2 items-start">
+            <div class="flex gap-3 px-4 py-2 items-start">
+              <div class="shrink-0 mt-1">
+                {#if userAvatarUrl}
+                  <img
+                    src={userAvatarUrl}
+                    alt="User"
+                    class="w-8 h-8 rounded-full border border-white/10 shadow-sm"
+                  />
+                {:else}
+                  <div
+                    class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300"
+                  >
+                    {userInitial}
+                  </div>
+                {/if}
+              </div>
               <div
-                class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-[#FFFFFF] shadow-lg"
+                class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-lg"
               >
-                <p class="text-lg font-medium leading-relaxed">{item.message.content}</p>
+                <p class="text-[13px] font-medium leading-relaxed">{item.message.content}</p>
               </div>
             </div>
           {:else if item.message.role === 'assistant'}
             <div class="px-12 py-2 pr-4">
               <MarkdownRenderer
                 content={item.message.content}
-                class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans"
+                class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans"
               />
             </div>
           {:else}
-            <div class="px-12 py-2 pr-4">
-              <p class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans">
+            <div class="px-12 py-2 pr-4 opacity-70">
+              <p class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans">
                 {item.message.content}
               </p>
             </div>
@@ -358,21 +379,43 @@
       {#if item.type === 'tool'}
         <ToolBlock tool={item.tool} call={item.call} result={item.result} />
       {:else}
-        <div
-          class={cn(
-            'px-3 py-2 text-xs font-medium',
-            item.message.role === 'user' ? 'rounded border-white-500/0 bg-violet-500/10 ' : ''
-          )}
-        >
+        <div class="flex gap-3 px-2 py-1 items-start">
           {#if item.message.role === 'user'}
-            <div class="flex items-center justify-between text-sm uppercase text-gray-500 mb-1">
-              <span>{item.message.role}</span>
-              <span>{item.message.kind}</span>
+            <div class="shrink-0 mt-1">
+              {#if userAvatarUrl}
+                <img
+                  src={userAvatarUrl}
+                  alt="User"
+                  class="w-7 h-7 rounded-full border border-white/10 shadow-sm"
+                />
+              {:else}
+                <div
+                  class="w-7 h-7 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[9px] font-bold text-gray-300"
+                >
+                  {userInitial}
+                </div>
+              {/if}
+            </div>
+            <div
+              class="flex-1 min-w-0 bg-violet-500/10 border border-white/5 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-sm"
+            >
+              <div
+                class="flex items-center justify-between text-[10px] uppercase text-gray-500 mb-1"
+              >
+                <span>{item.message.role}</span>
+                <span>{item.message.kind}</span>
+              </div>
+              <div class="text-[13px] font-medium whitespace-pre-wrap break-words">
+                {item.message.content || ''}
+              </div>
+            </div>
+          {:else}
+            <div class="px-3 py-2 text-xs font-medium">
+              <div class="text-[13px] whitespace-pre-wrap break-words">
+                {item.message.content || ''}
+              </div>
             </div>
           {/if}
-          <div class="text-base whitespace-pre-wrap break-words">
-            {item.message.content || ''}
-          </div>
         </div>
       {/if}
     {/each}
