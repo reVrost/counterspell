@@ -65,7 +65,7 @@
 
 	body {
 		@apply bg-background text-foreground text-base;
-		font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+		font-family: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
 		overscroll-behavior: none;
 	}
 
@@ -127,7 +127,7 @@
 	}
 
 	.font-heading {
-		font-family: 'Liter', serif;
+		font-family: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
 	}
 
 	/* Shimmer loading animation */
