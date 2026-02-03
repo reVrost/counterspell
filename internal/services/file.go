@@ -114,12 +114,12 @@ func (s *FileService) Read(ctx context.Context, path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
 	}
-	
+
 	absDataDir, err := filepath.Abs(s.dataDir)
 	if err != nil {
 		return "", fmt.Errorf("invalid data dir: %w", err)
 	}
-	
+
 	if !strings.HasPrefix(absPath, absDataDir) {
 		return "", fmt.Errorf("path outside data directory")
 	}
@@ -248,8 +248,8 @@ func (s *FileService) GetProjectRoot(ctx context.Context) (string, error) {
 // GetPlatformInfo returns platform information.
 func (s *FileService) GetPlatformInfo() map[string]any {
 	return map[string]any{
-		"os":   runtime.GOOS,
-		"arch": runtime.GOARCH,
+		"os":        runtime.GOOS,
+		"arch":      runtime.GOARCH,
 		"separator": string(filepath.Separator),
 	}
 }

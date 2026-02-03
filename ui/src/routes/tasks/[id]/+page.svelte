@@ -2,7 +2,7 @@
   import { taskStore } from '$lib/stores/tasks.svelte';
   import { tasksAPI } from '$lib/api';
   import { createTaskSSE } from '$lib/utils/sse';
-  import type { TaskResponse, Message, Task, LogEntry } from '$lib/types';
+  import type { TaskResponse, Message, Task, LogEntry, AgentStreamEvent, ContentBlock } from '$lib/types';
   import TaskDetail from '$lib/components/TaskDetail.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import { page } from '$app/stores';
@@ -16,6 +16,13 @@
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
   let sseTaskId = $state<string | null>(null);
+  const streamIndex = new Map<string, number>();
+  const streamState = new Map<string, { blocks: ContentBlock[]; current?: ContentBlock; args?: string }>();
+
+  function resetStreamState() {
+    streamIndex.clear();
+    streamState.clear();
+  }
 
   function applyTaskData(taskData: TaskResponse) {
     task = taskData;
@@ -25,6 +32,125 @@
       : '<div class="text-gray-500 italic">No changes made</div>';
     logContent = [];
     taskStore.currentTask = taskData.task;
+    resetStreamState();
+  }
+
+  function parseParts(msg: Message): ContentBlock[] {
+    if (msg.parts) {
+      try {
+        const parsed = JSON.parse(msg.parts);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore parse errors
+      }
+    }
+    if (msg.content) {
+      return [{ type: 'text', text: msg.content }];
+    }
+    return [];
+  }
+
+  function concatText(blocks: ContentBlock[]): string {
+    return blocks.filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('');
+  }
+
+  function ensureStreamMessage(messageId: string, role?: string) {
+    const existing = streamIndex.get(messageId);
+    if (existing !== undefined) return existing;
+
+    const now = Date.now();
+    const msg: Message = {
+      id: `stream:${messageId}`,
+      task_id: task?.task.id || '',
+      role: (role as Message['role']) || 'assistant',
+      parts: '[]',
+      content: '',
+      created_at: now,
+      updated_at: now,
+    };
+    messages = [...messages, msg];
+    streamIndex.set(messageId, messages.length - 1);
+    streamState.set(messageId, { blocks: [] });
+    return messages.length - 1;
+  }
+
+  function updateStreamMessage(messageId: string) {
+    const idx = streamIndex.get(messageId);
+    if (idx === undefined) return;
+    const state = streamState.get(messageId);
+    if (!state) return;
+
+    const blocks = [...state.blocks];
+    if (state.current && (state.current.type === 'text' || state.current.type === 'thinking')) {
+      blocks.push(state.current);
+    }
+    const msg = messages[idx];
+    msg.parts = JSON.stringify(blocks);
+    msg.content = concatText(blocks);
+    msg.updated_at = Date.now();
+    messages = [...messages];
+  }
+
+  function applyStreamEvent(event: AgentStreamEvent) {
+    if (!event.message_id || !event.type) return;
+    const id = event.message_id;
+    switch (event.type) {
+      case 'message_start': {
+        ensureStreamMessage(id, event.role);
+        break;
+      }
+      case 'content_start': {
+        ensureStreamMessage(id, event.role);
+        const state = streamState.get(id);
+        if (!state) return;
+        state.current = event.block || { type: event.block_type || 'text' };
+        state.args = '';
+        updateStreamMessage(id);
+        break;
+      }
+      case 'content_delta': {
+        ensureStreamMessage(id, event.role);
+        const state = streamState.get(id);
+        if (!state) return;
+        if (!state.current || state.current.type !== event.block_type) {
+          state.current = { type: event.block_type || 'text' };
+          state.args = '';
+        }
+        if (event.block_type === 'text' || event.block_type === 'thinking') {
+          state.current.text = (state.current.text || '') + (event.delta || '');
+        } else if (event.block_type === 'tool_use') {
+          state.args = (state.args || '') + (event.delta || '');
+        }
+        updateStreamMessage(id);
+        break;
+      }
+      case 'content_end': {
+        ensureStreamMessage(id, event.role);
+        const state = streamState.get(id);
+        if (!state) return;
+        let block = event.block || state.current;
+        if (!block) return;
+        if (block.type === 'tool_use' && !block.input && state.args) {
+          try {
+            block = { ...block, input: JSON.parse(state.args) };
+          } catch {
+            block = { ...block, input: { raw: state.args } };
+          }
+        }
+        state.blocks.push(block);
+        state.current = undefined;
+        state.args = '';
+        updateStreamMessage(id);
+        break;
+      }
+      case 'message_end': {
+        updateStreamMessage(id);
+        streamState.delete(id);
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   async function loadTask(
@@ -73,11 +199,10 @@
     eventSource = createTaskSSE(taskId, {
       onAgentUpdate: (data: string) => {
         try {
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed)) {
-            // Update messages in-place
-            messages.push(...parsed); // append only
-          }
+          const envelope = JSON.parse(data);
+          if (!envelope?.data) return;
+          const streamEvent = JSON.parse(envelope.data) as AgentStreamEvent;
+          applyStreamEvent(streamEvent);
         } catch (e) {
           console.error('Failed to parse agent update JSON:', e);
         }

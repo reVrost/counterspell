@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/counterspell/internal/agent/tools"
 )
 
@@ -26,14 +27,18 @@ var ErrCodexBinaryPath = errors.New("agent: codex binary not found in PATH")
 // It executes `codex exec --json` and normalizes the JSON event stream into
 // StreamEvents for the UI.
 type CodexBackend struct {
-	binaryPath string
-	workDir    string
-	callback   StreamCallback
-	apiKey     string
-	baseURL    string
-	model      string
-	sessionID  string
-	extraArgs  []string
+	binaryPath    string
+	workDir       string
+	apiKey        string
+	baseURL       string
+	model         string
+	sessionID     string
+	extraArgs     []string
+	streamCtx     context.Context
+	events        chan<- StreamEvent
+	streamMsgID   string
+	streamMsgRole string
+	streamText    string
 
 	mu           sync.Mutex
 	cmd          *exec.Cmd
@@ -57,13 +62,6 @@ func WithCodexBinaryPath(path string) CodexOption {
 func WithCodexWorkDir(dir string) CodexOption {
 	return func(b *CodexBackend) {
 		b.workDir = dir
-	}
-}
-
-// WithCodexCallback sets the event streaming callback.
-func WithCodexCallback(cb StreamCallback) CodexOption {
-	return func(b *CodexBackend) {
-		b.callback = cb
 	}
 }
 
@@ -124,7 +122,25 @@ func NewCodexBackend(opts ...CodexOption) (*CodexBackend, error) {
 
 // Run executes a new task via Codex CLI.
 func (b *CodexBackend) Run(ctx context.Context, task string) error {
-	return b.execute(ctx, task)
+	stream := b.Stream(ctx, task)
+	return drainStream(ctx, stream)
+}
+
+// Stream executes a task via Codex CLI and returns a stream of events.
+func (b *CodexBackend) Stream(ctx context.Context, task string) *Stream {
+	events := make(chan StreamEvent, 32)
+	done := make(chan error, 1)
+
+	go func() {
+		defer close(events)
+		defer close(done)
+		b.setStream(ctx, events)
+		defer b.clearStream()
+
+		done <- b.execute(ctx, task)
+	}()
+
+	return &Stream{Events: events, Done: done}
 }
 
 // Close terminates any running codex process.
@@ -139,6 +155,20 @@ func (b *CodexBackend) Close() error {
 		return b.cmd.Process.Kill()
 	}
 	return nil
+}
+
+func (b *CodexBackend) setStream(ctx context.Context, events chan<- StreamEvent) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.streamCtx = ctx
+	b.events = events
+}
+
+func (b *CodexBackend) clearStream() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.streamCtx = nil
+	b.events = nil
 }
 
 // --- Internal execution ---
@@ -157,7 +187,6 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 		Content: []ContentBlock{{Type: "text", Text: prompt}},
 	})
 	b.mu.Unlock()
-	b.emitMessages()
 
 	cmd, err := b.buildCmd(ctx, prompt)
 	if err != nil {
@@ -233,14 +262,15 @@ func (b *CodexBackend) parseOutput(scanner *bufio.Scanner) {
 			line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		}
 		if line == "[DONE]" {
-			b.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+			b.finalizeStreamText("assistant")
+			b.emit(StreamEvent{Type: EventDone})
 			continue
 		}
 
 		var event map[string]any
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			// Not JSON, emit as text
-			b.emit(StreamEvent{Type: EventText, Content: line})
+			b.appendStreamText(line)
 			continue
 		}
 
@@ -257,11 +287,12 @@ func (b *CodexBackend) processCodexEvent(event map[string]any) {
 			b.setSessionID(threadID)
 		}
 	case "turn.completed":
-		b.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+		b.finalizeStreamText("assistant")
+		b.emit(StreamEvent{Type: EventDone})
 	case "turn.failed":
-		b.emit(StreamEvent{Type: EventError, Content: extractCodexError(event)})
+		b.emit(StreamEvent{Type: EventError, Error: extractCodexError(event)})
 	case "error":
-		b.emit(StreamEvent{Type: EventError, Content: extractCodexError(event)})
+		b.emit(StreamEvent{Type: EventError, Error: extractCodexError(event)})
 	case "item.started", "item.updated", "item.completed":
 		item, _ := event["item"].(map[string]any)
 		if item != nil {
@@ -289,7 +320,7 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 			}
 			text = strings.TrimSpace(text)
 			if text != "" {
-				b.appendFinalText(text)
+				b.appendStreamText(text)
 			}
 		}
 		return
@@ -308,8 +339,8 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 		if text == "" {
 			return
 		}
-		b.appendMessage("assistant", []ContentBlock{{Type: "text", Text: text}})
-		b.appendFinalText(text)
+		b.finalizeStreamText("assistant")
+		b.emitTextMessage("assistant", text)
 		return
 	case "reasoning":
 		// Intentionally ignored to avoid leaking reasoning content.
@@ -325,8 +356,8 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 		}
 		text = strings.TrimSpace(text)
 		if text != "" {
-			b.appendMessage("assistant", []ContentBlock{{Type: "text", Text: text}})
-			b.appendFinalText(text)
+			b.finalizeStreamText("assistant")
+			b.emitTextMessage("assistant", text)
 		}
 		return
 	default:
@@ -342,18 +373,20 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 			}
 			text = strings.TrimSpace(text)
 			if text != "" {
-				b.appendMessage("assistant", []ContentBlock{{Type: "text", Text: text}})
-				b.appendFinalText(text)
+				b.finalizeStreamText("assistant")
+				b.emitTextMessage("assistant", text)
 			}
 		}
 		return
 	}
 
 	if isCompleted {
+		b.finalizeStreamText("assistant")
 		b.emitCodexToolResult(itemType, item)
 		return
 	}
 
+	b.finalizeStreamText("assistant")
 	b.emitCodexToolCall(itemType, item)
 }
 
@@ -379,14 +412,14 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 				text := extractTextFromContent(payload["content"])
 				text = strings.TrimSpace(text)
 				if text != "" {
-					b.appendMessage(role, []ContentBlock{{Type: "text", Text: text}})
-					if role == "assistant" {
-						b.appendFinalText(text)
-					}
+					b.finalizeStreamText("assistant")
+					b.emitTextMessage(role, text)
 				}
 			case "tool_call", "tool_use":
+				b.finalizeStreamText("assistant")
 				b.emitCodexToolCall(payloadType, payload)
 			case "tool_result", "tool_output":
+				b.finalizeStreamText("assistant")
 				b.emitCodexToolResult(payloadType, payload)
 			}
 		}
@@ -395,8 +428,8 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 			text := extractTextFromContent(message["content"])
 			text = strings.TrimSpace(text)
 			if text != "" {
-				b.appendMessage("assistant", []ContentBlock{{Type: "text", Text: text}})
-				b.appendFinalText(text)
+				b.finalizeStreamText("assistant")
+				b.emitTextMessage("assistant", text)
 			}
 		}
 	case "assistant_message", "agent_message":
@@ -406,8 +439,8 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 		}
 		text = strings.TrimSpace(text)
 		if text != "" {
-			b.appendMessage("assistant", []ContentBlock{{Type: "text", Text: text}})
-			b.appendFinalText(text)
+			b.finalizeStreamText("assistant")
+			b.emitTextMessage("assistant", text)
 		}
 	case "assistant_message_delta", "agent_message_delta":
 		delta := getString(event, "delta")
@@ -416,34 +449,37 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 		}
 		delta = strings.TrimSpace(delta)
 		if delta != "" {
-			b.appendFinalText(delta)
+			b.appendStreamText(delta)
 		}
 	case "tool_call", "tool_use", "function_call":
+		b.finalizeStreamText("assistant")
 		b.emitCodexToolCall(eventType, event)
 	case "tool_result", "tool_output", "function_result":
+		b.finalizeStreamText("assistant")
 		b.emitCodexToolResult(eventType, event)
 	case "result":
 		if isError, _ := event["is_error"].(bool); isError {
-			b.emit(StreamEvent{Type: EventError, Content: extractCodexError(event)})
+			b.emit(StreamEvent{Type: EventError, Error: extractCodexError(event)})
 			return
 		}
-		b.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+		b.finalizeStreamText("assistant")
+		b.emit(StreamEvent{Type: EventDone})
 	default:
 		// Streaming delta-style text events
 		if delta := getString(event, "delta"); delta != "" {
-			b.appendFinalText(delta)
+			b.appendStreamText(delta)
 			return
 		}
 		if text := getString(event, "text"); text != "" {
-			b.appendMessage("assistant", []ContentBlock{{Type: "text", Text: text}})
-			b.appendFinalText(text)
+			b.finalizeStreamText("assistant")
+			b.emitTextMessage("assistant", text)
 		}
 	}
 }
 
 func (b *CodexBackend) emitCodexToolCall(itemType string, item map[string]any) {
 	toolID := getString(item, "id")
-	toolName, content, argsJSON := formatCodexToolCall(itemType, item)
+	toolName, _, argsJSON := formatCodexToolCall(itemType, item)
 
 	// Add tool use to messages
 	b.mu.Lock()
@@ -457,14 +493,12 @@ func (b *CodexBackend) emitCodexToolCall(itemType string, item map[string]any) {
 		}},
 	})
 	b.mu.Unlock()
-	b.emitMessages()
-
-	b.emit(StreamEvent{
-		Type:    EventTool,
-		Tool:    toolName,
-		Args:    argsJSON,
-		Content: content,
-	})
+	msgID := shortuuid.New()
+	block := &ContentBlock{Type: "tool_use", Name: toolName, ID: toolID, Input: argsToMap(argsJSON, item)}
+	b.emit(StreamEvent{Type: EventMessageStart, MessageID: msgID, Role: "assistant"})
+	b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "tool_use", Block: block})
+	b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "tool_use", Block: block})
+	b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: "assistant"})
 }
 
 func (b *CodexBackend) emitCodexToolResult(itemType string, item map[string]any) {
@@ -476,13 +510,11 @@ func (b *CodexBackend) emitCodexToolResult(itemType string, item map[string]any)
 		toolID = getString(item, "id")
 	}
 
-	toolName, _, argsJSON := formatCodexToolCall(itemType, item)
+	toolName, _, _ := formatCodexToolCall(itemType, item)
 	output := extractCodexToolResult(item)
 	if output == "" {
 		output = fmt.Sprintf("%s completed", toolName)
 	}
-	truncated := truncateDisplay(output, 200)
-
 	// Add tool result to messages
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{
@@ -494,24 +526,91 @@ func (b *CodexBackend) emitCodexToolResult(itemType string, item map[string]any)
 		}},
 	})
 	b.mu.Unlock()
-	b.emitMessages()
-
-	b.emit(StreamEvent{
-		Type:    EventToolResult,
-		Tool:    toolName,
-		Args:    argsJSON,
-		Content: truncated,
-	})
+	msgID := shortuuid.New()
+	block := &ContentBlock{Type: "tool_result", ToolUseID: toolID, Content: output}
+	b.emit(StreamEvent{Type: EventMessageStart, MessageID: msgID, Role: "user"})
+	b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "tool_result", Block: block})
+	b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "tool_result", Block: block})
+	b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: "user"})
 }
 
-func (b *CodexBackend) appendFinalText(text string) {
+func (b *CodexBackend) emit(event StreamEvent) {
+	b.mu.Lock()
+	ctx := b.streamCtx
+	events := b.events
+	b.mu.Unlock()
+	if events == nil {
+		return
+	}
+	if ctx == nil {
+		events <- event
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case events <- event:
+	}
+}
+
+func (b *CodexBackend) startStreamMessage(role string) string {
+	b.mu.Lock()
+	if b.streamMsgID != "" {
+		id := b.streamMsgID
+		b.mu.Unlock()
+		return id
+	}
+	id := shortuuid.New()
+	b.streamMsgID = id
+	b.streamMsgRole = role
+	b.mu.Unlock()
+	b.emit(StreamEvent{Type: EventMessageStart, MessageID: id, Role: role})
+	return id
+}
+
+func (b *CodexBackend) endStreamMessage() {
+	b.mu.Lock()
+	id := b.streamMsgID
+	role := b.streamMsgRole
+	b.streamMsgID = ""
+	b.streamMsgRole = ""
+	b.mu.Unlock()
+	if id != "" {
+		b.emit(StreamEvent{Type: EventMessageEnd, MessageID: id, Role: role})
+	}
+}
+
+func (b *CodexBackend) appendStreamText(delta string) {
+	if delta == "" {
+		return
+	}
+	msgID := b.startStreamMessage("assistant")
+	start := false
+	b.mu.Lock()
+	if b.streamText == "" {
+		start = true
+	}
+	b.streamText += delta
+	b.finalMessage += delta
+	b.mu.Unlock()
+	if start {
+		b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text"}})
+	}
+	b.emit(StreamEvent{Type: EventContentDelta, MessageID: msgID, BlockType: "text", Delta: delta})
+}
+
+func (b *CodexBackend) finalizeStreamText(role string) {
+	b.mu.Lock()
+	text := b.streamText
+	b.streamText = ""
+	msgID := b.streamMsgID
+	b.mu.Unlock()
 	if text == "" {
 		return
 	}
-	b.mu.Lock()
-	b.finalMessage += text
-	b.mu.Unlock()
-	b.emit(StreamEvent{Type: EventText, Content: text})
+	b.appendMessage(role, []ContentBlock{{Type: "text", Text: text}})
+	b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text", Text: text}})
+	b.endStreamMessage()
 }
 
 func (b *CodexBackend) appendMessage(role string, blocks []ContentBlock) {
@@ -521,43 +620,35 @@ func (b *CodexBackend) appendMessage(role string, blocks []ContentBlock) {
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{Role: role, Content: blocks})
 	b.mu.Unlock()
-	b.emitMessages()
 }
 
-func (b *CodexBackend) emit(event StreamEvent) {
-	slog.Debug("[CODEX] emit", "type", event.Type, "content_len", len(event.Content), "has_callback", b.callback != nil)
-	if b.callback != nil {
-		b.callback(event)
-	}
-}
-
-func (b *CodexBackend) emitMessages() {
-	if b.callback == nil {
-		slog.Debug("[CODEX] emitMessages skipped - no callback")
+func (b *CodexBackend) emitTextMessage(role, text string) {
+	if strings.TrimSpace(text) == "" {
 		return
 	}
-	b.mu.Lock()
-	msgs := make([]Message, len(b.messages))
-	copy(msgs, b.messages)
-	b.mu.Unlock()
-
-	data, err := json.Marshal(msgs)
-	if err != nil {
-		slog.Error("[CODEX] emitMessages failed to marshal", "error", err)
-		return
+	b.appendMessage(role, []ContentBlock{{Type: "text", Text: text}})
+	if role == "assistant" {
+		b.mu.Lock()
+		b.finalMessage += text
+		b.mu.Unlock()
 	}
-	slog.Debug("[CODEX] emitMessages", "msg_count", len(msgs), "data_len", len(data))
+	msgID := shortuuid.New()
+	b.emit(StreamEvent{Type: EventMessageStart, MessageID: msgID, Role: role})
+	b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text"}})
+	b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text", Text: text}})
+	b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: role})
 }
 
 func (b *CodexBackend) setSessionID(sessionID string) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if sessionID == "" || b.sessionID == sessionID {
+		b.mu.Unlock()
 		return
 	}
 	b.sessionID = sessionID
+	b.mu.Unlock()
 	slog.Info("[CODEX] Session ID detected", "session_id", sessionID)
-	b.emit(StreamEvent{Type: "session", SessionID: sessionID})
+	b.emit(StreamEvent{Type: EventSession, SessionID: sessionID})
 }
 
 // --- Describable interface ---
@@ -595,7 +686,6 @@ func (b *CodexBackend) RestoreState(stateJSON string) error {
 	b.mu.Lock()
 	b.messages = msgs
 	b.mu.Unlock()
-	b.emitMessages()
 	return nil
 }
 

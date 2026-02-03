@@ -5,7 +5,7 @@
   import { tasksAPI } from '$lib/api';
   import { cn } from '$lib/utils';
   import { modalSlideUp, backdropFade, slide, DURATIONS } from '$lib/utils/transitions';
-  import type { Message, Task } from '$lib/types';
+  import type { Message, Task, ContentBlock } from '$lib/types';
   import ChatInput from './ChatInput.svelte';
   import MarkdownRenderer from './MarkdownRenderer.svelte';
   import TodoIndicator from './TodoIndicator.svelte';
@@ -28,45 +28,101 @@
   let { task, messages, logContent, isInProgress }: Props = $props();
 
   // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
-  // 1. Update the type to include a mandatory ID
   type DisplayItem =
     | { type: 'message'; id: string; message: Message }
     | { type: 'thinking'; id: string; items: { command: string; result: string }[] };
 
+  function parseParts(msg: Message): ContentBlock[] {
+    if (msg.parts) {
+      try {
+        const parsed = JSON.parse(msg.parts);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore parse errors
+      }
+    }
+    if (msg.content) {
+      return [{ type: 'text', text: msg.content }];
+    }
+    return [];
+  }
+
+  function concatText(blocks: ContentBlock[]): string {
+    return blocks.filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('');
+  }
+
+  function formatToolUse(block: ContentBlock): string {
+    if (!block.name) return 'Tool';
+    if (!block.input) return block.name;
+    try {
+      return `${block.name} ${JSON.stringify(block.input)}`;
+    } catch {
+      return block.name;
+    }
+  }
+
   let displayItems = $derived.by(() => {
     const items: DisplayItem[] = [];
     let i = 0;
+
     while (i < messages.length) {
       const msg = messages[i];
-      if (msg.role === 'tool' || msg.role === 'tool_result') {
+      const blocks = parseParts(msg);
+      const text = concatText(blocks);
+      const thinkingBlocks = blocks.filter((b) => b.type === 'thinking');
+      const toolUses = blocks.filter((b) => b.type === 'tool_use');
+      const toolResults = blocks.filter((b) => b.type === 'tool_result');
+
+      const hasToolRole = msg.role === 'tool' || msg.role === 'tool_result';
+      const hasThinking = thinkingBlocks.length > 0;
+      const hasToolBlocks = toolUses.length > 0 || toolResults.length > 0;
+
+      if (text) {
+        items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
+      }
+
+      if (hasToolRole || hasThinking || hasToolBlocks) {
         const thinkingItems: { command: string; result: string }[] = [];
-        // Capture the ID of the first message in this group to use as the group ID
         const groupId = msg.id || `thinking-${i}`;
 
-        while (
-          i < messages.length &&
-          (messages[i].role === 'tool' || messages[i].role === 'tool_result')
-        ) {
-          const toolMsg = messages[i];
-          if (toolMsg.role === 'tool') {
-            let result = '';
-            if (i + 1 < messages.length && messages[i + 1].role === 'tool_result') {
-              result = messages[i + 1].content;
+        for (const block of thinkingBlocks) {
+          thinkingItems.push({ command: 'Thinking', result: block.text || '' });
+        }
+
+        const remainingResults = [...toolResults];
+        for (const tool of toolUses) {
+          let result = '';
+          if (remainingResults.length > 0) {
+            const match = remainingResults.shift();
+            result = match?.content || '';
+          } else if (i + 1 < messages.length) {
+            const next = messages[i + 1];
+            const nextBlocks = parseParts(next);
+            const nextResult = nextBlocks.find((b) => b.type === 'tool_result');
+            if (next.role === 'tool_result' || nextResult) {
+              result = nextResult?.content || next.content || '';
               i++;
             }
-            thinkingItems.push({ command: toolMsg.content, result });
-          } else {
-            thinkingItems.push({ command: 'Command Trace', result: toolMsg.content });
           }
-          i++;
+          thinkingItems.push({ command: formatToolUse(tool), result });
         }
-        items.push({ type: 'thinking', id: groupId, items: thinkingItems });
-      } else {
-        // Use the message's own ID
-        items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
-        i++;
+
+        for (const block of remainingResults) {
+          thinkingItems.push({ command: 'Command Trace', result: block.content || '' });
+        }
+
+        if (hasToolRole && toolUses.length === 0 && toolResults.length === 0 && msg.content) {
+          thinkingItems.push({ command: msg.role === 'tool' ? msg.content : 'Command Trace', result: msg.content });
+        }
+
+        if (thinkingItems.length > 0) {
+          items.push({ type: 'thinking', id: groupId, items: thinkingItems });
+        }
       }
+
+      i++;
     }
+
     return items;
   });
 

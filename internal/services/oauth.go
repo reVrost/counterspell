@@ -671,7 +671,6 @@ func (s *OAuthService) callInvokerRegisterMachine(ctx context.Context, machineJW
 	return &resp, nil
 }
 
-
 func (s *OAuthService) invokerURL(path string) string {
 	base := strings.TrimRight(s.cfg.InvokerBaseURL, "/")
 	if strings.HasPrefix(path, "/") {

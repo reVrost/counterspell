@@ -34,7 +34,6 @@ type NativeBackendOption func(*nativeBackendConfig)
 type nativeBackendConfig struct {
 	provider llm.Provider
 	workDir  string
-	callback StreamCallback
 }
 
 // WithProvider sets the LLM provider.
@@ -51,13 +50,6 @@ func WithWorkDir(dir string) NativeBackendOption {
 	}
 }
 
-// WithCallback sets the event streaming callback.
-func WithCallback(cb StreamCallback) NativeBackendOption {
-	return func(c *nativeBackendConfig) {
-		c.callback = cb
-	}
-}
-
 // NewNativeBackend creates a native Go agent backend.
 //
 // Example:
@@ -65,7 +57,6 @@ func WithCallback(cb StreamCallback) NativeBackendOption {
 //	backend, err := NewNativeBackend(
 //	    WithProvider(llm.NewAnthropicProvider(apiKey)),
 //	    WithWorkDir("/path/to/workspace"),
-//	    WithCallback(func(e StreamEvent) { ... }),
 //	)
 func NewNativeBackend(opts ...NativeBackendOption) (*NativeBackend, error) {
 	cfg := &nativeBackendConfig{
@@ -79,7 +70,7 @@ func NewNativeBackend(opts ...NativeBackendOption) (*NativeBackend, error) {
 		return nil, ErrProviderRequired
 	}
 
-	runner := NewRunner(cfg.provider, cfg.workDir, cfg.callback)
+	runner := NewRunner(cfg.provider, cfg.workDir)
 	return &NativeBackend{runner: runner}, nil
 }
 
@@ -88,6 +79,11 @@ func NewNativeBackend(opts ...NativeBackendOption) (*NativeBackend, error) {
 // Run executes a new task.
 func (b *NativeBackend) Run(ctx context.Context, task string) error {
 	return b.runner.Run(ctx, task)
+}
+
+// Stream executes a task and returns a stream of events.
+func (b *NativeBackend) Stream(ctx context.Context, task string) *Stream {
+	return b.runner.Stream(ctx, task)
 }
 
 // Send continues the conversation with a follow-up message.

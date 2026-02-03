@@ -20,155 +20,47 @@ func (e *ErrMergeConflict) Error() string {
 	return fmt.Sprintf("merge conflict in %d files: %s", len(e.ConflictedFiles), strings.Join(e.ConflictedFiles, ", "))
 }
 
-// GitManager handles cloning and updating repositories.
+// GitManager handles git workspace operations.
 type GitManager struct {
-	dataDir string
-	mu      sync.Mutex
+	repoRoot string
+	dataDir  string
+	mu       sync.Mutex
 }
 
 // NewGitManager creates a new repo manager.
-// dataDir is the base directory for storing repos (e.g., "./data")
-func NewGitManager(dataDir string) *GitManager {
-	// Convert to absolute path to ensure worktrees are created at correct level
+// repoRoot is the root of the local git repository.
+// dataDir is the base directory for storing workspaces (e.g., "./data").
+func NewGitManager(repoRoot, dataDir string) *GitManager {
+	absRoot, err := filepath.Abs(repoRoot)
+	if err != nil {
+		absRoot = repoRoot
+	}
 	absDir, err := filepath.Abs(dataDir)
 	if err != nil {
 		absDir = dataDir // fallback if conversion fails
 	}
-	return &GitManager{dataDir: absDir}
+	return &GitManager{repoRoot: absRoot, dataDir: absDir}
 }
 
-// repoPath returns the local path for a given owner/repo.
-func (m *GitManager) repoPath(owner, repo string) string {
-	return filepath.Join(m.dataDir, "repos", owner, repo)
+func (m *GitManager) Kind() RepoKind {
+	return RepoKindGit
 }
 
-// worktreePath returns the worktree path for a given task.
-func (m *GitManager) worktreePath(taskID string) string {
+func (m *GitManager) RootPath() string {
+	return m.repoRoot
+}
+
+// workspacePath returns the workspace path for a given task.
+func (m *GitManager) workspacePath(taskID string) string {
 	return filepath.Join(m.dataDir, "worktrees", "task-"+taskID)
 }
 
-// WorktreePath returns the worktree path for a given task (exported).
-func (m *GitManager) WorktreePath(taskID string) string {
-	return m.worktreePath(taskID)
+// WorkspacePath returns the workspace path for a given task (exported).
+func (m *GitManager) WorkspacePath(taskID string) string {
+	return m.workspacePath(taskID)
 }
 
-// RepoPath returns the local path for a given owner/repo (exported).
-func (m *GitManager) RepoPath(owner, repo string) string {
-	return m.repoPath(owner, repo)
-}
-
-// EnsureRepo clones or updates a repository.
-// Returns the local repo path.
-func (m *GitManager) EnsureRepo(owner, repo, token string) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	repoPath := m.repoPath(owner, repo)
-	slog.Info("[GIT] EnsureRepo called", "owner", owner, "repo", repo, "repo_path", repoPath)
-
-	// Check if repo already exists
-	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
-		slog.Info("[GIT] Repo exists, fetching latest", "owner", owner, "repo", repo, "token_provided", token != "")
-		if err := m.fetchLatest(repoPath, token, owner, repo); err != nil {
-			slog.Error("[GIT] Failed to fetch", "error", err)
-			return "", fmt.Errorf("failed to fetch: %w", err)
-		}
-		slog.Info("[GIT] Repo fetched successfully", "path", repoPath)
-		return repoPath, nil
-	}
-
-	// Clone the repo
-	slog.Info("[GIT] Cloning repo", "owner", owner, "repo", repo, "dest", repoPath)
-	if err := m.cloneRepo(owner, repo, token, repoPath); err != nil {
-		slog.Error("[GIT] Failed to clone", "error", err)
-		return "", fmt.Errorf("failed to clone: %w", err)
-	}
-
-	slog.Info("[GIT] Repo cloned successfully", "path", repoPath)
-	return repoPath, nil
-}
-
-// cloneRepo performs the actual clone.
-func (m *GitManager) cloneRepo(owner, repo, token, destPath string) error {
-	// Ensure parent directory exists
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	// Build clone URL with token for auth
-	var cloneURL string
-	if token != "" {
-		cloneURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, owner, repo)
-		slog.Info("[GIT] Using authenticated clone URL", "token_length", len(token))
-	} else {
-		cloneURL = fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
-		slog.Warn("[GIT] No token provided, cloning without auth")
-	}
-
-	slog.Info("[GIT] Cloning repo", "owner", owner, "repo", repo, "dest", destPath)
-
-	// Clone with depth 1 for speed, but we need full history for worktrees
-	// So we do a regular clone
-	cmd := exec.Command("git", "clone", cloneURL, destPath)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.Error("[GIT] Clone command failed", "error", err, "output", string(output))
-		return fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
-	}
-
-	slog.Info("[GIT] Cloned repo successfully", "path", destPath)
-	return nil
-}
-
-// fetchLatest fetches the latest changes from origin.
-func (m *GitManager) fetchLatest(repoPath, token, owner, repo string) error {
-	slog.Info("[GIT] Fetching latest changes", "path", repoPath, "has_token", token != "")
-
-	// Update remote URL with current token if provided
-	if token != "" {
-		newURL := fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, owner, repo)
-		slog.Info("[GIT] Updating remote URL with token", "token_length", len(token))
-		cmd := exec.Command("git", "remote", "set-url", "origin", newURL)
-		cmd.Dir = repoPath
-		if output, err := cmd.CombinedOutput(); err != nil {
-			slog.Error("[GIT] Failed to update remote URL", "error", err, "output", string(output))
-			return fmt.Errorf("failed to update remote URL: %w\nOutput: %s", err, string(output))
-		}
-		slog.Info("[GIT] Remote URL updated successfully")
-	}
-
-	cmd := exec.Command("git", "fetch", "origin")
-	cmd.Dir = repoPath
-	if output, err := cmd.CombinedOutput(); err != nil {
-		slog.Error("[GIT] git fetch failed", "error", err, "output", string(output))
-		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
-	}
-
-	slog.Info("[GIT] Fetch successful, resetting to origin/main")
-
-	// Reset main to origin/main
-	cmd = exec.Command("git", "checkout", "main")
-	cmd.Dir = repoPath
-	_, _ = cmd.CombinedOutput() // Ignore error, might be on main already
-
-	cmd = exec.Command("git", "reset", "--hard", "origin/main")
-	cmd.Dir = repoPath
-	if _, err := cmd.CombinedOutput(); err != nil {
-		// Try master branch
-		slog.Info("[GIT] Trying master branch instead", "path", repoPath)
-		cmd = exec.Command("git", "reset", "--hard", "origin/master")
-		cmd.Dir = repoPath
-		if output, err := cmd.CombinedOutput(); err != nil {
-			slog.Error("[GIT] git reset failed", "error", err, "output", string(output))
-			return fmt.Errorf("git reset failed: %w\nOutput: %s", err, string(output))
-		}
-	}
-
-	slog.Info("[GIT] Fetched and reset successfully", "path", repoPath)
-	return nil
-}
-
-// CreateWorktree creates an isolated worktree for a task.
+// CreateWorkspace creates an isolated workspace for a task.
 // Returns the worktree path.
 func (m *GitManager) CreateWorktree(owner, repo, taskID, branchName string) (string, error) {
 	repoPath := m.repoPath(owner, repo)

@@ -177,8 +177,8 @@ func (r *Registry) toolTodos(args map[string]any) string {
 	r.ctx.TodoState.SetTodos(newTodos)
 
 	// Emit todo update event
-	if r.ctx.OnTodoUpdate != nil {
-		r.ctx.OnTodoUpdate()
+	if r.ctx.TodoEvents != nil {
+		r.ctx.TodoEvents <- r.ctx.TodoState.GetTodos()
 	}
 
 	// Calculate stats

@@ -2,8 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/revrost/counterspell/internal/agent"
 	"github.com/revrost/counterspell/internal/db/sqlc"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSaveMessage_PingPong tests that messages are stored correctly in a ping-pong fashion
-func TestSaveMessage_PingPong(t *testing.T) {
+// TestConsumeAgentStream_PersistsMessages verifies stream events persist final message parts.
+func TestConsumeAgentStream_PersistsMessages(t *testing.T) {
 	testDB := setupTestDB(t)
 	defer testDB.Close()
 
@@ -51,54 +51,84 @@ func TestSaveMessage_PingPong(t *testing.T) {
 	runID, err := orch.repo.CreateAgentRun(ctx, taskID, "start", "native", "anthropic", "claude-3")
 	require.NoError(t, err)
 
-	// User: HI
-	userMsg1 := agent.Message{
-		Role:    "user",
-		Content: []agent.ContentBlock{{Type: "text", Text: "HI"}},
-	}
-	orch.saveMessage(taskID, userMsg1)
-	time.Sleep(2 * time.Millisecond)
+	events := make(chan agent.StreamEvent, 32)
+	stream := &agent.Stream{Events: events}
 
-	// Agent: HI there
-	assistantMsg1 := agent.Message{
-		Role:    "assistant",
-		Content: []agent.ContentBlock{{Type: "text", Text: "HI there"}},
-	}
-	orch.saveMessage(taskID, assistantMsg1)
-	time.Sleep(2 * time.Millisecond)
+	go func() {
+		defer close(events)
 
-	// User: how areyou
-	userMsg2 := agent.Message{
-		Role:    "user",
-		Content: []agent.ContentBlock{{Type: "text", Text: "how areyou"}},
-	}
-	orch.saveMessage(taskID, userMsg2)
-	time.Sleep(2 * time.Millisecond)
+		// Assistant message with thinking + text
+		events <- agent.StreamEvent{Type: agent.EventMessageStart, MessageID: "msg-1", Role: "assistant"}
+		events <- agent.StreamEvent{Type: agent.EventContentStart, MessageID: "msg-1", BlockType: "thinking"}
+		events <- agent.StreamEvent{Type: agent.EventContentDelta, MessageID: "msg-1", BlockType: "thinking", Delta: "planning..."}
+		events <- agent.StreamEvent{Type: agent.EventContentEnd, MessageID: "msg-1", BlockType: "thinking"}
+		events <- agent.StreamEvent{Type: agent.EventContentStart, MessageID: "msg-1", BlockType: "text"}
+		events <- agent.StreamEvent{Type: agent.EventContentDelta, MessageID: "msg-1", BlockType: "text", Delta: "HI there"}
+		events <- agent.StreamEvent{Type: agent.EventContentEnd, MessageID: "msg-1", BlockType: "text"}
+		events <- agent.StreamEvent{Type: agent.EventMessageEnd, MessageID: "msg-1", Role: "assistant"}
 
-	// Agent: good, and you?
-	assistantMsg2 := agent.Message{
-		Role:    "assistant",
-		Content: []agent.ContentBlock{{Type: "text", Text: "good, and you?"}},
-	}
-	orch.saveMessage(taskID, assistantMsg2)
+		// Tool use
+		events <- agent.StreamEvent{Type: agent.EventMessageStart, MessageID: "msg-2", Role: "assistant"}
+		events <- agent.StreamEvent{
+			Type:      agent.EventContentStart,
+			MessageID: "msg-2",
+			BlockType: "tool_use",
+			Block:     &agent.ContentBlock{Type: "tool_use", Name: "ls", ID: "tool-1"},
+		}
+		events <- agent.StreamEvent{Type: agent.EventContentDelta, MessageID: "msg-2", BlockType: "tool_use", Delta: `{"path":"."}`}
+		events <- agent.StreamEvent{Type: agent.EventContentEnd, MessageID: "msg-2", BlockType: "tool_use"}
+		events <- agent.StreamEvent{Type: agent.EventMessageEnd, MessageID: "msg-2", Role: "assistant"}
+
+		// Tool result
+		events <- agent.StreamEvent{Type: agent.EventMessageStart, MessageID: "msg-3", Role: "user"}
+		events <- agent.StreamEvent{
+			Type:      agent.EventContentStart,
+			MessageID: "msg-3",
+			BlockType: "tool_result",
+			Block:     &agent.ContentBlock{Type: "tool_result", ToolUseID: "tool-1", Content: "file1.txt"},
+		}
+		events <- agent.StreamEvent{Type: agent.EventContentEnd, MessageID: "msg-3", BlockType: "tool_result"}
+		events <- agent.StreamEvent{Type: agent.EventMessageEnd, MessageID: "msg-3", Role: "user"}
+	}()
+
+	err = orch.consumeAgentStream(ctx, taskID, runID, stream)
+	require.NoError(t, err)
 
 	// Verify total 4 messages stored
 	messages, err := orch.repo.GetMessagesByTask(context.Background(), taskID)
 	require.NoError(t, err)
-	assert.Equal(t, 4, len(messages), "Should have exactly 4 messages in DB")
+	require.Len(t, messages, 3)
 
-	assert.Equal(t, "user", messages[0].Role)
-	assert.Equal(t, "HI", messages[0].Content)
-	assert.Equal(t, runID, messages[0].RunID)
+	var assistantMsg *sqlc.Message
+	var toolUseMsg *sqlc.Message
+	var toolResultMsg *sqlc.Message
+	for i := range messages {
+		switch messages[i].Content {
+		case "HI there":
+			assistantMsg = &messages[i]
+		case "ls":
+			toolUseMsg = &messages[i]
+		case "file1.txt":
+			toolResultMsg = &messages[i]
+		}
+	}
 
-	assert.Equal(t, "assistant", messages[1].Role)
-	assert.Equal(t, "HI there", messages[1].Content)
+	require.NotNil(t, assistantMsg)
+	require.NotNil(t, toolUseMsg)
+	require.NotNil(t, toolResultMsg)
 
-	assert.Equal(t, "user", messages[2].Role)
-	assert.Equal(t, "how areyou", messages[2].Content)
+	assert.Equal(t, "assistant", assistantMsg.Role)
+	assert.Equal(t, runID, assistantMsg.RunID)
 
-	assert.Equal(t, "assistant", messages[3].Role)
-	assert.Equal(t, "good, and you?", messages[3].Content)
+	var parts []agent.ContentBlock
+	require.NoError(t, json.Unmarshal([]byte(assistantMsg.Parts), &parts))
+	require.Len(t, parts, 2)
+	assert.Equal(t, "thinking", parts[0].Type)
+	assert.Equal(t, "planning...", parts[0].Text)
+	assert.Equal(t, "text", parts[1].Type)
+
+	assert.Equal(t, "tool", toolUseMsg.Role)
+	assert.Equal(t, "tool", toolResultMsg.Role)
 }
 
 func TestContinueTask_Validation(t *testing.T) {
@@ -307,4 +337,3 @@ func TestContinueTask_NoMessages(t *testing.T) {
 	err = orch.submitTaskJob(ctx, task.ID, repoRow.ID, "continue", "model-1", "test", "test", "", true)
 	require.NoError(t, err, "submitTaskJob should work even with no message history")
 }
-

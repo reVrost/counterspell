@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/counterspell/internal/agent/tools"
 )
 
@@ -33,13 +34,17 @@ var ErrNoBinaryPath = errors.New("agent: claude binary not found in PATH")
 //   - State management is limited (CLI manages its own state)
 //   - IntrospectableBackend not fully supported
 type ClaudeCodeBackend struct {
-	binaryPath string
-	workDir    string
-	callback   StreamCallback
-	apiKey     string
-	baseURL    string
-	model      string
-	sessionID  string // Claude Code session ID
+	binaryPath    string
+	workDir       string
+	apiKey        string
+	baseURL       string
+	model         string
+	sessionID     string // Claude Code session ID
+	streamCtx     context.Context
+	events        chan<- StreamEvent
+	streamMsgID   string
+	streamMsgRole string
+	streamText    string
 
 	mu           sync.Mutex
 	cmd          *exec.Cmd
@@ -63,13 +68,6 @@ func WithBinaryPath(path string) ClaudeCodeOption {
 func WithClaudeWorkDir(dir string) ClaudeCodeOption {
 	return func(b *ClaudeCodeBackend) {
 		b.workDir = dir
-	}
-}
-
-// WithClaudeCallback sets the event streaming callback.
-func WithClaudeCallback(cb StreamCallback) ClaudeCodeOption {
-	return func(b *ClaudeCodeBackend) {
-		b.callback = cb
 	}
 }
 
@@ -108,7 +106,6 @@ func WithSessionID(sessionID string) ClaudeCodeOption {
 //	backend, err := NewClaudeCodeBackend(
 //	    WithBinaryPath("/usr/local/bin/claude"),
 //	    WithClaudeWorkDir("/path/to/workspace"),
-//	    WithClaudeCallback(func(e StreamEvent) { ... }),
 //	)
 func NewClaudeCodeBackend(opts ...ClaudeCodeOption) (*ClaudeCodeBackend, error) {
 	b := &ClaudeCodeBackend{
@@ -131,7 +128,25 @@ func NewClaudeCodeBackend(opts ...ClaudeCodeOption) (*ClaudeCodeBackend, error) 
 
 // Run executes a new task via Claude Code CLI.
 func (b *ClaudeCodeBackend) Run(ctx context.Context, task string) error {
-	return b.execute(ctx, task)
+	stream := b.Stream(ctx, task)
+	return drainStream(ctx, stream)
+}
+
+// Stream executes a task via Claude Code CLI and returns a stream of events.
+func (b *ClaudeCodeBackend) Stream(ctx context.Context, task string) *Stream {
+	events := make(chan StreamEvent, 32)
+	done := make(chan error, 1)
+
+	go func() {
+		defer close(events)
+		defer close(done)
+		b.setStream(ctx, events)
+		defer b.clearStream()
+
+		done <- b.execute(ctx, task)
+	}()
+
+	return &Stream{Events: events, Done: done}
 }
 
 // // Send continues the conversation with a follow-up message.
@@ -153,6 +168,20 @@ func (b *ClaudeCodeBackend) Close() error {
 	return nil
 }
 
+func (b *ClaudeCodeBackend) setStream(ctx context.Context, events chan<- StreamEvent) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.streamCtx = ctx
+	b.events = events
+}
+
+func (b *ClaudeCodeBackend) clearStream() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.streamCtx = nil
+	b.events = nil
+}
+
 // --- Internal execution ---
 
 func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string) error {
@@ -169,7 +198,6 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string) error {
 		Content: []ContentBlock{{Type: "text", Text: prompt}},
 	})
 	b.mu.Unlock()
-	b.emitMessages()
 
 	cmd, err := b.buildCmd(ctx, prompt)
 	if err != nil {
@@ -215,7 +243,7 @@ func (b *ClaudeCodeBackend) execute(ctx context.Context, prompt string) error {
 				stderrMu.Lock()
 				stderrLines = append(stderrLines, line)
 				stderrMu.Unlock()
-				b.emit(StreamEvent{Type: EventError, Content: line})
+				b.emit(StreamEvent{Type: EventError, Error: line})
 			}
 		}
 	})
@@ -244,7 +272,7 @@ func (b *ClaudeCodeBackend) parseOutput(scanner *bufio.Scanner) {
 		var event map[string]any
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			// Not JSON, emit as text
-			b.emit(StreamEvent{Type: EventText, Content: line})
+			b.appendStreamText(line)
 			continue
 		}
 
@@ -259,14 +287,18 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 	case "system":
 		// Capture session ID from system event
 		if sessionID, ok := event["session_id"].(string); ok && sessionID != "" {
+			changed := false
 			b.mu.Lock()
 			if b.sessionID != sessionID {
 				b.sessionID = sessionID
-				slog.Info("[CLAUDE-CODE] Session ID detected", "session_id", sessionID)
-				// Emit session ID for orchestrator to save
-				b.emit(StreamEvent{Type: "session", SessionID: sessionID})
+				changed = true
 			}
 			b.mu.Unlock()
+			if changed {
+				slog.Info("[CLAUDE-CODE] Session ID detected", "session_id", sessionID)
+				// Emit session ID for orchestrator to save
+				b.emit(StreamEvent{Type: EventSession, SessionID: sessionID})
+			}
 		}
 
 	case "user":
@@ -285,14 +317,30 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 					b.mu.Lock()
 					b.messages = append(b.messages, Message{Role: "user", Content: blocks})
 					b.mu.Unlock()
-					b.emitMessages()
 				}
 			}
 		}
 
 	case "assistant":
+		// Flush any streaming text before handling a full assistant message
+		streamText := b.flushStreamText()
+		if streamText != "" {
+			b.mu.Lock()
+			b.messages = append(b.messages, Message{Role: "assistant", Content: []ContentBlock{{Type: "text", Text: streamText}}})
+			b.mu.Unlock()
+			b.emit(StreamEvent{
+				Type:      EventContentEnd,
+				MessageID: b.streamMsgID,
+				BlockType: "text",
+				Block:     &ContentBlock{Type: "text", Text: streamText},
+			})
+			b.endStreamMessage()
+		}
+
 		if message, ok := event["message"].(map[string]any); ok {
 			if content, ok := message["content"].([]any); ok {
+				msgID := shortuuid.New()
+				b.emit(StreamEvent{Type: EventMessageStart, MessageID: msgID, Role: "assistant"})
 				var blocks []ContentBlock
 				for _, block := range content {
 					if blockMap, ok := block.(map[string]any); ok {
@@ -304,7 +352,8 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 								b.finalMessage += text
 								b.mu.Unlock()
 								blocks = append(blocks, ContentBlock{Type: "text", Text: text})
-								b.emit(StreamEvent{Type: EventText, Content: text})
+								b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text"}})
+								b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text", Text: text}})
 							}
 						case "tool_use":
 							name, _ := blockMap["name"].(string)
@@ -316,13 +365,8 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 								ID:    id,
 								Input: input,
 							})
-							inputJSON, _ := json.Marshal(input)
-							b.emit(StreamEvent{
-								Type:    EventTool,
-								Tool:    name,
-								Args:    string(inputJSON),
-								Content: fmt.Sprintf("Running %s", name),
-							})
+							b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: name, ID: id, Input: input}})
+							b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: name, ID: id, Input: input}})
 						}
 					}
 				}
@@ -330,26 +374,35 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 					b.mu.Lock()
 					b.messages = append(b.messages, Message{Role: "assistant", Content: blocks})
 					b.mu.Unlock()
-					b.emitMessages()
 				}
+				b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: "assistant"})
 			}
 		}
 
 	case "content_block_delta":
 		if delta, ok := event["delta"].(map[string]any); ok {
 			if text, ok := delta["text"].(string); ok {
-				b.mu.Lock()
-				b.finalMessage += text
-				b.mu.Unlock()
-				b.emit(StreamEvent{Type: EventText, Content: text})
+				b.appendStreamText(text)
 			}
 		}
 
 	case "tool_use":
+		streamText := b.flushStreamText()
+		if streamText != "" {
+			b.mu.Lock()
+			b.messages = append(b.messages, Message{Role: "assistant", Content: []ContentBlock{{Type: "text", Text: streamText}}})
+			b.mu.Unlock()
+			b.emit(StreamEvent{
+				Type:      EventContentEnd,
+				MessageID: b.streamMsgID,
+				BlockType: "text",
+				Block:     &ContentBlock{Type: "text", Text: streamText},
+			})
+			b.endStreamMessage()
+		}
 		name, _ := event["name"].(string)
 		id, _ := event["id"].(string)
 		input, _ := event["input"].(map[string]any)
-		inputJSON, _ := json.Marshal(input)
 
 		// Add tool use to messages
 		b.mu.Lock()
@@ -363,16 +416,26 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 			}},
 		})
 		b.mu.Unlock()
-		b.emitMessages()
-
-		b.emit(StreamEvent{
-			Type:    EventTool,
-			Tool:    name,
-			Args:    string(inputJSON),
-			Content: fmt.Sprintf("Running %s", name),
-		})
+		msgID := shortuuid.New()
+		b.emit(StreamEvent{Type: EventMessageStart, MessageID: msgID, Role: "assistant"})
+		b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: name, ID: id, Input: input}})
+		b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: name, ID: id, Input: input}})
+		b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: "assistant"})
 
 	case "tool_result":
+		streamText := b.flushStreamText()
+		if streamText != "" {
+			b.mu.Lock()
+			b.messages = append(b.messages, Message{Role: "assistant", Content: []ContentBlock{{Type: "text", Text: streamText}}})
+			b.mu.Unlock()
+			b.emit(StreamEvent{
+				Type:      EventContentEnd,
+				MessageID: b.streamMsgID,
+				BlockType: "text",
+				Block:     &ContentBlock{Type: "text", Text: streamText},
+			})
+			b.endStreamMessage()
+		}
 		content, _ := event["content"].(string)
 		toolUseID, _ := event["tool_use_id"].(string)
 
@@ -387,12 +450,11 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 			}},
 		})
 		b.mu.Unlock()
-		b.emitMessages()
-
-		if len(content) > 200 {
-			content = content[:200] + "..."
-		}
-		b.emit(StreamEvent{Type: EventToolResult, Content: content})
+		msgID := shortuuid.New()
+		b.emit(StreamEvent{Type: EventMessageStart, MessageID: msgID, Role: "user"})
+		b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "tool_result", Block: &ContentBlock{Type: "tool_result", ToolUseID: toolUseID, Content: content}})
+		b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "tool_result", Block: &ContentBlock{Type: "tool_result", ToolUseID: toolUseID, Content: content}})
+		b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: "user"})
 
 	case "result":
 		// Check if this is an error result
@@ -400,36 +462,97 @@ func (b *ClaudeCodeBackend) processClaudeEvent(event map[string]any) {
 		resultText, _ := event["result"].(string)
 		if isError {
 			slog.Error("[CLAUDE-CODE] Result error", "result", resultText)
-			b.emit(StreamEvent{Type: EventError, Content: resultText})
+			b.emit(StreamEvent{Type: EventError, Error: resultText})
 		} else {
-			b.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+			streamText := b.flushStreamText()
+			if streamText != "" {
+				b.mu.Lock()
+				b.messages = append(b.messages, Message{Role: "assistant", Content: []ContentBlock{{Type: "text", Text: streamText}}})
+				b.mu.Unlock()
+				b.emit(StreamEvent{
+					Type:      EventContentEnd,
+					MessageID: b.streamMsgID,
+					BlockType: "text",
+					Block:     &ContentBlock{Type: "text", Text: streamText},
+				})
+				b.endStreamMessage()
+			}
+			b.emit(StreamEvent{Type: EventDone})
 		}
 	}
 }
 
 func (b *ClaudeCodeBackend) emit(event StreamEvent) {
-	slog.Debug("[CLAUDE-CODE] emit", "type", event.Type, "content_len", len(event.Content), "has_callback", b.callback != nil)
-	if b.callback != nil {
-		b.callback(event)
+	b.mu.Lock()
+	ctx := b.streamCtx
+	events := b.events
+	b.mu.Unlock()
+	if events == nil {
+		return
+	}
+	if ctx == nil {
+		events <- event
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case events <- event:
 	}
 }
 
-func (b *ClaudeCodeBackend) emitMessages() {
-	if b.callback == nil {
-		slog.Debug("[CLAUDE-CODE] emitMessages skipped - no callback")
-		return
-	}
+func (b *ClaudeCodeBackend) startStreamMessage(role string) string {
 	b.mu.Lock()
-	msgs := make([]Message, len(b.messages))
-	copy(msgs, b.messages)
+	if b.streamMsgID != "" {
+		id := b.streamMsgID
+		b.mu.Unlock()
+		return id
+	}
+	id := shortuuid.New()
+	b.streamMsgID = id
+	b.streamMsgRole = role
 	b.mu.Unlock()
+	b.emit(StreamEvent{Type: EventMessageStart, MessageID: id, Role: role})
+	return id
+}
 
-	data, err := json.Marshal(msgs)
-	if err != nil {
-		slog.Error("[CLAUDE-CODE] emitMessages failed to marshal", "error", err)
+func (b *ClaudeCodeBackend) endStreamMessage() {
+	b.mu.Lock()
+	id := b.streamMsgID
+	role := b.streamMsgRole
+	b.streamMsgID = ""
+	b.streamMsgRole = ""
+	b.mu.Unlock()
+	if id != "" {
+		b.emit(StreamEvent{Type: EventMessageEnd, MessageID: id, Role: role})
+	}
+}
+
+func (b *ClaudeCodeBackend) appendStreamText(delta string) {
+	if delta == "" {
 		return
 	}
-	slog.Debug("[CLAUDE-CODE] emitMessages", "msg_count", len(msgs), "data_len", len(data))
+	msgID := b.startStreamMessage("assistant")
+	start := false
+	b.mu.Lock()
+	if b.streamText == "" {
+		start = true
+	}
+	b.streamText += delta
+	b.finalMessage += delta
+	b.mu.Unlock()
+	if start {
+		b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text"}})
+	}
+	b.emit(StreamEvent{Type: EventContentDelta, MessageID: msgID, BlockType: "text", Delta: delta})
+}
+
+func (b *ClaudeCodeBackend) flushStreamText() string {
+	b.mu.Lock()
+	text := b.streamText
+	b.streamText = ""
+	b.mu.Unlock()
+	return text
 }
 
 // --- Describable interface ---
@@ -467,8 +590,6 @@ func (b *ClaudeCodeBackend) RestoreState(stateJSON string) error {
 	b.mu.Lock()
 	b.messages = msgs
 	b.mu.Unlock()
-	// Emit restored messages to update UI
-	b.emitMessages()
 	return nil
 }
 

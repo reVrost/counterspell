@@ -62,7 +62,7 @@ func (s *GitHubService) ExchangeCode(ctx context.Context, code string) (string, 
 }
 
 type GitHubUser struct {
-	ID       int64  `json:"id"`
+	ID        int64  `json:"id"`
 	Login     string `json:"login"`
 	AvatarURL string `json:"avatar_url"`
 }
@@ -109,7 +109,7 @@ func (s *GitHubService) CreateConnection(ctx context.Context, accessToken string
 		now := time.Now().UnixMilli()
 		if _, err := s.db.Queries.CreateGithubConnection(ctx, sqlc.CreateGithubConnectionParams{
 			ID:           id,
-			GithubUserID:  fmt.Sprintf("%d", user.ID),
+			GithubUserID: fmt.Sprintf("%d", user.ID),
 			AccessToken:  accessToken,
 			Username:     user.Login,
 			AvatarUrl:    sql.NullString{String: user.AvatarURL, Valid: user.AvatarURL != ""},
@@ -142,8 +142,8 @@ type GitHubRepo struct {
 	Owner    struct {
 		Login string `json:"login"`
 	} `json:"owner"`
-	Private bool   `json:"private"`
-	HTMLURL string `json:"html_url"`
+	Private  bool   `json:"private"`
+	HTMLURL  string `json:"html_url"`
 	CloneURL string `json:"clone_url"`
 }
 
@@ -192,17 +192,17 @@ func (s *GitHubService) SyncRepos(ctx context.Context, connectionID string) erro
 		// Use GitHub repo ID as our database ID for consistency
 		repoID := fmt.Sprintf("%d", r.ID)
 		if _, err := s.db.Queries.UpsertRepository(ctx, sqlc.UpsertRepositoryParams{
-			ID:          repoID,
+			ID:           repoID,
 			ConnectionID: connectionID,
-			Name:        r.Name,
-			FullName:    r.FullName,
-			Owner:       r.Owner.Login,
-			IsPrivate:   r.Private,
-			HtmlUrl:     r.HTMLURL,
-			CloneUrl:    r.CloneURL,
-			LocalPath:   sql.NullString{},
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			Name:         r.Name,
+			FullName:     r.FullName,
+			Owner:        r.Owner.Login,
+			IsPrivate:    r.Private,
+			HtmlUrl:      r.HTMLURL,
+			CloneUrl:     r.CloneURL,
+			LocalPath:    sql.NullString{},
+			CreatedAt:    now,
+			UpdatedAt:    now,
 		}); err != nil {
 			return fmt.Errorf("failed to upsert repo %s: %w", r.FullName, err)
 		}

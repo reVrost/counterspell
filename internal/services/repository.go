@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/lithammer/shortuuid/v4"
+	"github.com/revrost/counterspell/internal/agent"
 	"github.com/revrost/counterspell/internal/db"
 	"github.com/revrost/counterspell/internal/db/sqlc"
 	"github.com/revrost/counterspell/internal/models"
@@ -295,6 +297,26 @@ func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, con
 	})
 }
 
+// CreateMessageWithParts creates a new message with structured parts.
+func (s *Repository) CreateMessageWithParts(ctx context.Context, taskID, runID, role, content, parts string) error {
+	id := shortuuid.New()
+	now := time.Now().UnixMilli()
+	if strings.TrimSpace(parts) == "" {
+		parts = "[]"
+	}
+
+	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
+		ID:        id,
+		TaskID:    taskID,
+		RunID:     runID,
+		Role:      role,
+		Content:   content,
+		Parts:     parts,
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+}
+
 // GetMessagesByTask retrieves all messages for a task.
 func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sqlc.Message, error) {
 	return s.db.Queries.GetMessagesByTask(ctx, taskID)
@@ -525,22 +547,59 @@ func (s *Repository) GetAgentRunByBackendSessionID(ctx context.Context, backend,
 
 // ConvertMessagesToJSON converts sqlc.Message to JSON format for agent state restoration.
 func ConvertMessagesToJSON(messages []sqlc.Message) (string, error) {
-	type ContentBlock struct {
-		Type string `json:"type"`
-		Text string `json:"text,omitempty"`
-	}
 	type Message struct {
-		Role    string         `json:"role"`
-		Content []ContentBlock `json:"content"`
+		Role    string               `json:"role"`
+		Content []agent.ContentBlock `json:"content"`
 	}
 
 	result := make([]Message, 0, len(messages))
 	for _, msg := range messages {
+		var blocks []agent.ContentBlock
+		if strings.TrimSpace(msg.Parts) != "" && strings.TrimSpace(msg.Parts) != "[]" {
+			_ = json.Unmarshal([]byte(msg.Parts), &blocks)
+		}
+		if len(blocks) == 0 {
+			if strings.TrimSpace(msg.Content) == "" {
+				continue
+			}
+			blocks = []agent.ContentBlock{{Type: "text", Text: msg.Content}}
+		}
+
+		filtered := blocks[:0]
+		for _, block := range blocks {
+			if block.Type == "thinking" {
+				continue
+			}
+			filtered = append(filtered, block)
+		}
+
+		role := msg.Role
+		if len(blocks) > 0 {
+			hasToolResult := false
+			hasToolUse := false
+			for _, block := range blocks {
+				if block.Type == "tool_result" {
+					hasToolResult = true
+				} else if block.Type == "tool_use" {
+					hasToolUse = true
+				}
+			}
+			if hasToolResult {
+				role = "user"
+			} else if hasToolUse {
+				role = "assistant"
+			}
+		} else {
+			if role == "tool_result" {
+				role = "user"
+			} else if role == "tool" {
+				role = "assistant"
+			}
+		}
+
 		result = append(result, Message{
-			Role: msg.Role,
-			Content: []ContentBlock{
-				{Type: "text", Text: msg.Content},
-			},
+			Role:    role,
+			Content: filtered,
 		})
 	}
 

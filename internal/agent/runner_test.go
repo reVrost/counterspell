@@ -16,7 +16,7 @@ func TestRunner_EmptyUserMessage(t *testing.T) {
 	mockCaller := NewMockLLMCaller(ctrl)
 	mockProvider := &mockLLMProvider{}
 
-	r := NewRunner(mockProvider, ".", nil)
+	r := NewRunner(mockProvider, ".")
 	r.llmCaller = mockCaller
 
 	ctx := context.Background()
@@ -44,7 +44,7 @@ func TestRunner_EmptyUserMessage(t *testing.T) {
 				{Type: LLMMessageEnd},
 			}), nil)
 
-		err := r.runWithMessage(ctx, "", true, make(chan StreamEvent, 4), make(chan []tools.TodoItem, 1))
+		err := r.runWithMessage(ctx, "", true, make(chan StreamEvent, 64), make(chan []tools.TodoItem, 1))
 		if err != nil {
 			t.Errorf("expected no error for empty message on continuation, got %v", err)
 		}
@@ -74,7 +74,7 @@ func TestRunner_MessagePersistence(t *testing.T) {
 	mockCaller := NewMockLLMCaller(ctrl)
 	mockProvider := &mockLLMProvider{}
 
-	r := NewRunner(mockProvider, ".", nil)
+	r := NewRunner(mockProvider, ".")
 	r.llmCaller = mockCaller
 
 	ctx := context.Background()

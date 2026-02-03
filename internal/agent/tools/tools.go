@@ -36,8 +36,8 @@ type Context struct {
 	WorkDir string
 	// TodoState is set by the runner for the todo tool
 	TodoState *TodoState
-	// OnTodoUpdate is called when todos change
-	OnTodoUpdate func()
+	// TodoEvents receives the latest todo list when it changes.
+	TodoEvents chan<- []TodoItem
 }
 
 // Registry holds all available tools.

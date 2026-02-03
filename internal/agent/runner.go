@@ -6,20 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/counterspell/internal/agent/tools"
 	"github.com/revrost/counterspell/internal/llm"
-)
-
-// Event types for streaming
-const (
-	EventTool       = "tool"
-	EventToolResult = "result"
-	EventText       = "text"
-	EventUserText   = "user_text"
-	EventError      = "error"
-	EventDone       = "done"
-	EventTodo       = "todo" // Todo list update
 )
 
 // Message represents a single message in the conversation.
@@ -29,15 +20,16 @@ type Message struct {
 	Content []ContentBlock `json:"content"`
 }
 
-// ContentBlock can be one of three types:
+// ContentBlock can be one of four types:
 // - text: Assistant response text
+// - thinking: Assistant hidden reasoning
 // - tool_use: Assistant requesting to call a tool
 // - tool_result: Result sent back after tool execution (from us to API)
 type ContentBlock struct {
 	// For all blocks
 	Type string `json:"type"`
 
-	// For text blocks
+	// For text/thinking blocks
 	Text string `json:"text,omitempty"`
 
 	// For tool_use blocks (assistant calling a tool)
@@ -50,48 +42,35 @@ type ContentBlock struct {
 	Content   string `json:"content,omitempty"`     // Tool output
 }
 
-// StreamEvent represents a single event in the agent execution.
-type StreamEvent struct {
-	Type       string `json:"type"`
-	Content    string `json:"content"`
-	Tool       string `json:"tool,omitempty"`
-	Args       string `json:"args,omitempty"`
-	SessionID  string `json:"session_id,omitempty"` // Backend session ID (e.g., Claude Code session)
-}
-
-// StreamCallback is called for each event during agent execution.
-type StreamCallback func(event StreamEvent)
-
 // Runner executes agent tasks with streaming output.
 type Runner struct {
 	provider       llm.Provider
 	llmCaller      LLMCaller
 	workDir        string
-	callback       StreamCallback
 	systemPrompt   string
 	finalMessage   string
 	messageHistory []Message
 	todoState      *tools.TodoState
 	toolRegistry   *tools.Registry
+	toolCtx        *tools.Context
 }
 
 // NewRunner creates a new agent runner.
-func NewRunner(provider llm.Provider, workDir string, callback StreamCallback) *Runner {
+func NewRunner(provider llm.Provider, workDir string) *Runner {
 	r := &Runner{
 		provider:     provider,
 		llmCaller:    NewLLMCaller(provider),
 		workDir:      workDir,
-		callback:     callback,
 		systemPrompt: fmt.Sprintf("You are a coding assistant. Work directory: %s. Be concise. Make changes directly.", workDir),
 		todoState:    tools.NewTodoState(),
 	}
 
 	// Create tool registry with context
 	toolCtx := &tools.Context{
-		WorkDir:      workDir,
-		TodoState:    r.todoState,
-		OnTodoUpdate: r.emitTodoUpdate,
+		WorkDir:   workDir,
+		TodoState: r.todoState,
 	}
+	r.toolCtx = toolCtx
 	r.toolRegistry = tools.NewRegistry(toolCtx)
 
 	return r
@@ -132,16 +111,121 @@ func (r *Runner) GetTodoState() *tools.TodoState {
 
 // Run executes the agent loop for a given task.
 func (r *Runner) Run(ctx context.Context, task string) error {
-	return r.runWithMessage(ctx, task, false)
+	stream := r.Stream(ctx, task)
+	return drainStream(ctx, stream)
 }
 
-// Continue resumes the agent loop with a new follow-up message.
-// func (r *Runner) Continue(ctx context.Context, followUpMessage string) error {
-// 	return r.runWithMessage(ctx, followUpMessage, true)
-// }
+// Stream executes the agent loop for a given task and returns a stream of events.
+func (r *Runner) Stream(ctx context.Context, task string) *Stream {
+	events := make(chan StreamEvent, 32)
+	done := make(chan error, 1)
+	todoEvents := make(chan []tools.TodoItem, 1)
+
+	r.toolCtx.TodoEvents = todoEvents
+
+	go func() {
+		defer close(events)
+		defer close(done)
+		defer func() { r.toolCtx.TodoEvents = nil }()
+
+		err := r.runWithMessage(ctx, task, false, events, todoEvents)
+		done <- err
+	}()
+
+	return &Stream{Events: events, Done: done}
+}
+
+func drainStream(ctx context.Context, stream *Stream) error {
+	if stream == nil {
+		return nil
+	}
+	for stream.Events != nil || stream.Done != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case _, ok := <-stream.Events:
+			if !ok {
+				stream.Events = nil
+			}
+		case err, ok := <-stream.Done:
+			if !ok {
+				stream.Done = nil
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+type blockBuilder struct {
+	block ContentBlock
+	args  strings.Builder
+}
+
+type messageBuilder struct {
+	messageID string
+	role      string
+	blocks    []ContentBlock
+	current   *blockBuilder
+	toolCalls []ContentBlock
+}
+
+func (b *messageBuilder) ensureBlock(blockType string, block *ContentBlock) {
+	if b.current != nil && b.current.block.Type == blockType {
+		return
+	}
+	b.finalizeCurrent()
+	bb := &blockBuilder{block: ContentBlock{Type: blockType}}
+	if block != nil {
+		bb.block = *block
+		if bb.block.Type == "" {
+			bb.block.Type = blockType
+		}
+	}
+	b.current = bb
+}
+
+func (b *messageBuilder) appendDelta(blockType, delta string) {
+	b.ensureBlock(blockType, nil)
+	switch blockType {
+	case "text", "thinking":
+		b.current.block.Text += delta
+	case "tool_use":
+		b.current.args.WriteString(delta)
+	}
+}
+
+func (b *messageBuilder) finalizeCurrent() *ContentBlock {
+	if b.current == nil {
+		return nil
+	}
+	block := b.current.block
+	if block.Type == "tool_use" {
+		argsJSON := strings.TrimSpace(b.current.args.String())
+		if argsJSON != "" {
+			input := map[string]any{}
+			if err := json.Unmarshal([]byte(argsJSON), &input); err == nil {
+				block.Input = input
+			} else {
+				block.Input = map[string]any{"raw": argsJSON}
+			}
+		}
+	}
+	b.blocks = append(b.blocks, block)
+	if block.Type == "tool_use" {
+		b.toolCalls = append(b.toolCalls, block)
+	}
+	b.current = nil
+	return &block
+}
+
+func (b *messageBuilder) finalizeAll() {
+	_ = b.finalizeCurrent()
+}
 
 // runWithMessage is the core loop that handles both new runs and continuations.
-func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isContinuation bool) error {
+func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isContinuation bool, events chan<- StreamEvent, todoEvents chan []tools.TodoItem) error {
 	allTools := r.toolRegistry.All()
 
 	// Use existing message history or start fresh
@@ -150,20 +234,33 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		messages = []Message{}
 	}
 
+	if !isContinuation {
+		r.finalMessage = ""
+	}
+
 	if userMessage != "" {
 		// Add user message
 		msg := Message{
 			Role: "user",
-			Content: []ContentBlock{
-				{Type: "text", Text: userMessage},
-			},
+			Content: []ContentBlock{{
+				Type: "text",
+				Text: userMessage,
+			}},
 		}
 		messages = append(messages, msg)
-
-		r.emit(StreamEvent{Type: EventUserText, Content: userMessage})
 	} else if len(messages) == 0 {
 		return fmt.Errorf("agent: cannot start task with empty message")
 	}
+
+	todoDone := make(chan struct{})
+	go func() {
+		defer close(todoDone)
+		for todos := range todoEvents {
+			emitEvent(ctx, events, StreamEvent{Type: EventTodo, Todos: todos})
+		}
+	}()
+	defer func() { <-todoDone }()
+	defer close(todoEvents)
 
 	// Agent loop
 	for {
@@ -174,84 +271,145 @@ func (r *Runner) runWithMessage(ctx context.Context, userMessage string, isConti
 		default:
 		}
 
-		slog.Info("[RUNNER] Calling LLM API", "messages", messages, "all_tools", allTools, "system_prompt", r.systemPrompt)
-		resp, err := r.llmCaller.Call(messages, allTools, r.systemPrompt)
+		slog.Info("[RUNNER] Calling LLM API", "message_count", len(messages), "tool_count", len(allTools), "system_prompt", r.systemPrompt)
+		stream, err := r.llmCaller.Stream(ctx, messages, allTools, r.systemPrompt)
 		if err != nil {
 			r.messageHistory = messages
-			r.emit(StreamEvent{Type: EventError, Content: err.Error()})
+			emitEvent(ctx, events, StreamEvent{Type: EventError, Error: err.Error()})
 			slog.Error("[RUNNER] LLM API call failed", "error", err)
 			return err
 		}
 
-		// Log the raw response for debugging
-		respJSON, _ := json.MarshalIndent(resp, "", "  ")
-		fmt.Printf("\n=== LLM API RESPONSE ===\n%s\n=== END RESPONSE ===\n\n", string(respJSON))
-		for i, block := range resp.Content {
-			fmt.Printf("Block %d: type=%s, has_text=%v, has_name=%v, id=%s\n", i, block.Type, block.Text != "", block.Name != "", block.ID)
+		messageID := shortuuid.New()
+		emitEvent(ctx, events, StreamEvent{Type: EventMessageStart, MessageID: messageID, Role: "assistant"})
+		builder := &messageBuilder{messageID: messageID, role: "assistant"}
+		messageEnded := false
+
+		for stream.Events != nil || stream.Done != nil {
+			select {
+			case <-ctx.Done():
+				stream.Events = nil
+				stream.Done = nil
+			case ev, ok := <-stream.Events:
+				if !ok {
+					stream.Events = nil
+					continue
+				}
+				switch ev.Type {
+				case LLMContentStart:
+					builder.ensureBlock(ev.BlockType, ev.Block)
+					emitEvent(ctx, events, StreamEvent{
+						Type:      EventContentStart,
+						MessageID: messageID,
+						BlockType: ev.BlockType,
+						Block:     ev.Block,
+					})
+				case LLMContentDelta:
+					builder.appendDelta(ev.BlockType, ev.Delta)
+					emitEvent(ctx, events, StreamEvent{
+						Type:      EventContentDelta,
+						MessageID: messageID,
+						BlockType: ev.BlockType,
+						Delta:     ev.Delta,
+					})
+				case LLMContentEnd:
+					builder.ensureBlock(ev.BlockType, ev.Block)
+					finished := builder.finalizeCurrent()
+					emitEvent(ctx, events, StreamEvent{
+						Type:      EventContentEnd,
+						MessageID: messageID,
+						BlockType: ev.BlockType,
+						Block:     finished,
+					})
+				case LLMMessageEnd:
+					messageEnded = true
+				}
+			case err, ok := <-stream.Done:
+				if !ok {
+					stream.Done = nil
+					continue
+				}
+				if err != nil {
+					emitEvent(ctx, events, StreamEvent{Type: EventError, Error: err.Error()})
+					return err
+				}
+				stream.Done = nil
+			}
 		}
 
-		toolResults := []ContentBlock{}
-
-		// Immediately add assistant message and emit so UI shows response right away
-		assistantMsg := Message{Role: "assistant", Content: resp.Content}
+		builder.finalizeAll()
+		assistantMsg := Message{Role: "assistant", Content: builder.blocks}
 		messages = append(messages, assistantMsg)
 
-		for _, block := range resp.Content {
+		for _, block := range builder.blocks {
 			if block.Type == "text" && block.Text != "" {
-				r.emit(StreamEvent{Type: EventText, Content: block.Text})
 				r.finalMessage += block.Text
-			}
-
-			if block.Type == "tool_use" {
-				argsJSON, _ := json.Marshal(block.Input)
-				r.emit(StreamEvent{
-					Type:    EventTool,
-					Tool:    block.Name,
-					Args:    string(argsJSON),
-					Content: fmt.Sprintf("Running %s", block.Name),
-				})
-
-				result := r.runTool(block.Name, block.Input, allTools)
-
-				// Truncate result for display
-				displayResult := result
-				if len(displayResult) > 200 {
-					displayResult = displayResult[:200] + "..."
-				}
-				r.emit(StreamEvent{
-					Type:    EventToolResult,
-					Tool:    block.Name,
-					Content: displayResult,
-				})
-
-				toolResults = append(toolResults, ContentBlock{
-					Type:      "tool_result",
-					ToolUseID: block.ID,
-					Content:   result,
-				})
 			}
 		}
 
-		if len(toolResults) == 0 {
+		if !messageEnded {
+			messageEnded = true
+		}
+		if messageEnded {
+			emitEvent(ctx, events, StreamEvent{Type: EventMessageEnd, MessageID: messageID, Role: "assistant"})
+		}
+
+		if len(builder.toolCalls) == 0 {
 			slog.Info("[RUNNER] No more tools to run, completing task")
 			break
 		}
 
+		toolResults := []ContentBlock{}
+		for _, block := range builder.toolCalls {
+			result := r.runTool(block.Name, block.Input, allTools)
+			toolResults = append(toolResults, ContentBlock{
+				Type:      "tool_result",
+				ToolUseID: block.ID,
+				Content:   result,
+			})
+
+			toolMsgID := shortuuid.New()
+			emitEvent(ctx, events, StreamEvent{Type: EventMessageStart, MessageID: toolMsgID, Role: "user"})
+			emitEvent(ctx, events, StreamEvent{
+				Type:      EventContentStart,
+				MessageID: toolMsgID,
+				BlockType: "tool_result",
+				Block: &ContentBlock{
+					Type:      "tool_result",
+					ToolUseID: block.ID,
+					Content:   result,
+				},
+			})
+			emitEvent(ctx, events, StreamEvent{
+				Type:      EventContentEnd,
+				MessageID: toolMsgID,
+				BlockType: "tool_result",
+				Block: &ContentBlock{
+					Type:      "tool_result",
+					ToolUseID: block.ID,
+					Content:   result,
+				},
+			})
+			emitEvent(ctx, events, StreamEvent{Type: EventMessageEnd, MessageID: toolMsgID, Role: "user"})
+		}
+
 		slog.Info("[RUNNER] Running %d tool result(s) through agent loop", "len_tool_results", len(toolResults))
-		toolResultMsg := Message{Role: "tool_result", Content: toolResults}
+		toolResultMsg := Message{Role: "user", Content: toolResults}
 		messages = append(messages, toolResultMsg)
 	}
 
 	// Store message history for future continuations
 	r.messageHistory = messages
 
-	r.emit(StreamEvent{Type: EventDone, Content: "Task completed"})
+	emitEvent(ctx, events, StreamEvent{Type: EventDone})
 	return nil
 }
 
-func (r *Runner) emit(event StreamEvent) {
-	if r.callback != nil {
-		r.callback(event)
+func emitEvent(ctx context.Context, events chan<- StreamEvent, event StreamEvent) {
+	select {
+	case <-ctx.Done():
+		return
+	case events <- event:
 	}
 }
 
@@ -266,19 +424,4 @@ func (r *Runner) runTool(name string, args map[string]any, allTools map[string]t
 		}
 	}()
 	return tool.Func(args)
-}
-
-// emitTodoUpdate sends a todo update event through the callback
-func (r *Runner) emitTodoUpdate() {
-	if r.callback == nil {
-		return
-	}
-
-	todos := r.todoState.GetTodos()
-	data, _ := json.Marshal(todos)
-
-	r.emit(StreamEvent{
-		Type:    EventTodo,
-		Content: string(data),
-	})
 }

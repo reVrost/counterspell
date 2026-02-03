@@ -14,14 +14,8 @@ func TestNativeBackend_Events(t *testing.T) {
 	mockCaller := NewMockLLMCaller(ctrl)
 	mockProvider := &mockLLMProvider{}
 
-	var receivedEvents []StreamEvent
-	callback := func(e StreamEvent) {
-		receivedEvents = append(receivedEvents, e)
-	}
-
 	backend, err := NewNativeBackend(
 		WithProvider(mockProvider),
-		WithCallback(callback),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create backend: %v", err)
@@ -33,77 +27,119 @@ func TestNativeBackend_Events(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Event flow for simple text response", func(t *testing.T) {
-		receivedEvents = nil
-
 		mockCaller.EXPECT().
-			Call(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&APIResponse{
-				Content: []ContentBlock{{Type: "text", Text: "Hello, I am the agent."}},
-			}, nil)
+			Stream(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(makeLLMStream([]LLMEvent{
+				{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}},
+				{Type: LLMContentDelta, BlockType: "text", Delta: "Hello, I am the agent."},
+				{Type: LLMContentEnd, BlockType: "text"},
+				{Type: LLMMessageEnd},
+			}), nil)
 
-		err := backend.Run(ctx, "Hi")
+		stream := backend.Stream(ctx, "Hi")
+		events, err := collectStream(stream)
 		if err != nil {
-			t.Errorf("Run failed: %v", err)
+			t.Errorf("Stream failed: %v", err)
 		}
 
-		expectedTypes := []string{EventUserText, EventText, EventDone}
-		if len(receivedEvents) != len(expectedTypes) {
-			t.Errorf("expected %d events, got %d", len(expectedTypes), len(receivedEvents))
+		if !hasEventType(events, EventContentDelta) {
+			t.Errorf("expected content_delta event")
 		}
-
-		for i, eventType := range expectedTypes {
-			if i < len(receivedEvents) && receivedEvents[i].Type != eventType {
-				t.Errorf("event %d: expected type %s, got %s", i, eventType, receivedEvents[i].Type)
-			}
+		if !hasEventType(events, EventDone) {
+			t.Errorf("expected done event")
 		}
 	})
 
 	t.Run("Event flow for tool usage", func(t *testing.T) {
-		receivedEvents = nil
-
-		// First call returns a tool use
 		mockCaller.EXPECT().
-			Call(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&APIResponse{
-				Content: []ContentBlock{{
-					Type:  "tool_use",
-					Name:  "list_files",
-					ID:    "call_123",
-					Input: map[string]any{"path": "."},
-				}},
-			}, nil).Times(1)
+			Stream(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(makeLLMStream([]LLMEvent{
+				{Type: LLMContentStart, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: "list_files", ID: "call_123", Input: map[string]any{"path": "."}}},
+				{Type: LLMContentEnd, BlockType: "tool_use"},
+				{Type: LLMMessageEnd},
+			}), nil).Times(1)
 
-		// Second call (after tool result) returns a text response
 		mockCaller.EXPECT().
-			Call(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&APIResponse{
-				Content: []ContentBlock{{Type: "text", Text: "I listed the files."}},
-			}, nil).Times(1)
+			Stream(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(makeLLMStream([]LLMEvent{
+				{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}},
+				{Type: LLMContentDelta, BlockType: "text", Delta: "I listed the files."},
+				{Type: LLMContentEnd, BlockType: "text"},
+				{Type: LLMMessageEnd},
+			}), nil).Times(1)
 
-		err := backend.Run(ctx, "list files")
+		stream := backend.Stream(ctx, "list files")
+		events, err := collectStream(stream)
 		if err != nil {
-			t.Errorf("Run failed: %v", err)
+			t.Errorf("Stream failed: %v", err)
 		}
 
-		expectedTypes := []string{
-			EventUserText,
-			EventTool,
-			EventToolResult,
-			EventText,
-			EventDone,
+		if !hasEventType(events, EventContentEnd) {
+			t.Errorf("expected content_end event")
 		}
-
-		if len(receivedEvents) != len(expectedTypes) {
-			t.Errorf("expected %d events, got %d", len(expectedTypes), len(receivedEvents))
-			for i, e := range receivedEvents {
-				t.Logf("Event %d: %s", i, e.Type)
-			}
+		if !hasBlockType(events, "tool_result") {
+			t.Errorf("expected tool_result content")
 		}
-
-		for i, eventType := range expectedTypes {
-			if i < len(receivedEvents) && receivedEvents[i].Type != eventType {
-				t.Errorf("event %d: expected type %s, got %s", i, eventType, receivedEvents[i].Type)
-			}
+		if !hasEventType(events, EventDone) {
+			t.Errorf("expected done event")
 		}
 	})
+}
+
+func makeLLMStream(events []LLMEvent) *LLMStream {
+	eventCh := make(chan LLMEvent, len(events))
+	doneCh := make(chan error, 1)
+	go func() {
+		for _, ev := range events {
+			eventCh <- ev
+		}
+		close(eventCh)
+		doneCh <- nil
+		close(doneCh)
+	}()
+	return &LLMStream{Events: eventCh, Done: doneCh}
+}
+
+func collectStream(stream *Stream) ([]StreamEvent, error) {
+	var events []StreamEvent
+	var streamErr error
+	for stream.Events != nil || stream.Done != nil {
+		select {
+		case ev, ok := <-stream.Events:
+			if !ok {
+				stream.Events = nil
+				continue
+			}
+			events = append(events, ev)
+		case err, ok := <-stream.Done:
+			if !ok {
+				stream.Done = nil
+				continue
+			}
+			streamErr = err
+			stream.Done = nil
+		}
+	}
+	return events, streamErr
+}
+
+func hasEventType(events []StreamEvent, typ StreamEventType) bool {
+	for _, ev := range events {
+		if ev.Type == typ {
+			return true
+		}
+	}
+	return false
+}
+
+func hasBlockType(events []StreamEvent, blockType string) bool {
+	for _, ev := range events {
+		if ev.Block != nil && ev.Block.Type == blockType {
+			return true
+		}
+		if ev.BlockType == blockType {
+			return true
+		}
+	}
+	return false
 }

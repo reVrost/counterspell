@@ -10,6 +10,7 @@
 package agent
 
 import (
+	context "context"
 	reflect "reflect"
 
 	tools "github.com/revrost/counterspell/internal/agent/tools"
@@ -40,17 +41,17 @@ func (m *MockLLMCaller) EXPECT() *MockLLMCallerMockRecorder {
 	return m.recorder
 }
 
-// Call mocks base method.
-func (m *MockLLMCaller) Call(messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*APIResponse, error) {
+// Stream mocks base method.
+func (m *MockLLMCaller) Stream(ctx context.Context, messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*LLMStream, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Call", messages, allTools, systemPrompt)
-	ret0, _ := ret[0].(*APIResponse)
+	ret := m.ctrl.Call(m, "Stream", ctx, messages, allTools, systemPrompt)
+	ret0, _ := ret[0].(*LLMStream)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Call indicates an expected call of Call.
-func (mr *MockLLMCallerMockRecorder) Call(messages, allTools, systemPrompt any) *gomock.Call {
+// Stream indicates an expected call of Stream.
+func (mr *MockLLMCallerMockRecorder) Stream(ctx, messages, allTools, systemPrompt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Call", reflect.TypeOf((*MockLLMCaller)(nil).Call), messages, allTools, systemPrompt)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stream", reflect.TypeOf((*MockLLMCaller)(nil).Stream), ctx, messages, allTools, systemPrompt)
 }

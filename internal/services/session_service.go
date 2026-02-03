@@ -140,7 +140,7 @@ func (s *SessionService) Chat(ctx context.Context, sessionID, message, modelID s
 	}
 
 	writer := newSessionMessageWriter(ctx, s.repo, sessionID, nextSeq+1)
-	backend, cleanup, err := s.buildBackend(ctx, session, modelID, s.makeSessionCallback(writer), true)
+	backend, cleanup, err := s.buildBackend(ctx, session, modelID, true)
 	if err != nil {
 		return err
 	}
@@ -156,11 +156,8 @@ func (s *SessionService) Chat(ctx context.Context, sessionID, message, modelID s
 		}
 	}
 
-	if err := backend.Run(ctx, message); err != nil {
-		return err
-	}
-
-	return nil
+	stream := backend.Stream(ctx, message)
+	return s.consumeSessionStream(ctx, writer, stream)
 }
 
 // Promote converts a session into a task with summarized title/intent.
@@ -211,7 +208,7 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 
 func (s *SessionService) summarizeSession(ctx context.Context, session *models.Session, messages []models.SessionMessage) (string, string, error) {
 	prompt := buildSummaryPrompt(messages)
-	backend, cleanup, err := s.buildBackend(ctx, session, "", nil, false)
+	backend, cleanup, err := s.buildBackend(ctx, session, "", false)
 	if err != nil {
 		return "", "", err
 	}
@@ -240,7 +237,6 @@ func (s *SessionService) buildBackend(
 	ctx context.Context,
 	session *models.Session,
 	modelID string,
-	callback agent.StreamCallback,
 	useSessionID bool,
 ) (agent.Backend, func(), error) {
 	if session.AgentBackend == "codex" {
@@ -268,9 +264,6 @@ func (s *SessionService) buildBackend(
 			agent.WithBaseURL(baseURL),
 			agent.WithClaudeWorkDir(s.dataDir),
 		}
-		if callback != nil {
-			opts = append(opts, agent.WithClaudeCallback(callback))
-		}
 		if useSessionID && session.BackendSessionID != nil && *session.BackendSessionID != "" {
 			opts = append(opts, agent.WithSessionID(*session.BackendSessionID))
 		}
@@ -288,9 +281,6 @@ func (s *SessionService) buildBackend(
 		opts := []agent.NativeBackendOption{
 			agent.WithProvider(llmProvider),
 			agent.WithWorkDir(s.dataDir),
-		}
-		if callback != nil {
-			opts = append(opts, agent.WithCallback(callback))
 		}
 		backend, err := agent.NewNativeBackend(opts...)
 		if err != nil {
@@ -515,43 +505,93 @@ func (w *sessionMessageWriter) append(role, kind, content, toolName, toolCallID 
 	}
 }
 
-func (s *SessionService) makeSessionCallback(writer *sessionMessageWriter) agent.StreamCallback {
-	return func(event agent.StreamEvent) {
-		switch event.Type {
-		case "session":
-			if event.SessionID != "" {
-				if err := s.repo.UpdateSessionBackendSessionID(context.Background(), writer.sessionID, event.SessionID); err != nil {
-					slog.Warn("[SESSIONS] failed to update backend session id", "session_id", writer.sessionID, "error", err)
-				}
+func (s *SessionService) consumeSessionStream(ctx context.Context, writer *sessionMessageWriter, stream *agent.Stream) error {
+	if stream == nil {
+		return nil
+	}
+	assembler := newStreamAssembler()
+	for stream.Events != nil || stream.Done != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-stream.Events:
+			if !ok {
+				stream.Events = nil
+				continue
 			}
-		case agent.EventText:
-			writer.append(
-				"assistant",
-				"text",
-				event.Content,
-				"",
-				"",
-				map[string]any{"type": "text", "content": event.Content},
-			)
-		case agent.EventTool:
-			writer.append(
-				"assistant",
-				"tool_use",
-				event.Args,
-				event.Tool,
-				"",
-				map[string]any{"type": "tool_use", "tool": event.Tool, "args": event.Args},
-			)
-		case agent.EventToolResult:
-			writer.append(
-				"tool",
-				"tool_result",
-				event.Content,
-				"",
-				"",
-				map[string]any{"type": "tool_result", "content": event.Content},
-			)
-		default:
+			s.handleSessionEvent(writer, assembler, event)
+		case err, ok := <-stream.Done:
+			if !ok {
+				stream.Done = nil
+				continue
+			}
+			return err
 		}
 	}
+	return nil
+}
+
+func (s *SessionService) handleSessionEvent(writer *sessionMessageWriter, assembler *streamAssembler, event agent.StreamEvent) {
+	switch event.Type {
+	case agent.EventSession:
+		if event.SessionID != "" {
+			if err := s.repo.UpdateSessionBackendSessionID(context.Background(), writer.sessionID, event.SessionID); err != nil {
+				slog.Warn("[SESSIONS] failed to update backend session id", "session_id", writer.sessionID, "error", err)
+			}
+		}
+	case agent.EventTodo:
+		// Session UI doesn't currently consume todo updates.
+	default:
+		if msg, ok := assembler.Apply(event); ok {
+			persistSessionMessage(writer, msg)
+		}
+	}
+}
+
+func persistSessionMessage(writer *sessionMessageWriter, msg *streamMessage) {
+	if msg == nil || len(msg.blocks) == 0 {
+		return
+	}
+	for _, block := range msg.blocks {
+		role, kind, content, toolName, toolCallID := sessionBlockFields(msg.role, block)
+		raw := sessionBlockRaw(block)
+		writer.append(role, kind, content, toolName, toolCallID, raw)
+	}
+}
+
+func sessionBlockFields(role string, block agent.ContentBlock) (string, string, string, string, string) {
+	switch block.Type {
+	case "tool_result":
+		return "tool", "tool_result", block.Content, "", block.ToolUseID
+	case "tool_use":
+		inputJSON, _ := json.Marshal(block.Input)
+		return roleOrDefault(role, "assistant"), "tool_use", string(inputJSON), block.Name, block.ID
+	case "thinking":
+		return roleOrDefault(role, "assistant"), "thinking", block.Text, "", ""
+	default:
+		return roleOrDefault(role, "assistant"), "text", block.Text, "", ""
+	}
+}
+
+func sessionBlockRaw(block agent.ContentBlock) map[string]any {
+	raw := map[string]any{"type": block.Type}
+	switch block.Type {
+	case "tool_use":
+		raw["tool"] = block.Name
+		raw["input"] = block.Input
+		raw["id"] = block.ID
+	case "tool_result":
+		raw["tool_use_id"] = block.ToolUseID
+		raw["content"] = block.Content
+	default:
+		raw["content"] = block.Text
+	}
+	return raw
+}
+
+func roleOrDefault(role, fallback string) string {
+	if role == "" {
+		return fallback
+	}
+	return role
 }

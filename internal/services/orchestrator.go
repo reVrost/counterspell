@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -417,9 +418,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			agent.WithCodexAPIKey(apiKey),
 			agent.WithCodexModel(model),
 			agent.WithCodexWorkDir(worktreePath),
-			agent.WithCodexCallback(func(e agent.StreamEvent) {
-				o.handleAgentEvent(job.TaskID, e)
-			}),
 		}
 		if baseURL != "" {
 			codexOpts = append(codexOpts, agent.WithCodexBaseURL(baseURL))
@@ -462,9 +460,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 			agent.WithModel(model),
 			agent.WithBaseURL(baseURL),
 			agent.WithClaudeWorkDir(worktreePath),
-			agent.WithClaudeCallback(func(e agent.StreamEvent) {
-				o.handleAgentEvent(job.TaskID, e)
-			}),
 		}
 		// Pass session ID if available
 		if backendSessionID != "" {
@@ -495,9 +490,6 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 		backend, err = agent.NewNativeBackend(
 			agent.WithProvider(llmProvider),
 			agent.WithWorkDir(worktreePath),
-			agent.WithCallback(func(e agent.StreamEvent) {
-				o.handleAgentEvent(job.TaskID, e)
-			}),
 		)
 	}
 
@@ -516,7 +508,8 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 	// Execute task
 	slog.Info("[ORCHESTRATOR] Starting agent execution", "task_id", job.TaskID)
-	execErr := backend.Run(ctx, job.Intent)
+	stream := backend.Stream(ctx, job.Intent)
+	execErr := o.consumeAgentStream(ctx, job.TaskID, runID, stream)
 	if execErr != nil {
 		slog.Error("[ORCHESTRATOR] Agent execution failed", "error", execErr, "task_id", job.TaskID)
 		job.ResultCh <- TaskResult{TaskID: job.TaskID, Success: false, Error: execErr.Error()}
@@ -555,52 +548,113 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 	slog.Info("[ORCHESTRATOR] Task completed", "task_id", job.TaskID, "success", true)
 }
 
-// handleAgentEvent processes agent events and publishes to UI.
-func (o *Orchestrator) handleAgentEvent(taskID string, event agent.StreamEvent) {
-	switch event.Type {
-	case "session":
-		// Save backend session ID when detected
-		if event.SessionID != "" {
-			o.saveBackendSessionID(taskID, event.SessionID)
-		}
-	case agent.EventTool:
-		o.saveMessage(taskID, agent.Message{Role: "tool", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
-	case agent.EventToolResult:
-		o.saveMessage(taskID, agent.Message{Role: "tool_result", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
-	case agent.EventText:
-		o.saveMessage(taskID, agent.Message{Role: "assistant", Content: []agent.ContentBlock{{Type: "text", Text: event.Content}}})
-	case agent.EventError:
-	case agent.EventDone:
-	case agent.EventTodo:
+// consumeAgentStream drains a stream of agent events, persists assembled messages, and publishes SSE updates.
+func (o *Orchestrator) consumeAgentStream(ctx context.Context, taskID, runID string, stream *agent.Stream) error {
+	if stream == nil {
+		return nil
 	}
-
-	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
+	assembler := newStreamAssembler()
+	for stream.Events != nil || stream.Done != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-stream.Events:
+			if !ok {
+				stream.Events = nil
+				continue
+			}
+			o.publishAgentStream(taskID, event)
+			switch event.Type {
+			case agent.EventSession:
+				if event.SessionID != "" {
+					o.saveBackendSessionID(taskID, event.SessionID)
+				}
+			case agent.EventTodo:
+				if event.Todos != nil {
+					if data, err := json.Marshal(event.Todos); err == nil {
+						o.eventBus.Publish(models.Event{TaskID: taskID, Type: "todo", Data: string(data)})
+					}
+				}
+			default:
+				if msg, ok := assembler.Apply(event); ok {
+					o.persistAgentMessage(ctx, taskID, runID, msg)
+					o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
+				}
+			}
+		case err, ok := <-stream.Done:
+			if !ok {
+				stream.Done = nil
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
-// saveMessage saves a single agent message to database.
-func (o *Orchestrator) saveMessage(taskID string, msg agent.Message) {
-	// Get latest run ID
-	run, err := o.repo.GetLatestAgentRun(context.Background(), taskID)
+func (o *Orchestrator) publishAgentStream(taskID string, event agent.StreamEvent) {
+	data, err := json.Marshal(event)
 	if err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to get latest run", "error", err)
+		slog.Warn("[ORCHESTRATOR] Failed to marshal agent event", "error", err)
 		return
 	}
+	o.eventBus.Publish(models.Event{
+		TaskID: taskID,
+		Type:   string(EventTypeAgentUpdate),
+		Data:   string(data),
+	})
+}
 
-	// Extract text content from content blocks
-	var textContent string
-	for _, block := range msg.Content {
-		if block.Type == "text" {
-			textContent += block.Text
+func (o *Orchestrator) persistAgentMessage(ctx context.Context, taskID, runID string, msg *streamMessage) {
+	if msg == nil || len(msg.blocks) == 0 {
+		return
+	}
+	role := msg.role
+	if role == "" {
+		role = "assistant"
+	}
+	if len(msg.blocks) == 1 {
+		switch msg.blocks[0].Type {
+		case "tool_result":
+			role = "tool"
+		case "tool_use":
+			role = "tool"
 		}
 	}
 
-	slog.Info("[ORCHESTRATOR] Saving message", "task_id", taskID, "run_id", run.ID, "role", msg.Role, "content", textContent)
-	if err := o.repo.CreateMessage(context.Background(), taskID, run.ID, msg.Role, textContent); err != nil {
-		slog.Error("[ORCHESTRATOR] Failed to save message", "error", err)
+	content := buildContentFromBlocks(msg.blocks)
+	if content == "" {
+		for _, block := range msg.blocks {
+			if block.Type == "tool_result" {
+				content = block.Content
+				break
+			}
+			if block.Type == "tool_use" {
+				content = block.Name
+			}
+		}
 	}
 
-	// Publish agent_run_updated
-	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeAgentRunUpdated), Data: ""})
+	partsJSON, err := json.Marshal(msg.blocks)
+	if err != nil {
+		slog.Warn("[ORCHESTRATOR] Failed to marshal message parts", "error", err)
+		partsJSON = []byte("[]")
+	}
+
+	slog.Info("[ORCHESTRATOR] Saving message", "task_id", taskID, "run_id", runID, "role", role, "content_len", len(content))
+	if err := o.repo.CreateMessageWithParts(ctx, taskID, runID, role, content, string(partsJSON)); err != nil {
+		slog.Error("[ORCHESTRATOR] Failed to save message", "error", err)
+	}
+}
+
+func buildContentFromBlocks(blocks []agent.ContentBlock) string {
+	var b strings.Builder
+	for _, block := range blocks {
+		if block.Type == "text" {
+			b.WriteString(block.Text)
+		}
+	}
+	return b.String()
 }
 
 // saveBackendSessionID saves the backend session ID to the latest agent run.
