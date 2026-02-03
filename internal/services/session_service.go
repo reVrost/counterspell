@@ -183,34 +183,27 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 		return nil, err
 	}
 
+	if session.AgentBackend == "codex" {
+		return nil, ErrCodexUnsupported
+	}
+
 	snapshot, err := json.Marshal(messages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to snapshot messages: %w", err)
 	}
 
-	title := "Promoted session"
-	if session.Title != nil && strings.TrimSpace(*session.Title) != "" {
-		title = *session.Title
-	}
-	task, err := s.repo.CreateFromSession(ctx, sessionID, title, title, string(snapshot))
-	if err != nil {
-		return nil, err
-	}
-
-	if session.AgentBackend == "codex" {
-		return task, nil
-	}
-
 	summaryTitle, summaryIntent, err := s.summarizeSession(ctx, session, messages)
 	if err != nil {
 		slog.Warn("[SESSIONS] summarize failed", "session_id", sessionID, "error", err)
-		return task, nil
+		return nil, fmt.Errorf("failed to summarize session: %w", err)
 	}
-	if summaryTitle != "" && summaryIntent != "" {
-		if err := s.repo.UpdateTaskTitleIntent(ctx, task.ID, summaryTitle, summaryIntent); err != nil {
-			return task, err
-		}
-		return s.repo.Get(ctx, task.ID)
+	if summaryTitle == "" || summaryIntent == "" {
+		return nil, fmt.Errorf("failed to summarize session: empty title or intent")
+	}
+
+	task, err := s.repo.CreateFromSession(ctx, sessionID, summaryTitle, summaryIntent, string(snapshot))
+	if err != nil {
+		return nil, err
 	}
 
 	return task, nil
