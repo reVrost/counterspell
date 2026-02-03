@@ -17,9 +17,14 @@
 
   let { activeTab = 'inbox', onNavigate, onSearch }: Props = $props();
 
-  const tabs = ['inbox', 'sessions', 'projects', 'search', 'layers'];
-  const currentTab = $derived(activeTab === 'focus' ? 'search' : activeTab || 'inbox');
-  const activeIndex = $derived(tabs.indexOf(currentTab));
+  const tabs = ['inbox', 'sessions', 'focus', 'layers'];
+  const activeIndex = $derived(tabs.indexOf(activeTab || 'inbox'));
+  const navIndex = $derived(activeIndex === -1 ? 0 : activeIndex);
+  const navButtonSize = 56;
+  const navBaseSize = 48;
+  const navGap = 4;
+  const navStep = navButtonSize + navGap;
+  const navTop = (navButtonSize - navBaseSize) / 2;
 
   function handleTabClick(tab: string) {
     if (onNavigate) {
@@ -28,21 +33,19 @@
   }
 
   const navBase =
-    'absolute h-12 w-14 bg-[#2a2a2a] rounded-full transition-all gap-1 border border-white/[0.01]';
+    'absolute left-0 h-12 w-14 bg-[#2a2a2a] rounded-full transition-all gap-1 border border-white/[0.01]';
 </script>
 
 <div class="flex items-center justify-center w-full">
   <!-- Main Navigation Pill -->
   <div class="flex-1 flex items-center justify-center">
     <div
-      class={navBase}
-      style="transform:translateX({((activeIndex === -1 ? 0 : activeIndex) -
-        (tabs.length - 1) / 2) *
-        48}px);"
-    ></div>
-    <div
-      class="inline-flex items-center gap-1 bg-[#1a1a1a] rounded-full px-1 border border-white/[0.06]"
+      class="relative inline-flex items-center gap-1 bg-[#1a1a1a] rounded-full px-1 border border-white/[0.06]"
     >
+      <div
+        class={navBase}
+        style="top:{navTop}px; transform:translateX({navIndex * navStep}px);"
+      ></div>
       <!-- Inbox (Home) -->
       <button
         type="button"
