@@ -90,30 +90,34 @@
 </script>
 
 <div class="flex flex-col gap-6">
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-      {#each ['all', 'native', 'claude-code', 'codex'] as option}
-        <button
-          type="button"
-          onclick={() => (filter = option as any)}
-          class={cn(
-            'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide border transition',
-            filter === option
-              ? 'bg-white/10 border-white/20 text-white'
-              : 'bg-transparent border-white/10 text-gray-500 hover:text-gray-300'
-          )}
-        >
-          {option === 'all' ? 'All' : option}
-        </button>
-      {/each}
-    </div>
-    <button
-      type="button"
-      onclick={createSession}
-      class="w-full sm:w-auto px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+  <div class="flex justify-center">
+    <div
+      class="flex w-full max-w-[520px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
     >
-      New Session
-    </button>
+      <div class="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 px-1">
+        {#each ['all', 'native', 'claude-code', 'codex'] as option}
+          <button
+            type="button"
+            onclick={() => (filter = option as any)}
+            class={cn(
+              'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide border transition',
+              filter === option
+                ? 'bg-white/10 border-white/20 text-white'
+                : 'bg-transparent border-white/10 text-gray-500 hover:text-gray-300'
+            )}
+          >
+            {option === 'all' ? 'All' : option}
+          </button>
+        {/each}
+      </div>
+      <button
+        type="button"
+        onclick={createSession}
+        class="w-full sm:w-auto px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+      >
+        New Session
+      </button>
+    </div>
   </div>
 
   {#if loading}
@@ -121,8 +125,8 @@
   {:else if error}
     <div class="text-sm text-red-400">{error}</div>
   {:else}
-    <div class="grid gap-4 md:grid-cols-2">
-      <div class={cn('space-y-2', selectedSession ? 'hidden md:block' : '')}>
+    <div class="grid min-w-0 gap-4 md:grid-cols-2">
+      <div class={cn('space-y-2 min-w-0', selectedSession ? 'hidden md:block' : '')}>
         {#if filteredSessions.length === 0}
           <div class="text-sm text-gray-500">No sessions yet.</div>
         {:else}
@@ -155,7 +159,7 @@
 
       <div
         class={cn(
-          'rounded-xl border border-white/10 bg-white/[0.02] p-4 min-h-[60vh] md:min-h-[320px] flex flex-col',
+          'min-w-0 rounded-xl border border-white/10 bg-white/[0.02] p-4 min-h-[60vh] md:min-h-[320px] flex flex-col',
           selectedSession ? 'block' : 'hidden md:flex'
         )}
       >
@@ -217,13 +221,13 @@
                     <div class="text-[10px] uppercase text-blue-300 mb-1">
                       {msg.tool_name || 'tool'}
                     </div>
-                    <pre class="whitespace-pre-wrap text-[11px] text-gray-400">{msg.content ||
+                    <pre class="whitespace-pre-wrap break-words text-[11px] text-gray-400">{msg.content ||
                         ''}</pre>
                   {:else if msg.kind === 'tool_result'}
-                    <pre class="whitespace-pre-wrap text-[11px] text-gray-400">{msg.content ||
+                    <pre class="whitespace-pre-wrap break-words text-[11px] text-gray-400">{msg.content ||
                         ''}</pre>
                   {:else}
-                    <div class="text-[12px] whitespace-pre-wrap">
+                    <div class="text-[12px] whitespace-pre-wrap break-words">
                       {msg.content || ''}
                     </div>
                   {/if}
