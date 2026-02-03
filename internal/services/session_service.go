@@ -49,7 +49,55 @@ func (s *SessionService) Get(ctx context.Context, sessionID string) (*models.Ses
 	if err != nil {
 		return nil, nil, err
 	}
+	if session.AgentBackend == "codex" {
+		messages = filterCodexSetupMessages(messages)
+	}
 	return session, messages, nil
+}
+
+func filterCodexSetupMessages(messages []models.SessionMessage) []models.SessionMessage {
+	if len(messages) == 0 {
+		return messages
+	}
+	filtered := messages[:0]
+	for _, msg := range messages {
+		if strings.ToLower(msg.Kind) == "setup" {
+			continue
+		}
+		if strings.ToLower(msg.Role) == "user" && isCodexSetupContent(valueOrEmpty(msg.Content)) {
+			continue
+		}
+		filtered = append(filtered, msg)
+	}
+	return filtered
+}
+
+func valueOrEmpty(val *string) string {
+	if val == nil {
+		return ""
+	}
+	return *val
+}
+
+func isCodexSetupContent(content string) bool {
+	if strings.TrimSpace(content) == "" {
+		return false
+	}
+	lower := strings.ToLower(content)
+	for _, marker := range codexSetupMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+var codexSetupMarkers = []string{
+	"agents.md",
+	"<environment_context>",
+	"<collaboration_mode>",
+	"<instructions>",
+	"<permissions instructions>",
 }
 
 // Create creates a new empty session.

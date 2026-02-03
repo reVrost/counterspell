@@ -23,8 +23,8 @@
   const navButtonSize = 56;
   const navBaseSize = 48;
   const navGap = 4;
-  const navStep = navButtonSize + navGap;
-  const navTop = (navButtonSize - navBaseSize) / 2;
+  const navStep = navButtonSize + navGap - 11;
+  const navTop = (navButtonSize - navBaseSize) / 2 - 1;
 
   function handleTabClick(tab: string) {
     if (onNavigate) {
@@ -33,7 +33,7 @@
   }
 
   const navBase =
-    'absolute left-0 h-12 w-14 bg-[#2a2a2a] rounded-full transition-all gap-1 border border-white/[0.01]';
+    'absolute left-1.2 h-12 w-14 bg-[#2a2a2a] rounded-full transition-all gap-1 border border-white/[0.01]';
 </script>
 
 <div class="flex items-center justify-center w-full">
