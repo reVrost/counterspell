@@ -6,7 +6,6 @@
   import Thread from './Thread.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import type { Session, SessionMessage } from '$lib/types';
-  import { tick } from 'svelte';
 
   interface Props {
     session: Session;
@@ -15,15 +14,6 @@
   }
 
   let { session, messages, onRefresh }: Props = $props();
-
-  $effect(() => {
-    tick().then(() => {
-      const container = document.getElementById('content-scroll');
-      if (container) {
-        container.scrollTo({ top: container.scrollHeight });
-      }
-    });
-  });
 
   function formatRelativeTimestamp(value?: number | null): string {
     if (!value) return 'No messages yet';
@@ -70,7 +60,7 @@
   }
 </script>
 
-<div class="flex flex-col h-screen content-scroll">
+<div class="flex flex-col h-screen">
   <div
     class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-popover"
   >
@@ -105,12 +95,13 @@
   </div>
 
   <div class="flex-1 overflow-hidden flex flex-col relative">
-    <div class="px-4 pt-3 text-xs font-medium text-gray-500">
-      {formatRelativeTimestamp(session.last_message_at)}
-    </div>
-
-    <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3">
-      <Thread mode="session" {messages} emptyText="No messages yet." />
+    <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3" id="content-scroll">
+      <Thread
+        mode="session"
+        {messages}
+        emptyText="No messages yet."
+        scrollContainerId="content-scroll"
+      />
     </div>
 
     <div class="absolute bottom-0 inset-x-0 z-10 pb-4 px-4">

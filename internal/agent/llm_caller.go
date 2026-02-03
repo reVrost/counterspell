@@ -318,6 +318,9 @@ type FunctionCall struct {
 }
 
 func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*LLMStream, error) {
+	providerType := detectProviderType(c.provider.APIURL())
+	supportsTools := providerType != "zai"
+
 	openAIMessages := []OpenAIMessage{}
 
 	openAIMessages = append(openAIMessages, OpenAIMessage{
@@ -329,6 +332,10 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 		isToolResult := false
 		for _, block := range msg.Content {
 			if block.Type == "tool_result" {
+				if !supportsTools {
+					isToolResult = true
+					continue
+				}
 				isToolResult = true
 				openAIMessages = append(openAIMessages, OpenAIMessage{
 					Role:       "tool",
@@ -363,6 +370,9 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 					contentBuilder.WriteString(block.Text)
 				}
 				if block.Type == "tool_use" {
+					if !supportsTools {
+						continue
+					}
 					argsJSON, _ := json.Marshal(block.Input)
 					oaMsg.ToolCalls = append(oaMsg.ToolCalls, OpenAIToolCall{
 						ID:   block.ID,
@@ -374,21 +384,26 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 					})
 				}
 			}
+			if !supportsTools && contentBuilder.Len() == 0 {
+				continue
+			}
 			oaMsg.Content = contentBuilder.String()
 			openAIMessages = append(openAIMessages, oaMsg)
 		}
 	}
 
 	openAITools := []OpenAIToolDef{}
-	for name, tool := range allTools {
-		openAITools = append(openAITools, OpenAIToolDef{
-			Type: "function",
-			Function: FunctionDef{
-				Name:        name,
-				Description: tool.Description,
-				Parameters:  tools.MakeSchema(map[string]tools.Tool{name: tool})[0].InputSchema,
-			},
-		})
+	if supportsTools {
+		for name, tool := range allTools {
+			openAITools = append(openAITools, OpenAIToolDef{
+				Type: "function",
+				Function: FunctionDef{
+					Name:        name,
+					Description: tool.Description,
+					Parameters:  tools.MakeSchema(map[string]tools.Tool{name: tool})[0].InputSchema,
+				},
+			})
+		}
 	}
 
 	req := OpenAIRequest{

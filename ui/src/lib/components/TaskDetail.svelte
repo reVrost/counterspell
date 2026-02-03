@@ -17,7 +17,6 @@
   import GitMergeIcon from '@lucide/svelte/icons/git-merge';
   import GithubIcon from '@lucide/svelte/icons/github';
   import SparklesIcon from '@lucide/svelte/icons/sparkles';
-  import { tick } from 'svelte';
 
   interface Props {
     task: Task;
@@ -103,16 +102,6 @@
       appState.showToast(err instanceof Error ? err.message : `Failed to ${action}`, 'error');
     }
   }
-
-  $effect(() => {
-    // wait for DOM to update
-    tick().then(() => {
-      const container = document.getElementById('content-scroll');
-      if (container) {
-        container.scrollTo({ top: container.scrollHeight });
-      }
-    });
-  });
 
   $effect(() => {
     if (activeTab === 'diff' && diffContent === '' && !isLoadingDiff) {
@@ -297,6 +286,7 @@
             messages={messages}
             emptyText="No agent output"
             emptyClass="p-5 text-gray-500 italic text-xs"
+            scrollContainerId="content-scroll"
           />
 
           {#if isInProgress}
