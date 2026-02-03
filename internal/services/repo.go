@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,26 +29,36 @@ type GitManager struct {
 }
 
 // NewGitManager creates a new repo manager.
-// repoRoot is the root of the local git repository.
-// dataDir is the base directory for storing workspaces (e.g., "./data").
-func NewGitManager(repoRoot, dataDir string) *GitManager {
-	absRoot, err := filepath.Abs(repoRoot)
-	if err != nil {
-		absRoot = repoRoot
-	}
+// dataDir is the base directory for storing repositories and workspaces (e.g., "./data").
+func NewGitManager(dataDir string) *GitManager {
 	absDir, err := filepath.Abs(dataDir)
 	if err != nil {
 		absDir = dataDir // fallback if conversion fails
 	}
-	return &GitManager{repoRoot: absRoot, dataDir: absDir}
-}
-
-func (m *GitManager) Kind() RepoKind {
-	return RepoKindGit
+	repoRoot := filepath.Join(absDir, "repos")
+	return &GitManager{repoRoot: repoRoot, dataDir: absDir}
 }
 
 func (m *GitManager) RootPath() string {
 	return m.repoRoot
+}
+
+func (m *GitManager) repoPath(owner, repo string) string {
+	return filepath.Join(m.repoRoot, owner, repo)
+}
+
+func (m *GitManager) worktreePath(taskID string) string {
+	return m.workspacePath(taskID)
+}
+
+// RepoPath returns the local path for a repository.
+func (m *GitManager) RepoPath(owner, repo string) string {
+	return m.repoPath(owner, repo)
+}
+
+// WorktreePath returns the worktree path for a task (exported).
+func (m *GitManager) WorktreePath(taskID string) string {
+	return m.worktreePath(taskID)
 }
 
 // workspacePath returns the workspace path for a given task.
@@ -58,6 +69,40 @@ func (m *GitManager) workspacePath(taskID string) string {
 // WorkspacePath returns the workspace path for a given task (exported).
 func (m *GitManager) WorkspacePath(taskID string) string {
 	return m.workspacePath(taskID)
+}
+
+// EnsureRepo clones a repo if it doesn't exist locally and returns its path.
+func (m *GitManager) EnsureRepo(owner, repo, token string) (string, error) {
+	if owner == "" || repo == "" {
+		return "", fmt.Errorf("owner and repo are required")
+	}
+
+	repoPath := m.repoPath(owner, repo)
+	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
+		return repoPath, nil
+	}
+	if _, err := os.Stat(repoPath); err == nil {
+		return "", fmt.Errorf("repo path exists but is not a git repo: %s", repoPath)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(repoPath), 0755); err != nil {
+		return "", fmt.Errorf("failed to create repos dir: %w", err)
+	}
+
+	cloneURL := fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
+	if token != "" {
+		cloneURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", url.PathEscape(token), owner, repo)
+	}
+
+	slog.Info("[GIT] Cloning repository", "owner", owner, "repo", repo, "path", repoPath, "has_token", token != "")
+	cmd := exec.Command("git", "clone", cloneURL, repoPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
+	}
+
+	slog.Info("[GIT] Repository cloned", "owner", owner, "repo", repo, "path", repoPath)
+	return repoPath, nil
 }
 
 // CreateWorkspace creates an isolated workspace for a task.
