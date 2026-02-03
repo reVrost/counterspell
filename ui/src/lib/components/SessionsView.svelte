@@ -19,10 +19,32 @@
     return sessions.filter((s) => s.agent_backend === filter);
   });
 
-  function formatTimestamp(value?: number | null): string {
+  function formatRelativeTimestamp(value?: number | null): string {
     if (!value) return 'No messages yet';
-    return new Date(value).toLocaleString();
+    const diffMs = Math.max(0, Date.now() - value);
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 45) return 'now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    const weeks = Math.floor(days / 7);
+    if (weeks < 4) return `${weeks}w`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo`;
+    const years = Math.floor(days / 365);
+    return `${years}y`;
   }
+
+  function isSystemLikeMessage(message: SessionMessage): boolean {
+    const role = message.role?.toLowerCase?.() ?? '';
+    if (role === 'system' || role === 'developer') return true;
+    return message.kind?.toLowerCase?.() === 'system';
+  }
+
+  const visibleMessages = $derived.by(() => messages.filter((msg) => !isSystemLikeMessage(msg)));
 
   async function loadSessions() {
     try {
@@ -150,7 +172,7 @@
                 </span>
               </div>
               <div class="text-xs font-medium text-gray-500 mt-1">
-                {formatTimestamp(session.last_message_at)}
+                {formatRelativeTimestamp(session.last_message_at)}
               </div>
             </button>
           {/each}
@@ -184,7 +206,7 @@
                   {selectedSession.title || 'Untitled session'}
                 </div>
                 <div class="text-xs font-medium text-gray-500 truncate">
-                  {selectedSession.agent_backend} • {formatTimestamp(selectedSession.last_message_at)}
+                  {selectedSession.agent_backend} • {formatRelativeTimestamp(selectedSession.last_message_at)}
                 </div>
               </div>
             </div>
@@ -199,10 +221,10 @@
 
           <div class="flex-1 overflow-y-auto relative">
             <div class="space-y-2 px-3 py-3 pb-28">
-              {#if messages.length === 0}
+              {#if visibleMessages.length === 0}
                 <div class="text-xs font-medium text-gray-500">No messages yet.</div>
               {:else}
-                {#each messages as msg}
+                {#each visibleMessages as msg}
                   <div
                     class={cn(
                       'rounded-lg border px-3 py-2 text-xs font-medium',
