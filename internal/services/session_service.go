@@ -18,6 +18,8 @@ import (
 
 var ErrCodexUnsupported = errors.New("codex sessions are not supported yet")
 
+const codexChatModel = "gpt-5.2-codex-medium"
+
 // SessionService manages session CRUD and chat execution.
 type SessionService struct {
 	repo     *Repository
@@ -66,9 +68,6 @@ func (s *SessionService) Create(ctx context.Context, backend string) (*models.Se
 			backend = "native"
 		}
 	}
-	if backend == "codex" {
-		return nil, ErrCodexUnsupported
-	}
 
 	now := time.Now().UnixMilli()
 	id := shortuuid.New()
@@ -98,9 +97,6 @@ func (s *SessionService) Chat(ctx context.Context, sessionID, message, modelID s
 	session, err := s.repo.GetSession(ctx, sessionID)
 	if err != nil {
 		return err
-	}
-	if session.AgentBackend == "codex" {
-		return ErrCodexUnsupported
 	}
 
 	existingMessages, err := s.repo.ListSessionMessages(ctx, sessionID)
@@ -240,7 +236,39 @@ func (s *SessionService) buildBackend(
 	useSessionID bool,
 ) (agent.Backend, func(), error) {
 	if session.AgentBackend == "codex" {
-		return nil, func() {}, ErrCodexUnsupported
+		apiKey, provider, err := s.resolveCodexAPIKey(ctx, codexProviderHint(modelID))
+		if err != nil {
+			slog.Warn("[SESSIONS] Codex API key not configured", "error", err)
+		}
+		model := codexChatModel
+		baseURL := ""
+		switch provider {
+		case "openrouter":
+			baseURL = "https://openrouter.ai/api/v1"
+		case "openai", "":
+			if provider == "" {
+				provider = "openai"
+			}
+		default:
+			return nil, func() {}, fmt.Errorf("unsupported provider for codex backend: %s", provider)
+		}
+
+		opts := []agent.CodexOption{
+			agent.WithCodexAPIKey(apiKey),
+			agent.WithCodexModel(model),
+			agent.WithCodexWorkDir(s.dataDir),
+		}
+		if baseURL != "" {
+			opts = append(opts, agent.WithCodexBaseURL(baseURL))
+		}
+		if useSessionID && session.BackendSessionID != nil && *session.BackendSessionID != "" {
+			opts = append(opts, agent.WithCodexSessionID(*session.BackendSessionID))
+		}
+		backend, err := agent.NewCodexBackend(opts...)
+		if err != nil {
+			return nil, func() {}, err
+		}
+		return backend, func() { _ = backend.Close() }, nil
 	}
 
 	resolutionModelID := modelID
@@ -326,6 +354,56 @@ func (s *SessionService) resolveProvider(ctx context.Context, modelID string) (s
 		model = actualModel
 	}
 	return apiKey, actualProvider, model, nil
+}
+
+func codexProviderHint(modelID string) string {
+	if modelID == "" {
+		return ""
+	}
+	parts := strings.SplitN(modelID, "#", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	switch parts[0] {
+	case "o":
+		return "openrouter"
+	case "openrouter":
+		return "openrouter"
+	case "openai":
+		return "openai"
+	default:
+		return ""
+	}
+}
+
+func (s *SessionService) resolveCodexAPIKey(ctx context.Context, providerHint string) (string, string, error) {
+	candidates := make([]string, 0, 3)
+	if providerHint != "" {
+		candidates = append(candidates, providerHint)
+	}
+	candidates = append(candidates, "openai", "openrouter")
+
+	seen := map[string]bool{}
+	var lastErr error
+	for _, provider := range candidates {
+		if seen[provider] {
+			continue
+		}
+		seen[provider] = true
+		apiKey, actualProvider, _, err := s.settings.GetAPIKeyForProvider(ctx, provider)
+		if err == nil {
+			if actualProvider != "" {
+				return apiKey, actualProvider, nil
+			}
+			return apiKey, provider, nil
+		}
+		lastErr = err
+	}
+
+	if providerHint == "" {
+		providerHint = "openai"
+	}
+	return "", providerHint, lastErr
 }
 
 func fixedClaudeCodeModel(provider string) string {

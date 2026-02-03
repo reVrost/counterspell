@@ -1,5 +1,7 @@
 package models
 
+import "encoding/json"
+
 // Session represents a chat session.
 type Session struct {
 	ID               string  `json:"id"`
@@ -25,4 +27,32 @@ type SessionMessage struct {
 	ToolCallID *string `json:"tool_call_id,omitempty"`
 	RawJSON    string  `json:"raw_json"`
 	CreatedAt  int64   `json:"created_at"`
+}
+
+// MarshalJSON implements custom JSON marshaling to avoid double-encoding
+// tool_use content which is already JSON stored as a string.
+func (m SessionMessage) MarshalJSON() ([]byte, error) {
+	type Alias SessionMessage // Avoid recursion
+	raw := struct {
+		Alias
+		Content interface{} `json:"content,omitempty"`
+	}{
+		Alias: (Alias)(m),
+	}
+
+	if m.Content != nil {
+		if m.Kind == "tool_use" {
+			// Content is already JSON, parse it to avoid double-encoding
+			var parsed interface{}
+			if err := json.Unmarshal([]byte(*m.Content), &parsed); err == nil {
+				raw.Content = parsed
+			} else {
+				raw.Content = *m.Content
+			}
+		} else {
+			raw.Content = *m.Content
+		}
+	}
+
+	return json.Marshal(raw)
 }

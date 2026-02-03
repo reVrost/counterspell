@@ -13,7 +13,7 @@
   const callCmd = $derived.by(() => {
     if (!call) return '';
     try {
-      return JSON.parse(JSON.parse(call)).cmd;
+      return JSON.parse(call).cmd;
     } catch {
       return call;
     }
