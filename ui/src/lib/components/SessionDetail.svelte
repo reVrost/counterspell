@@ -2,9 +2,8 @@
   import { goto } from '$app/navigation';
   import { sessionsAPI } from '$lib/api';
   import { appState } from '$lib/stores/app.svelte';
-  import { cn } from '$lib/utils';
   import ChatInput from './ChatInput.svelte';
-  import ToolBlock from './ToolBlock.svelte';
+  import Thread from './Thread.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import type { Session, SessionMessage } from '$lib/types';
 
@@ -34,60 +33,6 @@
     const years = Math.floor(days / 365);
     return `${years}y`;
   }
-
-  function isSystemLikeMessage(message: SessionMessage): boolean {
-    const role = message.role?.toLowerCase?.() ?? '';
-    if (role === 'system' || role === 'developer') return true;
-    return message.kind?.toLowerCase?.() === 'system';
-  }
-
-  const visibleMessages = $derived.by(() => messages.filter((msg) => !isSystemLikeMessage(msg)));
-
-  type DisplayItem =
-    | { type: 'message'; id: string; message: SessionMessage }
-    | { type: 'tool'; id: string; tool: string; call: string; result: string };
-
-  let displayItems = $derived.by(() => {
-    const items: DisplayItem[] = [];
-    let i = 0;
-    while (i < visibleMessages.length) {
-      const msg = visibleMessages[i];
-      if (msg.kind === 'tool_use' || msg.kind === 'tool_result') {
-        if (msg.kind === 'tool_use') {
-          let result = '';
-          const next = visibleMessages[i + 1];
-          if (
-            next &&
-            next.kind === 'tool_result' &&
-            (!msg.tool_call_id || !next.tool_call_id || next.tool_call_id === msg.tool_call_id)
-          ) {
-            result = next.content || '';
-            i++;
-          }
-          items.push({
-            type: 'tool',
-            id: msg.id,
-            tool: msg.tool_name || 'tool',
-            call: msg.content || '',
-            result
-          });
-        } else {
-          items.push({
-            type: 'tool',
-            id: msg.id,
-            tool: msg.tool_name || 'tool result',
-            call: '',
-            result: msg.content || ''
-          });
-        }
-        i++;
-        continue;
-      }
-      items.push({ type: 'message', id: msg.id, message: msg });
-      i++;
-    }
-    return items;
-  });
 
   function handleBack() {
     goto('/dashboard');
@@ -155,34 +100,7 @@
     </div>
 
     <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3">
-      {#if visibleMessages.length === 0}
-        <div class="text-xs font-medium text-gray-500">No messages yet.</div>
-      {:else}
-        <div class="space-y-2">
-          {#each displayItems as item}
-            {#if item.type === 'tool'}
-              <ToolBlock tool={item.tool} call={item.call} result={item.result} />
-            {:else}
-              <div
-                class={cn(
-                  'rounded-lg border px-3 py-2 text-xs font-medium',
-                  item.message.role === 'user'
-                    ? 'border-violet-500/30 bg-violet-500/10 text-gray-200'
-                    : 'border-white/10 bg-white/5 text-gray-300'
-                )}
-              >
-                <div class="flex items-center justify-between text-[10px] uppercase text-gray-500 mb-1">
-                  <span>{item.message.role}</span>
-                  <span>{item.message.kind}</span>
-                </div>
-                <div class="text-[12px] whitespace-pre-wrap break-words">
-                  {item.message.content || ''}
-                </div>
-              </div>
-            {/if}
-          {/each}
-        </div>
-      {/if}
+      <Thread mode="session" messages={messages} emptyText="No messages yet." />
     </div>
 
     <div class="absolute bottom-0 inset-x-0 z-10 pb-4 px-4">

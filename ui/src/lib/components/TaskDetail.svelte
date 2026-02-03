@@ -5,11 +5,11 @@
   import { tasksAPI } from '$lib/api';
   import { cn } from '$lib/utils';
   import { modalSlideUp, backdropFade, slide, DURATIONS } from '$lib/utils/transitions';
-  import type { Message, Task, ContentBlock } from '$lib/types';
+  import type { Message, Task } from '$lib/types';
   import ChatInput from './ChatInput.svelte';
   import MarkdownRenderer from './MarkdownRenderer.svelte';
   import TodoIndicator from './TodoIndicator.svelte';
-  import ToolBlock from './ToolBlock.svelte';
+  import Thread from './Thread.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import TrashIcon from '@lucide/svelte/icons/trash';
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -28,182 +28,7 @@
 
   let { task, messages, logContent, isInProgress }: Props = $props();
 
-  // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
-  type ThinkingItem = { tool: string; call: string; result: string };
-  type DisplayItem =
-    | { type: 'message'; id: string; message: Message }
-    | { type: 'thinking'; id: string; items: ThinkingItem[] };
-
-  function formatToolInput(value: unknown): string {
-    if (value == null) return '';
-    if (typeof value === 'string') return value;
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return String(value);
-    }
-  }
-
-  function extractToolFromUnknown(value: unknown): { tool: string; call: string } | null {
-    if (!value) return null;
-    if (Array.isArray(value)) {
-      for (const entry of value) {
-        const found = extractToolFromUnknown(entry);
-        if (found) return found;
-      }
-      return null;
-    }
-    if (typeof value !== 'object') return null;
-
-    const record = value as Record<string, unknown>;
-    const tool = record.tool ?? record.tool_name ?? record.name ?? record.toolName;
-    if (!tool) return null;
-
-    const call = formatToolInput(
-      record.input ?? record.arguments ?? record.args ?? record.content ?? record.command ?? record.data
-    );
-    return { tool: String(tool), call };
-  }
-
-  function parseToolFromJson(text: string): { tool: string; call: string } | null {
-    if (!text) return null;
-    const trimmed = text.trim();
-    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) return null;
-    try {
-      const parsed = JSON.parse(trimmed);
-      return extractToolFromUnknown(parsed);
-    } catch {
-      return null;
-    }
-  }
-
-  function parseToolFromContent(text: string): { tool: string; call: string } {
-    const trimmed = text.trim();
-    if (!trimmed) return { tool: 'tool', call: '' };
-
-    const fromJson = parseToolFromJson(trimmed);
-    if (fromJson) return fromJson;
-
-    const lines = trimmed.split('\n');
-    const firstLine = lines[0]?.trim() ?? '';
-    const prefixed = firstLine.match(/^([a-zA-Z0-9_-]{2,})(?:\s+|:)(.+)$/);
-    if (prefixed) {
-      const remainder = [prefixed[2], ...lines.slice(1)].filter(Boolean).join('\n').trim();
-      return { tool: prefixed[1], call: remainder };
-    }
-    if (lines.length > 1 && /^[a-zA-Z0-9_-]{2,}$/.test(firstLine)) {
-      return { tool: firstLine, call: lines.slice(1).join('\n').trim() };
-    }
-
-    return { tool: 'tool', call: trimmed };
-  }
-
-  function parseToolMessage(msg: Message): { tool: string; call: string } {
-    const fromParts = parseToolFromJson(msg.parts || '');
-    if (fromParts) return fromParts;
-    return parseToolFromContent(msg.content || '');
-  }
-
-  function parseParts(msg: Message): ContentBlock[] {
-    if (msg.parts) {
-      try {
-        const parsed = JSON.parse(msg.parts);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {
-        // ignore parse errors
-      }
-    }
-    if (msg.content) {
-      return [{ type: 'text', text: msg.content }];
-    }
-    return [];
-  }
-
-  function concatText(blocks: ContentBlock[]): string {
-    return blocks.filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('');
-  }
-
-  function formatToolUse(block: ContentBlock): string {
-    if (!block.name) return 'Tool';
-    if (!block.input) return block.name;
-    try {
-      return `${block.name} ${JSON.stringify(block.input)}`;
-    } catch {
-      return block.name;
-    }
-  }
-
-  let displayItems = $derived.by(() => {
-    const items: DisplayItem[] = [];
-    let i = 0;
-
-    while (i < messages.length) {
-      const msg = messages[i];
-      const blocks = parseParts(msg);
-      const text = concatText(blocks);
-      const thinkingBlocks = blocks.filter((b) => b.type === 'thinking');
-      const toolUses = blocks.filter((b) => b.type === 'tool_use');
-      const toolResults = blocks.filter((b) => b.type === 'tool_result');
-
-      const hasToolRole = msg.role === 'tool' || msg.role === 'tool_result';
-      const hasThinking = thinkingBlocks.length > 0;
-      const hasToolBlocks = toolUses.length > 0 || toolResults.length > 0;
-
-      if (text) {
-        items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
-      }
-
-      if (hasToolRole || hasThinking || hasToolBlocks) {
-        const thinkingItems: ThinkingItem[] = [];
-        const groupId = msg.id || `thinking-${i}`;
-
-        for (const block of thinkingBlocks) {
-          thinkingItems.push({ tool: 'thinking', call: block.text || '', result: '' });
-        }
-
-        const remainingResults = [...toolResults];
-        for (const tool of toolUses) {
-          let result = '';
-          if (remainingResults.length > 0) {
-            const match = remainingResults.shift();
-            result = match?.content || '';
-          } else if (i + 1 < messages.length) {
-            const next = messages[i + 1];
-            const nextBlocks = parseParts(next);
-            const nextResult = nextBlocks.find((b) => b.type === 'tool_result');
-            if (next.role === 'tool_result' || nextResult) {
-              result = nextResult?.content || next.content || '';
-              i++;
-            }
-          }
-          const toolName = tool.name || 'tool';
-          const call = formatToolInput(tool.input ?? tool.content ?? tool.text ?? '');
-          thinkingItems.push({ tool: toolName, call, result });
-        }
-
-        for (const block of remainingResults) {
-          thinkingItems.push({ tool: 'tool result', call: '', result: block.content || '' });
-        }
-
-        if (hasToolRole && toolUses.length === 0 && toolResults.length === 0 && msg.content) {
-          if (msg.role === 'tool') {
-            const { tool, call } = parseToolMessage(msg);
-            thinkingItems.push({ tool, call, result: '' });
-          } else {
-            thinkingItems.push({ tool: 'tool result', call: '', result: msg.content });
-          }
-        }
-
-        if (thinkingItems.length > 0) {
-          items.push({ type: 'thinking', id: groupId, items: thinkingItems });
-        }
-      }
-
-      i++;
-    }
-
-    return items;
-  });
+  // Thread rendering handled by Thread component
 
   function escapeHtml(text: string): string {
     return text
@@ -467,13 +292,12 @@
     {#if activeTab === 'agent'}
       <div class="pb-32">
         <div id="agent-content" class="mt-1 space-y-1">
-          {#each displayItems as item}
-            {#if item.type === 'message'}
-              {@render messageSnippet(item.message)}
-            {:else if item.type === 'thinking'}
-              {@render thinkingSnippet(item.items)}
-            {/if}
-          {/each}
+          <Thread
+            mode="task"
+            messages={messages}
+            emptyText="No agent output"
+            emptyClass="p-5 text-gray-500 italic text-xs"
+          />
 
           {#if isInProgress}
             <div class="flex items-center gap-3 px-12 py-3">
@@ -495,68 +319,9 @@
               </div>
             </div>
           {/if}
-
-          {#if messages.length === 0}
-            <div class="p-5 text-gray-500 italic text-xs">No agent output</div>
-          {/if}
         </div>
       </div>
     {/if}
-
-    {#snippet messageSnippet(msg: Message)}
-      {#if msg.role === 'user'}
-        <div class="flex gap-4 px-4 py-2 items-start">
-          <div
-            class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-xl px-4 py-3 text-[#FFFFFF] shadow-lg"
-          >
-            <p class="text-base font-medium leading-relaxed">{msg.content}</p>
-          </div>
-        </div>
-      {:else if msg.role === 'assistant'}
-        <div class="px-12 py-2 pr-4">
-          <MarkdownRenderer
-            content={msg.content}
-            class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans"
-          />
-        </div>
-      {:else}
-        <div class="px-12 py-2 pr-4">
-          <p class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans">
-            {msg.content}
-          </p>
-        </div>
-      {/if}
-    {/snippet}
-
-    {#snippet thinkingSnippet(items: { tool: string; call: string; result: string }[])}
-      <details class="mx-12 my-4 group" open>
-        <summary
-          class="flex items-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors list-none outline-none"
-        >
-          <div
-            class="w-4 h-4 flex items-center justify-center group-open:rotate-90 transition-transform"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
-            >
-          </div>
-          <span class="text-xs font-bold tracking-widest uppercase">Thinking</span>
-        </summary>
-        <div class="mt-3 space-y-3">
-          {#each items as item}
-            <ToolBlock tool={item.tool} call={item.call} result={item.result} />
-          {/each}
-        </div>
-      </details>
-    {/snippet}
 
     <!-- Diff Tab -->
     {#if activeTab === 'diff'}
