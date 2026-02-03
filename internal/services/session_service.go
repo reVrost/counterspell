@@ -54,12 +54,7 @@ func (s *SessionService) Get(ctx context.Context, sessionID string) (*models.Ses
 	}
 	return session, messages, nil
 }
-func valueOrEmpty(val *string) string {
-	if val == nil {
-		return ""
-	}
-	return *val
-}
+
 // Create creates a new empty session.
 func (s *SessionService) Create(ctx context.Context, backend string) (*models.Session, error) {
 	backend = strings.TrimSpace(backend)
@@ -430,11 +425,11 @@ func buildSummaryPrompt(messages []models.SessionMessage) string {
 		}
 		switch kind {
 		case "tool_use":
-			b.WriteString(fmt.Sprintf("[%s TOOL_USE %s] %s\n", role, valueOrEmpty(msg.ToolName), content))
+			fmt.Fprintf(&b, "[%s TOOL_USE %s] %s\n", role, valueOrEmpty(msg.ToolName), content)
 		case "tool_result":
-			b.WriteString(fmt.Sprintf("[%s TOOL_RESULT] %s\n", role, content))
+			fmt.Fprintf(&b, "[%s TOOL_RESULT] %s\n", role, content)
 		default:
-			b.WriteString(fmt.Sprintf("[%s] %s\n", role, content))
+			fmt.Fprintf(&b, "[%s] %s\n", role, content)
 		}
 	}
 
