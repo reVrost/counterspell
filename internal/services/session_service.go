@@ -54,24 +54,12 @@ func (s *SessionService) Get(ctx context.Context, sessionID string) (*models.Ses
 	}
 	return session, messages, nil
 }
-
-func filterCodexSetupMessages(messages []models.SessionMessage) []models.SessionMessage {
-	if len(messages) == 0 {
-		return messages
+func valueOrEmpty(val *string) string {
+	if val == nil {
+		return ""
 	}
-	filtered := messages[:0]
-	for _, msg := range messages {
-		if strings.ToLower(msg.Kind) == "setup" {
-			continue
-		}
-		if strings.ToLower(msg.Role) == "user" && isCodexSetupContent(valueOrEmpty(msg.Content)) {
-			continue
-		}
-		filtered = append(filtered, msg)
-	}
-	return filtered
+	return *val
 }
-
 // Create creates a new empty session.
 func (s *SessionService) Create(ctx context.Context, backend string) (*models.Session, error) {
 	backend = strings.TrimSpace(backend)
