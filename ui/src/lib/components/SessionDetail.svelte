@@ -95,7 +95,7 @@
   </div>
 
   <div class="flex-1 overflow-hidden flex flex-col relative">
-    <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3" id="content-scroll">
+    <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3 mb-12" id="content-scroll">
       <Thread
         mode="session"
         {messages}

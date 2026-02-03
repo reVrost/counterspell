@@ -10,6 +10,15 @@
 
   let { tool, call = '', result = '', class: className = '' }: Props = $props();
 
+  const callCmd = $derived.by(() => {
+    if (!call) return '';
+    try {
+      return JSON.parse(JSON.parse(call)).cmd;
+    } catch {
+      return call;
+    }
+  });
+
   function looksLikeDiff(text: string): boolean {
     if (!text) return false;
     const trimmed = text.trim();
@@ -24,28 +33,28 @@
   }
 
   const normalizedTool = $derived.by(() => (tool || '').trim().toLowerCase());
-  const isShellTool = $derived.by(() =>
-    /(bash|shell|zsh|sh|cmd|powershell)/.test(normalizedTool)
-  );
+  const isShellTool = $derived.by(() => /(bash|shell|zsh|sh|cmd|powershell)/.test(normalizedTool));
   const isWriteTool = $derived.by(() => /(write|edit|patch|diff|apply_patch)/.test(normalizedTool));
   const callIsDiff = $derived.by(() => looksLikeDiff(call) || isWriteTool);
   const resultIsDiff = $derived.by(() => looksLikeDiff(result) && !callIsDiff);
 
-  const callClass = $derived.by(() => {
-    if (!call) return '';
-    if (callIsDiff) return 'max-h-[496px] overflow-y-auto bg-[#0D1117]';
-    if (isShellTool) return 'max-h-[228px] overflow-y-auto';
-    return 'max-h-[360px] overflow-y-auto';
-  });
+  // const callClass = $derived.by(() => {
+  //   if (!call) return '';
+  //   if (callIsDiff) return 'max-h-[120px] overflow-y-auto bg-[#0D1117]';
+  //   if (isShellTool) return 'max-h-[28px] overflow-y-auto';
+  //   return 'max-h-[28px] overflow-y-auto';
+  // });
 
   const resultClass = $derived.by(() => {
     if (!result) return '';
-    if (resultIsDiff) return 'max-h-[496px] overflow-y-auto bg-[#0D1117]';
-    if (isShellTool) return 'max-h-[228px] overflow-y-auto';
-    return 'max-h-[360px] overflow-y-auto';
+    if (resultIsDiff) return 'max-h-[120px] overflow-y-auto bg-[#0D1117]';
+    if (isShellTool) return 'max-h-[43px] overflow-y-auto';
+    return 'max-h-[43px] overflow-y-auto';
   });
 
-  const toolLabel = $derived.by(() => (tool && tool.trim() ? tool.trim() : 'tool'));
+  const toolLabel = $derived.by(() =>
+    tool && tool.trim() ? tool.trim().replace('_command', '') : 'tool'
+  );
 </script>
 
 <div
@@ -58,28 +67,22 @@
     class="flex items-center justify-between px-3 py-1.5 bg-gradient-to-r from-white/5 to-transparent border-b border-white/10"
   >
     <div class="flex items-center gap-2 min-w-0">
-      <div class="h-2 w-2 rounded-full bg-emerald-400/70 shadow-[0_0_10px_rgba(52,211,153,0.4)]"></div>
-      <span
-        class="text-[10px] font-semibold uppercase tracking-[0.28em] text-gray-500 truncate"
-        title={toolLabel}
-      >
-        {toolLabel}
-      </span>
+      <div
+        class="h-2 w-2 rounded-full bg-emerald-400/70 shadow-[0_0_10px_rgba(52,211,153,0.4)]"
+      ></div>
+      <pre
+        class="text-sm whitespace-pre-wrap break-words font-bold leading-tight">{toolLabel}: {callCmd}</pre>
     </div>
-    <span class="text-[9px] text-gray-600 uppercase tracking-[0.2em]">tool</span>
+    <span class="text-xs text-gray-600 uppercase tracking-[0.2em]">tool</span>
   </div>
 
   {#if call}
     <div
       class={cn(
         'px-3 py-2 text-xs text-gray-300 font-mono overflow-x-auto leading-snug',
-        callIsDiff ? 'border-b border-white/5' : '',
-        callClass
+        callIsDiff ? 'border-b border-white/5' : ''
       )}
-    >
-      <div class="text-[9px] uppercase tracking-[0.2em] text-gray-500 mb-1">call</div>
-      <pre class="whitespace-pre-wrap break-words leading-tight">{call}</pre>
-    </div>
+    ></div>
   {/if}
 
   {#if result}
@@ -90,7 +93,6 @@
         resultClass
       )}
     >
-      <div class="text-[9px] uppercase tracking-[0.2em] text-gray-500 mb-1">result</div>
       <pre class="whitespace-pre-wrap break-words leading-tight">{result}</pre>
     </div>
   {/if}

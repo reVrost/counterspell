@@ -283,7 +283,7 @@
         <div id="agent-content" class="mt-1 space-y-1">
           <Thread
             mode="task"
-            messages={messages}
+            {messages}
             emptyText="No agent output"
             emptyClass="p-5 text-gray-500 italic text-xs"
             scrollContainerId="content-scroll"

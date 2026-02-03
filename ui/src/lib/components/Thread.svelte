@@ -353,23 +353,23 @@
 {:else if isEmpty}
   <div class={cn('text-xs font-medium text-gray-500', emptyClass)}>{emptyText}</div>
 {:else}
-  <div class={cn('space-y-2', className)}>
+  <div class={cn('space-y-6', className)}>
     {#each sessionItems as item}
       {#if item.type === 'tool'}
         <ToolBlock tool={item.tool} call={item.call} result={item.result} />
       {:else}
         <div
           class={cn(
-            'rounded-lg border px-3 py-2 text-xs font-medium',
-            item.message.role === 'user'
-              ? 'border-violet-500/30 bg-violet-500/10 '
-              : 'border-white/10 bg-white/5 '
+            'px-3 py-2 text-xs font-medium',
+            item.message.role === 'user' ? 'rounded border-white-500/0 bg-violet-500/10 ' : ''
           )}
         >
-          <div class="flex items-center justify-between text-sm uppercase text-gray-500 mb-1">
-            <span>{item.message.role}</span>
-            <span>{item.message.kind}</span>
-          </div>
+          {#if item.message.role === 'user'}
+            <div class="flex items-center justify-between text-sm uppercase text-gray-500 mb-1">
+              <span>{item.message.role}</span>
+              <span>{item.message.kind}</span>
+            </div>
+          {/if}
           <div class="text-base whitespace-pre-wrap break-words">
             {item.message.content || ''}
           </div>
