@@ -79,7 +79,7 @@
       .replace(/'/g, '&#39;');
   }
 
-  let activeTab = $state<'agent' | 'diff'>('agent');
+  let activeTab = $state<'task' | 'agent' | 'diff'>('task');
   let confirmAction = $state<string | null>(null);
   let diffContent = $state<string>('');
   let isLoadingDiff = $state<boolean>(false);
@@ -251,7 +251,7 @@
     class="flex items-center justify-between p-2 px-7 bg-popover shrink-0 border-b border-white/5"
   >
     <div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50">
-      {#each ['agent', 'diff'] as tab}
+      {#each ['task', 'agent', 'diff'] as tab}
         <button
           onclick={() => (activeTab = tab as typeof activeTab)}
           class={cn(
@@ -266,7 +266,7 @@
             ></span>
           {/if}
           <span class="relative z-10">
-            {tab === 'agent' ? 'Agent' : tab === 'diff' ? 'Diff' : 'Log'}
+            {tab === 'task' ? 'Task' : tab === 'agent' ? 'Agent' : tab === 'diff' ? 'Diff' : 'Log'}
           </span>
         </button>
       {/each}
@@ -314,6 +314,20 @@
 
   <!-- Main Content Area -->
   <div class="flex-1 overflow-y-auto relative w-full h-screen mb-10" id="content-scroll">
+    <!-- Task Tab -->
+    {#if activeTab === 'task'}
+      <div class="px-6 py-4 pb-32">
+        {#if task.intent?.trim()}
+          <MarkdownRenderer
+            content={task.intent}
+            class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans"
+          />
+        {:else}
+          <div class="text-sm text-gray-500 italic">No task description</div>
+        {/if}
+      </div>
+    {/if}
+
     <!-- Agent Tab -->
     {#if activeTab === 'agent'}
       <div class="pb-32">
