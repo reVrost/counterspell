@@ -9,6 +9,7 @@
   import ChatInput from './ChatInput.svelte';
   import MarkdownRenderer from './MarkdownRenderer.svelte';
   import TodoIndicator from './TodoIndicator.svelte';
+  import ToolBlock from './ToolBlock.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import TrashIcon from '@lucide/svelte/icons/trash';
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -28,9 +29,80 @@
   let { task, messages, logContent, isInProgress }: Props = $props();
 
   // Group messages for rendering (e.g., grouping tool/result into thinking blocks)
+  type ThinkingItem = { tool: string; call: string; result: string };
   type DisplayItem =
     | { type: 'message'; id: string; message: Message }
-    | { type: 'thinking'; id: string; items: { command: string; result: string }[] };
+    | { type: 'thinking'; id: string; items: ThinkingItem[] };
+
+  function formatToolInput(value: unknown): string {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+
+  function extractToolFromUnknown(value: unknown): { tool: string; call: string } | null {
+    if (!value) return null;
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const found = extractToolFromUnknown(entry);
+        if (found) return found;
+      }
+      return null;
+    }
+    if (typeof value !== 'object') return null;
+
+    const record = value as Record<string, unknown>;
+    const tool = record.tool ?? record.tool_name ?? record.name ?? record.toolName;
+    if (!tool) return null;
+
+    const call = formatToolInput(
+      record.input ?? record.arguments ?? record.args ?? record.content ?? record.command ?? record.data
+    );
+    return { tool: String(tool), call };
+  }
+
+  function parseToolFromJson(text: string): { tool: string; call: string } | null {
+    if (!text) return null;
+    const trimmed = text.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return extractToolFromUnknown(parsed);
+    } catch {
+      return null;
+    }
+  }
+
+  function parseToolFromContent(text: string): { tool: string; call: string } {
+    const trimmed = text.trim();
+    if (!trimmed) return { tool: 'tool', call: '' };
+
+    const fromJson = parseToolFromJson(trimmed);
+    if (fromJson) return fromJson;
+
+    const lines = trimmed.split('\n');
+    const firstLine = lines[0]?.trim() ?? '';
+    const prefixed = firstLine.match(/^([a-zA-Z0-9_-]{2,})(?:\s+|:)(.+)$/);
+    if (prefixed) {
+      const remainder = [prefixed[2], ...lines.slice(1)].filter(Boolean).join('\n').trim();
+      return { tool: prefixed[1], call: remainder };
+    }
+    if (lines.length > 1 && /^[a-zA-Z0-9_-]{2,}$/.test(firstLine)) {
+      return { tool: firstLine, call: lines.slice(1).join('\n').trim() };
+    }
+
+    return { tool: 'tool', call: trimmed };
+  }
+
+  function parseToolMessage(msg: Message): { tool: string; call: string } {
+    const fromParts = parseToolFromJson(msg.parts || '');
+    if (fromParts) return fromParts;
+    return parseToolFromContent(msg.content || '');
+  }
 
   function parseParts(msg: Message): ContentBlock[] {
     if (msg.parts) {
@@ -82,11 +154,11 @@
       }
 
       if (hasToolRole || hasThinking || hasToolBlocks) {
-        const thinkingItems: { command: string; result: string }[] = [];
+        const thinkingItems: ThinkingItem[] = [];
         const groupId = msg.id || `thinking-${i}`;
 
         for (const block of thinkingBlocks) {
-          thinkingItems.push({ command: 'Thinking', result: block.text || '' });
+          thinkingItems.push({ tool: 'thinking', call: block.text || '', result: '' });
         }
 
         const remainingResults = [...toolResults];
@@ -104,15 +176,22 @@
               i++;
             }
           }
-          thinkingItems.push({ command: formatToolUse(tool), result });
+          const toolName = tool.name || 'tool';
+          const call = formatToolInput(tool.input ?? tool.content ?? tool.text ?? '');
+          thinkingItems.push({ tool: toolName, call, result });
         }
 
         for (const block of remainingResults) {
-          thinkingItems.push({ command: 'Command Trace', result: block.content || '' });
+          thinkingItems.push({ tool: 'tool result', call: '', result: block.content || '' });
         }
 
         if (hasToolRole && toolUses.length === 0 && toolResults.length === 0 && msg.content) {
-          thinkingItems.push({ command: msg.role === 'tool' ? msg.content : 'Command Trace', result: msg.content });
+          if (msg.role === 'tool') {
+            const { tool, call } = parseToolMessage(msg);
+            thinkingItems.push({ tool, call, result: '' });
+          } else {
+            thinkingItems.push({ tool: 'tool result', call: '', result: msg.content });
+          }
         }
 
         if (thinkingItems.length > 0) {
@@ -449,7 +528,7 @@
       {/if}
     {/snippet}
 
-    {#snippet thinkingSnippet(items: { command: string; result: string }[])}
+    {#snippet thinkingSnippet(items: { tool: string; call: string; result: string }[])}
       <details class="mx-12 my-4 group" open>
         <summary
           class="flex items-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors list-none outline-none"
@@ -473,53 +552,7 @@
         </summary>
         <div class="mt-3 space-y-3">
           {#each items as item}
-            <div
-              class="bg-[#0a0a0a] border border-white/5 rounded-lg overflow-hidden font-mono shadow-xl"
-            >
-              <div
-                class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5"
-              >
-                <div class="flex items-center gap-2 text-gray-400">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="text-gray-500"
-                    ><polyline points="4 17 10 11 4 5" /><line
-                      x1="12"
-                      y1="19"
-                      x2="20"
-                      y2="19"
-                    /></svg
-                  >
-                  <span class="text-sm font-bold text-gray-500 tracking-tight">{item.command}</span>
-                </div>
-                <div class="text-gray-700 hover:text-gray-500 transition-colors">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
-                  >
-                </div>
-              </div>
-              {#if item.result}
-                <div class="p-3 text-xs text-gray-400 overflow-x-auto max-h-[400px]">
-                  <pre class="whitespace-pre-wrap leading-tight antialiased">{item.result}</pre>
-                </div>
-              {/if}
-            </div>
+            <ToolBlock tool={item.tool} call={item.call} result={item.result} />
           {/each}
         </div>
       </details>
