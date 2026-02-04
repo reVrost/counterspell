@@ -9,6 +9,7 @@
   import SearchIcon from '@lucide/svelte/icons/search';
   import PlusIcon from '@lucide/svelte/icons/plus';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import Logo from './Logo.svelte';
 
   let projectSearch = $state('');
@@ -45,11 +46,11 @@
   <div class="flex items-center">
     <DropdownMenu.Root bind:open={appState.projectMenuOpen}>
       <DropdownMenu.Trigger
-        class="flex items-center gap-3 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-3 py-1.5 rounded-xl transition-all duration-200 outline-none"
+        class="flex items-center gap-1.5 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-2 py-1.5 rounded-xl transition-all duration-200 outline-none"
       >
-        <Logo class="w-7 h-7" />
+        <Logo class="w-6 h-6" />
         <span
-          class="text-lg font-medium tracking-tight text-white/90 group-hover:text-white transition-colors"
+          class="text-lg font-semibold tracking-tight text-white/90 group-hover:text-white transition-colors"
         >
           {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
         </span>
@@ -147,7 +148,7 @@
 
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        class="flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity p-0.5 outline-none rounded-full"
+        class="flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.04] active:bg-white/[0.06] p-1 pr-3 rounded-full transition-all outline-none border border-transparent hover:border-white/5"
       >
         <div class="relative group">
           <div
@@ -157,7 +158,7 @@
             <img
               src={`https://github.com/${appState.githubLogin}.png`}
               alt={appState.githubLogin}
-              class="w-9 h-9 rounded-full border border-white/10 relative z-10 bg-zinc-900"
+              class="w-7 h-7 rounded-full border border-white/10 relative z-10 bg-zinc-900 shadow-xl"
               onerror={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
                 target.src = `https://ui-avatars.com/api/?name=${getInitial(appState.githubLogin || appState.userEmail)}&background=18181b&color=a855f7&bold=true`;
@@ -165,16 +166,20 @@
             />
           {:else}
             <div
-              class="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-xs font-bold text-purple-400 relative z-10"
+              class="w-7 h-7 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-[10px] font-bold text-purple-400 relative z-10"
             >
               {getInitial(appState.userEmail)}
             </div>
           {/if}
           <div
-            class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950 z-20 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950 z-20 shadow-[0_0_8px_rgba(16,185,129,0.5)] scale-75"
           ></div>
         </div>
+        <ChevronDownIcon
+          class="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors"
+        />
       </DropdownMenu.Trigger>
+
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           class="w-60 bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-1.5 z-50"

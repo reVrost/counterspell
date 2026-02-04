@@ -69,19 +69,29 @@
 		overscroll-behavior: none;
 	}
 
-	/* Hide scrollbars globally */
-	html,
-	body,
-	main,
-	div {
-		scrollbar-width: none !important;
-		-ms-overflow-style: none !important;
+	/* Sleek, minimalist scrollbar */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 	}
+
 	::-webkit-scrollbar {
-		display: none !important;
-		width: 0 !important;
-		height: 0 !important;
-		background: transparent !important;
+		width: 5px;
+		height: 5px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 10px;
+		transition: background 0.2s ease;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background: rgba(255, 255, 255, 0.2);
 	}
 
 	/* Mobile-native touch behavior */

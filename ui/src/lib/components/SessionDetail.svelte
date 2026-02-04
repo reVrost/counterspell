@@ -132,7 +132,7 @@
   </div>
 
   <div class="flex-1 overflow-hidden flex flex-col relative">
-    <div class="flex-1 overflow-y-auto relative px-4 pb-28 pt-3 mb-12" id="content-scroll">
+    <div class="flex-1 overflow-y-auto relative px-4 pb-32 pt-3" id="content-scroll">
       <Thread
         mode="session"
         messages={displayMessages}
@@ -141,10 +141,7 @@
       />
     </div>
 
-    <div class="absolute bottom-0 inset-x-0 z-10 pb-4 px-4">
-      <div
-        class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
-      ></div>
+    <div class="absolute bottom-4 inset-x-4 z-10">
       <div class="relative mx-auto max-w-3xl">
         <ChatInput mode="chat" placeholder="Message this session..." onSubmit={handleChatSubmit} />
       </div>

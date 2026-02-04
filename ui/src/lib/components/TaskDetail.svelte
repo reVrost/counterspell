@@ -263,7 +263,7 @@
   {/if}
 
   <!-- Main Content Area -->
-  <div class="flex-1 overflow-y-auto relative w-full h-screen mb-10" id="content-scroll">
+  <div class="flex-1 overflow-y-auto relative w-full h-full" id="content-scroll">
     <!-- Task Tab -->
     {#if activeTab === 'task'}
       <div class="px-6 py-4 pb-32">

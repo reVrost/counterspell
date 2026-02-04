@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
   import InboxIcon from '@lucide/svelte/icons/inbox';
-  import { SquarePen } from '@lucide/svelte';
+  import { MessagesSquareIcon, SquarePen } from '@lucide/svelte';
   import FolderIcon from '@lucide/svelte/icons/folder';
   import MessageSquareIcon from '@lucide/svelte/icons/message-square';
   import LayersIcon from '@lucide/svelte/icons/layers';
@@ -17,7 +17,7 @@
 
   let { activeTab = 'inbox', onNavigate, onSearch }: Props = $props();
 
-  const tabs = ['inbox', 'sessions', 'focus', 'layers'];
+  const tabs = ['sessions', 'inbox', 'focus', 'layers'];
   const activeIndex = $derived(tabs.indexOf(activeTab || 'inbox'));
   const navIndex = $derived(activeIndex === -1 ? 0 : activeIndex);
   const navButtonSize = 56;
@@ -46,6 +46,22 @@
         class={navBase}
         style="top:{navTop}px; transform:translateX({navIndex * navStep}px);"
       ></div>
+
+      <!-- Sessions -->
+      <button
+        type="button"
+        onclick={() => handleTabClick('sessions')}
+        class={cn(
+          'relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200',
+          activeTab === 'sessions'
+            ? 'text-white'
+            : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
+        )}
+        aria-label="Sessions"
+      >
+        <MessagesSquareIcon class="w-6 h-6" strokeWidth={activeTab === 'sessions' ? 2.5 : 2} />
+      </button>
+
       <!-- Inbox (Home) -->
       <button
         type="button"
@@ -66,21 +82,6 @@
             {taskStore.reviewCount}
           </div>
         {/if}
-      </button>
-
-      <!-- Sessions -->
-      <button
-        type="button"
-        onclick={() => handleTabClick('sessions')}
-        class={cn(
-          'relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200',
-          activeTab === 'sessions'
-            ? 'text-white'
-            : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
-        )}
-        aria-label="Sessions"
-      >
-        <MessageSquareIcon class="w-6 h-6" strokeWidth={activeTab === 'sessions' ? 2.5 : 2} />
       </button>
 
       <!-- Projects -->

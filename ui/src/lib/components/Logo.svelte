@@ -22,7 +22,7 @@
   <path
     d="M5 7H17V19"
     stroke="url(#logo-gradient)"
-    stroke-width="3"
+    stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
     filter="url(#logo-glow)"
