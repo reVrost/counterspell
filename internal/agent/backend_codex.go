@@ -858,7 +858,15 @@ func parseCodexTodoList(item map[string]any) []tools.TodoItem {
 			continue
 		}
 		completed, _ := entry["completed"].(bool)
-		todos = append(todos, tools.TodoItem{Text: text, Completed: completed})
+		status := tools.TodoStatusPending
+		if completed {
+			status = tools.TodoStatusCompleted
+		}
+		todos = append(todos, tools.TodoItem{
+			Content:    text,
+			Status:     status,
+			ActiveForm: "",
+		})
 	}
 	return todos
 }

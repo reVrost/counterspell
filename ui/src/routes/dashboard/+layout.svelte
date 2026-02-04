@@ -17,6 +17,8 @@
     DURATIONS,
     prefersReducedMotion,
   } from '$lib/utils/transitions';
+  import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
+  import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
   import type { Project, Task, Message, LogEntry } from '$lib/types';
   import { onDestroy, tick } from 'svelte';
 
@@ -30,6 +32,29 @@
   let currentMessages = $state<Message[]>([]);
   let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
+
+  function parseError(err: string) {
+    if (err.startsWith('API error:')) {
+      const parts = err.split(' - ');
+      if (parts.length > 1) {
+        try {
+          const json = JSON.parse(parts[1]);
+          return {
+            status: parts[0].replace('API error: ', ''),
+            message: json.message || json.error || 'Internal Server Error',
+            code: json.code || 'INTERNAL_ERROR',
+          };
+        } catch {
+          return {
+            status: parts[0].replace('API error: ', ''),
+            message: parts[1],
+            code: 'ERROR',
+          };
+        }
+      }
+    }
+    return { status: 'Error', message: err, code: 'ERROR' };
+  }
 
   // Cache for loaded tasks
   let taskCache = $state<
@@ -80,14 +105,14 @@
       // Cache the result
       taskCache.set(taskId, {
         task: data.task,
-        project: data.project,
+        project: data.project!,
         messages: data.messages || [],
         logs: data.logs || [],
       });
 
       if (!isPrefetch) {
         currentTask = data.task;
-        currentProject = data.project;
+        currentProject = data.project!;
         taskStore.currentTask = data.task;
         currentMessages = data.messages || [];
         logContent = data.logs?.map((log) => renderLogEntryHTML(log)) || [];
@@ -146,105 +171,6 @@
         console.error('Task SSE error:', error);
       },
     });
-  }
-
-  // Helper to render messages as HTML (matches Go backend rendering)
-  function renderMessagesHTML(messages: Message[], isInProgress: boolean): string {
-    if (messages.length === 0) {
-      return '<div class="p-5 text-gray-500 italic text-xs">No agent output</div>';
-    }
-
-    let html = '<div class="space-y-0">';
-    for (const msg of messages) {
-      html += renderMessageBubbleHTML(msg);
-    }
-    html += '</div>';
-
-    if (isInProgress) {
-      html += `
-				<div class="flex items-center gap-3 px-4 py-3">
-					<div class="relative">
-						<div class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-							<i class="fas fa-robot text-sm text-violet-400 pulse-glow"></i>
-						</div>
-						<div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
-							<div class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"></div>
-						</div>
-					</div>
-					<div>
-						<p class="text-xs font-medium shimmer">Agent is thinking...</p>
-						<p class="text-[10px] text-gray-600">Analyzing code</p>
-					</div>
-				</div>
-			`;
-    }
-
-    return html;
-  }
-
-  function renderMessageBubbleHTML(msg: Message): string {
-    const isUser = msg.role === 'user';
-    const bgClass = isUser
-      ? 'bg-violet-500/10 border-violet-500/20'
-      : 'bg-gray-800/50 border-gray-700/50';
-    const icon = isUser ? 'fa-user' : 'fa-robot';
-    const iconColor = isUser ? 'text-violet-400' : 'text-blue-400';
-
-    let contentHtml = '';
-    for (const block of msg.content) {
-      if (block.type === 'text' && block.text) {
-        contentHtml += `<p class="text-sm text-gray-300 leading-normal">${escapeHtml(block.text)}</p>`;
-      } else if (block.type === 'tool_use' && block.toolName) {
-        contentHtml += `
-					<div class="flex items-center gap-2 my-2">
-						<span class="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] font-mono text-blue-300">
-							${escapeHtml(block.toolName)}
-						</span>
-					</div>
-				`;
-      } else if (block.type === 'tool_result') {
-        contentHtml += `<pre class="text-xs text-gray-400 font-mono whitespace-pre-wrap bg-gray-900/50 rounded p-2 my-2">${escapeHtml(block.text || '')}</pre>`;
-      }
-    }
-
-    return `
-			<div class="flex gap-3 px-4 py-3 ${bgClass} border-b border-white/5">
-				<div class="w-8 h-8 rounded-full ${iconColor} bg-white/5 flex items-center justify-center shrink-0">
-					<i class="fas ${icon} text-xs"></i>
-				</div>
-				<div class="flex-1 min-w-0">
-					${contentHtml}
-				</div>
-			</div>
-		`;
-  }
-
-  function renderLoadingDiff(): string {
-    return `
-			<div class="flex flex-col items-center justify-center h-48 text-gray-500 space-y-4">
-				<i class="fas fa-cog fa-spin text-3xl opacity-50"></i>
-				<p class="text-xs font-mono">Generating changes...</p>
-			</div>
-		`;
-  }
-
-  function renderDiffHTML(diff: string): string {
-    if (!diff) return '<div class="text-gray-500 italic">No changes made</div>';
-
-    let html = '';
-    for (const line of diff.split('\n')) {
-      const escapedLine = escapeHtml(line);
-      if (line.startsWith('+')) {
-        html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-xs border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith('-')) {
-        html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-xs border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith('@@')) {
-        html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-xs">${escapedLine}</div>`;
-      } else if (line.trim() !== '') {
-        html += `<div class="px-3 py-1 text-gray-400 font-mono text-xs">${escapedLine}</div>`;
-      }
-    }
-    return html;
   }
 
   function renderLogEntryHTML(log: LogEntry): string {
@@ -342,16 +268,50 @@
         {#if loadingTask && !currentTask}
           <TaskDetailSkeleton />
         {:else if taskError}
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center">
-              <p class="text-sm text-red-400 mb-2">{taskError}</p>
-              <button
-                onclick={() => loadTaskDetail(appState.modalTaskId!)}
-                class="px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-xs text-violet-300 hover:bg-violet-500/30 transition-colors"
-              >
-                Retry
-              </button>
+          {@const errorData = parseError(taskError)}
+          <div
+            class="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in duration-500 scale-in-95"
+          >
+            <div
+              class="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(239,68,68,0.1)]"
+            >
+              <AlertCircleIcon class="w-8 h-8 text-red-500" />
             </div>
+
+            <h3 class="text-lg font-bold text-white mb-2 tracking-tight">Something went wrong</h3>
+            <p class="text-sm text-zinc-400 max-w-sm mb-6 leading-relaxed">
+              {errorData.message}
+            </p>
+
+            <div
+              class="flex items-center gap-3 mb-8 px-4 py-2 bg-white/[0.03] border border-white/5 rounded-xl"
+            >
+              <span class="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest"
+                >Code</span
+              >
+              <span
+                class="text-[10px] font-mono text-zinc-400 font-medium tracking-tight bg-white/5 px-2 py-0.5 rounded"
+                >{errorData.code}</span
+              >
+              <div class="w-px h-3 bg-white/10 mx-1"></div>
+              <span class="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest"
+                >Status</span
+              >
+              <span
+                class="text-[10px] font-mono text-zinc-400 font-medium tracking-tight bg-white/5 px-2 py-0.5 rounded"
+                >{errorData.status}</span
+              >
+            </div>
+
+            <button
+              onclick={() => loadTaskDetail(appState.modalTaskId!)}
+              class="flex items-center gap-2 px-6 py-2.5 bg-violet-600 hover:bg-violet-500 border border-violet-400/30 rounded-full text-sm font-semibold text-white transition-all shadow-lg active:scale-95 group"
+            >
+              <RefreshCwIcon
+                class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"
+              />
+              Retry Connection
+            </button>
           </div>
         {:else if currentTask && currentProject}
           <TaskDetail
