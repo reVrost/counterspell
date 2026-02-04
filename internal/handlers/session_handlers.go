@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -92,6 +93,7 @@ func (h *Handlers) HandleSessionChat(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		slog.Error("[SESSIONS] chat request failed", "session_id", sessionID, "model_id", req.ModelID, "error", err)
 		http.Error(w, "Failed to send message", http.StatusInternalServerError)
 		return
 	}

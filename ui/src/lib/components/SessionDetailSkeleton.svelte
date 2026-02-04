@@ -3,7 +3,7 @@
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 </script>
 
-<div class="flex flex-col h-screen">
+<div class="flex flex-col h-[100dvh]">
   <!-- Header Skeleton -->
   <div
     class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-popover"

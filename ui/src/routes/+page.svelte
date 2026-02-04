@@ -123,7 +123,7 @@
   {/if}
 </svelte:head>
 
-<div class="h-screen flex flex-col overflow-hidden bg-[#0C0E12]">
+<div class="h-[100dvh] flex flex-col overflow-hidden bg-[#0C0E12]">
   <!-- Background Effects -->
   <div class="absolute inset-0 overflow-hidden pointer-events-none">
     <div

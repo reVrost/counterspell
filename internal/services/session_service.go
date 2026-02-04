@@ -138,6 +138,7 @@ func (s *SessionService) Chat(ctx context.Context, sessionID, message, modelID s
 	writer := newSessionMessageWriter(ctx, s.repo, sessionID, nextSeq+1)
 	backend, cleanup, err := s.buildBackend(ctx, session, modelID, true)
 	if err != nil {
+		slog.Error("[SESSIONS] failed to build backend", "session_id", sessionID, "backend", session.AgentBackend, "model_id", modelID, "error", err)
 		return err
 	}
 	defer cleanup()
@@ -148,12 +149,17 @@ func (s *SessionService) Chat(ctx context.Context, sessionID, message, modelID s
 			return err
 		}
 		if err := backend.RestoreState(historyJSON); err != nil {
+			slog.Error("[SESSIONS] failed to restore backend state", "session_id", sessionID, "backend", session.AgentBackend, "error", err)
 			return err
 		}
 	}
 
 	stream := backend.Stream(ctx, message)
-	return s.consumeSessionStream(ctx, writer, stream)
+	if err := s.consumeSessionStream(ctx, writer, stream); err != nil {
+		slog.Error("[SESSIONS] stream failed", "session_id", sessionID, "backend", session.AgentBackend, "model_id", modelID, "error", err)
+		return err
+	}
+	return nil
 }
 
 // Promote converts a session into a task with summarized title/intent.
@@ -242,15 +248,15 @@ func (s *SessionService) buildBackend(
 		}
 		model := codexChatModel
 		baseURL := ""
-	switch provider {
-	case "openrouter":
-		baseURL = "https://openrouter.ai/api/v1"
-	case "zai":
-		baseURL = "https://api.z.ai/api/coding/paas/v4"
-	case "openai", "":
-		if provider == "" {
-			provider = "openai"
-		}
+		switch provider {
+		case "openrouter":
+			baseURL = "https://openrouter.ai/api/v1"
+		case "zai":
+			baseURL = "https://api.z.ai/api/coding/paas/v4"
+		case "openai", "":
+			if provider == "" {
+				provider = "openai"
+			}
 		default:
 			return nil, func() {}, fmt.Errorf("unsupported provider for codex backend: %s", provider)
 		}

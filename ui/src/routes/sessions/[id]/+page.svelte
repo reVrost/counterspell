@@ -64,7 +64,7 @@
   <title>{session?.title || 'Session'} - Counterspell</title>
 </svelte:head>
 
-<div class="min-h-screen bg-background flex flex-col">
+<div class="min-h-[100dvh] bg-background flex flex-col">
   <div class="flex-1 overflow-hidden">
     {#if loading}
       <SessionDetailSkeleton />

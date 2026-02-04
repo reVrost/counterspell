@@ -10,7 +10,7 @@
     });
 </script>
 
-<div class="min-h-screen bg-background flex flex-col">
+<div class="min-h-[100dvh] bg-background flex flex-col">
     <div class="flex-1 flex items-center justify-center">
         <ErrorView
             title={status.toString()}

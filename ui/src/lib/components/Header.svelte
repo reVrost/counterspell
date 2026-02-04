@@ -13,6 +13,7 @@
   import Logo from './Logo.svelte';
 
   let projectSearch = $state('');
+  let userMenuOpen = $state(false);
   let { activeTab } = $props();
 
   const filteredProjects = $derived(
@@ -146,7 +147,7 @@
       </button>
     {/if}
 
-    <DropdownMenu.Root>
+    <DropdownMenu.Root bind:open={userMenuOpen}>
       <DropdownMenu.Trigger
         class="flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.04] active:bg-white/[0.06] p-1 pr-3 rounded-full transition-all outline-none border border-transparent hover:border-white/5"
       >
@@ -154,29 +155,40 @@
           <div
             class="absolute -inset-0.5 bg-gradient-to-tr from-purple-600 to-pink-600 rounded-full opacity-0 group-hover:opacity-40 blur-sm transition-opacity"
           ></div>
-          {#if appState.githubLogin}
-            <img
-              src={`https://github.com/${appState.githubLogin}.png`}
-              alt={appState.githubLogin}
-              class="w-7 h-7 rounded-full border border-white/10 relative z-10 bg-zinc-900 shadow-xl"
-              onerror={(e) => {
-                const target = e.currentTarget as HTMLImageElement;
-                target.src = `https://ui-avatars.com/api/?name=${getInitial(appState.githubLogin || appState.userEmail)}&background=18181b&color=a855f7&bold=true`;
-              }}
-            />
-          {:else}
-            <div
-              class="w-7 h-7 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-[10px] font-bold text-purple-400 relative z-10"
-            >
-              {getInitial(appState.userEmail)}
-            </div>
-          {/if}
+
+          <div
+            class="w-7 h-7 rounded-full border border-white/10 relative z-10 bg-zinc-900 shadow-xl overflow-hidden flex items-center justify-center"
+          >
+            {#if appState.githubLogin}
+              <img
+                src={`https://github.com/${appState.githubLogin}.png`}
+                alt={appState.githubLogin}
+                class="w-full h-full object-cover animate-in fade-in duration-300"
+                onerror={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.src = `https://ui-avatars.com/api/?name=${getInitial(appState.githubLogin || appState.userEmail)}&background=18181b&color=a855f7&bold=true`;
+                }}
+              />
+            {:else if appState.userEmail}
+              <div
+                class="w-full h-full flex items-center justify-center text-[10px] font-bold text-purple-400 animate-in fade-in duration-300"
+              >
+                {getInitial(appState.userEmail)}
+              </div>
+            {:else}
+              <div class="w-full h-full bg-zinc-800 animate-pulse"></div>
+            {/if}
+          </div>
+
           <div
             class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950 z-20 shadow-[0_0_8px_rgba(16,185,129,0.5)] scale-75"
           ></div>
         </div>
         <ChevronDownIcon
-          class="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors"
+          class={cn(
+            'w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-all duration-300',
+            userMenuOpen && 'rotate-180 text-zinc-300'
+          )}
         />
       </DropdownMenu.Trigger>
 

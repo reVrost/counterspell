@@ -222,7 +222,7 @@
   }
 </script>
 
-<div class="h-screen flex flex-col overflow-hidden bg-background">
+<div class="h-[100dvh] flex flex-col overflow-hidden bg-background">
   <Toast />
   <SettingsModal />
   <Header activeTab={appState.activeTab} />
