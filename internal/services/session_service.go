@@ -246,19 +246,32 @@ func (s *SessionService) buildBackend(
 		if err != nil {
 			slog.Warn("[SESSIONS] Codex API key not configured", "error", err)
 		}
-		model := codexChatModel
-		baseURL := ""
-		switch provider {
-		case "openrouter":
-			baseURL = "https://openrouter.ai/api/v1"
-		case "zai":
-			baseURL = "https://api.z.ai/api/coding/paas/v4"
-		case "openai", "":
-			if provider == "" {
-				provider = "openai"
+		model := ""
+		if apiKey != "" {
+			model = codexChatModel
+			if override, ok := codexModelOverride(modelID); ok {
+				model = override
 			}
-		default:
-			return nil, func() {}, fmt.Errorf("unsupported provider for codex backend: %s", provider)
+		} else if override, ok := codexModelOverride(modelID); ok {
+			model = override
+		} else if modelID != "" {
+			slog.Info("[SESSIONS] ignoring model_id for codex CLI auth", "model_id", modelID)
+		}
+
+		baseURL := ""
+		if apiKey != "" {
+			switch provider {
+			case "openrouter":
+				baseURL = "https://openrouter.ai/api/v1"
+			case "zai":
+				baseURL = "https://api.z.ai/api/coding/paas/v4"
+			case "openai", "":
+				if provider == "" {
+					provider = "openai"
+				}
+			default:
+				return nil, func() {}, fmt.Errorf("unsupported provider for codex backend: %s", provider)
+			}
 		}
 
 		opts := []agent.CodexOption{
@@ -384,6 +397,32 @@ func codexProviderHint(modelID string) string {
 	default:
 		return ""
 	}
+}
+
+func codexModelOverride(modelID string) (string, bool) {
+	if modelID == "" {
+		return "", false
+	}
+	parts := strings.SplitN(modelID, "#", 2)
+	if len(parts) == 2 {
+		if parts[0] != "codex" {
+			return "", false
+		}
+		modelID = parts[1]
+	}
+	modelID = strings.TrimPrefix(modelID, "codex/")
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		return "", false
+	}
+	if idx := strings.LastIndex(modelID, "/"); idx >= 0 {
+		modelID = modelID[idx+1:]
+	}
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		return "", false
+	}
+	return modelID, true
 }
 
 func (s *SessionService) resolveCodexAPIKey(ctx context.Context, providerHint string) (string, string, error) {
