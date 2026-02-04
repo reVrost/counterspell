@@ -146,10 +146,10 @@
                       class={cn(
                         'flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border transition-colors',
                         session.agent_backend === 'codex'
-                          ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 group-hover:bg-blue-500/20'
+                          ? 'bg-purple-500/10 border-purpe-500/20 text-purple-400 group-hover:bg-purple-500/20'
                           : session.agent_backend === 'claude-code'
                             ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 group-hover:bg-purple-500/20'
-                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20'
+                            : 'bg-purple-500/10 border-purple-500/20 text-purple-400 group-hover:bg-purple-500/20'
                       )}
                     >
                       {#if session.agent_backend === 'codex'}
@@ -216,7 +216,7 @@
                     </div>
                   </div>
                   <div
-                    class="flex items-center gap-2 text-xs text-gray-500 group-hover:text-gray-400 transition-colors"
+                    class="flex items-center gap-2 text-sm text-gray-500 group-hover:text-gray-400 transition-colors"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

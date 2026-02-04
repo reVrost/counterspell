@@ -232,7 +232,7 @@
   </main>
 
   <!-- Bottom Navigation Bar -->
-  <div class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-4xl grid items-end">
+  <div class="fixed bottom-4 left-4 right-4 z-20 mx-auto max-w-4xl grid items-end mb-safe">
     {#if appState.showChatInput}
       <div class="col-start-1 row-start-1 w-full relative z-50">
         <ChatInput mode="create" onClose={() => appState.closeChatInput()} />

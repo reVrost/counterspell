@@ -337,7 +337,7 @@
   </div>
 
   <!-- Chat Input Overlay - Always visible -->
-  <div class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3">
+  <div class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3 pb-safe">
     <div
       class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
     ></div>

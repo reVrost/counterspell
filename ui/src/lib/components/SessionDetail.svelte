@@ -141,7 +141,7 @@
       />
     </div>
 
-    <div class="absolute bottom-4 inset-x-4 z-10">
+    <div class="absolute bottom-5 inset-x-4 z-10 mb-safe">
       <div class="relative mx-auto max-w-3xl">
         <ChatInput mode="chat" placeholder="Message this session..." onSubmit={handleChatSubmit} />
       </div>

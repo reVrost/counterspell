@@ -9,7 +9,6 @@
   let errorMsg = $state('');
   let showError = $state(false);
   let checkingAuth = $state(true);
-  let needsReset = $state(false);
 
   async function handleLogin() {
     loading = true;
@@ -49,76 +48,55 @@
     errorMsg = '';
   }
 
-  $effect(async () => {
+  $effect(() => {
     if (!browser) return;
 
-    console.log('📍 Landing page mounted, checking auth...');
+    (async () => {
+      console.log('📍 Landing page mounted, checking auth...');
 
-    // Check for OAuth errors in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const error = urlParams.get('error');
-    const errorDesc = urlParams.get('error_description');
+      // Check for OAuth errors in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+      const errorDesc = urlParams.get('error_description');
 
-    if (error) {
-      errorMsg = errorDesc || `Login error: ${error}`;
-      showError = true;
-      // Clear error from URL
-      window.history.replaceState({}, '', '/');
-      checkingAuth = false;
-      return;
-    }
-
-    //Check if already authenticated
-    try {
-      const session = await authAPI.checkSession();
-      console.log('✅ Auth check result:', session);
-
-      if (session.authenticated) {
-        console.log('🚀 Redirecting to dashboard...');
-        window.location.href = '/dashboard';
-      } else {
-        console.log('❓ Not authenticated, staying on landing page');
+      if (error) {
+        errorMsg = errorDesc || `Login error: ${error}`;
+        showError = true;
+        // Clear error from URL
+        window.history.replaceState({}, '', '/');
+        checkingAuth = false;
+        return;
       }
-    } catch (e) {
-      console.log('❌ Auth check failed:', e);
-      // Check if it's a 401 error (token expired)
-      if (e instanceof Error && e.message.includes('401')) {
-        console.log('⚠️ Token expired, clearing cookies...');
-        await clearAllCookies();
+
+      //Check if already authenticated
+      try {
+        const session = await authAPI.checkSession();
+        console.log('✅ Auth check result:', session);
+
+        if (session.authenticated) {
+          console.log('🚀 Redirecting to dashboard...');
+          window.location.href = '/dashboard';
+        } else {
+          console.log('❓ Not authenticated, staying on landing page');
+        }
+      } catch (e) {
+        console.log('❌ Auth check failed:', e);
+        // Check if it's a 401 error (token expired)
+        if (e instanceof Error && e.message.includes('401')) {
+          console.log('⚠️ Token expired, clearing cookies...');
+          await clearAllCookies();
+        }
+        // Not authenticated, stay on landing page
+      } finally {
+        checkingAuth = false;
       }
-      // Not authenticated, stay on landing page
-    } finally {
-      checkingAuth = false;
-    }
+    })();
   });
 </script>
 
 <svelte:head>
   {#if browser}
     <script>
-      // Global reset function
-      // window.forceReset = async () => {
-      // 	console.log('🔄 Global force reset...');
-      // 	localStorage.clear();
-      // 	sessionStorage.clear();
-      //
-      // 	// Clear all cookies
-      // 	document.cookie.split(';').forEach((c) => {
-      // 		const domain = window.location.hostname;
-      // 		const domains = [domain, `.${domain}`, 'localhost'];
-      // 		domains.forEach((d) => {
-      // 			document.cookie = c
-      // 				.replace(/^ +/, '')
-      // 				.replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/;domain=${d}`);
-      // 			document.cookie = c
-      // 				.replace(/^ +/, '')
-      // 				.replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/;`);
-      // 		});
-      // 	});
-      //
-      // 	console.log('✅ Reset complete, reloading...');
-      // 	setTimeout(() => window.location.reload(), 500);
-      // };
     </script>
   {/if}
 </svelte:head>
@@ -193,15 +171,12 @@
               <KeyIcon class="w-5 h-5" />
               Continue with Counterspell
             </button>
-            <p class="mt-4 text-[10px] text-gray-600">
-              By continuing, you agree to Developer Protocol v2.1
-            </p>
           </div>
         {:else}
           <!-- Loading State -->
           <div class="space-y-4">
             <div
-              class="bg-gray-900/50 rounded-xl p-4 border border-gray-800 text-left space-y-3 font-mono text-xs"
+              class="bg-gray-900/50 rounded-xl p-4 border border-gray-800 text-left space-y-3 font-mono text-sm"
             >
               <div class="flex items-center gap-3">
                 <div
@@ -219,7 +194,7 @@
 
     <!-- Footer -->
     <div class="absolute bottom-8 text-center space-y-2">
-      <p class="text-xs text-gray-600">
+      <p class="text-sm text-gray-600">
         <a
           href="https://github.com/revrost/counterspell"
           target="_blank"

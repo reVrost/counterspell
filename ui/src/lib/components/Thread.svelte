@@ -487,12 +487,6 @@
             <div
               class="flex-1 min-w-0 bg-violet-500/10 border border-white/5 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-sm"
             >
-              <div
-                class="flex items-center justify-between text-[10px] uppercase text-gray-500 mb-1"
-              >
-                <span>{item.message.role}</span>
-                <span>{item.message.kind}</span>
-              </div>
               <div class="text-[13px] font-medium whitespace-pre-wrap break-words">
                 {item.message.content || ''}
               </div>

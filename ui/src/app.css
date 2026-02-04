@@ -157,6 +157,14 @@
 		font-family: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
 	}
 
+	.pb-safe {
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+
+	.mb-safe {
+		margin-bottom: env(safe-area-inset-bottom);
+	}
+
 	/* Shimmer loading animation */
 	.shimmer {
 		background-image: linear-gradient(90deg,
