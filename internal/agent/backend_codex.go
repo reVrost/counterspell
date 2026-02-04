@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,8 +24,8 @@ var ErrCodexBinaryPath = errors.New("agent: codex binary not found in PATH")
 
 // CodexBackend wraps the OpenAI Codex CLI as a Backend.
 //
-// It executes `codex exec --experimental-json` via the Go Codex SDK and
-// normalizes the JSON event stream into StreamEvents for the UI.
+// It uses the Go Codex SDK (codex.Codex) and normalizes the JSON event stream
+// into StreamEvents for the UI.
 type CodexBackend struct {
 	binaryPath   string
 	workDir      string
@@ -36,6 +35,9 @@ type CodexBackend struct {
 	sessionID    string
 	extraArgs    []string
 	systemPrompt string
+	logStream    bool
+
+	client *codex.Codex
 
 	streamCtx     context.Context
 	events        chan<- StreamEvent
@@ -44,7 +46,6 @@ type CodexBackend struct {
 	streamText    string
 
 	mu           sync.Mutex
-	cmd          *exec.Cmd
 	cancel       context.CancelFunc
 	finalMessage string
 	messages     []Message
@@ -98,6 +99,7 @@ func WithCodexSessionID(sessionID string) CodexOption {
 }
 
 // WithCodexExtraArgs appends extra CLI args to the codex command.
+// Note: codex.Codex does not expose extra args; stored but currently unused.
 func WithCodexExtraArgs(args ...string) CodexOption {
 	return func(b *CodexBackend) {
 		b.extraArgs = append(b.extraArgs, args...)
@@ -125,6 +127,18 @@ func NewCodexBackend(opts ...CodexOption) (*CodexBackend, error) {
 	if _, err := exec.LookPath(b.binaryPath); err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrCodexBinaryPath, b.binaryPath)
 	}
+
+	if !b.logStream {
+		if env := strings.TrimSpace(os.Getenv("CODEX_DEBUG_STREAM")); env != "" && env != "0" && env != "false" {
+			b.logStream = true
+		}
+	}
+
+	b.client = codex.New(codex.Options{
+		CodexPathOverride: b.binaryPath,
+		BaseURL:           b.baseURL,
+		APIKey:            b.apiKey,
+	})
 
 	return b, nil
 }
@@ -162,9 +176,6 @@ func (b *CodexBackend) Close() error {
 	if b.cancel != nil {
 		b.cancel()
 	}
-	if b.cmd != nil && b.cmd.Process != nil {
-		return b.cmd.Process.Kill()
-	}
 	return nil
 }
 
@@ -191,11 +202,11 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 	b.cancel = cancel
 	b.mu.Unlock()
 
-	// Add user message to history and emit immediately
 	execPrompt := prompt
 	if b.systemPrompt != "" && b.sessionID == "" {
 		execPrompt = b.systemPrompt + "\n\n" + prompt
 	}
+
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{
 		Role:    "user",
@@ -208,53 +219,49 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 		workDir = b.workDir
 	}
 
-	execClient := codex.NewExec(b.binaryPath, nil, nil)
-	stream := execClient.Run(ctx, codex.ExecArgs{
-		Input:            execPrompt,
-		BaseURL:          b.baseURL,
-		APIKey:           b.apiKey,
-		ThreadID:         b.sessionID,
+	threadOptions := codex.ThreadOptions{
 		Model:            b.model,
 		WorkingDirectory: workDir,
-		ExtraArgs:        b.extraArgs,
-	})
+	}
 
-	for line := range stream.Lines {
-		b.processCodexLine(line)
+	thread := b.client.StartThread(threadOptions)
+	if b.sessionID != "" {
+		thread = b.client.ResumeThread(b.sessionID, threadOptions)
+	}
+
+	stream := thread.RunStreamed(ctx, execPrompt, codex.TurnOptions{})
+	for event := range stream.Events {
+		if b.logStream {
+			slog.Info("[CODEX] event", "type", event.Type, "thread_id", event.ThreadID, "raw", event.Raw)
+		}
+		if event.Raw != nil {
+			b.processCodexEvent(event.Raw)
+			continue
+		}
+		b.handleThreadEventFallback(event)
 	}
 	return <-stream.Done
 }
 
-func (b *CodexBackend) parseOutput(scanner *bufio.Scanner) {
-	for scanner.Scan() {
-		b.processCodexLine(scanner.Text())
+func (b *CodexBackend) handleThreadEventFallback(event codex.ThreadEvent) {
+	switch event.Type {
+	case "thread.started":
+		if event.ThreadID != "" {
+			b.setSessionID(event.ThreadID)
+		}
+	case "turn.failed":
+		if event.Error != nil && event.Error.Message != "" {
+			b.emit(StreamEvent{Type: EventError, Error: event.Error.Message})
+			return
+		}
+		b.emit(StreamEvent{Type: EventError, Error: "Codex execution failed"})
+	case "error":
+		if event.Message != "" {
+			b.emit(StreamEvent{Type: EventError, Error: event.Message})
+			return
+		}
+		b.emit(StreamEvent{Type: EventError, Error: "Codex execution failed"})
 	}
-}
-
-func (b *CodexBackend) processCodexLine(line string) {
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return
-	}
-
-	// Handle SSE-style output if present
-	if strings.HasPrefix(line, "data:") {
-		line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-	}
-	if line == "[DONE]" {
-		b.finalizeStreamText("assistant")
-		b.emit(StreamEvent{Type: EventDone})
-		return
-	}
-
-	var event map[string]any
-	if err := json.Unmarshal([]byte(line), &event); err != nil {
-		// Not JSON, emit as text
-		b.appendStreamText(line)
-		return
-	}
-
-	b.processCodexEvent(event)
 }
 
 func (b *CodexBackend) processCodexEvent(event map[string]any) {
@@ -721,46 +728,6 @@ func (b *CodexBackend) setTodos(items []tools.TodoItem) {
 	b.mu.Unlock()
 }
 
-// buildCmd constructs the exec.Cmd for running Codex CLI.
-func (b *CodexBackend) buildCmd(ctx context.Context, prompt string) (*exec.Cmd, error) {
-	args := []string{"exec"}
-	if b.sessionID != "" {
-		args = append(args, "resume")
-	}
-
-	args = append(args, "--json", "--full-auto")
-	if b.sessionID == "" {
-		args = append(args, "--cd", b.workDir)
-	}
-	if b.model != "" {
-		args = append(args, "--model", b.model)
-	}
-	if len(b.extraArgs) > 0 {
-		args = append(args, b.extraArgs...)
-	}
-	if b.sessionID != "" {
-		args = append(args, b.sessionID)
-	}
-	if prompt != "" {
-		args = append(args, prompt)
-	}
-
-	cmd := exec.CommandContext(ctx, b.binaryPath, args...)
-	cmd.Dir = b.workDir
-
-	env := os.Environ()
-	if b.apiKey != "" {
-		env = append(env, "CODEX_API_KEY="+b.apiKey)
-		env = append(env, "OPENAI_API_KEY="+b.apiKey)
-	}
-	if b.baseURL != "" {
-		env = append(env, "OPENAI_BASE_URL="+b.baseURL)
-		env = append(env, "OPENAI_API_BASE="+b.baseURL)
-	}
-	cmd.Env = env
-	return cmd, nil
-}
-
 func looksLikeCodexToolItem(itemType string, item map[string]any) bool {
 	switch itemType {
 	case "command_execution", "file_change", "mcp_tool_call", "web_search", "tool_call", "tool_use", "tool_result", "tool_output":
@@ -905,13 +872,6 @@ func marshalJSON(value any) string {
 	return string(data)
 }
 
-func truncateDisplay(content string, limit int) string {
-	if limit <= 0 || len(content) <= limit {
-		return content
-	}
-	return content[:limit] + "..."
-}
-
 func argsToMap(argsJSON string, fallback map[string]any) map[string]any {
 	if argsJSON == "" {
 		return fallback
@@ -924,54 +884,20 @@ func argsToMap(argsJSON string, fallback map[string]any) map[string]any {
 }
 
 func extractTextFromContent(content any) string {
-	switch v := content.(type) {
-	case string:
-		return v
-	case []any:
-		parts := make([]string, 0, len(v))
-		for _, item := range v {
-			switch block := item.(type) {
-			case string:
-				parts = append(parts, block)
-			case map[string]any:
-				if text := extractTextFromBlock(block); text != "" {
-					parts = append(parts, text)
-				}
-			}
-		}
-		return strings.Join(parts, "")
-	case map[string]any:
-		if text := extractTextFromBlock(v); text != "" {
-			return text
-		}
-		if inner, ok := v["content"]; ok {
-			return extractTextFromContent(inner)
-		}
-	}
-	return ""
-}
-
-func extractTextFromBlock(block map[string]any) string {
-	if block == nil {
+	blocks, ok := content.([]any)
+	if !ok {
 		return ""
 	}
-
-	if blockType, ok := block["type"].(string); ok {
-		switch blockType {
-		case "text", "output_text", "input_text":
-			if text, ok := block["text"].(string); ok {
-				return text
-			}
-		default:
-			return ""
+	parts := make([]string, 0, len(blocks))
+	for _, block := range blocks {
+		entry, ok := block.(map[string]any)
+		if !ok {
+			continue
+		}
+		text, _ := entry["text"].(string)
+		if text != "" {
+			parts = append(parts, text)
 		}
 	}
-
-	if text, ok := block["text"].(string); ok {
-		return text
-	}
-	if text, ok := block["content"].(string); ok {
-		return text
-	}
-	return ""
+	return strings.Join(parts, "")
 }
