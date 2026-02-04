@@ -167,62 +167,101 @@
       const msg = taskMessages[i];
       const blocks = parseParts(msg);
       const text = concatText(blocks);
-      const thinkingBlocks = blocks.filter((b) => b.type === 'thinking');
-      const toolUses = blocks.filter((b) => b.type === 'tool_use');
-      const toolResults = blocks.filter((b) => b.type === 'tool_result');
+      const hasContent = text.trim().length > 0;
 
-      const hasToolRole = msg.role === 'tool' || msg.role === 'tool_result';
-      const hasThinking = thinkingBlocks.length > 0;
-      const hasToolBlocks = toolUses.length > 0 || toolResults.length > 0;
-
-      if (text) {
+      if (hasContent) {
         items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
       }
 
-      if (hasToolRole || hasThinking || hasToolBlocks) {
-        const thinkingItems: ThinkingItem[] = [];
-        const groupId = msg.id || `thinking-${i}`;
+      // Collect consecutive tool/thinking sequences
+      const thinkingItems: ThinkingItem[] = [];
+      const groupId = msg.id || `thinking-${i}`;
 
+      // Lookahead loop to group all consecutive purely functional messages
+      let j = i;
+      while (j < taskMessages.length) {
+        const currentMsg = taskMessages[j];
+        const currentBlocks = parseParts(currentMsg);
+        const currentText = concatText(currentBlocks).trim();
+
+        // If this message has actual text output from assistant (and it's not the first iteration with text handled above)
+        // or it's a user message, we stop grouping.
+        if (j > i && (currentText.length > 0 || currentMsg.role === 'user')) {
+          break;
+        }
+
+        const thinkingBlocks = currentBlocks.filter((b) => b.type === 'thinking');
+        const toolUses = currentBlocks.filter((b) => b.type === 'tool_use');
+        const toolResults = currentBlocks.filter((b) => b.type === 'tool_result');
+        const hasToolRole = currentMsg.role === 'tool' || currentMsg.role === 'tool_result';
+
+        // Add thinking
         for (const block of thinkingBlocks) {
           thinkingItems.push({ tool: 'thinking', call: block.text || '', result: '' });
         }
 
+        // Add tool uses + results
         const remainingResults = [...toolResults];
         for (const tool of toolUses) {
           let result = '';
           if (remainingResults.length > 0) {
             const match = remainingResults.shift();
             result = match?.content || '';
-          } else if (i + 1 < taskMessages.length) {
-            const next = taskMessages[i + 1];
+          } else if (j + 1 < taskMessages.length) {
+            // Peek at next message for result
+            const next = taskMessages[j + 1];
             const nextBlocks = parseParts(next);
             const nextResult = nextBlocks.find((b) => b.type === 'tool_result');
             if (next.role === 'tool_result' || nextResult) {
               result = nextResult?.content || next.content || '';
-              i++;
+              j++; // Consume the result message
             }
           }
-          const toolName = tool.name || 'tool';
-          const call = formatToolInput(tool.input ?? tool.content ?? tool.text ?? '');
-          thinkingItems.push({ tool: toolName, call, result });
+          thinkingItems.push({
+            tool: tool.name || 'tool',
+            call: formatToolInput(tool.input ?? tool.content ?? tool.text ?? ''),
+            result,
+          });
         }
 
         for (const block of remainingResults) {
           thinkingItems.push({ tool: 'tool result', call: '', result: block.content || '' });
         }
 
-        if (hasToolRole && toolUses.length === 0 && toolResults.length === 0 && msg.content) {
-          if (msg.role === 'tool') {
-            const { tool, call } = parseToolMessage(msg);
+        if (
+          hasToolRole &&
+          toolUses.length === 0 &&
+          toolResults.length === 0 &&
+          currentMsg.content
+        ) {
+          if (currentMsg.role === 'tool') {
+            const { tool, call } = parseToolMessage(currentMsg);
             thinkingItems.push({ tool, call, result: '' });
           } else {
-            thinkingItems.push({ tool: 'tool result', call: '', result: msg.content });
+            thinkingItems.push({ tool: 'tool result', call: '', result: currentMsg.content });
           }
         }
 
-        if (thinkingItems.length > 0) {
-          items.push({ type: 'thinking', id: groupId, items: thinkingItems });
+        if (thinkingItems.length === 0 && j === i && !hasContent) {
+          // If we're here, it's a message with neither text nor identifiable tools/thinking
+          // But avoid infinite loop, increment j
         }
+
+        j++;
+        // If the next message has text or is user, stop merging
+        if (j < taskMessages.length) {
+          const nextMsg = taskMessages[j];
+          const nextBlocks = parseParts(nextMsg);
+          const nextText = concatText(nextBlocks).trim();
+          if (nextText.length > 0 || nextMsg.role === 'user') {
+            break;
+          }
+        }
+      }
+
+      if (thinkingItems.length > 0) {
+        items.push({ type: 'thinking', id: groupId, items: thinkingItems });
+        i = j - 1; // Sync outer loop index
       }
 
       i++;
@@ -293,6 +332,49 @@
       });
     }
   });
+
+  function categorizeGroup(items: ThinkingItem[]): { label: string; color: string } {
+    if (items.length === 0) return { label: 'Thinking', color: 'text-zinc-500' };
+
+    const firstItem = items[0];
+    const lowTool = (firstItem.tool || '').toLowerCase();
+    const lowCall = (firstItem.call || '').toLowerCase();
+
+    // If they are all similar, type the whole group
+    const isAllReading = items.every(
+      (item) =>
+        (item.tool || '').toLowerCase().includes('read') ||
+        (item.call || '').toLowerCase().includes('cat ') ||
+        (item.call || '').toLowerCase().includes('view_file') ||
+        (item.call || '').toLowerCase().includes('sed -n')
+    );
+    if (isAllReading) return { label: 'Reading', color: 'text-emerald-500/80' };
+
+    const isAllExploring = items.every(
+      (item) =>
+        (item.tool || '').toLowerCase().includes('ls') ||
+        (item.tool || '').toLowerCase().includes('list') ||
+        (item.call || '').toLowerCase().startsWith('ls ')
+    );
+    if (isAllExploring) return { label: 'Exploring', color: 'text-emerald-500/80' };
+
+    const isAllSearching = items.every(
+      (item) =>
+        (item.tool || '').toLowerCase().includes('search') ||
+        (item.tool || '').toLowerCase().includes('grep')
+    );
+    if (isAllSearching) return { label: 'Searching', color: 'text-emerald-500/80' };
+
+    const isAllEditing = items.every(
+      (item) =>
+        (item.tool || '').toLowerCase().includes('write') ||
+        (item.tool || '').toLowerCase().includes('edit') ||
+        (item.tool || '').toLowerCase().includes('patch')
+    );
+    if (isAllEditing) return { label: 'Editing', color: 'text-emerald-500/80' };
+
+    return { label: 'Thinking', color: 'text-zinc-500' };
+  }
 </script>
 
 {#if mode === 'task'}
@@ -340,28 +422,34 @@
             </div>
           {/if}
         {:else}
-          <details class="mx-12 my-4 group" open>
+          {@const cat = categorizeGroup(item.items)}
+          <details class="ml-12 mr-4 my-2 group" open>
             <summary
-              class="flex items-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors list-none outline-none"
+              class="flex items-center gap-2.5 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors list-none outline-none select-none py-1"
             >
               <div
-                class="w-4 h-4 flex items-center justify-center group-open:rotate-90 transition-transform"
+                class="w-3.5 h-3.5 flex items-center justify-center group-open:rotate-90 transition-transform opacity-60"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
+                  width="12"
+                  height="12"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  stroke-width="2.5"
+                  stroke-width="3"
                   stroke-linecap="round"
                   stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
                 >
               </div>
-              <span class="text-xs font-bold tracking-widest uppercase">Thinking</span>
+              <div class="flex items-center gap-2">
+                <span class={cn('text-[10px] font-black tracking-[0.15em] uppercase', cat.color)}
+                  >{cat.label}</span
+                >
+                <span class="text-[10px] opacity-40 font-mono">({item.items.length})</span>
+              </div>
             </summary>
-            <div class="mt-3 space-y-3">
+            <div class="mt-2 space-y-1.5 border-l border-white/[0.06] ml-[6px] pl-4 transition-all">
               {#each item.items as toolItem}
                 <ToolBlock tool={toolItem.tool} call={toolItem.call} result={toolItem.result} />
               {/each}
@@ -374,12 +462,12 @@
 {:else if isEmpty}
   <div class={cn('text-xs font-medium text-gray-500', emptyClass)}>{emptyText}</div>
 {:else}
-  <div class={cn('space-y-6', className)}>
+  <div class={cn('space-y-1', className)}>
     {#each sessionItems as item}
       {#if item.type === 'tool'}
         <ToolBlock tool={item.tool} call={item.call} result={item.result} />
       {:else}
-        <div class="flex gap-3 px-2 py-1 items-start">
+        <div class="flex gap-3 px-2 py-6 items-start">
           {#if item.message.role === 'user'}
             <div class="shrink-0 mt-1">
               {#if userAvatarUrl}
