@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/lithammer/shortuuid/v4"
+	"github.com/revrost/counterspell/internal/agent/codex"
 	"github.com/revrost/counterspell/internal/agent/tools"
 )
 
@@ -24,8 +25,8 @@ var ErrCodexBinaryPath = errors.New("agent: codex binary not found in PATH")
 
 // CodexBackend wraps the OpenAI Codex CLI as a Backend.
 //
-// It executes `codex exec --json` and normalizes the JSON event stream into
-// StreamEvents for the UI.
+// It executes `codex exec --experimental-json` via the Go Codex SDK and
+// normalizes the JSON event stream into StreamEvents for the UI.
 type CodexBackend struct {
 	binaryPath   string
 	workDir      string
@@ -47,6 +48,7 @@ type CodexBackend struct {
 	cancel       context.CancelFunc
 	finalMessage string
 	messages     []Message
+	todos        []tools.TodoItem
 }
 
 // CodexOption configures a CodexBackend.
@@ -201,94 +203,58 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 	})
 	b.mu.Unlock()
 
-	cmd, err := b.buildCmd(ctx, execPrompt)
-	if err != nil {
-		return err
+	workDir := ""
+	if b.sessionID == "" {
+		workDir = b.workDir
 	}
 
-	b.mu.Lock()
-	b.cmd = cmd
-	b.mu.Unlock()
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("stdout pipe: %w", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("stderr pipe: %w", err)
-	}
-
-	slog.Info("[CODEX] Starting command", "binary", b.binaryPath, "args", cmd.Args, "workdir", b.workDir, "api_key_len", len(b.apiKey), "base_url", b.baseURL)
-
-	if err := cmd.Start(); err != nil {
-		slog.Error("[CODEX] Failed to start command", "binary", b.binaryPath, "args", cmd.Args, "workdir", b.workDir, "error", err)
-		return fmt.Errorf("start codex: %w", err)
-	}
-
-	// Parse output in background
-	var wg sync.WaitGroup
-	var stderrLines []string
-	var stderrMu sync.Mutex
-
-	wg.Go(func() {
-		b.parseOutput(bufio.NewScanner(stdout))
+	execClient := codex.NewExec(b.binaryPath, nil, nil)
+	stream := execClient.Run(ctx, codex.ExecArgs{
+		Input:            execPrompt,
+		BaseURL:          b.baseURL,
+		APIKey:           b.apiKey,
+		ThreadID:         b.sessionID,
+		Model:            b.model,
+		WorkingDirectory: workDir,
+		ExtraArgs:        b.extraArgs,
 	})
 
-	wg.Go(func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line != "" {
-				slog.Warn("[CODEX] stderr", "line", line)
-				stderrMu.Lock()
-				stderrLines = append(stderrLines, line)
-				stderrMu.Unlock()
-			}
-		}
-	})
-
-	err = cmd.Wait()
-	wg.Wait()
-
-	if err != nil {
-		stderrMu.Lock()
-		stderrContent := strings.Join(stderrLines, "\n")
-		stderrMu.Unlock()
-		if stderrContent != "" {
-			return fmt.Errorf("%w: %s", err, stderrContent)
-		}
+	for line := range stream.Lines {
+		b.processCodexLine(line)
 	}
-	return err
+	return <-stream.Done
 }
 
 func (b *CodexBackend) parseOutput(scanner *bufio.Scanner) {
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		// Handle SSE-style output if present
-		if strings.HasPrefix(line, "data:") {
-			line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		}
-		if line == "[DONE]" {
-			b.finalizeStreamText("assistant")
-			b.emit(StreamEvent{Type: EventDone})
-			continue
-		}
-
-		var event map[string]any
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			// Not JSON, emit as text
-			b.appendStreamText(line)
-			continue
-		}
-
-		b.processCodexEvent(event)
+		b.processCodexLine(scanner.Text())
 	}
+}
+
+func (b *CodexBackend) processCodexLine(line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+
+	// Handle SSE-style output if present
+	if strings.HasPrefix(line, "data:") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	}
+	if line == "[DONE]" {
+		b.finalizeStreamText("assistant")
+		b.emit(StreamEvent{Type: EventDone})
+		return
+	}
+
+	var event map[string]any
+	if err := json.Unmarshal([]byte(line), &event); err != nil {
+		// Not JSON, emit as text
+		b.appendStreamText(line)
+		return
+	}
+
+	b.processCodexEvent(event)
 }
 
 func (b *CodexBackend) processCodexEvent(event map[string]any) {
@@ -373,6 +339,18 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 			b.emitTextMessage("assistant", text)
 		}
 		return
+	case "todo_list":
+		if !isCompleted && !isUpdated {
+			return
+		}
+		todos := parseCodexTodoList(item)
+		if len(todos) == 0 {
+			return
+		}
+		b.setTodos(todos)
+		b.emit(StreamEvent{Type: EventTodo, Todos: todos})
+		return
+
 	default:
 		// Continue to tool handling below.
 	}
@@ -729,7 +707,18 @@ func (b *CodexBackend) FinalMessage() string {
 
 // Todos returns the current task list (empty for Codex backend).
 func (b *CodexBackend) Todos() []tools.TodoItem {
-	return nil
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	result := make([]tools.TodoItem, len(b.todos))
+	copy(result, b.todos)
+	return result
+}
+
+func (b *CodexBackend) setTodos(items []tools.TodoItem) {
+	b.mu.Lock()
+	b.todos = make([]tools.TodoItem, len(items))
+	copy(b.todos, items)
+	b.mu.Unlock()
 }
 
 // buildCmd constructs the exec.Cmd for running Codex CLI.
@@ -832,6 +821,9 @@ func extractCodexToolResult(item map[string]any) string {
 	if out := getString(item, "diff"); out != "" {
 		return out
 	}
+	if out := getString(item, "aggregated_output"); out != "" {
+		return out
+	}
 
 	stdout := getString(item, "stdout")
 	stderr := getString(item, "stderr")
@@ -848,6 +840,27 @@ func extractCodexToolResult(item map[string]any) string {
 		return marshalJSON(files)
 	}
 	return ""
+}
+
+func parseCodexTodoList(item map[string]any) []tools.TodoItem {
+	rawItems, ok := item["items"].([]any)
+	if !ok {
+		return nil
+	}
+	todos := make([]tools.TodoItem, 0, len(rawItems))
+	for _, raw := range rawItems {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		text, _ := entry["text"].(string)
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		completed, _ := entry["completed"].(bool)
+		todos = append(todos, tools.TodoItem{Text: text, Completed: completed})
+	}
+	return todos
 }
 
 func extractCodexError(event map[string]any) string {
