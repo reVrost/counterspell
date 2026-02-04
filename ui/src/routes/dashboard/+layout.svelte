@@ -301,7 +301,7 @@
   <SettingsModal />
   <Header activeTab={appState.activeTab} />
 
-  <main class="flex-1 overflow-y-auto bg-background relative pt-14" id="feed-container">
+  <main class="flex-1 overflow-y-auto bg-background relative pt-16" id="feed-container">
     <div class="px-3 pt-6 pb-40">{@render children()}</div>
   </main>
 
