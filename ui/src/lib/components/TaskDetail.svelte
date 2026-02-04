@@ -10,6 +10,7 @@
   import MarkdownRenderer from './MarkdownRenderer.svelte';
   import TodoIndicator from './TodoIndicator.svelte';
   import Thread from './Thread.svelte';
+  import DiffSkeleton from './DiffSkeleton.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import TrashIcon from '@lucide/svelte/icons/trash';
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -324,12 +325,7 @@
         </div>
         <div class="p-3 diff-container">
           {#if isLoadingDiff}
-            <div class="flex items-center justify-center p-8 text-gray-400">
-              <div
-                class="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full mr-2"
-              ></div>
-              <span>Loading diff...</span>
-            </div>
+            <DiffSkeleton />
           {:else if diffContent}
             {@html diffContent}
           {:else}

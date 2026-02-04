@@ -3,6 +3,7 @@
   import { onDestroy } from 'svelte';
   import { sessionsAPI } from '$lib/api';
   import SessionDetail from '$lib/components/SessionDetail.svelte';
+  import SessionDetailSkeleton from '$lib/components/SessionDetailSkeleton.svelte';
   import type { Session, SessionMessage } from '$lib/types';
 
   let session = $state<Session | null>(null);
@@ -66,7 +67,7 @@
 <div class="min-h-screen bg-background flex flex-col">
   <div class="flex-1 overflow-hidden">
     {#if loading}
-      <div class="p-4 text-sm text-gray-500">Loading session...</div>
+      <SessionDetailSkeleton />
     {:else if error}
       <div class="flex items-center justify-center h-full">
         <div class="text-center">
@@ -80,7 +81,11 @@
         </div>
       </div>
     {:else if session}
-      <SessionDetail {session} {messages} onRefresh={() => loadSession(session.id, { showLoading: false })} />
+      <SessionDetail
+        {session}
+        {messages}
+        onRefresh={() => loadSession(session.id, { showLoading: false })}
+      />
     {/if}
   </div>
 </div>

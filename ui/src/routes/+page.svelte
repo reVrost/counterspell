@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { authAPI } from "$lib/api";
-  import GithubIcon from "@lucide/svelte/icons/github";
-  import KeyIcon from "@lucide/svelte/icons/key";
-  import XIcon from "@lucide/svelte/icons/x";
-  import { browser } from "$app/environment";
+  import { authAPI } from '$lib/api';
+  import GithubIcon from '@lucide/svelte/icons/github';
+  import KeyIcon from '@lucide/svelte/icons/key';
+  import XIcon from '@lucide/svelte/icons/x';
+  import { browser } from '$app/environment';
 
   let loading = $state(false);
-  let errorMsg = $state("");
+  let errorMsg = $state('');
   let showError = $state(false);
   let checkingAuth = $state(true);
   let needsReset = $state(false);
@@ -17,9 +17,9 @@
     try {
       await authAPI.loginWithInvoker();
     } catch (err) {
-      console.error("Login failed:", err);
+      console.error('Login failed:', err);
       loading = false;
-      errorMsg = "Failed to initiate login";
+      errorMsg = 'Failed to initiate login';
       showError = true;
     }
   }
@@ -28,45 +28,42 @@
     if (!browser) return;
 
     // Clear all cookies
-    document.cookie.split(";").forEach((c) => {
+    document.cookie.split(';').forEach((c) => {
       const domain = window.location.hostname;
-      const domains = [domain, `.${domain}`, "localhost"];
+      const domains = [domain, `.${domain}`, 'localhost'];
       domains.forEach((d) => {
         document.cookie = c
-          .replace(/^ +/, "")
-          .replace(
-            /=.*/,
-            `=;expires=${new Date(0).toUTCString()};path=/;domain=${d}`,
-          );
+          .replace(/^ +/, '')
+          .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/;domain=${d}`);
         document.cookie = c
-          .replace(/^ +/, "")
+          .replace(/^ +/, '')
           .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/;`);
       });
     });
 
-    console.log("✅ All cookies cleared");
+    console.log('✅ All cookies cleared');
   }
 
   function dismissError() {
     showError = false;
-    errorMsg = "";
+    errorMsg = '';
   }
 
   $effect(async () => {
     if (!browser) return;
 
-    console.log("📍 Landing page mounted, checking auth...");
+    console.log('📍 Landing page mounted, checking auth...');
 
     // Check for OAuth errors in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const error = urlParams.get("error");
-    const errorDesc = urlParams.get("error_description");
+    const error = urlParams.get('error');
+    const errorDesc = urlParams.get('error_description');
 
     if (error) {
       errorMsg = errorDesc || `Login error: ${error}`;
       showError = true;
       // Clear error from URL
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, '', '/');
       checkingAuth = false;
       return;
     }
@@ -74,19 +71,19 @@
     //Check if already authenticated
     try {
       const session = await authAPI.checkSession();
-      console.log("✅ Auth check result:", session);
+      console.log('✅ Auth check result:', session);
 
       if (session.authenticated) {
-        console.log("🚀 Redirecting to dashboard...");
-        window.location.href = "/dashboard";
+        console.log('🚀 Redirecting to dashboard...');
+        window.location.href = '/dashboard';
       } else {
-        console.log("❓ Not authenticated, staying on landing page");
+        console.log('❓ Not authenticated, staying on landing page');
       }
     } catch (e) {
-      console.log("❌ Auth check failed:", e);
+      console.log('❌ Auth check failed:', e);
       // Check if it's a 401 error (token expired)
-      if (e instanceof Error && e.message.includes("401")) {
-        console.log("⚠️ Token expired, clearing cookies...");
+      if (e instanceof Error && e.message.includes('401')) {
+        console.log('⚠️ Token expired, clearing cookies...');
         await clearAllCookies();
       }
       // Not authenticated, stay on landing page
@@ -143,10 +140,7 @@
     <div
       class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-red-500/90 backdrop-blur text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300"
     >
-      <XIcon
-        class="w-4 h-4 cursor-pointer hover:opacity-80"
-        onclick={dismissError}
-      />
+      <XIcon class="w-4 h-4 cursor-pointer hover:opacity-80" onclick={dismissError} />
       <span class="text-sm font-medium">{errorMsg}</span>
     </div>
   {/if}
@@ -158,12 +152,21 @@
     <!-- Content -->
     <div class="relative z-10 max-w-md w-full space-y-8">
       {#if checkingAuth}
-        <!-- Loading state while checking auth -->
-        <div class="space-y-4">
+        <div class="flex flex-col items-center gap-6">
           <div
-            class="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto"
-          ></div>
-          <p class="text-gray-400">Checking authentication...</p>
+            class="relative w-20 h-20 rounded-3xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center animate-pulse-glow"
+          >
+            <i class="fas fa-ghost text-3xl text-violet-400"></i>
+            <div
+              class="absolute inset-0 border-2 border-violet-500/30 rounded-3xl animate-ping opacity-20"
+            ></div>
+          </div>
+          <div class="space-y-2">
+            <h3 class="text-sm font-semibold text-gray-200">Aligning Realities</h3>
+            <p class="text-[11px] text-gray-500 font-medium uppercase tracking-widest">
+              Checking Authentication
+            </p>
+          </div>
         </div>
       {:else}
         <div class="space-y-4">
@@ -172,9 +175,7 @@
           >
             <KeyIcon class="w-8 h-8 text-white" />
           </div>
-          <h1 class="text-3xl font-bold text-white tracking-tight">
-            Welcome to Counterspell
-          </h1>
+          <h1 class="text-3xl font-bold text-white tracking-tight">Welcome to Counterspell</h1>
           <p class="text-gray-400 text-sm leading-relaxed">
             Mobile-first, hosted AI agent Kanban.
             <br />
