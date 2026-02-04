@@ -32,8 +32,7 @@ type CodexBackend struct {
 	apiKey       string
 	baseURL      string
 	model        string
-	sessionID    string
-	extraArgs    []string
+	threadID     string
 	systemPrompt string
 	logStream    bool
 
@@ -94,15 +93,7 @@ func WithCodexModel(model string) CodexOption {
 // WithCodexSessionID sets the Codex thread/session ID to continue.
 func WithCodexSessionID(sessionID string) CodexOption {
 	return func(b *CodexBackend) {
-		b.sessionID = sessionID
-	}
-}
-
-// WithCodexExtraArgs appends extra CLI args to the codex command.
-// Note: codex.Codex does not expose extra args; stored but currently unused.
-func WithCodexExtraArgs(args ...string) CodexOption {
-	return func(b *CodexBackend) {
-		b.extraArgs = append(b.extraArgs, args...)
+		b.threadID = sessionID
 	}
 }
 
@@ -128,10 +119,8 @@ func NewCodexBackend(opts ...CodexOption) (*CodexBackend, error) {
 		return nil, fmt.Errorf("%w: %s", ErrCodexBinaryPath, b.binaryPath)
 	}
 
-	if !b.logStream {
-		if env := strings.TrimSpace(os.Getenv("CODEX_DEBUG_STREAM")); env != "" && env != "0" && env != "false" {
-			b.logStream = true
-		}
+	if env := strings.TrimSpace(os.Getenv("CODEX_DEBUG_STREAM")); env != "" && env != "0" && env != "false" {
+		b.logStream = true
 	}
 
 	b.client = codex.New(codex.Options{
@@ -203,7 +192,7 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 	b.mu.Unlock()
 
 	execPrompt := prompt
-	if b.systemPrompt != "" && b.sessionID == "" {
+	if b.systemPrompt != "" && b.threadID == "" {
 		execPrompt = b.systemPrompt + "\n\n" + prompt
 	}
 
@@ -214,19 +203,16 @@ func (b *CodexBackend) execute(ctx context.Context, prompt string) error {
 	})
 	b.mu.Unlock()
 
-	workDir := ""
-	if b.sessionID == "" {
-		workDir = b.workDir
-	}
-
 	threadOptions := codex.ThreadOptions{
-		Model:            b.model,
-		WorkingDirectory: workDir,
+		Model: b.model,
+	}
+	if b.threadID == "" {
+		threadOptions.WorkingDirectory = b.workDir
 	}
 
 	thread := b.client.StartThread(threadOptions)
-	if b.sessionID != "" {
-		thread = b.client.ResumeThread(b.sessionID, threadOptions)
+	if b.threadID != "" {
+		thread = b.client.ResumeThread(b.threadID, threadOptions)
 	}
 
 	stream := thread.RunStreamed(ctx, execPrompt, codex.TurnOptions{})
@@ -247,7 +233,7 @@ func (b *CodexBackend) handleThreadEventFallback(event codex.ThreadEvent) {
 	switch event.Type {
 	case "thread.started":
 		if event.ThreadID != "" {
-			b.setSessionID(event.ThreadID)
+			b.setThreadID(event.ThreadID)
 		}
 	case "turn.failed":
 		if event.Error != nil && event.Error.Message != "" {
@@ -270,7 +256,7 @@ func (b *CodexBackend) processCodexEvent(event map[string]any) {
 	switch eventType {
 	case "thread.started":
 		if threadID := getString(event, "thread_id"); threadID != "" {
-			b.setSessionID(threadID)
+			b.setThreadID(threadID)
 		}
 	case "turn.completed":
 		b.finalizeStreamText("assistant")
@@ -357,13 +343,11 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 		b.setTodos(todos)
 		b.emit(StreamEvent{Type: EventTodo, Todos: todos})
 		return
-
 	default:
 		// Continue to tool handling below.
 	}
 
 	if !looksLikeCodexToolItem(itemType, item) {
-		// Fallback: treat any text content as assistant output
 		if isCompleted {
 			text := extractTextFromContent(item["content"])
 			if text == "" {
@@ -395,7 +379,7 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 	case "session_meta":
 		if payload, ok := event["payload"].(map[string]any); ok {
 			if id := getString(payload, "id"); id != "" {
-				b.setSessionID(id)
+				b.setThreadID(id)
 			}
 		}
 	case "response_item":
@@ -463,7 +447,6 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 		b.finalizeStreamText("assistant")
 		b.emit(StreamEvent{Type: EventDone})
 	default:
-		// Streaming delta-style text events
 		if delta := getString(event, "delta"); delta != "" {
 			b.appendStreamText(delta)
 			return
@@ -479,7 +462,6 @@ func (b *CodexBackend) emitCodexToolCall(itemType string, item map[string]any) {
 	toolID := getString(item, "id")
 	toolName, _, argsJSON := formatCodexToolCall(itemType, item)
 
-	// Add tool use to messages
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{
 		Role: "assistant",
@@ -513,7 +495,6 @@ func (b *CodexBackend) emitCodexToolResult(itemType string, item map[string]any)
 	if output == "" {
 		output = fmt.Sprintf("%s completed", toolName)
 	}
-	// Add tool result to messages
 	b.mu.Lock()
 	b.messages = append(b.messages, Message{
 		Role: "user",
@@ -637,16 +618,16 @@ func (b *CodexBackend) emitTextMessage(role, text string) {
 	b.emit(StreamEvent{Type: EventMessageEnd, MessageID: msgID, Role: role})
 }
 
-func (b *CodexBackend) setSessionID(sessionID string) {
+func (b *CodexBackend) setThreadID(threadID string) {
 	b.mu.Lock()
-	if sessionID == "" || b.sessionID == sessionID {
+	if threadID == "" || b.threadID == threadID {
 		b.mu.Unlock()
 		return
 	}
-	b.sessionID = sessionID
+	b.threadID = threadID
 	b.mu.Unlock()
-	slog.Info("[CODEX] Session ID detected", "session_id", sessionID)
-	b.emit(StreamEvent{Type: EventSession, SessionID: sessionID})
+	slog.Info("[CODEX] Thread ID detected", "thread_id", threadID)
+	b.emit(StreamEvent{Type: EventSession, SessionID: threadID})
 }
 
 // --- Describable interface ---
@@ -691,7 +672,7 @@ func (b *CodexBackend) RestoreState(stateJSON string) error {
 func (b *CodexBackend) SessionID() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.sessionID
+	return b.threadID
 }
 
 // --- IntrospectableBackend interface ---
