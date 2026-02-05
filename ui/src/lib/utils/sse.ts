@@ -80,6 +80,21 @@ export function createTaskSSE(taskId: string, callbacks: SSECallbacks = {}): Eve
   return eventSource;
 }
 
+export function createSessionSSE(sessionId: string, callbacks: SSECallbacks = {}): EventSource {
+  const eventSource = new EventSource(`/api/v1/events?session_id=${sessionId}`);
+
+  eventSource.addEventListener(EventType.AgentUpdate, (event) => {
+    callbacks.onAgentUpdate?.(event.data);
+  });
+
+  eventSource.onerror = (error) => {
+    console.error('Session SSE Error:', error);
+    callbacks.onError?.(error);
+  };
+
+  return eventSource;
+}
+
 export function createFeedSSE(onUpdate: () => void, onError?: (error: Event) => void): EventSource {
   const eventSource = new EventSource('/api/v1/events');
 

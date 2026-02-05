@@ -174,6 +174,7 @@ export interface FeedData {
   done: Task[];
   todo: Task[];
   planning: Task[];
+  projects?: Record<string, Project>;
 }
 
 export interface Model {

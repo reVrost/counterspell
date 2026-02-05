@@ -1,7 +1,9 @@
 -- SQLite Schema for Counterspell (Local-First Data Plane)
 -- This is consolidated schema - no migrations needed
 
--- Sessions: chat threads
+---
+--- Sessions: imported chat threads from third party
+---
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
@@ -36,6 +38,9 @@ CREATE TABLE IF NOT EXISTS session_messages (
     created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
     UNIQUE(session_id, sequence)
 );
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_message_at ON sessions(last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id, sequence);
 
 CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_insert
 AFTER INSERT ON session_messages
@@ -101,6 +106,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
 
+CREATE INDEX IF NOT EXISTS idx_runs_created_at ON agent_runs (created_at);
 CREATE TRIGGER IF NOT EXISTS update_agent_runs_updated_at
 AFTER UPDATE ON agent_runs
 BEGIN
@@ -108,7 +114,9 @@ UPDATE agent_runs SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
 
--- Artifacts: Files uploaded by agents
+---
+--- Artifacts: Files uploaded by agents
+---
 CREATE TABLE IF NOT EXISTS artifacts (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
@@ -126,8 +134,11 @@ BEGIN
 UPDATE artifacts SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
+CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts (created_at);
 
--- Messages: Chat messages for agent conversation history
+---
+--- Messages: Chat messages for agent conversation history
+---
 CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -150,6 +161,7 @@ UPDATE messages SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
 
+CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
 CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_insert
 AFTER INSERT ON messages
 BEGIN
@@ -166,7 +178,9 @@ UPDATE agent_runs SET
 WHERE id = old.run_id;
 END;
 
+---
 -- Settings: API keys and configuration (no user_id - single-tenant)
+---
 CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     openrouter_key TEXT,
@@ -185,59 +199,21 @@ BEGIN
 UPDATE settings SET updated_at = strftime('%s', 'now')
 WHERE id = new.id;
 END;
-
--- GitHub Connections: Store OAuth tokens (single connection for now)
-CREATE TABLE IF NOT EXISTS github_connections (
-    id TEXT PRIMARY KEY,
-    github_user_id TEXT UNIQUE NOT NULL,
-    access_token TEXT NOT NULL,
-    username TEXT NOT NULL,
-    avatar_url TEXT,
-    created_at INTEGER NOT NULL, -- Unix ms
-    updated_at INTEGER NOT NULL  -- Unix ms
-);
-
-CREATE TRIGGER IF NOT EXISTS update_github_connections_updated_at
-AFTER UPDATE ON github_connections
-BEGIN
-UPDATE github_connections SET updated_at = strftime('%s', 'now')
-WHERE id = new.id;
-END;
-
--- Repositories: Available repos for selection
-CREATE TABLE IF NOT EXISTS repositories (
-    id TEXT PRIMARY KEY,
-    connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    full_name TEXT NOT NULL,
-    owner TEXT NOT NULL,
-    is_private BOOLEAN NOT NULL,
-    html_url TEXT NOT NULL,
-    clone_url TEXT NOT NULL,
-    local_path TEXT,
-    created_at INTEGER NOT NULL, -- Unix ms
-    updated_at INTEGER NOT NULL, -- Unix ms
-    UNIQUE(connection_id, full_name)
-);
-
-CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at
-AFTER UPDATE ON repositories
-BEGIN
-UPDATE repositories SET updated_at = strftime('%s', 'now')
-WHERE id = new.id;
-END;
-
 -- Insert default settings row
 INSERT OR IGNORE INTO settings (id, agent_backend, provider, model) VALUES (1, 'native', 'anthropic', 'claude-opus-4-5');
+CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);
+CREATE INDEX IF NOT EXISTS idx_messages_task_created ON messages(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id);
 
--- OAuth Login Attempts: Temporary PKCE state for OAuth flow
+---
+--- OAuth/Tunnel/Handshake Login Attempts: Temporary PKCE state for OAuth flow
+---
 CREATE TABLE IF NOT EXISTS oauth_login_attempts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     state TEXT NOT NULL UNIQUE,
     code_verifier TEXT NOT NULL,
     created_at INTEGER NOT NULL -- Unix ms
 );
-
 -- Machine Identity: Stores machine credentials and tunnel info
 CREATE TABLE IF NOT EXISTS machine_identity (
     machine_id TEXT PRIMARY KEY,
@@ -250,14 +226,44 @@ CREATE TABLE IF NOT EXISTS machine_identity (
     last_seen_at INTEGER -- Unix ms
 );
 
--- Indices (optimize for common query patterns)
-CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
-CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);
-CREATE INDEX IF NOT EXISTS idx_messages_task_created ON messages(task_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_last_message_at ON sessions(last_message_at DESC);
-CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id, sequence);
-CREATE INDEX IF NOT EXISTS idx_runs_created_at ON agent_runs (created_at);
-CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
-CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts (created_at);
-CREATE INDEX IF NOT EXISTS idx_repos_connection ON repositories(connection_id);
+-- -- GitHub Connections: Store OAuth tokens (single connection for now)
+-- CREATE TABLE IF NOT EXISTS github_connections (
+--     id TEXT PRIMARY KEY,
+--     github_user_id TEXT UNIQUE NOT NULL,
+--     access_token TEXT NOT NULL,
+--     username TEXT NOT NULL,
+--     avatar_url TEXT,
+--     created_at INTEGER NOT NULL, -- Unix ms
+--     updated_at INTEGER NOT NULL  -- Unix ms
+-- );
+--
+-- CREATE TRIGGER IF NOT EXISTS update_github_connections_updated_at
+-- AFTER UPDATE ON github_connections
+-- BEGIN
+-- UPDATE github_connections SET updated_at = strftime('%s', 'now')
+-- WHERE id = new.id;
+-- END;
+--
+-- Repositories: Available repos for selection
+-- CREATE TABLE IF NOT EXISTS repositories (
+--     id TEXT PRIMARY KEY,
+--     connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
+--     name TEXT NOT NULL,
+--     full_name TEXT NOT NULL,
+--     owner TEXT NOT NULL,
+--     is_private BOOLEAN NOT NULL,
+--     html_url TEXT NOT NULL,
+--     clone_url TEXT NOT NULL,
+--     local_path TEXT,
+--     created_at INTEGER NOT NULL, -- Unix ms
+--     updated_at INTEGER NOT NULL, -- Unix ms
+--     UNIQUE(connection_id, full_name)
+-- );
+--
+-- CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at
+-- AFTER UPDATE ON repositories
+-- BEGIN
+-- UPDATE repositories SET updated_at = strftime('%s', 'now')
+-- WHERE id = new.id;
+-- END;
+-- CREATE INDEX IF NOT EXISTS idx_repos_connection ON repositories(connection_id);

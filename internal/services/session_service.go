@@ -24,14 +24,16 @@ const codexChatModel = "gpt-5.2-codex-medium"
 type SessionService struct {
 	repo     *Repository
 	settings *SettingsService
+	eventBus *EventBus
 	dataDir  string
 }
 
 // NewSessionService creates a new SessionService.
-func NewSessionService(repo *Repository, settings *SettingsService, dataDir string) *SessionService {
+func NewSessionService(repo *Repository, settings *SettingsService, eventBus *EventBus, dataDir string) *SessionService {
 	return &SessionService{
 		repo:     repo,
 		settings: settings,
+		eventBus: eventBus,
 		dataDir:  dataDir,
 	}
 }
@@ -129,6 +131,8 @@ func (s *SessionService) Chat(ctx context.Context, sessionID, message, modelID s
 	); err != nil {
 		return err
 	}
+
+	s.publishSessionUserMessage(sessionID, message)
 
 	if session.Title == nil || strings.TrimSpace(*session.Title) == "" || *session.Title == "New session" {
 		title := truncateSessionTitle(message)
@@ -659,6 +663,7 @@ func (s *SessionService) consumeSessionStream(ctx context.Context, writer *sessi
 				stream.Events = nil
 				continue
 			}
+			s.publishSessionStreamEvent(writer.sessionID, event)
 			s.handleSessionEvent(writer, assembler, event)
 		case err, ok := <-stream.Done:
 			if !ok {
@@ -669,6 +674,49 @@ func (s *SessionService) consumeSessionStream(ctx context.Context, writer *sessi
 		}
 	}
 	return nil
+}
+
+func (s *SessionService) publishSessionStreamEvent(sessionID string, event agent.StreamEvent) {
+	if s.eventBus == nil || sessionID == "" {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		slog.Warn("[SESSIONS] failed to marshal stream event", "session_id", sessionID, "error", err)
+		return
+	}
+	s.eventBus.Publish(models.Event{
+		SessionID: sessionID,
+		Type:      string(EventTypeAgentUpdate),
+		Data:      string(data),
+	})
+}
+
+func (s *SessionService) publishSessionUserMessage(sessionID, message string) {
+	if s.eventBus == nil || sessionID == "" || strings.TrimSpace(message) == "" {
+		return
+	}
+	msgID := shortuuid.New()
+	s.publishSessionStreamEvent(sessionID, agent.StreamEvent{Type: agent.EventMessageStart, MessageID: msgID, Role: "user"})
+	s.publishSessionStreamEvent(sessionID, agent.StreamEvent{
+		Type:      agent.EventContentStart,
+		MessageID: msgID,
+		BlockType: "text",
+		Block:     &agent.ContentBlock{Type: "text"},
+	})
+	s.publishSessionStreamEvent(sessionID, agent.StreamEvent{
+		Type:      agent.EventContentDelta,
+		MessageID: msgID,
+		BlockType: "text",
+		Delta:     message,
+	})
+	s.publishSessionStreamEvent(sessionID, agent.StreamEvent{
+		Type:      agent.EventContentEnd,
+		MessageID: msgID,
+		BlockType: "text",
+		Block:     &agent.ContentBlock{Type: "text", Text: message},
+	})
+	s.publishSessionStreamEvent(sessionID, agent.StreamEvent{Type: agent.EventMessageEnd, MessageID: msgID, Role: "user"})
 }
 
 func (s *SessionService) handleSessionEvent(writer *sessionMessageWriter, assembler *streamAssembler, event agent.StreamEvent) {

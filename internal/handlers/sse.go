@@ -14,6 +14,7 @@ import (
 // HandleSSE handles Server-Sent Events for real-time updates.
 func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	taskID := r.URL.Query().Get("task_id")
+	sessionID := r.URL.Query().Get("session_id")
 	ctx := r.Context()
 	// Auth removed for local-first mode
 
@@ -46,6 +47,13 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 
 		// Send initial state
 		h.sendInitialState(w, flusher, ctx, taskID)
+	} else if sessionID != "" {
+		if _, _, err := h.sessionService.Get(ctx, sessionID); err != nil {
+			http.Error(w, "Session not found", http.StatusNotFound)
+			return
+		}
+		_, _ = fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
+		flusher.Flush()
 	} else {
 		// Feed page: send initial ping
 		_, _ = fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
@@ -66,6 +74,10 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if taskID != "" && event.TaskID != taskID {
+				continue
+			}
+
+			if taskID == "" && sessionID != "" && event.SessionID != sessionID {
 				continue
 			}
 

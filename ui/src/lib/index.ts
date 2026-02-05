@@ -21,4 +21,4 @@ export * from "./types";
 
 // Utils
 export { cn, formatDuration } from "./utils";
-export { createTaskSSE, createFeedSSE } from "./utils/sse";
+export { createTaskSSE, createSessionSSE, createFeedSSE } from "./utils/sse";

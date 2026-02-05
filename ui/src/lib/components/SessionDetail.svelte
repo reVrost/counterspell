@@ -14,12 +14,6 @@
   }
 
   let { session, messages, onRefresh }: Props = $props();
-  let optimisticMessages = $state<SessionMessage[]>([]);
-
-  const displayMessages = $derived.by(() => {
-    if (optimisticMessages.length === 0) return messages;
-    return [...messages, ...optimisticMessages];
-  });
 
   function formatRelativeTimestamp(value?: number | null): string {
     if (!value) return 'No messages yet';
@@ -59,41 +53,11 @@
   async function handleChatSubmit(message: string, modelId: string) {
     const trimmed = message.trim();
     if (!trimmed) return;
-    const optimistic = buildOptimisticMessage(trimmed);
-    optimisticMessages = [...optimisticMessages, optimistic];
-
     try {
       await sessionsAPI.chat(session.id, trimmed, modelId);
-      if (onRefresh) {
-        try {
-          await onRefresh();
-          optimisticMessages = optimisticMessages.filter((msg) => msg.id !== optimistic.id);
-        } catch (refreshErr) {
-          console.error('Failed to refresh session:', refreshErr);
-          appState.showToast('Failed to refresh session', 'error');
-        }
-      }
     } catch (err) {
-      optimisticMessages = optimisticMessages.filter((msg) => msg.id !== optimistic.id);
       appState.showToast(err instanceof Error ? err.message : 'Failed to send message', 'error');
     }
-  }
-
-  function buildOptimisticMessage(content: string): SessionMessage {
-    const now = Date.now();
-    const lastSequence = messages.at(-1)?.sequence ?? 0;
-    return {
-      id: `optimistic-${crypto.randomUUID()}`,
-      session_id: session.id,
-      sequence: lastSequence + optimisticMessages.length + 1,
-      role: 'user',
-      kind: 'text',
-      content,
-      tool_name: null,
-      tool_call_id: null,
-      raw_json: JSON.stringify({ role: 'user', kind: 'text', content }),
-      created_at: now,
-    };
   }
 </script>
 
@@ -135,7 +99,7 @@
     <div class="flex-1 overflow-y-auto relative px-4 pb-40 pt-3" id="content-scroll">
       <Thread
         mode="session"
-        messages={displayMessages}
+        messages={messages}
         emptyText="No messages yet."
         scrollContainerId="content-scroll"
       />

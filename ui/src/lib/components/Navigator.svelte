@@ -17,13 +17,12 @@
 
   let { activeTab = 'inbox', onNavigate, onSearch }: Props = $props();
 
-  const tabs = ['sessions', 'inbox', 'focus', 'layers'];
+  const tabs = ['inbox', 'focus', 'layers'];
   const activeIndex = $derived(tabs.indexOf(activeTab || 'inbox'));
   const navIndex = $derived(activeIndex === -1 ? 0 : activeIndex);
   const navButtonSize = 64;
   const navBaseSize = 56;
   const navGap = 6;
-  const navStep = navButtonSize + navGap - 11;
   const navTop = (navButtonSize - navBaseSize) / 2 - 1;
 
   function handleTabClick(tab: string) {
@@ -48,19 +47,19 @@
       ></div>
 
       <!-- Sessions -->
-      <button
-        type="button"
-        onclick={() => handleTabClick('sessions')}
-        class={cn(
-          'relative z-10 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200',
-          activeTab === 'sessions'
-            ? 'text-white'
-            : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
-        )}
-        aria-label="Sessions"
-      >
-        <MessagesSquareIcon class="w-7 h-7" strokeWidth={activeTab === 'sessions' ? 2.5 : 2} />
-      </button>
+      <!-- <button -->
+      <!--   type="button" -->
+      <!--   onclick={() => handleTabClick('sessions')} -->
+      <!--   class={cn( -->
+      <!--     'relative z-10 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200', -->
+      <!--     activeTab === 'sessions' -->
+      <!--       ? 'text-white' -->
+      <!--       : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]' -->
+      <!--   )} -->
+      <!--   aria-label="Sessions" -->
+      <!-- > -->
+      <!--   <MessagesSquareIcon class="w-7 h-7" strokeWidth={activeTab === 'sessions' ? 2.5 : 2} /> -->
+      <!-- </button> -->
 
       <!-- Inbox (Home) -->
       <button

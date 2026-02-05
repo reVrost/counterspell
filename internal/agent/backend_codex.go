@@ -38,11 +38,14 @@ type CodexBackend struct {
 
 	client *codex.Codex
 
-	streamCtx     context.Context
-	events        chan<- StreamEvent
-	streamMsgID   string
-	streamMsgRole string
-	streamText    string
+	streamCtx           context.Context
+	events              chan<- StreamEvent
+	streamMsgID         string
+	streamMsgRole       string
+	streamText          string
+	streamThinkingMsgID string
+	streamThinkingRole  string
+	streamThinkingText  string
 
 	mu           sync.Mutex
 	cancel       context.CancelFunc
@@ -259,11 +262,14 @@ func (b *CodexBackend) processCodexEvent(event map[string]any) {
 			b.setThreadID(threadID)
 		}
 	case "turn.completed":
+		b.finalizeStreamThinking("assistant")
 		b.finalizeStreamText("assistant")
 		b.emit(StreamEvent{Type: EventDone})
 	case "turn.failed":
+		b.finalizeStreamThinking("assistant")
 		b.emit(StreamEvent{Type: EventError, Error: extractCodexError(event)})
 	case "error":
+		b.finalizeStreamThinking("assistant")
 		b.emit(StreamEvent{Type: EventError, Error: extractCodexError(event)})
 	case "item.started", "item.updated", "item.completed":
 		item, _ := event["item"].(map[string]any)
@@ -290,9 +296,24 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 			if text == "" {
 				text = getString(item, "text")
 			}
+			if text == "" {
+				text = getString(item, "delta")
+			}
 			text = strings.TrimSpace(text)
 			if text != "" {
 				b.appendStreamText(text)
+			}
+		case "reasoning":
+			text := extractTextFromContent(item["content"])
+			if text == "" {
+				text = getString(item, "text")
+			}
+			if text == "" {
+				text = getString(item, "delta")
+			}
+			text = strings.TrimSpace(text)
+			if text != "" {
+				b.appendStreamThinking(text)
 			}
 		}
 		return
@@ -303,6 +324,7 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 		if !isCompleted {
 			return
 		}
+		b.finalizeStreamThinking("assistant")
 		text := extractTextFromContent(item["content"])
 		if text == "" {
 			text = getString(item, "text")
@@ -315,13 +337,25 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 		b.emitTextMessage("assistant", text)
 		return
 	case "reasoning":
-		// Intentionally ignored to avoid leaking reasoning content.
+		if !isCompleted {
+			return
+		}
+		text := extractTextFromContent(item["content"])
+		if text == "" {
+			text = getString(item, "text")
+		}
+		text = strings.TrimSpace(text)
+		if text != "" {
+			b.appendStreamThinking(text)
+		}
+		b.finalizeStreamThinking("assistant")
 		return
 	case "plan_update":
 		// Treat plan updates as status text for now.
 		if !isCompleted {
 			return
 		}
+		b.finalizeStreamThinking("assistant")
 		text := extractTextFromContent(item["content"])
 		if text == "" {
 			text = getString(item, "text")
@@ -349,6 +383,7 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 
 	if !looksLikeCodexToolItem(itemType, item) {
 		if isCompleted {
+			b.finalizeStreamThinking("assistant")
 			text := extractTextFromContent(item["content"])
 			if text == "" {
 				text = getString(item, "text")
@@ -363,11 +398,13 @@ func (b *CodexBackend) processCodexItem(eventType string, item map[string]any) {
 	}
 
 	if isCompleted {
+		b.finalizeStreamThinking("assistant")
 		b.finalizeStreamText("assistant")
 		b.emitCodexToolResult(itemType, item)
 		return
 	}
 
+	b.finalizeStreamThinking("assistant")
 	b.finalizeStreamText("assistant")
 	b.emitCodexToolCall(itemType, item)
 }
@@ -394,13 +431,16 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 				text := extractTextFromContent(payload["content"])
 				text = strings.TrimSpace(text)
 				if text != "" {
+					b.finalizeStreamThinking("assistant")
 					b.finalizeStreamText("assistant")
 					b.emitTextMessage(role, text)
 				}
 			case "tool_call", "tool_use":
+				b.finalizeStreamThinking("assistant")
 				b.finalizeStreamText("assistant")
 				b.emitCodexToolCall(payloadType, payload)
 			case "tool_result", "tool_output":
+				b.finalizeStreamThinking("assistant")
 				b.finalizeStreamText("assistant")
 				b.emitCodexToolResult(payloadType, payload)
 			}
@@ -410,9 +450,29 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 			text := extractTextFromContent(message["content"])
 			text = strings.TrimSpace(text)
 			if text != "" {
+				b.finalizeStreamThinking("assistant")
 				b.finalizeStreamText("assistant")
 				b.emitTextMessage("assistant", text)
 			}
+		}
+	case "reasoning":
+		text := extractTextFromContent(event["content"])
+		if text == "" {
+			text = getString(event, "text")
+		}
+		text = strings.TrimSpace(text)
+		if text != "" {
+			b.appendStreamThinking(text)
+			b.finalizeStreamThinking("assistant")
+		}
+	case "reasoning_delta":
+		delta := getString(event, "delta")
+		if delta == "" {
+			delta = getString(event, "text")
+		}
+		delta = strings.TrimSpace(delta)
+		if delta != "" {
+			b.appendStreamThinking(delta)
 		}
 	case "assistant_message", "agent_message":
 		text := extractTextFromContent(event["content"])
@@ -434,9 +494,11 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 			b.appendStreamText(delta)
 		}
 	case "tool_call", "tool_use", "function_call":
+		b.finalizeStreamThinking("assistant")
 		b.finalizeStreamText("assistant")
 		b.emitCodexToolCall(eventType, event)
 	case "tool_result", "tool_output", "function_result":
+		b.finalizeStreamThinking("assistant")
 		b.finalizeStreamText("assistant")
 		b.emitCodexToolResult(eventType, event)
 	case "result":
@@ -444,6 +506,7 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 			b.emit(StreamEvent{Type: EventError, Error: extractCodexError(event)})
 			return
 		}
+		b.finalizeStreamThinking("assistant")
 		b.finalizeStreamText("assistant")
 		b.emit(StreamEvent{Type: EventDone})
 	default:
@@ -452,6 +515,7 @@ func (b *CodexBackend) processCodexLegacyEvent(event map[string]any) {
 			return
 		}
 		if text := getString(event, "text"); text != "" {
+			b.finalizeStreamThinking("assistant")
 			b.finalizeStreamText("assistant")
 			b.emitTextMessage("assistant", text)
 		}
@@ -559,6 +623,33 @@ func (b *CodexBackend) endStreamMessage() {
 	}
 }
 
+func (b *CodexBackend) startStreamThinking(role string) string {
+	b.mu.Lock()
+	if b.streamThinkingMsgID != "" {
+		id := b.streamThinkingMsgID
+		b.mu.Unlock()
+		return id
+	}
+	id := shortuuid.New()
+	b.streamThinkingMsgID = id
+	b.streamThinkingRole = role
+	b.mu.Unlock()
+	b.emit(StreamEvent{Type: EventMessageStart, MessageID: id, Role: role})
+	return id
+}
+
+func (b *CodexBackend) endStreamThinking() {
+	b.mu.Lock()
+	id := b.streamThinkingMsgID
+	role := b.streamThinkingRole
+	b.streamThinkingMsgID = ""
+	b.streamThinkingRole = ""
+	b.mu.Unlock()
+	if id != "" {
+		b.emit(StreamEvent{Type: EventMessageEnd, MessageID: id, Role: role})
+	}
+}
+
 func (b *CodexBackend) appendStreamText(delta string) {
 	if delta == "" {
 		return
@@ -578,6 +669,24 @@ func (b *CodexBackend) appendStreamText(delta string) {
 	b.emit(StreamEvent{Type: EventContentDelta, MessageID: msgID, BlockType: "text", Delta: delta})
 }
 
+func (b *CodexBackend) appendStreamThinking(delta string) {
+	if delta == "" {
+		return
+	}
+	msgID := b.startStreamThinking("assistant")
+	start := false
+	b.mu.Lock()
+	if b.streamThinkingText == "" {
+		start = true
+	}
+	b.streamThinkingText += delta
+	b.mu.Unlock()
+	if start {
+		b.emit(StreamEvent{Type: EventContentStart, MessageID: msgID, BlockType: "thinking", Block: &ContentBlock{Type: "thinking"}})
+	}
+	b.emit(StreamEvent{Type: EventContentDelta, MessageID: msgID, BlockType: "thinking", Delta: delta})
+}
+
 func (b *CodexBackend) finalizeStreamText(role string) {
 	b.mu.Lock()
 	text := b.streamText
@@ -590,6 +699,20 @@ func (b *CodexBackend) finalizeStreamText(role string) {
 	b.appendMessage(role, []ContentBlock{{Type: "text", Text: text}})
 	b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "text", Block: &ContentBlock{Type: "text", Text: text}})
 	b.endStreamMessage()
+}
+
+func (b *CodexBackend) finalizeStreamThinking(role string) {
+	b.mu.Lock()
+	text := b.streamThinkingText
+	b.streamThinkingText = ""
+	msgID := b.streamThinkingMsgID
+	b.mu.Unlock()
+	if text == "" {
+		return
+	}
+	b.appendMessage(role, []ContentBlock{{Type: "thinking", Text: text}})
+	b.emit(StreamEvent{Type: EventContentEnd, MessageID: msgID, BlockType: "thinking", Block: &ContentBlock{Type: "thinking", Text: text}})
+	b.endStreamThinking()
 }
 
 func (b *CodexBackend) appendMessage(role string, blocks []ContentBlock) {

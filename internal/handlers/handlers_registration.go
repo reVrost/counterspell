@@ -47,7 +47,7 @@ func NewHandlers(database *db.DB, events *services.EventBus, cfg *config.Config)
 
 		// Create shared services
 		taskService:     repo,
-		sessionService:  services.NewSessionService(repo, settingsService, cfg.DataDir),
+		sessionService:  services.NewSessionService(repo, settingsService, events, cfg.DataDir),
 		settingsService: settingsService,
 		fileService:     services.NewFileService(cfg.DataDir),
 		githubService:   services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret),
