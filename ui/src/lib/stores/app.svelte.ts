@@ -62,6 +62,22 @@ class AppState {
         localStorage.getItem("counterspell_active_project_name") || "";
       this.activeModelId =
         localStorage.getItem("counterspell_model") || MODELS[0].id;
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        this.deferredPrompt = e as BeforeInstallPromptEvent;
+        // Update UI notify the user they can install the PWA
+        this.canInstallPWA = true;
+      });
+
+      window.addEventListener("appinstalled", () => {
+        // Clear the deferredPrompt so it can be garbage collected
+        this.deferredPrompt = null;
+        this.canInstallPWA = false;
+        console.log("PWA was installed");
+      });
     }
   }
 

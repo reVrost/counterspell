@@ -212,10 +212,14 @@ func (s *SessionSyncer) syncSession(ctx context.Context, backend, sessionID stri
 		needsUpdate := false
 		updateTitle := ""
 		titleIsSetup := false
-		if backend == backendCodex && session.Title != nil {
-			titleIsSetup = isCodexSetupContent(*session.Title)
+		titleIsPlaceholder := false
+		if session.Title != nil {
+			if backend == backendCodex {
+				titleIsSetup = isCodexSetupContent(*session.Title)
+			}
+			titleIsPlaceholder = isPlaceholderTitle(*session.Title)
 		}
-		if session.Title == nil || strings.TrimSpace(*session.Title) == "" || titleIsSetup {
+		if session.Title == nil || strings.TrimSpace(*session.Title) == "" || titleIsSetup || titleIsPlaceholder {
 			titleMessages := messages
 			if backend == backendCodex {
 				titleMessages = filterCodexSetupImportedMessages(messages)
@@ -920,7 +924,7 @@ func sessionTitle(messages []importedMessage) string {
 			return truncateTitle(msg.Content)
 		}
 	}
-	return "Imported session"
+	return ""
 }
 
 func sessionTimeBounds(messages []importedMessage) (int64, int64) {
@@ -962,6 +966,10 @@ func envPath(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func isPlaceholderTitle(title string) bool {
+	return strings.EqualFold(strings.TrimSpace(title), "Imported session")
 }
 
 func userHomeDir() string {
