@@ -125,14 +125,14 @@
     <button
       type="button"
       onclick={handlePromote}
-      class="shrink-0 px-3 py-2 rounded-full text-xs font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
+      class="shrink-0 px-3 py-2 rounded-full text-sm font-medium uppercase tracking-wide border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition"
     >
-      Promote
+      Blueprint
     </button>
   </div>
 
   <div class="flex-1 overflow-hidden flex flex-col relative">
-    <div class="flex-1 overflow-y-auto relative px-4 pb-32 pt-3" id="content-scroll">
+    <div class="flex-1 overflow-y-auto relative px-4 pb-40 pt-3" id="content-scroll">
       <Thread
         mode="session"
         messages={displayMessages}

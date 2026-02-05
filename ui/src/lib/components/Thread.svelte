@@ -337,8 +337,6 @@
     if (items.length === 0) return { label: 'Thinking', color: 'text-zinc-500' };
 
     const firstItem = items[0];
-    const lowTool = (firstItem.tool || '').toLowerCase();
-    const lowCall = (firstItem.call || '').toLowerCase();
 
     // If they are all similar, type the whole group
     const isAllReading = items.every(
