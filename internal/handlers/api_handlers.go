@@ -13,7 +13,7 @@ import (
 // HandleListTask returns tasks.
 func (h *Handlers) HandleListTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tasks, err := h.taskService.ListWithRepository(ctx)
+	tasks, err := h.repository.ListWithRepository(ctx)
 	if err != nil {
 		slog.Error("Failed to get tasks", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks", err))
@@ -56,7 +56,7 @@ func (h *Handlers) HandleGetTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	taskResp, err := h.taskService.GetTaskWithDetails(ctx, taskID)
+	taskResp, err := h.repository.GetTaskWithDetails(ctx, taskID)
 	if err != nil {
 		slog.Error("Failed to get task details", "error", err)
 		http.Error(w, "Task not found", http.StatusNotFound)
@@ -73,14 +73,12 @@ func (h *Handlers) HandleGetTaskDiff(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Task ID required", http.StatusBadRequest)
 		return
 	}
-
-	gitDiff, err := h.repoManager.GetDiff(r.Context(), taskID)
+	gitDiff, err := h.orchestrator.GetDiff(r.Context(), taskID)
 	if err != nil {
 		slog.Error("Failed to get git diff", "task_id", taskID, "error", err)
 		http.Error(w, "Failed to get git diff", http.StatusInternalServerError)
 		return
 	}
-
 	render.JSON(w, r, map[string]string{"git_diff": gitDiff})
 }
 

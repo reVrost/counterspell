@@ -28,15 +28,8 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to create task", err))
-		return
-	}
-
 	slog.Info("[HANDLER] Starting task submission", "project_id", req.ProjectID, "intent", req.Intent, "model_id", req.ModelID)
-	taskID, err := orch.StartTask(ctx, req.ProjectID, req.Intent, req.ModelID)
+	taskID, err := h.orchestrator.StartTask(ctx, req.ProjectID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))
@@ -65,15 +58,8 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to create task", err))
-		return
-	}
-
 	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model_id", req.ModelID)
-	err = orch.ContinueTask(ctx, req.TaskID, req.Intent, req.ModelID)
+	err := h.orchestrator.ContinueTask(ctx, req.TaskID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))
@@ -88,14 +74,7 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to clear task", err))
-		return
-	}
-
-	if err := orch.CleanupTask(r.Context(), taskID); err != nil {
+	if err := h.orchestrator.CleanupTask(r.Context(), taskID); err != nil {
 		slog.Error("Failed to clear task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to clear task", err))
 		return
@@ -104,54 +83,13 @@ func (h *Handlers) HandleActionClear(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, map[string]string{"status": "ok"})
 }
 
-// HandleActionRetry retries a failed task.
-func (h *Handlers) HandleActionRetry(w http.ResponseWriter, r *http.Request) {
-	taskID := chi.URLParam(r, "id")
-	ctx := r.Context()
-	//	userID := "default"
-
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to retry task", err))
-		return
-	}
-
-	// For retry, we just start a new task with same intent
-	task, err := h.taskService.Get(ctx, taskID)
-	if err != nil {
-		http.Error(w, "Task not found", http.StatusNotFound)
-		return
-	}
-
-	repoID := ""
-	if task.RepositoryID != nil {
-		repoID = *task.RepositoryID
-	}
-	newTaskID, err := orch.StartTask(ctx, repoID, task.Intent, "")
-	if err != nil {
-		slog.Error("Failed to retry task", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to retry task", err))
-		return
-	}
-
-	render.JSON(w, r, map[string]string{"task_id": newTaskID})
-}
-
 // HandleActionMerge attempts to merge task changes.
 func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	ctx := r.Context()
 	//	userID := "default"
 
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to merge task", err))
-		return
-	}
-
-	if err := orch.MergeTask(ctx, taskID); err != nil {
+	if err := h.orchestrator.MergeTask(ctx, taskID); err != nil {
 		slog.Error("Failed to merge task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to merge task", err))
 		return
@@ -164,14 +102,7 @@ func (h *Handlers) HandleActionMerge(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to create PR", err))
-		return
-	}
-
-	prURL, err := orch.CreatePR(r.Context(), taskID)
+	prURL, err := h.orchestrator.CreatePR(r.Context(), taskID)
 	if err != nil {
 		slog.Error("Failed to create PR", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to create PR", err))
@@ -185,14 +116,7 @@ func (h *Handlers) HandleActionPR(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleActionDiscard(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 
-	orch, err := h.getOrchestrator()
-	if err != nil {
-		slog.Error("Failed to create orchestrator", "error", err)
-		_ = render.Render(w, r, ErrInternalServer("Failed to discard task", err))
-		return
-	}
-
-	if err := orch.CleanupTask(r.Context(), taskID); err != nil {
+	if err := h.orchestrator.CleanupTask(r.Context(), taskID); err != nil {
 		slog.Error("Failed to discard task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to discard task", err))
 		return

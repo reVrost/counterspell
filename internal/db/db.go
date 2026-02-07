@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	_ "modernc.org/sqlite"
 	"github.com/revrost/counterspell/internal/db/sqlc"
+	_ "modernc.org/sqlite"
 )
 
 //go:embed schema.sql
@@ -17,7 +17,7 @@ var schemaFS embed.FS
 
 // DB wraps database/sql and sqlc queries.
 type DB struct {
-	DB      *sql.DB
+	db      *sql.DB
 	Queries *sqlc.Queries
 }
 
@@ -47,7 +47,7 @@ func Connect(ctx context.Context, dbPath string) (*DB, error) {
 	slog.Info("Connected to SQLite database", "path", dbPath)
 
 	return &DB{
-		DB:      sqlDB,
+		db:      sqlDB,
 		Queries: sqlc.New(sqlDB),
 	}, nil
 }
@@ -61,7 +61,7 @@ func (db *DB) RunMigrations(ctx context.Context) error {
 	}
 
 	// Execute schema
-	if _, err := db.DB.ExecContext(ctx, string(schemaBytes)); err != nil {
+	if _, err := db.db.ExecContext(ctx, string(schemaBytes)); err != nil {
 		return fmt.Errorf("failed to execute schema: %w", err)
 	}
 
@@ -72,7 +72,7 @@ func (db *DB) RunMigrations(ctx context.Context) error {
 
 // Close closes database connection.
 func (db *DB) Close() {
-	if err := db.DB.Close(); err != nil {
+	if err := db.db.Close(); err != nil {
 		slog.Error("Error closing database", "error", err)
 	} else {
 		slog.Info("Database connection closed")

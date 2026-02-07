@@ -18,6 +18,18 @@ import (
 	"github.com/revrost/counterspell/internal/models"
 )
 
+// type Engine interface {
+// 	// Tickets
+// 	CreateTicket(ctx context.Context, workspaceID, title, prompt string) (Task, error)
+//
+// 	// Runs
+// 	StartRun(ctx context.Context, ticketID string) (Run, error)
+// 	CancelRun(ctx context.Context, runID string) error
+//
+// 	// Interactive review chat
+// 	PostMessage(ctx context.Context, ticketID, runID, clientID, text string) (Message, error)
+// }
+
 // ConflictFile represents a merge conflict.
 type ConflictFile struct {
 	Path     string `json:"path"`
@@ -948,6 +960,23 @@ func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query 
 	// Fuzzy search files
 	matches := fuzzySearch(files, query, limit)
 	return matches, nil
+}
+
+func (o *Orchestrator) GetDiff(ctx context.Context, taskID string) (string, error) {
+	workspacePath := o.repoManager.WorkspacePath(taskID)
+	if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
+		slog.Warn("[ORCHESTRATOR] Workspace missing, returning empty diff", "task_id", taskID, "path", workspacePath)
+		return "", nil
+	}
+
+	// Get git diff
+	gitDiff, err := o.repoManager.GetDiff(ctx, taskID)
+	if err != nil {
+		slog.Warn("[ORCHESTRATOR] Failed to get git diff", "task_id", taskID, "error", err)
+		return "", fmt.Errorf("failed to get git diff: %w", err)
+	}
+
+	return gitDiff, nil
 }
 
 // fuzzySearch performs fuzzy matching on file paths and returns top N matches.

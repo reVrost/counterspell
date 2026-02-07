@@ -9,16 +9,20 @@ import (
 type Handlers struct {
 	cfg *config.Config
 
+	repository      *services.Repository
 	sessionService  *services.SessionService
 	settingsService *services.SettingsService
 	fileService     *services.FileService
 	oauthService    *services.OAuthService
 	orchestrator    *services.Orchestrator
+	eventBus        *services.EventBus
 }
 
 // NewHandlers creates new HTTP handlers.
 func NewHandlers(
 	cfg *config.Config,
+	repository *services.Repository,
+	eventBus *services.EventBus,
 	settingsService *services.SettingsService,
 	sessionService *services.SessionService,
 	oauthService *services.OAuthService,
@@ -26,6 +30,8 @@ func NewHandlers(
 
 	return &Handlers{
 		cfg:             cfg,
+		repository:      repository,
+		eventBus:        eventBus,
 		sessionService:  sessionService,
 		settingsService: settingsService,
 		fileService:     services.NewFileService(cfg.DataDir),

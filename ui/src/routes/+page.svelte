@@ -169,7 +169,7 @@
               class="w-full bg-white text-black font-bold h-12 rounded-lg hover:bg-gray-200 transition active:scale-95 flex items-center justify-center gap-2"
             >
               <KeyIcon class="w-5 h-5" />
-              Continue with Counterspell
+              Continue with SSO
             </button>
           </div>
         {:else}

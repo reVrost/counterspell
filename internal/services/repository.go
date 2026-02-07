@@ -12,27 +12,26 @@ import (
 
 	"github.com/lithammer/shortuuid/v4"
 	"github.com/revrost/counterspell/internal/agent"
-	"github.com/revrost/counterspell/internal/db"
 	"github.com/revrost/counterspell/internal/db/sqlc"
 	"github.com/revrost/counterspell/internal/models"
 )
 
 // Repository handles task persistence.
 type Repository struct {
-	db *db.DB
+	Q *sqlc.Queries
 }
 
 // NewRepository creates a new task service.
-func NewRepository(database *db.DB) *Repository {
-	return &Repository{db: database}
+func NewRepository(queries *sqlc.Queries) *Repository {
+	return &Repository{Q: queries}
 }
 
 func (s *Repository) GetRepository(ctx context.Context, projectID string) (sqlc.Repository, error) {
-	return s.db.Queries.GetRepository(ctx, projectID)
+	return s.Q.GetRepository(ctx, projectID)
 }
 
 func (s *Repository) GetGithubConnectionByID(ctx context.Context, githubConnectionID string) (sqlc.GithubConnection, error) {
-	return s.db.Queries.GetGithubConnectionByID(ctx, githubConnectionID)
+	return s.Q.GetGithubConnectionByID(ctx, githubConnectionID)
 
 }
 
@@ -45,7 +44,7 @@ func (s *Repository) Create(ctx context.Context, repositoryID, intent string) (*
 	}
 
 	now := time.Now().UnixMilli()
-	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
+	if err := s.Q.CreateTask(ctx, sqlc.CreateTaskParams{
 		ID:               id,
 		RepositoryID:     sql.NullString{String: repositoryID, Valid: repositoryID != ""},
 		SessionID:        sql.NullString{},
@@ -73,7 +72,7 @@ func (s *Repository) CreateFromSession(ctx context.Context, sessionID, title, in
 	}
 
 	now := time.Now().UnixMilli()
-	if err := s.db.Queries.CreateTask(ctx, sqlc.CreateTaskParams{
+	if err := s.Q.CreateTask(ctx, sqlc.CreateTaskParams{
 		ID:               id,
 		RepositoryID:     sql.NullString{},
 		SessionID:        sql.NullString{String: sessionID, Valid: sessionID != ""},
@@ -92,7 +91,7 @@ func (s *Repository) CreateFromSession(ctx context.Context, sessionID, title, in
 
 // Get retrieves a task by ID.
 func (s *Repository) Get(ctx context.Context, id string) (*models.Task, error) {
-	task, err := s.db.Queries.GetTask(ctx, id)
+	task, err := s.Q.GetTask(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func (s *Repository) Get(ctx context.Context, id string) (*models.Task, error) {
 
 // List retrieves all tasks.
 func (s *Repository) List(ctx context.Context) ([]*models.Task, error) {
-	tasks, err := s.db.Queries.ListTasks(ctx)
+	tasks, err := s.Q.ListTasks(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +114,7 @@ func (s *Repository) List(ctx context.Context) ([]*models.Task, error) {
 
 // ListWithRepository retrieves all tasks with repository names.
 func (s *Repository) ListWithRepository(ctx context.Context) ([]*models.Task, error) {
-	tasks, err := s.db.Queries.ListTasksWithRepository(ctx)
+	tasks, err := s.Q.ListTasksWithRepository(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +128,7 @@ func (s *Repository) ListWithRepository(ctx context.Context) ([]*models.Task, er
 
 // ListByStatus retrieves tasks by status.
 func (s *Repository) ListByStatus(ctx context.Context, status string) ([]*models.Task, error) {
-	tasks, err := s.db.Queries.ListTasksByStatus(ctx, status)
+	tasks, err := s.Q.ListTasksByStatus(ctx, status)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +148,7 @@ func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error 
 		return fmt.Errorf("invalid status: %s", status)
 	}
 
-	if err := s.db.Queries.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
+	if err := s.Q.UpdateTaskStatus(ctx, sqlc.UpdateTaskStatusParams{
 		Status: status,
 		ID:     id,
 	}); err != nil {
@@ -163,7 +162,7 @@ func (s *Repository) GetTaskBySessionID(ctx context.Context, sessionID string) (
 	if sessionID == "" {
 		return nil, nil
 	}
-	task, err := s.db.Queries.GetTaskBySessionID(ctx, sql.NullString{String: sessionID, Valid: true})
+	task, err := s.Q.GetTaskBySessionID(ctx, sql.NullString{String: sessionID, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -178,7 +177,7 @@ func (s *Repository) UpdateTaskTitleIntent(ctx context.Context, taskID, title, i
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	return s.db.Queries.UpdateTaskTitleIntent(ctx, sqlc.UpdateTaskTitleIntentParams{
+	return s.Q.UpdateTaskTitleIntent(ctx, sqlc.UpdateTaskTitleIntentParams{
 		Title:  title,
 		Intent: intent,
 		ID:     taskID,
@@ -187,7 +186,7 @@ func (s *Repository) UpdateTaskTitleIntent(ctx context.Context, taskID, title, i
 
 // Delete removes a task.
 func (s *Repository) Delete(ctx context.Context, id string) error {
-	if err := s.db.Queries.DeleteTask(ctx, id); err != nil {
+	if err := s.Q.DeleteTask(ctx, id); err != nil {
 		return err
 	}
 	return nil
@@ -283,7 +282,7 @@ func (s *Repository) CreateMessage(ctx context.Context, taskID, runID, role, con
 	id := shortuuid.New()
 	now := time.Now().UnixMilli()
 
-	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
+	return s.Q.CreateMessage(ctx, sqlc.CreateMessageParams{
 		ID:      id,
 		TaskID:  taskID,
 		RunID:   runID,
@@ -305,7 +304,7 @@ func (s *Repository) CreateMessageWithParts(ctx context.Context, taskID, runID, 
 		parts = "[]"
 	}
 
-	return s.db.Queries.CreateMessage(ctx, sqlc.CreateMessageParams{
+	return s.Q.CreateMessage(ctx, sqlc.CreateMessageParams{
 		ID:        id,
 		TaskID:    taskID,
 		RunID:     runID,
@@ -319,7 +318,7 @@ func (s *Repository) CreateMessageWithParts(ctx context.Context, taskID, runID, 
 
 // GetMessagesByTask retrieves all messages for a task.
 func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sqlc.Message, error) {
-	return s.db.Queries.GetMessagesByTask(ctx, taskID)
+	return s.Q.GetMessagesByTask(ctx, taskID)
 }
 
 // --- Agent Run Operations ---
@@ -330,25 +329,25 @@ func (s *Repository) GetMessagesByTask(ctx context.Context, taskID string) ([]sq
 // This uses sqlc queries to get task, messages, artifacts, and agent runs.
 func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*models.TaskResponse, error) {
 	// Get the base task
-	task, err := s.db.Queries.GetTask(ctx, taskID)
+	task, err := s.Q.GetTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get all messages for the task
-	messages, err := s.db.Queries.GetMessagesByTask(ctx, taskID)
+	messages, err := s.Q.GetMessagesByTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get all artifacts for the task
-	artifacts, err := s.db.Queries.GetArtifactsByTask(ctx, taskID)
+	artifacts, err := s.Q.GetArtifactsByTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get all agent runs for the task
-	agentRuns, err := s.db.Queries.ListAgentRunsByTask(ctx, taskID)
+	agentRuns, err := s.Q.ListAgentRunsByTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +456,7 @@ func (s *Repository) CreateAgentRun(ctx context.Context, taskID, prompt, agentBa
 	id := shortuuid.New()
 	now := time.Now().UnixMilli()
 
-	if err := s.db.Queries.CreateAgentRun(ctx, sqlc.CreateAgentRunParams{
+	if err := s.Q.CreateAgentRun(ctx, sqlc.CreateAgentRunParams{
 		ID:           id,
 		TaskID:       taskID,
 		Prompt:       prompt,
@@ -476,7 +475,7 @@ func (s *Repository) CreateAgentRun(ctx context.Context, taskID, prompt, agentBa
 // UpdateAgentRunCompleted marks an agent run as completed.
 func (s *Repository) UpdateAgentRunCompleted(ctx context.Context, runID string) error {
 	now := time.Now()
-	return s.db.Queries.UpdateAgentRunCompleted(ctx, sqlc.UpdateAgentRunCompletedParams{
+	return s.Q.UpdateAgentRunCompleted(ctx, sqlc.UpdateAgentRunCompletedParams{
 		CompletedAt: sql.NullTime{Time: now, Valid: true},
 		ID:          runID,
 	})
@@ -484,7 +483,7 @@ func (s *Repository) UpdateAgentRunCompleted(ctx context.Context, runID string) 
 
 // UpdateAgentRunBackendSessionID saves the backend's session ID.
 func (s *Repository) UpdateAgentRunBackendSessionID(ctx context.Context, runID, sessionID string) error {
-	return s.db.Queries.UpdateAgentRunBackendSessionID(ctx, sqlc.UpdateAgentRunBackendSessionIDParams{
+	return s.Q.UpdateAgentRunBackendSessionID(ctx, sqlc.UpdateAgentRunBackendSessionIDParams{
 		BackendSessionID: sql.NullString{String: sessionID, Valid: sessionID != ""},
 		ID:               runID,
 	})
@@ -492,7 +491,7 @@ func (s *Repository) UpdateAgentRunBackendSessionID(ctx context.Context, runID, 
 
 // GetLatestAgentRun retrieves the most recent agent run for a task.
 func (s *Repository) GetLatestAgentRun(ctx context.Context, taskID string) (*sqlc.AgentRun, error) {
-	run, err := s.db.Queries.GetLatestRun(ctx, taskID)
+	run, err := s.Q.GetLatestRun(ctx, taskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -504,42 +503,8 @@ func (s *Repository) GetLatestAgentRun(ctx context.Context, taskID string) (*sql
 
 // GetAgentRun retrieves an agent run by ID.
 func (s *Repository) GetAgentRun(ctx context.Context, runID string) (*sqlc.AgentRun, error) {
-	run, err := s.db.Queries.GetAgentRun(ctx, runID)
+	run, err := s.Q.GetAgentRun(ctx, runID)
 	if err != nil {
-		return nil, err
-	}
-	return &run, nil
-}
-
-// GetAgentRunByBackendSessionID retrieves an agent run by backend session ID.
-func (s *Repository) GetAgentRunByBackendSessionID(ctx context.Context, backend, sessionID string) (*sqlc.AgentRun, error) {
-	if backend == "" || sessionID == "" {
-		return nil, nil
-	}
-
-	row := s.db.DB.QueryRowContext(ctx, `SELECT id, task_id, prompt, agent_backend, provider, model, summary_message_id, backend_session_id, cost, message_count, prompt_tokens, completion_tokens, completed_at, created_at, updated_at FROM agent_runs WHERE agent_backend = ? AND backend_session_id = ? ORDER BY created_at DESC LIMIT 1`, backend, sessionID)
-	var run sqlc.AgentRun
-	err := row.Scan(
-		&run.ID,
-		&run.TaskID,
-		&run.Prompt,
-		&run.AgentBackend,
-		&run.Provider,
-		&run.Model,
-		&run.SummaryMessageID,
-		&run.BackendSessionID,
-		&run.Cost,
-		&run.MessageCount,
-		&run.PromptTokens,
-		&run.CompletionTokens,
-		&run.CompletedAt,
-		&run.CreatedAt,
-		&run.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return &run, nil
@@ -627,7 +592,7 @@ func (s *Repository) CreateSession(ctx context.Context, session *models.Session)
 		return nil, fmt.Errorf("session is required")
 	}
 
-	if err := s.db.Queries.CreateSession(ctx, sqlc.CreateSessionParams{
+	if err := s.Q.CreateSession(ctx, sqlc.CreateSessionParams{
 		ID:               session.ID,
 		AgentBackend:     session.AgentBackend,
 		ExternalID:       sql.NullString{String: valueOrEmpty(session.ExternalID), Valid: session.ExternalID != nil},
@@ -646,7 +611,7 @@ func (s *Repository) CreateSession(ctx context.Context, session *models.Session)
 
 // GetSession retrieves a session by ID.
 func (s *Repository) GetSession(ctx context.Context, sessionID string) (*models.Session, error) {
-	row, err := s.db.Queries.GetSession(ctx, sessionID)
+	row, err := s.Q.GetSession(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -658,7 +623,7 @@ func (s *Repository) GetSessionByBackendExternal(ctx context.Context, backend, e
 	if backend == "" || externalID == "" {
 		return nil, nil
 	}
-	row, err := s.db.Queries.GetSessionByBackendExternal(ctx, sqlc.GetSessionByBackendExternalParams{
+	row, err := s.Q.GetSessionByBackendExternal(ctx, sqlc.GetSessionByBackendExternalParams{
 		AgentBackend: backend,
 		ExternalID:   sql.NullString{String: externalID, Valid: externalID != ""},
 	})
@@ -673,7 +638,7 @@ func (s *Repository) GetSessionByBackendExternal(ctx context.Context, backend, e
 
 // ListSessions retrieves all sessions.
 func (s *Repository) ListSessions(ctx context.Context) ([]*models.Session, error) {
-	rows, err := s.db.Queries.ListSessions(ctx)
+	rows, err := s.Q.ListSessions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -686,7 +651,7 @@ func (s *Repository) ListSessions(ctx context.Context) ([]*models.Session, error
 
 // UpdateSession updates session metadata.
 func (s *Repository) UpdateSession(ctx context.Context, sessionID, backendSessionID, title string, lastMessageAt *int64) error {
-	return s.db.Queries.UpdateSession(ctx, sqlc.UpdateSessionParams{
+	return s.Q.UpdateSession(ctx, sqlc.UpdateSessionParams{
 		BackendSessionID: sql.NullString{String: backendSessionID, Valid: backendSessionID != ""},
 		Title:            sql.NullString{String: title, Valid: title != ""},
 		LastMessageAt:    sql.NullInt64{Int64: valueOrZero(lastMessageAt), Valid: lastMessageAt != nil},
@@ -697,7 +662,7 @@ func (s *Repository) UpdateSession(ctx context.Context, sessionID, backendSessio
 
 // UpdateSessionBackendSessionID updates session backend session id.
 func (s *Repository) UpdateSessionBackendSessionID(ctx context.Context, sessionID, backendSessionID string) error {
-	return s.db.Queries.UpdateSessionBackendSessionID(ctx, sqlc.UpdateSessionBackendSessionIDParams{
+	return s.Q.UpdateSessionBackendSessionID(ctx, sqlc.UpdateSessionBackendSessionIDParams{
 		BackendSessionID: sql.NullString{String: backendSessionID, Valid: backendSessionID != ""},
 		UpdatedAt:        time.Now().UnixMilli(),
 		ID:               sessionID,
@@ -706,7 +671,7 @@ func (s *Repository) UpdateSessionBackendSessionID(ctx context.Context, sessionI
 
 // UpdateSessionTitle updates session title.
 func (s *Repository) UpdateSessionTitle(ctx context.Context, sessionID, title string) error {
-	return s.db.Queries.UpdateSessionTitle(ctx, sqlc.UpdateSessionTitleParams{
+	return s.Q.UpdateSessionTitle(ctx, sqlc.UpdateSessionTitleParams{
 		Title:     sql.NullString{String: title, Valid: title != ""},
 		UpdatedAt: time.Now().UnixMilli(),
 		ID:        sessionID,
@@ -715,7 +680,7 @@ func (s *Repository) UpdateSessionTitle(ctx context.Context, sessionID, title st
 
 // GetSessionNextSequence returns the next sequence number for a session message.
 func (s *Repository) GetSessionNextSequence(ctx context.Context, sessionID string) (int64, error) {
-	next, err := s.db.Queries.GetSessionNextSequence(ctx, sessionID)
+	next, err := s.Q.GetSessionNextSequence(ctx, sessionID)
 	if err != nil {
 		return 0, err
 	}
@@ -736,7 +701,7 @@ func (s *Repository) CreateSessionMessage(
 	createdAt int64,
 ) error {
 	id := shortuuid.New()
-	return s.db.Queries.CreateSessionMessage(ctx, sqlc.CreateSessionMessageParams{
+	return s.Q.CreateSessionMessage(ctx, sqlc.CreateSessionMessageParams{
 		ID:         id,
 		SessionID:  sessionID,
 		Sequence:   sequence,
@@ -752,7 +717,7 @@ func (s *Repository) CreateSessionMessage(
 
 // ListSessionMessages retrieves messages for a session.
 func (s *Repository) ListSessionMessages(ctx context.Context, sessionID string) ([]models.SessionMessage, error) {
-	rows, err := s.db.Queries.ListSessionMessages(ctx, sessionID)
+	rows, err := s.Q.ListSessionMessages(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}

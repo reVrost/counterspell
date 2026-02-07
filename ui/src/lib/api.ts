@@ -222,10 +222,6 @@ export const tasksAPI = {
     });
   },
 
-  async retry(taskId: string): Promise<APIResponse> {
-    return postAction(`/api/v1/tasks/${taskId}/retry`);
-  },
-
   async clear(taskId: string): Promise<APIResponse> {
     return postAction(`/api/v1/tasks/${taskId}/clear`);
   },

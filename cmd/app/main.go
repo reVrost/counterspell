@@ -97,13 +97,12 @@ func main() {
 	logger.Info("Authenticated", "subdomain", authResult.Subdomain, "machine_id", authResult.MachineID)
 
 	// Start session syncer (imports existing CLI sessions and tails for updates)
-	repo := services.NewRepository(database)
+	repo := services.NewRepository(database.Queries)
 	syncCtx, syncCancel := context.WithCancel(ctx)
 	syncer := services.NewSessionSyncer(repo)
 	syncer.Start(syncCtx)
 
 	// Create orchestrator
-	taskRepository := services.NewRepository(database)
 	// transcriptionService := services.NewTranscriptionService()
 	githubService := services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret)
 	repoManager, err := services.NewRepoManager(cfg.DataDir)
@@ -114,7 +113,7 @@ func main() {
 	settingsService := services.NewSettingsService(database)
 	eventBus := services.NewEventBus()
 	orchestrator, err := services.NewOrchestrator(
-		taskRepository,
+		repo,
 		eventBus,
 		settingsService,
 		githubService,
@@ -125,11 +124,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	sessionService := services.NewSessionService(taskRepository, settingsService, eventBus, cfg.DataDir)
+	sessionService := services.NewSessionService(repo, settingsService, eventBus, cfg.DataDir)
 	oauthService := services.NewOAuthService(database, cfg)
 
 	// Create handlers with shared database
-	h, err := handlers.NewHandlers(cfg, settingsService, sessionService, oauthService, orchestrator)
+	h, err := handlers.NewHandlers(cfg, repo, eventBus, settingsService, sessionService, oauthService, orchestrator)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)
@@ -189,10 +188,10 @@ func main() {
 	// Protected routes (require machine auth)
 	r.Group(func(r chi.Router) {
 		r.Use(h.RequireMachineAuth)
-		// GitHub OAuth routes
-		r.Get("/api/v1/github/authorize", h.HandleGitHubLogin)
-		r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
-		r.Get("/api/v1/github/repos", h.HandleGitHubRepos)
+		// GitHub OAuth routes, unused for now, all local
+		// r.Get("/api/v1/github/authorize", h.HandleGitHubLogin)
+		// r.Get("/api/v1/github/callback", h.HandleGitHubCallback)
+		// r.Get("/api/v1/github/repos", h.HandleGitHubRepos)
 
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)
@@ -204,7 +203,6 @@ func main() {
 		// Task Actions
 		r.Post("/api/v1/tasks/{id}/chat", h.HandleActionChat)
 		r.Post("/api/v1/tasks/{id}/clear", h.HandleActionClear)
-		r.Post("/api/v1/tasks/{id}/retry", h.HandleActionRetry)
 		r.Post("/api/v1/tasks/{id}/merge", h.HandleActionMerge)
 		r.Post("/api/v1/tasks/{id}/pr", h.HandleActionPR)
 		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
@@ -271,9 +269,6 @@ func main() {
 	// Stop session syncer
 	syncCancel()
 	syncer.Shutdown()
-
-	// Shutdown handlers (stops all active orchestrators)
-	h.Shutdown()
 
 	// Shutdown event bus (stops cleanup goroutine)
 	eventBus.Shutdown()
