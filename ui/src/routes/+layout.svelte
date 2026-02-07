@@ -6,13 +6,14 @@
   import { browser } from '$app/environment';
   import { authAPI } from '$lib/api';
   import { initGlobalErrorHandlers } from '$lib/utils/logger';
+  import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 1000 * 60 * 5,
         refetchOnWindowFocus: false,
-        retry: false, // Don't retry on 401 auth errors
+        retry: false,
       },
     },
   });
@@ -20,7 +21,6 @@
   let { children } = $props();
   let isInitialized = $state(false);
 
-  // Force logout function - only assign to window in browser
   if (browser) {
     (window as any).forceLogout = async () => {
       console.log('🔄 Force logout triggered');
@@ -29,7 +29,6 @@
       localStorage.clear();
       sessionStorage.clear();
 
-      // Clear cookies
       document.cookie.split(';').forEach((c) => {
         document.cookie = c
           .replace(/^ +/, '')
@@ -103,4 +102,7 @@
 
 <QueryClientProvider client={queryClient}>
   {@render children()}
+  {#if isInitialized}
+    <InstallPrompt />
+  {/if}
 </QueryClientProvider>
