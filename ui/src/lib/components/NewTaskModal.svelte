@@ -266,13 +266,13 @@
       {/if}
 
       <!-- Title Input -->
+      <!-- autoFocus -->
       <input
         type="text"
         bind:value={title}
         placeholder="Issue title"
         onkeydown={handleKeydown}
         class="bg-transparent border-none text-3xl font-bold text-white placeholder-gray-600 focus:ring-0 focus:outline-none p-0 w-full mb-4"
-        autoFocus
       />
 
       <!-- Description Input -->

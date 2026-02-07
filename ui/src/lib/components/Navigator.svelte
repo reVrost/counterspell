@@ -17,16 +17,16 @@
 
   let { onSearch }: Props = $props();
 
-  // Derive activeTab from URL, with fallback to appState for non-URL tabs like focus
-  const activeTab = $derived.by((): 'inbox' | 'focus' | 'settings' => {
+  // Derive activeTab from URL, with fallback to appState for non-URL tabs like search
+  const activeTab = $derived.by((): 'inbox' | 'search' | 'settings' => {
     const path = $page.url.pathname;
     if (path.startsWith('/app/settings')) return 'settings';
+    if (path.startsWith('/app/search')) return 'search';
     if (path === '/app' || path === '/app/') return 'inbox';
-    // For focus (search), it doesn't have a dedicated route yet
     return 'inbox';
   });
 
-  const tabs = ['inbox', 'focus', 'settings'];
+  const tabs = ['inbox', 'search', 'settings'];
   const activeIndex = $derived(tabs.indexOf(activeTab));
   const navIndex = $derived(activeIndex === -1 ? 0 : activeIndex);
   const navButtonSize = 64;
@@ -43,9 +43,8 @@
       case 'settings':
         goto('/app/settings');
         break;
-      case 'focus':
-        // Focus/Search doesn't have a dedicated page yet, just update state
-        appState.activeTab = 'focus';
+      case 'search':
+        goto('/app/search');
         break;
       default:
         goto('/app');
@@ -108,18 +107,18 @@
       <button
         type="button"
         onclick={() => {
-          handleTabClick('focus');
+          handleTabClick('search');
           if (onSearch) onSearch();
         }}
         class={cn(
           'relative z-10 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200',
-          activeTab === 'focus'
+          activeTab === 'search'
             ? 'text-white'
             : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
         )}
         aria-label="Search"
       >
-        <SearchIcon class="w-7 h-7" strokeWidth={activeTab === 'focus' ? 2.5 : 2} />
+        <SearchIcon class="w-7 h-7" strokeWidth={activeTab === 'search' ? 2.5 : 2} />
       </button>
 
       <!-- Settings -->
@@ -132,7 +131,7 @@
             ? 'text-white'
             : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
         )}
-        aria-label="Layers"
+        aria-label="Settings"
       >
         <CogIcon class="w-7 h-7" strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
       </button>

@@ -25,6 +25,7 @@
 
   // Check if on settings page - derive from URL
   const isSettingsPage = $derived($page.url.pathname.startsWith('/app/settings'));
+  const isSearchPage = $derived($page.url.pathname.startsWith('/app/search'));
 
   $effect(() => {
     appState.githubLogin;
@@ -67,7 +68,7 @@
 >
   <!-- Left: Workspace Selector or Page Title -->
   <div class="flex items-center">
-    {#if isSettingsPage}
+    {#if isSettingsPage || isSearchPage}
       <button
         onclick={() => goto('/app')}
         class="flex items-center gap-2 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-2 py-1.5 rounded-xl transition-all duration-200"
@@ -76,7 +77,7 @@
         <span
           class="text-lg font-semibold tracking-tight text-white/90 group-hover:text-white transition-colors"
         >
-          Settings
+          {isSettingsPage ? 'Settings' : 'Search'}
         </span>
       </button>
     {:else}
@@ -191,6 +192,15 @@
               <RefreshCwIcon class="w-4 h-4 {syncing ? 'animate-spin' : ''}" />
               {syncing ? 'Syncing...' : 'Sync Repos'}
             </DropdownMenu.Item>
+            {#if appState.canInstallPWA}
+              <DropdownMenu.Item
+                onSelect={() => appState.installPWA()}
+                class="w-full px-2.5 py-2 hover:bg-white/5 rounded-lg text-sm text-zinc-400 flex items-center gap-3 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none"
+              >
+                <DownloadIcon class="w-4 h-4" />
+                Install App
+              </DropdownMenu.Item>
+            {/if}
           </DropdownMenu.Group>
           <DropdownMenu.Separator class="h-px bg-white/5 my-1.5 mx-2" />
           <DropdownMenu.Group class="px-1.5 pb-1">
