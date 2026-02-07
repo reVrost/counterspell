@@ -131,3 +131,40 @@ func (p *ZaiProvider) Model() string {
 func (p *ZaiProvider) SetModel(model string) {
 	p.model = model
 }
+
+// OpenAIProvider implements OpenAI-compatible chat completions API.
+type OpenAIProvider struct {
+	apiKey string
+	model  string
+}
+
+func NewOpenAIProvider(apiKey string) *OpenAIProvider {
+	return &OpenAIProvider{
+		apiKey: apiKey,
+		model:  "gpt-5.2",
+	}
+}
+
+func (p *OpenAIProvider) Type() string {
+	return "openai"
+}
+
+func (p *OpenAIProvider) APIURL() string {
+	return "https://api.openai.com/v1/chat/completions"
+}
+
+func (p *OpenAIProvider) APIVersion() string {
+	return ""
+}
+
+func (p *OpenAIProvider) APIKey() string {
+	return p.apiKey
+}
+
+func (p *OpenAIProvider) Model() string {
+	return p.model
+}
+
+func (p *OpenAIProvider) SetModel(model string) {
+	p.model = model
+}

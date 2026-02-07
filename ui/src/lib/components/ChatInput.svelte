@@ -43,7 +43,7 @@
   let modelMenuRef = $state<HTMLDivElement | null>(null);
 
   const canSelectModel = $derived(
-    !appState.settings || appState.settings.agentBackend === 'native'
+    !appState.settings || appState.settings.agent_backend === 'native'
   );
 
   // Click outside handler for dropdowns

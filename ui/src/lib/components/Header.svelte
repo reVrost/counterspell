@@ -105,20 +105,6 @@
 
   <!-- Right: Actions & User -->
   <div class="flex items-center gap-2 pointer-events-auto">
-    {#if appState.canInstallPWA}
-      <button
-        onclick={() => appState.installPWA()}
-        class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.05] transition-all group mr-1"
-      >
-        <DownloadIcon
-          class="w-3.5 h-3.5 text-violet-400 group-hover:scale-110 transition-transform"
-        />
-        <span class="text-[11px] font-semibold text-zinc-400 group-hover:text-zinc-200"
-          >Install App</span
-        >
-      </button>
-    {/if}
-
     <DropdownMenu.Root bind:open={userMenuOpen}>
       <DropdownMenu.Trigger
         class="group flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.04] active:bg-white/[0.06] p-1 pr-3 rounded-full transition-all outline-none border border-transparent hover:border-white/5"

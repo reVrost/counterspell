@@ -10,63 +10,46 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/revrost/counterspell/internal/agent/tools"
 	"github.com/revrost/counterspell/internal/llm"
 )
 
-// OpenAICaller implements LLMCaller for OpenAI-compatible APIs.
+const (
+	openAICodexResponsesURL = "https://chatgpt.com/backend-api/codex/responses"
+)
+
+// OpenAICaller implements LLMCaller for OpenAI connector-based chat.
 type OpenAICaller struct {
 	provider llm.Provider
 }
 
-// OpenAI-specific request/response types.
-type OpenAIRequest struct {
-	Model      string          `json:"model"`
-	Messages   []OpenAIMessage `json:"messages"`
-	Tools      []OpenAIToolDef `json:"tools,omitempty"`
-	ToolChoice string          `json:"tool_choice,omitempty"`
-	Stream     bool            `json:"stream,omitempty"`
-}
-
-type OpenAIMessage struct {
-	Role       string           `json:"role"`
-	Content    any              `json:"content"`
-	ToolCalls  []OpenAIToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string           `json:"tool_call_id,omitempty"`
-}
-
-type OpenAIToolDef struct {
-	Type     string      `json:"type"`
-	Function FunctionDef `json:"function"`
-}
-
-type FunctionDef struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Parameters  tools.InputSchema `json:"parameters"`
-}
-
-type OpenAIToolCall struct {
-	ID       string       `json:"id"`
-	Type     string       `json:"type"`
-	Function FunctionCall `json:"function"`
-}
-
-type FunctionCall struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
+type openAICodexRequest struct {
+	Model        string `json:"model"`
+	Instructions string `json:"instructions,omitempty"`
+	Input        string `json:"input"`
+	Store        bool   `json:"store"`
+	Stream       bool   `json:"stream"`
 }
 
 func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools map[string]tools.Tool, systemPrompt string) (*LLMStream, error) {
-	supportsTools := true
-	openAIMessages := toOpenAIMessages(messages, systemPrompt, supportsTools)
-	openAITools := toOpenAITools(allTools, supportsTools)
+	_ = allTools
 
-	req := OpenAIRequest{
-		Model:    c.provider.Model(),
-		Messages: openAIMessages,
-		Tools:    openAITools,
-		Stream:   true,
+	accessToken := strings.TrimSpace(c.provider.APIKey())
+	if accessToken == "" {
+		return nil, fmt.Errorf("openai connector is not connected")
+	}
+	accountID, err := openAIConnectorAccountID(accessToken)
+	if err != nil {
+		return nil, fmt.Errorf("openai connector is required: %w", err)
+	}
+
+	req := openAICodexRequest{
+		Model:        c.provider.Model(),
+		Instructions: strings.TrimSpace(systemPrompt),
+		Input:        buildOpenAIConnectorInput(messages),
+		Store:        false,
+		Stream:       true,
 	}
 
 	body, err := json.Marshal(req)
@@ -74,13 +57,15 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.provider.APIURL(), bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, openAICodexResponsesURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.provider.APIKey())
+	httpReq.Header.Set("Authorization", "Bearer "+accessToken)
+	httpReq.Header.Set("chatgpt-account-id", accountID)
+	httpReq.Header.Set("OpenAI-Beta", "responses=experimental")
 
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
@@ -102,7 +87,7 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 		defer resp.Body.Close()
 
 		textActive := false
-		toolActive := map[int]OpenAIToolCall{}
+		completed := false
 
 		emit := func(ev LLMEvent) bool {
 			select {
@@ -125,65 +110,50 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 			}
 			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 			if data == "[DONE]" {
+				completed = true
 				break
 			}
 
-			var payload struct {
-				Choices []struct {
-					Delta struct {
-						Content   string `json:"content"`
-						ToolCalls []struct {
-							Index    int    `json:"index"`
-							ID       string `json:"id"`
-							Type     string `json:"type"`
-							Function struct {
-								Name      string `json:"name"`
-								Arguments string `json:"arguments"`
-							} `json:"function"`
-						} `json:"tool_calls"`
-					} `json:"delta"`
-					FinishReason *string `json:"finish_reason"`
-				} `json:"choices"`
-			}
+			var payload map[string]any
 			if err := json.Unmarshal([]byte(data), &payload); err != nil {
 				continue
 			}
 
-			for _, choice := range payload.Choices {
-				if choice.Delta.Content != "" {
-					if !textActive {
-						emit(LLMEvent{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}})
-						textActive = true
-					}
-					emit(LLMEvent{Type: LLMContentDelta, BlockType: "text", Delta: choice.Delta.Content})
+			eventType := getStringValue(payload["type"])
+			switch eventType {
+			case "response.output_text.delta":
+				delta := getStringValue(payload["delta"])
+				if delta == "" {
+					continue
 				}
+				if !textActive {
+					if !emit(LLMEvent{Type: LLMContentStart, BlockType: "text", Block: &ContentBlock{Type: "text"}}) {
+						done <- ctx.Err()
+						return
+					}
+					textActive = true
+				}
+				if !emit(LLMEvent{Type: LLMContentDelta, BlockType: "text", Delta: delta}) {
+					done <- ctx.Err()
+					return
+				}
+			case "response.output_text.done":
+				if textActive {
+					if !emit(LLMEvent{Type: LLMContentEnd, BlockType: "text"}) {
+						done <- ctx.Err()
+						return
+					}
+					textActive = false
+				}
+			case "response.completed":
+				completed = true
+			case "response.failed", "error":
+				done <- fmt.Errorf("openai connector response failed")
+				return
+			}
 
-				for _, tc := range choice.Delta.ToolCalls {
-					if _, ok := toolActive[tc.Index]; !ok {
-						toolID := tc.ID
-						if toolID == "" {
-							toolID = fmt.Sprintf("call_%d", tc.Index)
-						}
-						toolActive[tc.Index] = OpenAIToolCall{ID: toolID, Function: FunctionCall{Name: tc.Function.Name}}
-						emit(LLMEvent{Type: LLMContentStart, BlockType: "tool_use", Block: &ContentBlock{Type: "tool_use", Name: tc.Function.Name, ID: toolID}})
-					}
-					if tc.Function.Arguments != "" {
-						emit(LLMEvent{Type: LLMContentDelta, BlockType: "tool_use", Delta: tc.Function.Arguments})
-					}
-				}
-
-				if choice.FinishReason != nil {
-					if textActive {
-						emit(LLMEvent{Type: LLMContentEnd, BlockType: "text"})
-						textActive = false
-					}
-					if len(toolActive) > 0 {
-						for range toolActive {
-							emit(LLMEvent{Type: LLMContentEnd, BlockType: "tool_use"})
-						}
-						toolActive = map[int]OpenAIToolCall{}
-					}
-				}
+			if completed {
+				break
 			}
 		}
 
@@ -191,89 +161,70 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 			done <- err
 			return
 		}
-		emit(LLMEvent{Type: LLMMessageEnd})
+		if textActive {
+			_ = emit(LLMEvent{Type: LLMContentEnd, BlockType: "text"})
+		}
+		_ = emit(LLMEvent{Type: LLMMessageEnd})
 		done <- nil
 	}()
 
 	return &LLMStream{Events: events, Done: done}, nil
 }
 
-func toOpenAIMessages(messages []Message, systemPrompt string, supportsTools bool) []OpenAIMessage {
-	openAIMessages := []OpenAIMessage{{Role: "system", Content: systemPrompt}}
-
-	for _, msg := range messages {
-		isToolResult := false
-		for _, block := range msg.Content {
-			if block.Type == "tool_result" {
-				isToolResult = true
-				if supportsTools {
-					openAIMessages = append(openAIMessages, OpenAIMessage{
-						Role:       "tool",
-						ToolCallID: block.ToolUseID,
-						Content:    block.Content,
-					})
-				}
-			}
-		}
-
-		if isToolResult {
-			continue
-		}
-
-		if msg.Role == "user" {
-			var contentBuilder strings.Builder
-			for _, block := range msg.Content {
-				if block.Type == "text" {
-					contentBuilder.WriteString(block.Text)
-				}
-			}
-			openAIMessages = append(openAIMessages, OpenAIMessage{Role: "user", Content: contentBuilder.String()})
-		}
-
-		if msg.Role == "assistant" {
-			oaMsg := OpenAIMessage{Role: "assistant"}
-			var contentBuilder strings.Builder
-			for _, block := range msg.Content {
-				if block.Type == "text" {
-					contentBuilder.WriteString(block.Text)
-				}
-				if block.Type == "tool_use" && supportsTools {
-					argsJSON, _ := json.Marshal(block.Input)
-					oaMsg.ToolCalls = append(oaMsg.ToolCalls, OpenAIToolCall{
-						ID:   block.ID,
-						Type: "function",
-						Function: FunctionCall{
-							Name:      block.Name,
-							Arguments: string(argsJSON),
-						},
-					})
-				}
-			}
-			if !supportsTools && contentBuilder.Len() == 0 {
-				continue
-			}
-			oaMsg.Content = contentBuilder.String()
-			openAIMessages = append(openAIMessages, oaMsg)
-		}
+func openAIConnectorAccountID(accessToken string) (string, error) {
+	claims := jwt.MapClaims{}
+	token, _, err := jwt.NewParser(jwt.WithoutClaimsValidation()).ParseUnverified(accessToken, claims)
+	if err != nil || token == nil {
+		return "", fmt.Errorf("invalid access token")
 	}
-
-	return openAIMessages
+	authClaimRaw, ok := claims["https://api.openai.com/auth"]
+	if !ok {
+		return "", fmt.Errorf("access token missing connector auth claims")
+	}
+	authClaim, ok := authClaimRaw.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("access token connector auth claims invalid")
+	}
+	accountID, _ := authClaim["chatgpt_account_id"].(string)
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return "", fmt.Errorf("access token missing chatgpt_account_id")
+	}
+	return accountID, nil
 }
 
-func toOpenAITools(allTools map[string]tools.Tool, supportsTools bool) []OpenAIToolDef {
-	if !supportsTools {
-		return nil
+func buildOpenAIConnectorInput(messages []Message) string {
+	var b strings.Builder
+	for _, msg := range messages {
+		var content strings.Builder
+		for _, block := range msg.Content {
+			switch block.Type {
+			case "text":
+				if strings.TrimSpace(block.Text) != "" {
+					if content.Len() > 0 {
+						content.WriteString("\n")
+					}
+					content.WriteString(block.Text)
+				}
+			case "tool_result":
+				if strings.TrimSpace(block.Content) != "" {
+					if content.Len() > 0 {
+						content.WriteString("\n")
+					}
+					content.WriteString(block.Content)
+				}
+			}
+		}
+		text := strings.TrimSpace(content.String())
+		if text == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "%s: %s\n", strings.ToUpper(strings.TrimSpace(msg.Role)), text)
 	}
-	openAITools := []OpenAIToolDef{}
-	for name, tool := range allTools {
-		openAITools = append(openAITools, OpenAIToolDef{
-			Type: "function",
-			Function: FunctionDef{
-				Name:        name,
-				Description: tool.Description,
-				Parameters:  tools.MakeSchema(map[string]tools.Tool{name: tool})[0].InputSchema,
-			},
-		})
-	}
-	return openAITools
+	return strings.TrimSpace(b.String())
+}
+
+func getStringValue(v any) string {
+	s, _ := v.(string)
+	return strings.TrimSpace(s)
 }

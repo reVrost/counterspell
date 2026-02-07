@@ -42,7 +42,7 @@ class AppState {
 
   // PWA
   deferredPrompt = $state<BeforeInstallPromptEvent | null>(null);
-  canInstallPWA = $state(false);
+  canInstallPWA = $state(true);
 
   // Auth
   isAuthenticated = $state(false);

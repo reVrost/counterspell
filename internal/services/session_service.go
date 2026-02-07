@@ -362,6 +362,13 @@ func (s *SessionService) resolveProvider(ctx context.Context, modelID string) (s
 	if err != nil {
 		return "", "", "", err
 	}
+	if actualProvider == "openai" {
+		token, tokenErr := s.settings.GetConnectorAccessToken(ctx, "openai")
+		if tokenErr != nil {
+			return "", "", "", fmt.Errorf("openai connector required: %w", tokenErr)
+		}
+		apiKey = token
+	}
 	if model == "" {
 		model = actualModel
 	}
@@ -461,6 +468,8 @@ func newLLMProvider(provider, apiKey string) (llm.Provider, error) {
 		return llm.NewOpenRouterProvider(apiKey), nil
 	case "zai":
 		return llm.NewZaiProvider(apiKey), nil
+	case "openai":
+		return llm.NewOpenAIProvider(apiKey), nil
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}

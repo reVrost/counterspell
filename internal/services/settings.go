@@ -182,3 +182,31 @@ func (s *SettingsService) GetAPIKeyForProvider(ctx context.Context, provider str
 		return "", "", "", fmt.Errorf("unknown provider: %s", provider)
 	}
 }
+
+// GetConnectorAccessToken returns an access token for a named connector.
+// Used for providers authenticated via OAuth connector flow (e.g. OpenAI subscription).
+func (s *SettingsService) GetConnectorAccessToken(ctx context.Context, connector string) (string, error) {
+	connector = strings.TrimSpace(connector)
+	if connector == "" {
+		return "", fmt.Errorf("connector is required")
+	}
+
+	row, err := s.db.Queries.GetConnectorAuth(ctx, connector)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("%s connector not connected", connector)
+		}
+		return "", fmt.Errorf("failed to get %s connector auth: %w", connector, err)
+	}
+
+	token := strings.TrimSpace(row.AccessToken.String)
+	if !row.AccessToken.Valid || token == "" {
+		return "", fmt.Errorf("%s connector missing access token", connector)
+	}
+
+	if row.ExpiresAt.Valid && row.ExpiresAt.Int64 > 0 && time.Now().UnixMilli() >= row.ExpiresAt.Int64 {
+		return "", fmt.Errorf("%s connector token expired", connector)
+	}
+
+	return token, nil
+}
