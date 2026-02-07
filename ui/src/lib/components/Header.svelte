@@ -1,10 +1,13 @@
 <script lang="ts">
   import { appState } from '$lib/stores/app.svelte';
   import { cn, getInitial } from '$lib/utils';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import SettingsIcon from '@lucide/svelte/icons/settings';
   import DownloadIcon from '@lucide/svelte/icons/download';
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
   import LogOutIcon from '@lucide/svelte/icons/log-out';
+  import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import Logo from './Logo.svelte';
@@ -13,7 +16,6 @@
   let userMenuOpen = $state(false);
   let avatarImageFailed = $state(false);
   let signingOut = $state(false);
-  let { activeTab } = $props();
   const accountName = $derived(appState.githubLogin || appState.userEmail);
   const avatarSrc = $derived(
     appState.githubLogin
@@ -21,10 +23,18 @@
       : ''
   );
 
+  // Check if on settings page
+  const isSettingsPage = $derived(appState.activeTab === 'settings');
+
   $effect(() => {
     appState.githubLogin;
     avatarImageFailed = false;
   });
+
+  async function handleSettings() {
+    appState.activeTab = 'settings';
+    await goto('/dashboard/settings');
+  }
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -56,27 +66,41 @@
 <header
   class="h-16 flex items-center justify-between px-6 z-30 shrink-0 fixed top-0 left-0 right-0 backdrop-blur-lg bg-zinc-950/30 transition-all duration-300"
 >
-  <!-- Left: Workspace Selector -->
+  <!-- Left: Workspace Selector or Page Title -->
   <div class="flex items-center">
-    <WorkspaceSelectorDropdown
-      bind:open={appState.projectMenuOpen}
-      contentClass="mt-2 ml-6"
-      sideOffset={8}
-    >
-      <DropdownMenu.Trigger
-        class="flex items-center gap-1.5 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-2 py-1.5 rounded-xl transition-all duration-200 outline-none"
+    {#if isSettingsPage}
+      <button
+        onclick={() => goto('/dashboard')}
+        class="flex items-center gap-2 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-2 py-1.5 rounded-xl transition-all duration-200"
       >
-        <Logo class="w-6 h-6" />
+        <ChevronLeftIcon class="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" />
         <span
           class="text-lg font-semibold tracking-tight text-white/90 group-hover:text-white transition-colors"
         >
-          {appState.activeWorkspaceName || 'All Workspaces'}
+          Settings
         </span>
-        <ChevronDownIcon
-          class="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors"
-        />
-      </DropdownMenu.Trigger>
-    </WorkspaceSelectorDropdown>
+      </button>
+    {:else}
+      <WorkspaceSelectorDropdown
+        bind:open={appState.projectMenuOpen}
+        contentClass="mt-2 ml-6"
+        sideOffset={8}
+      >
+        <DropdownMenu.Trigger
+          class="flex items-center gap-1.5 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-2 py-1.5 rounded-xl transition-all duration-200 outline-none"
+        >
+          <Logo class="w-6 h-6" />
+          <span
+            class="text-lg font-semibold tracking-tight text-white/90 group-hover:text-white transition-colors"
+          >
+            {appState.activeWorkspaceName || 'All Workspaces'}
+          </span>
+          <ChevronDownIcon
+            class="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors"
+          />
+        </DropdownMenu.Trigger>
+      </WorkspaceSelectorDropdown>
+    {/if}
   </div>
 
   <!-- Right: Actions & User -->
@@ -155,7 +179,7 @@
           </div>
           <DropdownMenu.Group class="px-1.5">
             <DropdownMenu.Item
-              onSelect={() => (appState.settingsOpen = true)}
+              onSelect={handleSettings}
               class="w-full px-2.5 py-2 hover:bg-white/5 rounded-lg text-sm text-zinc-400 flex items-center gap-3 transition-colors text-left cursor-pointer focus:bg-white/5 outline-none"
             >
               <SettingsIcon class="w-4 h-4" /> Settings

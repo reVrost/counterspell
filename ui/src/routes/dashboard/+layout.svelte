@@ -1,7 +1,6 @@
 <script lang="ts">
   import Header from '$lib/components/Header.svelte';
   import Toast from '$lib/components/Toast.svelte';
-  import SettingsModal from '$lib/components/SettingsModal.svelte';
   import Navigator from '$lib/components/Navigator.svelte';
   import TaskDetail from '$lib/components/TaskDetail.svelte';
   import TaskDetailSkeleton from '$lib/components/TaskDetailSkeleton.svelte';
@@ -15,14 +14,13 @@
   import { modalSlideUp, backdropFade, DURATIONS } from '$lib/utils/transitions';
   import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
-  import type { Project, Task, Message, LogEntry } from '$lib/types';
+  import type { Workspace, Task, Message, LogEntry } from '$lib/types';
   import { onDestroy, tick } from 'svelte';
 
   let { children } = $props();
 
   // Task detail state for modal
   let currentTask = $state<Task | null>(null);
-  let currentProject = $state<Project | null>(null);
   let loadingTask = $state(false);
   let taskError = $state<string | null>(null);
   let currentMessages = $state<Message[]>([]);
@@ -58,7 +56,7 @@
       string,
       {
         task: Task;
-        project: Project;
+        workspace: Workspace;
         messages: Message[];
         logs: LogEntry[];
       }
@@ -84,7 +82,6 @@
       const cached = taskCache.get(taskId)!;
       if (!isPrefetch) {
         currentTask = cached.task;
-        currentProject = cached.project;
         currentMessages = cached.messages;
         logContent = cached.logs.map((log) => renderLogEntryHTML(log));
         setupSSE(taskId);
@@ -101,14 +98,13 @@
       // Cache the result
       taskCache.set(taskId, {
         task: data.task,
-        project: data.project!,
+        workspace: data.workspace!,
         messages: data.messages || [],
         logs: data.logs || [],
       });
 
       if (!isPrefetch) {
         currentTask = data.task;
-        currentProject = data.project!;
         taskStore.currentTask = data.task;
         currentMessages = data.messages || [];
         logContent = data.logs?.map((log) => renderLogEntryHTML(log)) || [];
@@ -194,7 +190,6 @@
         eventSource.close();
         eventSource = null;
       }
-      currentProject = null;
       logContent = [];
       currentMessages = [];
       currentTask = null;
@@ -220,8 +215,7 @@
 
 <div class="h-[100dvh] flex flex-col overflow-hidden bg-background">
   <Toast />
-  <SettingsModal />
-  <Header activeTab={appState.activeTab} />
+  <Header />
 
   <main class="flex-1 overflow-y-auto bg-background relative pt-16" id="feed-container">
     <div class="px-3 pt-6 pb-40">{@render children()}</div>
@@ -318,7 +312,7 @@
               Retry Connection
             </button>
           </div>
-        {:else if currentTask && currentProject}
+        {:else if currentTask}
           <TaskDetail
             task={currentTask}
             messages={currentMessages}

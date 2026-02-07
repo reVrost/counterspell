@@ -116,7 +116,7 @@ export interface Artifact {
 
 export interface TaskResponse {
   task: Task;
-  project?: Project;
+  workspace?: Workspace;
   messages: Message[];
   artifacts: Artifact[];
   agent_runs?: AgentRun[];
@@ -137,11 +137,11 @@ export interface Todo {
 }
 
 export interface UserSettings {
-  agentBackend: 'native' | 'claude-code' | 'codex';
-  openRouterKey?: string;
-  zaiKey?: string;
-  anthropicKey?: string;
-  openAiKey?: string;
+  agent_backend: 'native' | 'claude-code' | 'codex';
+  openrouter_key?: string;
+  zai_key?: string;
+  anthropic_key?: string;
+  openai_key?: string;
 }
 
 export interface Session {

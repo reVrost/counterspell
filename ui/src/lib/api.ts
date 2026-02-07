@@ -246,11 +246,11 @@ export const settingsAPI = {
     await fetchAPI('/api/v1/settings', {
       method: 'POST',
       body: JSON.stringify({
-        agent_backend: settings.agentBackend,
-        openrouter_key: settings.openRouterKey || '',
-        zai_key: settings.zaiKey || '',
-        anthropic_key: settings.anthropicKey || '',
-        openai_key: settings.openAiKey || '',
+        agent_backend: settings.agent_backend,
+        openrouter_key: settings.openrouter_key || '',
+        zai_key: settings.zai_key || '',
+        anthropic_key: settings.anthropic_key || '',
+        openai_key: settings.openai_key || '',
       }),
     });
   },
