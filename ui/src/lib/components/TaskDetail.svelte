@@ -154,7 +154,7 @@
     <div class="flex items-center gap-3">
       <button
         onclick={handleBack}
-        class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+        class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none"
         aria-label="Go back"
       >
         <ArrowLeftIcon class="w-5 h-5" />
@@ -205,13 +205,13 @@
         <button
           onclick={() => (activeTab = tab as typeof activeTab)}
           class={cn(
-            'px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 relative overflow-hidden',
+            'px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none relative overflow-hidden',
             activeTab === tab ? 'bg-gray-800 text-[#FFFFFF] shadow' : 'text-gray-500'
           )}
         >
           {#if activeTab === tab}
             <span
-              class="absolute inset-0 bg-purple-500/10"
+              class="absolute inset-0 bg-violet-500/10"
               style:transition="opacity 200ms ease-out"
             ></span>
           {/if}
@@ -428,8 +428,8 @@
         {:else if confirmAction === 'pr'}
           <div class="space-y-4">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <GithubIcon class="w-5 h-5 text-purple-500" />
+              <div class="w-10 h-10 rounded-full bg-violet-500/10 flex items-center justify-center">
+                <GithubIcon class="w-5 h-5 text-violet-500" />
               </div>
               <div>
                 <h3 class="font-semibold text-[#FFFFFF]">Create Pull Request</h3>
@@ -448,7 +448,7 @@
               </button>
               <button
                 onclick={() => handleAction('pr')}
-                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-[#FFFFFF] text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Create PR
               </button>
@@ -487,8 +487,8 @@
         {:else if confirmAction === 'review'}
           <div class="space-y-4">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <SparklesIcon class="w-5 h-5 text-purple-500" />
+              <div class="w-10 h-10 rounded-full bg-violet-500/10 flex items-center justify-center">
+                <SparklesIcon class="w-5 h-5 text-violet-500" />
               </div>
               <div>
                 <h3 class="font-semibold text-[#FFFFFF]">Request AI Review</h3>
@@ -507,7 +507,7 @@
               </button>
               <button
                 onclick={() => handleAction('review')}
-                class="flex-1 h-9 rounded-lg bg-purple-600 hover:bg-purple-500 text-[#FFFFFF] text-sm font-medium transition-colors"
+                class="flex-1 h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-[#FFFFFF] text-sm font-medium transition-colors"
               >
                 Request Review
               </button>

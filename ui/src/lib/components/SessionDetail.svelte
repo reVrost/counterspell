@@ -68,7 +68,7 @@
     <div class="flex items-center gap-3 min-w-0">
       <button
         onclick={handleBack}
-        class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+        class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none"
         aria-label="Go back"
       >
         <ArrowLeftIcon class="w-5 h-5" />
@@ -99,7 +99,7 @@
     <div class="flex-1 overflow-y-auto relative px-4 pb-40 pt-3" id="content-scroll">
       <Thread
         mode="session"
-        messages={messages}
+        {messages}
         emptyText="No messages yet."
         scrollContainerId="content-scroll"
       />

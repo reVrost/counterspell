@@ -71,7 +71,7 @@
                 bind:value={projectSearch}
                 type="text"
                 placeholder="Filter repositories..."
-                class="w-full bg-white/[0.03] border border-white/5 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-all"
+                class="w-full bg-white/[0.03] border border-white/5 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-all"
               />
             </div>
           </div>
@@ -105,7 +105,7 @@
                   </div>
                 </div>
                 {#if appState.activeProjectId === p.id}
-                  <CheckIcon class="w-3.5 h-3.5 text-purple-400" />
+                  <CheckIcon class="w-3.5 h-3.5 text-violet-400" />
                 {/if}
               </DropdownMenu.Item>
             {/each}
@@ -121,7 +121,7 @@
           >
             <span class="font-medium">{appState.projects.length} Repositories</span>
             <button
-              class="hover:text-purple-400 font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+              class="hover:text-violet-400 font-semibold cursor-pointer flex items-center gap-1 transition-colors"
             >
               <PlusIcon class="w-3 h-3" /> New
             </button>
@@ -139,7 +139,7 @@
         class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.05] transition-all group mr-1"
       >
         <DownloadIcon
-          class="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform"
+          class="w-3.5 h-3.5 text-violet-400 group-hover:scale-110 transition-transform"
         />
         <span class="text-[11px] font-semibold text-zinc-400 group-hover:text-zinc-200"
           >Install App</span
@@ -153,7 +153,7 @@
       >
         <div class="relative group">
           <div
-            class="absolute -inset-0.5 bg-gradient-to-tr from-purple-600 to-pink-600 rounded-full opacity-0 group-hover:opacity-40 blur-sm transition-opacity"
+            class="absolute -inset-0.5 bg-gradient-to-tr from-violet-600 to-pink-600 rounded-full opacity-0 group-hover:opacity-40 blur-sm transition-opacity"
           ></div>
 
           <div
@@ -171,7 +171,7 @@
               />
             {:else if appState.userEmail}
               <div
-                class="w-full h-full flex items-center justify-center text-[10px] font-bold text-purple-400 animate-in fade-in duration-300"
+                class="w-full h-full flex items-center justify-center text-[10px] font-bold text-violet-400 animate-in fade-in duration-300"
               >
                 {getInitial(appState.userEmail)}
               </div>

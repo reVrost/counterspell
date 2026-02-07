@@ -96,17 +96,40 @@ func main() {
 	}
 	logger.Info("Authenticated", "subdomain", authResult.Subdomain, "machine_id", authResult.MachineID)
 
-	// Create event bus
-	eventBus := services.NewEventBus()
-
 	// Start session syncer (imports existing CLI sessions and tails for updates)
 	repo := services.NewRepository(database)
 	syncCtx, syncCancel := context.WithCancel(ctx)
 	syncer := services.NewSessionSyncer(repo)
 	syncer.Start(syncCtx)
 
+	// Create orchestrator
+	taskRepository := services.NewRepository(database)
+	// transcriptionService := services.NewTranscriptionService()
+	githubService := services.NewGitHubService(database, cfg.GitHubClientID, cfg.GitHubClientSecret)
+	repoManager, err := services.NewRepoManager(cfg.DataDir)
+	if err != nil {
+		logger.Error("Failed to create repo manager", "error", err)
+		os.Exit(1)
+	}
+	settingsService := services.NewSettingsService(database)
+	eventBus := services.NewEventBus()
+	orchestrator, err := services.NewOrchestrator(
+		taskRepository,
+		eventBus,
+		settingsService,
+		githubService,
+		repoManager,
+	)
+	if err != nil {
+		logger.Error("Failed to create orchestrator", "error", err)
+		os.Exit(1)
+	}
+
+	sessionService := services.NewSessionService(taskRepository, settingsService, eventBus, cfg.DataDir)
+	oauthService := services.NewOAuthService(database, cfg)
+
 	// Create handlers with shared database
-	h, err := handlers.NewHandlers(database, eventBus, cfg)
+	h, err := handlers.NewHandlers(cfg, settingsService, sessionService, oauthService, orchestrator)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)
@@ -173,12 +196,20 @@ func main() {
 
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)
-
-		// Home page actions, tasks are like inbox
 		r.Get("/api/v1/tasks", h.HandleListTask)
 		r.Post("/api/v1/tasks", h.HandleAddTask)
 		r.Get("/api/v1/tasks/{id}", h.HandleGetTask)
 		r.Get("/api/v1/tasks/{id}/diff", h.HandleGetTaskDiff)
+
+		// Task Actions
+		r.Post("/api/v1/tasks/{id}/chat", h.HandleActionChat)
+		r.Post("/api/v1/tasks/{id}/clear", h.HandleActionClear)
+		r.Post("/api/v1/tasks/{id}/retry", h.HandleActionRetry)
+		r.Post("/api/v1/tasks/{id}/merge", h.HandleActionMerge)
+		r.Post("/api/v1/tasks/{id}/pr", h.HandleActionPR)
+		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
+
+		// Home page actions, tasks are like inbox
 		r.Get("/api/v1/sessions", h.HandleListSessions)
 		r.Post("/api/v1/sessions", h.HandleCreateSession)
 		r.Get("/api/v1/sessions/{id}", h.HandleGetSessionDetail)
@@ -190,15 +221,6 @@ func main() {
 		// Settings and transcription
 		r.Post("/api/v1/settings", h.HandleSaveSettings)
 		r.Post("/api/v1/transcribe", h.HandleTranscribe)
-
-		// Task Actions
-		r.Post("/api/v1/tasks/{id}/chat", h.HandleActionChat)
-		r.Post("/api/v1/tasks/{id}/clear", h.HandleActionClear)
-		r.Post("/api/v1/tasks/{id}/retry", h.HandleActionRetry)
-		r.Post("/api/v1/tasks/{id}/merge", h.HandleActionMerge)
-		r.Post("/api/v1/tasks/{id}/pr", h.HandleActionPR)
-		r.Post("/api/v1/tasks/{id}/discard", h.HandleActionDiscard)
-
 	})
 
 	// Serve Svelte UI (embedded SPA build) - MUST BE LAST

@@ -31,18 +31,18 @@
   }
 
   const baseClasses =
-    'w-full text-left bg-card border rounded-sm p-4 shadow-sm focus:outline-none focus:ring-2 transition-all duration-200 ease-in-out active:scale-[0.98]';
+    'w-full text-left bg-card border rounded-sm p-4 shadow-sm transition-all duration-200 ease-in-out active:scale-[0.98]';
 
   const variantClasses = {
-    pending: 'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-gray-500/50',
+    pending: 'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
     planning:
-      'border-purple-900/50 hover:border-primary/40 hover:bg-primary/5 focus:ring-purple-500/50',
+      'border-violet-900/50 hover:border-violet-500/40 hover:bg-violet-500/5 active:bg-violet-500/10',
     in_progress:
-      'border-gray-800/50 hover:border-primary/30 hover:bg-primary/5 focus:ring-orange-500/50',
-    review: 'border-gray-800 hover:border-primary/30 hover:bg-primary/5 focus:ring-blue-500/50',
-    done: 'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 focus:ring-green-500/50',
+      'border-gray-800/50 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
+    review: 'border-gray-800 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
+    done: 'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
     failed:
-      'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 focus:ring-green-500/50',
+      'bg-card border-gray-600/20 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
   };
 </script>
 
@@ -109,7 +109,7 @@
       {:else if variant === 'planning'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs font-medium text-purple-400 px-2 py-0.5 rounded-full border border-purple-900/40 bg-purple-950/20 font-semibold uppercase tracking-wider"
+            class="text-xs font-medium text-violet-400 px-2 py-0.5 rounded-full border border-violet-900/40 bg-violet-950/20 font-semibold uppercase tracking-wider"
           >
             Planning
           </span>
