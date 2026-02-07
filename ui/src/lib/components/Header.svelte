@@ -14,11 +14,21 @@
 
   let projectSearch = $state('');
   let userMenuOpen = $state(false);
+  let avatarImageFailed = $state(false);
   let { activeTab } = $props();
 
   const filteredProjects = $derived(
     appState.projects.filter((p) => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
   );
+  const accountName = $derived(appState.githubLogin || appState.userEmail);
+  const avatarSrc = $derived(
+    appState.githubLogin ? `https://avatars.githubusercontent.com/${appState.githubLogin}?size=64` : ''
+  );
+
+  $effect(() => {
+    appState.githubLogin;
+    avatarImageFailed = false;
+  });
 
   async function handleSignOut() {
     await appState.logout();
@@ -149,31 +159,32 @@
 
     <DropdownMenu.Root bind:open={userMenuOpen}>
       <DropdownMenu.Trigger
-        class="flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.04] active:bg-white/[0.06] p-1 pr-3 rounded-full transition-all outline-none border border-transparent hover:border-white/5"
+        class="group flex items-center gap-2.5 cursor-pointer hover:bg-white/[0.04] active:bg-white/[0.06] p-1 pr-3 rounded-full transition-all outline-none border border-transparent hover:border-white/5"
+        aria-label="Open user menu"
       >
         <div class="relative group">
           <div
-            class="absolute -inset-0.5 bg-gradient-to-tr from-violet-600 to-pink-600 rounded-full opacity-0 group-hover:opacity-40 blur-sm transition-opacity"
+            class="absolute pointer-events-none -inset-0.5 bg-gradient-to-tr from-violet-600 to-pink-600 rounded-full opacity-0 group-hover:opacity-40 blur-sm transition-opacity"
           ></div>
 
           <div
             class="w-7 h-7 rounded-full border border-white/10 relative z-10 bg-zinc-900 shadow-xl overflow-hidden flex items-center justify-center"
           >
-            {#if appState.githubLogin}
+            {#if appState.githubLogin && !avatarImageFailed}
               <img
-                src={`https://github.com/${appState.githubLogin}.png`}
+                src={avatarSrc}
                 alt={appState.githubLogin}
                 class="w-full h-full object-cover animate-in fade-in duration-300"
-                onerror={(e) => {
-                  const target = e.currentTarget as HTMLImageElement;
-                  target.src = `https://ui-avatars.com/api/?name=${getInitial(appState.githubLogin || appState.userEmail)}&background=18181b&color=a855f7&bold=true`;
+                draggable="false"
+                onerror={() => {
+                  avatarImageFailed = true;
                 }}
               />
-            {:else if appState.userEmail}
+            {:else if accountName}
               <div
                 class="w-full h-full flex items-center justify-center text-[10px] font-bold text-violet-400 animate-in fade-in duration-300"
               >
-                {getInitial(appState.userEmail)}
+                {getInitial(accountName)}
               </div>
             {:else}
               <div class="w-full h-full bg-zinc-800 animate-pulse"></div>
@@ -181,7 +192,7 @@
           </div>
 
           <div
-            class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950 z-20 shadow-[0_0_8px_rgba(16,185,129,0.5)] scale-75"
+            class="absolute pointer-events-none -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950 z-20 shadow-[0_0_8px_rgba(16,185,129,0.5)] scale-75"
           ></div>
         </div>
         <ChevronDownIcon
@@ -201,7 +212,7 @@
           <div class="px-4 py-3 border-b border-white/5 mb-1 bg-white/[0.02]">
             <p class="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Account</p>
             <p class="text-sm font-semibold text-zinc-100 mt-1 truncate">
-              {appState.githubLogin || appState.userEmail}
+              {accountName}
             </p>
           </div>
           <DropdownMenu.Group class="px-1.5">
