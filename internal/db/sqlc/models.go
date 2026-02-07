@@ -79,20 +79,6 @@ type OauthLoginAttempt struct {
 	CreatedAt    int64  `json:"created_at"`
 }
 
-type Repository struct {
-	ID           string         `json:"id"`
-	ConnectionID string         `json:"connection_id"`
-	Name         string         `json:"name"`
-	FullName     string         `json:"full_name"`
-	Owner        string         `json:"owner"`
-	IsPrivate    bool           `json:"is_private"`
-	HtmlUrl      string         `json:"html_url"`
-	CloneUrl     string         `json:"clone_url"`
-	LocalPath    sql.NullString `json:"local_path"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
-}
-
 type Session struct {
 	ID               string         `json:"id"`
 	AgentBackend     string         `json:"agent_backend"`
@@ -131,14 +117,21 @@ type Setting struct {
 }
 
 type Task struct {
-	ID               string         `json:"id"`
-	RepositoryID     sql.NullString `json:"repository_id"`
-	SessionID        sql.NullString `json:"session_id"`
-	Title            string         `json:"title"`
-	Intent           string         `json:"intent"`
-	PromotedSnapshot sql.NullString `json:"promoted_snapshot"`
-	Status           string         `json:"status"`
-	Position         sql.NullInt64  `json:"position"`
-	CreatedAt        int64          `json:"created_at"`
-	UpdatedAt        int64          `json:"updated_at"`
+	ID          string         `json:"id"`
+	WorkspaceID sql.NullString `json:"workspace_id"`
+	Title       string         `json:"title"`
+	Intent      string         `json:"intent"`
+	Status      string         `json:"status"`
+	Position    sql.NullInt64  `json:"position"`
+	CreatedAt   int64          `json:"created_at"`
+	UpdatedAt   int64          `json:"updated_at"`
+}
+
+type Workspace struct {
+	ID                 string `json:"id"`
+	GithubConnectionID string `json:"github_connection_id"`
+	Name               string `json:"name"`
+	LocalPath          string `json:"local_path"`
+	CreatedAt          int64  `json:"created_at"`
+	UpdatedAt          int64  `json:"updated_at"`
 }

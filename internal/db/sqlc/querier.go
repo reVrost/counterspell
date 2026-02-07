@@ -6,7 +6,6 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 )
 
 type Querier interface {
@@ -17,7 +16,6 @@ type Querier interface {
 	CreateMachineIdentity(ctx context.Context, arg CreateMachineIdentityParams) error
 	CreateMessage(ctx context.Context, arg CreateMessageParams) error
 	CreateOAuthLoginAttempt(ctx context.Context, arg CreateOAuthLoginAttemptParams) error
-	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	// Sessions
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSessionMessage(ctx context.Context, arg CreateSessionMessageParams) error
@@ -27,7 +25,6 @@ type Querier interface {
 	DeleteGithubConnection(ctx context.Context, id string) error
 	DeleteMessagesByTask(ctx context.Context, taskID string) error
 	DeleteOAuthLoginAttempt(ctx context.Context, state string) error
-	DeleteRepositoriesByConnection(ctx context.Context, connectionID string) error
 	DeleteTask(ctx context.Context, id string) error
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
 	GetArtifact(ctx context.Context, id string) (Artifact, error)
@@ -43,20 +40,17 @@ type Querier interface {
 	GetMessagesByTask(ctx context.Context, taskID string) ([]Message, error)
 	GetOAuthLoginAttempt(ctx context.Context, state string) (GetOAuthLoginAttemptRow, error)
 	GetRecentMessages(ctx context.Context, arg GetRecentMessagesParams) ([]Message, error)
-	GetRepository(ctx context.Context, id string) (Repository, error)
 	GetSession(ctx context.Context, id string) (Session, error)
 	GetSessionByBackendExternal(ctx context.Context, arg GetSessionByBackendExternalParams) (Session, error)
 	GetSessionNextSequence(ctx context.Context, sessionID string) (int64, error)
 	GetSettings(ctx context.Context) (GetSettingsRow, error)
 	GetTask(ctx context.Context, id string) (GetTaskRow, error)
-	GetTaskBySessionID(ctx context.Context, sessionID sql.NullString) (Task, error)
 	ListAgentRunsByTask(ctx context.Context, taskID string) ([]AgentRun, error)
-	ListRepositories(ctx context.Context, connectionID string) ([]Repository, error)
 	ListSessionMessages(ctx context.Context, sessionID string) ([]SessionMessage, error)
 	ListSessions(ctx context.Context) ([]Session, error)
 	ListTasks(ctx context.Context) ([]Task, error)
 	ListTasksByStatus(ctx context.Context, status string) ([]Task, error)
-	ListTasksWithRepository(ctx context.Context) ([]ListTasksWithRepositoryRow, error)
+	ListTasksByWorkspace(ctx context.Context) ([]ListTasksByWorkspaceRow, error)
 	UpdateAgentRunBackendSessionID(ctx context.Context, arg UpdateAgentRunBackendSessionIDParams) error
 	UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error
 	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)
@@ -70,7 +64,6 @@ type Querier interface {
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error
 	UpdateTaskTitleIntent(ctx context.Context, arg UpdateTaskTitleIntentParams) error
 	UpsertMachineIdentity(ctx context.Context, arg UpsertMachineIdentityParams) (MachineIdentity, error)
-	UpsertRepository(ctx context.Context, arg UpsertRepositoryParams) (Repository, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) error
 }
 

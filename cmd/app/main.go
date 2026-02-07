@@ -197,7 +197,7 @@ func main() {
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)
 		r.Get("/api/v1/tasks", h.HandleListTask)
-		r.Post("/api/v1/tasks", h.HandleAddTask)
+		r.Post("/api/v1/tasks", h.HandleNewTask)
 		r.Get("/api/v1/tasks/{id}", h.HandleGetTask)
 		r.Get("/api/v1/tasks/{id}/diff", h.HandleGetTaskDiff)
 

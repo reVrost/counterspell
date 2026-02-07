@@ -18,17 +18,21 @@ import (
 	"github.com/revrost/counterspell/internal/models"
 )
 
-// type Engine interface {
-// 	// Tickets
-// 	CreateTicket(ctx context.Context, workspaceID, title, prompt string) (Task, error)
-//
-// 	// Runs
-// 	StartRun(ctx context.Context, ticketID string) (Run, error)
-// 	CancelRun(ctx context.Context, runID string) error
-//
-// 	// Interactive review chat
-// 	PostMessage(ctx context.Context, ticketID, runID, clientID, text string) (Message, error)
-// }
+type Engine interface {
+	// Task/Tickets
+	// NewTask creates a new task with title and description, this takes it to the planning phase, or if planning is not required
+	// this can be queued up for execution.
+
+	// NewTask(ctx context.Context, workspaceID, title, prompt string) (Task, error)
+	// PromptTask(ctx context.Context, taskID, prompt string) (Task, error)
+
+	// Runs
+	// StartRun(ctx context.Context, ticketID string) (Run, error)
+	// CancelRun(ctx context.Context, runID string) error
+
+	// Interactive review chat (THis is basically PromptTask)
+	PostMessage(ctx context.Context, ticketID, runID, clientID, text string) (Message, error)
+}
 
 // ConflictFile represents a merge conflict.
 type ConflictFile struct {
@@ -137,16 +141,16 @@ func (o *Orchestrator) Shutdown() {
 	slog.Info("[ORCHESTRATOR] Shutdown complete")
 }
 
-// StartTask creates a task and begins execution.
-func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID string) (string, error) {
+// NewTask creates a task and begins execution.
+func (o *Orchestrator) NewTask(ctx context.Context, workspaceID, intent, modelID string) (string, error) {
 	// 1. Resolve projectID to a repository and ensure it's cloned
 	var token string
 	var owner, repoName string
-	if projectID == "" {
+	if workspaceID == "" {
 		return "", fmt.Errorf("project_id is required")
 	}
 	// Look up repo in DB
-	repo, err := o.repo.GetRepository(ctx, projectID)
+	repo, err := o.repo.GetRepository(ctx, workspaceID)
 	if err == nil {
 		// Get connection for token
 		conn, err := o.repo.GetGithubConnectionByID(ctx, repo.ConnectionID)
@@ -160,23 +164,23 @@ func (o *Orchestrator) StartTask(ctx context.Context, projectID, intent, modelID
 	}
 
 	// Create task in database
-	task, err := o.repo.Create(ctx, projectID, intent)
+	task, err := o.repo.CreateTask(ctx, workspaceID, intent)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create task: %w", err)
 	}
 	taskID := task.ID
 
-	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", projectID, "intent", intent)
+	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", workspaceID, "intent", intent)
 
-	if err := o.submitTaskJob(ctx, taskID, projectID, intent, modelID, owner, repoName, token, false); err != nil {
-		return "", err
+	if err := o.queueTaskJob(ctx, taskID, workspaceID, intent, modelID, owner, repoName, token, false); err != nil {
+		return "", fmt.Errorf("failed to queue task job: %w", err)
 	}
 
 	return taskID, nil
 }
 
-// ContinueTask continues a task with a follow-up message.
-func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, modelID string) error {
+// PromptTask continues a task with a follow-up message.
+func (o *Orchestrator) PromptTask(ctx context.Context, taskID, followUpMsg, modelID string) error {
 	if followUpMsg == "" {
 		return fmt.Errorf("follow-up message cannot be empty")
 	}
@@ -203,10 +207,10 @@ func (o *Orchestrator) ContinueTask(ctx context.Context, taskID, followUpMsg, mo
 		}
 	}
 
-	return o.submitTaskJob(ctx, taskID, projectID, followUpMsg, modelID, owner, repoName, token, true)
+	return o.queueTaskJob(ctx, taskID, projectID, followUpMsg, modelID, owner, repoName, token, true)
 }
 
-func (o *Orchestrator) submitTaskJob(ctx context.Context, taskID, projectID, intent, modelID, owner, repoName, token string, isContinuation bool) error {
+func (o *Orchestrator) queueTaskJob(ctx context.Context, taskID, projectID, intent, modelID, owner, repoName, token string, isContinuation bool) error {
 	messageHistoryJSON := ""
 	if isContinuation {
 		// Load existing messages for state restoration

@@ -17,7 +17,7 @@ type Provider interface {
 	// SetModel sets the model to use.
 	SetModel(model string)
 
-	// Type returns the provider type (anthropic or openai).
+	// Type returns the provider type (anthropic, openai, openrouter, zai-coding).
 	Type() string
 }
 
@@ -72,11 +72,11 @@ func NewOpenRouterProvider(apiKey string) *OpenRouterProvider {
 }
 
 func (p *OpenRouterProvider) Type() string {
-	return "anthropic"
+	return "openrouter"
 }
 
 func (p *OpenRouterProvider) APIURL() string {
-	return "https://openrouter.ai/api/v1/messages"
+	return "https://openrouter.ai/api/v1"
 }
 
 func (p *OpenRouterProvider) APIVersion() string {
@@ -109,7 +109,7 @@ func NewZaiProvider(apiKey string) *ZaiProvider {
 }
 
 func (p *ZaiProvider) Type() string {
-	return "openai"
+	return "zai-coding"
 }
 
 func (p *ZaiProvider) APIURL() string {

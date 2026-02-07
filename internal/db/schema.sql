@@ -1,79 +1,14 @@
 -- SQLite Schema for Counterspell (Local-First Data Plane)
 -- This is consolidated schema - no migrations needed
 
----
---- Sessions: imported chat threads from third party
----
-CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
-    external_id TEXT,
-    backend_session_id TEXT,
-    title TEXT,
-    message_count INTEGER NOT NULL DEFAULT 0,
-    last_message_at INTEGER,
-    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
-    updated_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
-    UNIQUE(agent_backend, external_id)
-);
-
-CREATE TRIGGER IF NOT EXISTS update_sessions_updated_at
-AFTER UPDATE ON sessions
-BEGIN
-UPDATE sessions SET updated_at = strftime('%s', 'now')
-WHERE id = new.id;
-END;
-
--- Session Messages: raw conversation events
-CREATE TABLE IF NOT EXISTS session_messages (
-    id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-    sequence INTEGER NOT NULL,
-    role TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    content TEXT,
-    tool_name TEXT,
-    tool_call_id TEXT,
-    raw_json TEXT NOT NULL,
-    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
-    UNIQUE(session_id, sequence)
-);
-CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
-CREATE INDEX IF NOT EXISTS idx_sessions_last_message_at ON sessions(last_message_at DESC);
-CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id, sequence);
-
-CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_insert
-AFTER INSERT ON session_messages
-BEGIN
-UPDATE sessions SET
-    message_count = message_count + 1,
-    last_message_at = CASE
-        WHEN last_message_at IS NULL OR new.created_at > last_message_at THEN new.created_at
-        ELSE last_message_at
-    END,
-    updated_at = strftime('%s', 'now')
-WHERE id = new.session_id;
-END;
-
-CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_delete
-AFTER DELETE ON session_messages
-BEGIN
-UPDATE sessions SET
-    message_count = message_count - 1,
-    updated_at = strftime('%s', 'now')
-WHERE id = old.session_id;
-END;
-
 -- Tasks: Core unit of work
 -- Status flow: planning -> in_progress -> review -> done | failed
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
-    repository_id TEXT REFERENCES repositories(id) ON DELETE SET NULL,
-    session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+    workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
-    promoted_snapshot TEXT,
-    status TEXT NOT NULL CHECK(status IN ('pending', 'planning', 'in_progress', 'review', 'done', 'failed')),
+    status TEXT NOT NULL CHECK(status IN ('draft', 'planning', 'in_progress', 'review', 'done', 'failed')),
     position INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
     updated_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
@@ -226,16 +161,19 @@ CREATE TABLE IF NOT EXISTS machine_identity (
     last_seen_at INTEGER -- Unix ms
 );
 
--- -- GitHub Connections: Store OAuth tokens (single connection for now)
--- CREATE TABLE IF NOT EXISTS github_connections (
---     id TEXT PRIMARY KEY,
---     github_user_id TEXT UNIQUE NOT NULL,
---     access_token TEXT NOT NULL,
---     username TEXT NOT NULL,
---     avatar_url TEXT,
---     created_at INTEGER NOT NULL, -- Unix ms
---     updated_at INTEGER NOT NULL  -- Unix ms
--- );
+---
+--- GitHub Connections: Store OAuth tokens (single connection for now)
+---
+CREATE TABLE IF NOT EXISTS github_connections (
+    id TEXT PRIMARY KEY,
+    github_user_id TEXT UNIQUE NOT NULL,
+    access_token TEXT NOT NULL,
+    username TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL  -- Unix ms
+);
+
 --
 -- CREATE TRIGGER IF NOT EXISTS update_github_connections_updated_at
 -- AFTER UPDATE ON github_connections
@@ -244,26 +182,84 @@ CREATE TABLE IF NOT EXISTS machine_identity (
 -- WHERE id = new.id;
 -- END;
 --
--- Repositories: Available repos for selection
--- CREATE TABLE IF NOT EXISTS repositories (
---     id TEXT PRIMARY KEY,
---     connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
---     name TEXT NOT NULL,
---     full_name TEXT NOT NULL,
---     owner TEXT NOT NULL,
---     is_private BOOLEAN NOT NULL,
---     html_url TEXT NOT NULL,
---     clone_url TEXT NOT NULL,
---     local_path TEXT,
---     created_at INTEGER NOT NULL, -- Unix ms
---     updated_at INTEGER NOT NULL, -- Unix ms
---     UNIQUE(connection_id, full_name)
--- );
+-- Workspaces: Available workspace for selection
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    github_connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    local_path TEXT NOT NULL,
+    created_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL, -- Unix ms
+    UNIQUE(name)
+);
 --
--- CREATE TRIGGER IF NOT EXISTS update_repositories_updated_at
--- AFTER UPDATE ON repositories
--- BEGIN
--- UPDATE repositories SET updated_at = strftime('%s', 'now')
--- WHERE id = new.id;
--- END;
--- CREATE INDEX IF NOT EXISTS idx_repos_connection ON repositories(connection_id);
+CREATE TRIGGER IF NOT EXISTS update_workspaces_updated_at
+AFTER UPDATE ON workspaces
+BEGIN
+UPDATE workspaces SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+
+---
+--- Sessions: imported chat threads from third party
+---
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    external_id TEXT,
+    backend_session_id TEXT,
+    title TEXT,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    last_message_at INTEGER,
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
+    updated_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
+    UNIQUE(agent_backend, external_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_sessions_updated_at
+AFTER UPDATE ON sessions
+BEGIN
+UPDATE sessions SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Session Messages: raw conversation events
+CREATE TABLE IF NOT EXISTS session_messages (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    sequence INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    content TEXT,
+    tool_name TEXT,
+    tool_call_id TEXT,
+    raw_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
+    UNIQUE(session_id, sequence)
+);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_message_at ON sessions(last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id, sequence);
+
+CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_insert
+AFTER INSERT ON session_messages
+BEGIN
+UPDATE sessions SET
+    message_count = message_count + 1,
+    last_message_at = CASE
+        WHEN last_message_at IS NULL OR new.created_at > last_message_at THEN new.created_at
+        ELSE last_message_at
+    END,
+    updated_at = strftime('%s', 'now')
+WHERE id = new.session_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_delete
+AFTER DELETE ON session_messages
+BEGIN
+UPDATE sessions SET
+    message_count = message_count - 1,
+    updated_at = strftime('%s', 'now')
+WHERE id = old.session_id;
+END;

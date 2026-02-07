@@ -51,74 +51,12 @@ func (q *Queries) CreateGithubConnection(ctx context.Context, arg CreateGithubCo
 	return i, err
 }
 
-const createRepository = `-- name: CreateRepository :one
-INSERT INTO repositories (
-    id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
-) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-) RETURNING id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
-`
-
-type CreateRepositoryParams struct {
-	ID           string         `json:"id"`
-	ConnectionID string         `json:"connection_id"`
-	Name         string         `json:"name"`
-	FullName     string         `json:"full_name"`
-	Owner        string         `json:"owner"`
-	IsPrivate    bool           `json:"is_private"`
-	HtmlUrl      string         `json:"html_url"`
-	CloneUrl     string         `json:"clone_url"`
-	LocalPath    sql.NullString `json:"local_path"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
-}
-
-func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, createRepository,
-		arg.ID,
-		arg.ConnectionID,
-		arg.Name,
-		arg.FullName,
-		arg.Owner,
-		arg.IsPrivate,
-		arg.HtmlUrl,
-		arg.CloneUrl,
-		arg.LocalPath,
-		arg.CreatedAt,
-		arg.UpdatedAt,
-	)
-	var i Repository
-	err := row.Scan(
-		&i.ID,
-		&i.ConnectionID,
-		&i.Name,
-		&i.FullName,
-		&i.Owner,
-		&i.IsPrivate,
-		&i.HtmlUrl,
-		&i.CloneUrl,
-		&i.LocalPath,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const deleteGithubConnection = `-- name: DeleteGithubConnection :exec
 DELETE FROM github_connections WHERE id = ?
 `
 
 func (q *Queries) DeleteGithubConnection(ctx context.Context, id string) error {
 	_, err := q.db.ExecContext(ctx, deleteGithubConnection, id)
-	return err
-}
-
-const deleteRepositoriesByConnection = `-- name: DeleteRepositoriesByConnection :exec
-DELETE FROM repositories WHERE connection_id = ?
-`
-
-func (q *Queries) DeleteRepositoriesByConnection(ctx context.Context, connectionID string) error {
-	_, err := q.db.ExecContext(ctx, deleteRepositoriesByConnection, connectionID)
 	return err
 }
 
@@ -160,68 +98,6 @@ func (q *Queries) GetGithubConnectionByID(ctx context.Context, id string) (Githu
 	return i, err
 }
 
-const getRepository = `-- name: GetRepository :one
-SELECT id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at FROM repositories WHERE id = ?
-`
-
-func (q *Queries) GetRepository(ctx context.Context, id string) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, getRepository, id)
-	var i Repository
-	err := row.Scan(
-		&i.ID,
-		&i.ConnectionID,
-		&i.Name,
-		&i.FullName,
-		&i.Owner,
-		&i.IsPrivate,
-		&i.HtmlUrl,
-		&i.CloneUrl,
-		&i.LocalPath,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const listRepositories = `-- name: ListRepositories :many
-SELECT id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at FROM repositories WHERE connection_id = ? ORDER BY full_name ASC
-`
-
-func (q *Queries) ListRepositories(ctx context.Context, connectionID string) ([]Repository, error) {
-	rows, err := q.db.QueryContext(ctx, listRepositories, connectionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Repository{}
-	for rows.Next() {
-		var i Repository
-		if err := rows.Scan(
-			&i.ID,
-			&i.ConnectionID,
-			&i.Name,
-			&i.FullName,
-			&i.Owner,
-			&i.IsPrivate,
-			&i.HtmlUrl,
-			&i.CloneUrl,
-			&i.LocalPath,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateGithubConnection = `-- name: UpdateGithubConnection :one
 UPDATE github_connections
 SET access_token = ?, username = ?, avatar_url = ?, updated_at = ?
@@ -252,67 +128,6 @@ func (q *Queries) UpdateGithubConnection(ctx context.Context, arg UpdateGithubCo
 		&i.AccessToken,
 		&i.Username,
 		&i.AvatarUrl,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const upsertRepository = `-- name: UpsertRepository :one
-INSERT INTO repositories (
-    id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
-) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-)
-ON CONFLICT(connection_id, full_name) DO UPDATE SET
-    name = excluded.name,
-    is_private = excluded.is_private,
-    html_url = excluded.html_url,
-    clone_url = excluded.clone_url,
-    local_path = excluded.local_path,
-    updated_at = excluded.updated_at
-RETURNING id, connection_id, name, full_name, owner, is_private, html_url, clone_url, local_path, created_at, updated_at
-`
-
-type UpsertRepositoryParams struct {
-	ID           string         `json:"id"`
-	ConnectionID string         `json:"connection_id"`
-	Name         string         `json:"name"`
-	FullName     string         `json:"full_name"`
-	Owner        string         `json:"owner"`
-	IsPrivate    bool           `json:"is_private"`
-	HtmlUrl      string         `json:"html_url"`
-	CloneUrl     string         `json:"clone_url"`
-	LocalPath    sql.NullString `json:"local_path"`
-	CreatedAt    int64          `json:"created_at"`
-	UpdatedAt    int64          `json:"updated_at"`
-}
-
-func (q *Queries) UpsertRepository(ctx context.Context, arg UpsertRepositoryParams) (Repository, error) {
-	row := q.db.QueryRowContext(ctx, upsertRepository,
-		arg.ID,
-		arg.ConnectionID,
-		arg.Name,
-		arg.FullName,
-		arg.Owner,
-		arg.IsPrivate,
-		arg.HtmlUrl,
-		arg.CloneUrl,
-		arg.LocalPath,
-		arg.CreatedAt,
-		arg.UpdatedAt,
-	)
-	var i Repository
-	err := row.Scan(
-		&i.ID,
-		&i.ConnectionID,
-		&i.Name,
-		&i.FullName,
-		&i.Owner,
-		&i.IsPrivate,
-		&i.HtmlUrl,
-		&i.CloneUrl,
-		&i.LocalPath,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

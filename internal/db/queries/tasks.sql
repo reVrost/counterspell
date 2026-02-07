@@ -1,22 +1,20 @@
 -- name: CreateTask :exec
-INSERT INTO tasks (id, repository_id, session_id, title, intent, promoted_snapshot, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO tasks (id, workspace_id, title, intent, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetTask :one
 SELECT
     t.id,
-    t.repository_id,
-    t.session_id,
+    t.workspace_id,
     t.title,
     t.intent,
-    t.promoted_snapshot,
     t.status,
     t.position,
     t.created_at,
     t.updated_at,
-    r.full_name as repository_name
+    r.name as workspace_name
 FROM tasks t
-LEFT JOIN repositories r ON t.repository_id = r.id
+LEFT JOIN workspaces r ON t.workspace_id = r.id
 WHERE t.id = ?;
 
 -- name: ListTasks :many
@@ -27,6 +25,25 @@ ORDER BY status ASC, position ASC, created_at DESC;
 SELECT * FROM tasks
 WHERE status = ?
 ORDER BY status ASC, position ASC, created_at DESC;
+
+-- name: ListTasksByWorkspace :many
+SELECT
+    t.id,
+    t.workspace_id,
+    t.title,
+    t.intent,
+    t.status,
+    t.position,
+    t.created_at,
+    t.updated_at,
+    r.name as workspace_name,
+    COALESCE((SELECT m.content FROM messages m WHERE m.task_id = t.id AND m.role = 'assistant' ORDER BY m.created_at DESC LIMIT 1), '') as last_assistant_message
+FROM tasks t
+LEFT JOIN workspaces r ON t.workspace_id = r.id
+ORDER BY t.status ASC, t.position ASC, t.created_at DESC;
+
+-- name: UpdateTaskTitleIntent :exec
+UPDATE tasks SET title = ?, intent = ? WHERE id = ?;
 
 -- name: UpdateTaskStatus :exec
 UPDATE tasks SET status = ? WHERE id = ?;
@@ -39,27 +56,3 @@ UPDATE tasks SET status = ?, position = ? WHERE id = ?;
 
 -- name: DeleteTask :exec
 DELETE FROM tasks WHERE id = ?;
-
--- name: ListTasksWithRepository :many
-SELECT
-    t.id,
-    t.repository_id,
-    t.session_id,
-    t.title,
-    t.intent,
-    t.promoted_snapshot,
-    t.status,
-    t.position,
-    t.created_at,
-    t.updated_at,
-    r.full_name as repository_name,
-    COALESCE((SELECT m.content FROM messages m WHERE m.task_id = t.id AND m.role = 'assistant' ORDER BY m.created_at DESC LIMIT 1), '') as last_assistant_message
-FROM tasks t
-LEFT JOIN repositories r ON t.repository_id = r.id
-ORDER BY t.status ASC, t.position ASC, t.created_at DESC;
-
--- name: GetTaskBySessionID :one
-SELECT * FROM tasks WHERE session_id = ?;
-
--- name: UpdateTaskTitleIntent :exec
-UPDATE tasks SET title = ?, intent = ? WHERE id = ?;

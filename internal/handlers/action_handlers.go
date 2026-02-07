@@ -8,8 +8,8 @@ import (
 	"github.com/go-chi/render"
 )
 
-// HandleAddTask creates a new task from frontend.
-func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
+// HandleNewTask creates a new task from frontend.
+func (h *Handlers) HandleNewTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	//	userID := "default"
 
@@ -29,7 +29,7 @@ func (h *Handlers) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("[HANDLER] Starting task submission", "project_id", req.ProjectID, "intent", req.Intent, "model_id", req.ModelID)
-	taskID, err := h.orchestrator.StartTask(ctx, req.ProjectID, req.Intent, req.ModelID)
+	taskID, err := h.orchestrator.NewTask(ctx, req.ProjectID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))
@@ -59,7 +59,7 @@ func (h *Handlers) HandleActionChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("[HANDLER] Continue chat submission", "task_id", req.TaskID, "intent", req.Intent, "model_id", req.ModelID)
-	err := h.orchestrator.ContinueTask(ctx, req.TaskID, req.Intent, req.ModelID)
+	err := h.orchestrator.PromptTask(ctx, req.TaskID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))

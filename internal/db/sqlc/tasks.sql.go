@@ -11,30 +11,26 @@ import (
 )
 
 const createTask = `-- name: CreateTask :exec
-INSERT INTO tasks (id, repository_id, session_id, title, intent, promoted_snapshot, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO tasks (id, workspace_id, title, intent, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
-	ID               string         `json:"id"`
-	RepositoryID     sql.NullString `json:"repository_id"`
-	SessionID        sql.NullString `json:"session_id"`
-	Title            string         `json:"title"`
-	Intent           string         `json:"intent"`
-	PromotedSnapshot sql.NullString `json:"promoted_snapshot"`
-	Status           string         `json:"status"`
-	CreatedAt        int64          `json:"created_at"`
-	UpdatedAt        int64          `json:"updated_at"`
+	ID          string         `json:"id"`
+	WorkspaceID sql.NullString `json:"workspace_id"`
+	Title       string         `json:"title"`
+	Intent      string         `json:"intent"`
+	Status      string         `json:"status"`
+	CreatedAt   int64          `json:"created_at"`
+	UpdatedAt   int64          `json:"updated_at"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) error {
 	_, err := q.db.ExecContext(ctx, createTask,
 		arg.ID,
-		arg.RepositoryID,
-		arg.SessionID,
+		arg.WorkspaceID,
 		arg.Title,
 		arg.Intent,
-		arg.PromotedSnapshot,
 		arg.Status,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -54,33 +50,29 @@ func (q *Queries) DeleteTask(ctx context.Context, id string) error {
 const getTask = `-- name: GetTask :one
 SELECT
     t.id,
-    t.repository_id,
-    t.session_id,
+    t.workspace_id,
     t.title,
     t.intent,
-    t.promoted_snapshot,
     t.status,
     t.position,
     t.created_at,
     t.updated_at,
-    r.full_name as repository_name
+    r.name as workspace_name
 FROM tasks t
-LEFT JOIN repositories r ON t.repository_id = r.id
+LEFT JOIN workspaces r ON t.workspace_id = r.id
 WHERE t.id = ?
 `
 
 type GetTaskRow struct {
-	ID               string         `json:"id"`
-	RepositoryID     sql.NullString `json:"repository_id"`
-	SessionID        sql.NullString `json:"session_id"`
-	Title            string         `json:"title"`
-	Intent           string         `json:"intent"`
-	PromotedSnapshot sql.NullString `json:"promoted_snapshot"`
-	Status           string         `json:"status"`
-	Position         sql.NullInt64  `json:"position"`
-	CreatedAt        int64          `json:"created_at"`
-	UpdatedAt        int64          `json:"updated_at"`
-	RepositoryName   sql.NullString `json:"repository_name"`
+	ID            string         `json:"id"`
+	WorkspaceID   sql.NullString `json:"workspace_id"`
+	Title         string         `json:"title"`
+	Intent        string         `json:"intent"`
+	Status        string         `json:"status"`
+	Position      sql.NullInt64  `json:"position"`
+	CreatedAt     int64          `json:"created_at"`
+	UpdatedAt     int64          `json:"updated_at"`
+	WorkspaceName sql.NullString `json:"workspace_name"`
 }
 
 func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
@@ -88,44 +80,20 @@ func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
 	var i GetTaskRow
 	err := row.Scan(
 		&i.ID,
-		&i.RepositoryID,
-		&i.SessionID,
+		&i.WorkspaceID,
 		&i.Title,
 		&i.Intent,
-		&i.PromotedSnapshot,
 		&i.Status,
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.RepositoryName,
-	)
-	return i, err
-}
-
-const getTaskBySessionID = `-- name: GetTaskBySessionID :one
-SELECT id, repository_id, session_id, title, intent, promoted_snapshot, status, position, created_at, updated_at FROM tasks WHERE session_id = ?
-`
-
-func (q *Queries) GetTaskBySessionID(ctx context.Context, sessionID sql.NullString) (Task, error) {
-	row := q.db.QueryRowContext(ctx, getTaskBySessionID, sessionID)
-	var i Task
-	err := row.Scan(
-		&i.ID,
-		&i.RepositoryID,
-		&i.SessionID,
-		&i.Title,
-		&i.Intent,
-		&i.PromotedSnapshot,
-		&i.Status,
-		&i.Position,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.WorkspaceName,
 	)
 	return i, err
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, repository_id, session_id, title, intent, promoted_snapshot, status, position, created_at, updated_at FROM tasks
+SELECT id, workspace_id, title, intent, status, position, created_at, updated_at FROM tasks
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
@@ -140,11 +108,9 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.RepositoryID,
-			&i.SessionID,
+			&i.WorkspaceID,
 			&i.Title,
 			&i.Intent,
-			&i.PromotedSnapshot,
 			&i.Status,
 			&i.Position,
 			&i.CreatedAt,
@@ -164,7 +130,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, repository_id, session_id, title, intent, promoted_snapshot, status, position, created_at, updated_at FROM tasks
+SELECT id, workspace_id, title, intent, status, position, created_at, updated_at FROM tasks
 WHERE status = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -180,11 +146,9 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 		var i Task
 		if err := rows.Scan(
 			&i.ID,
-			&i.RepositoryID,
-			&i.SessionID,
+			&i.WorkspaceID,
 			&i.Title,
 			&i.Intent,
-			&i.PromotedSnapshot,
 			&i.Status,
 			&i.Position,
 			&i.CreatedAt,
@@ -203,61 +167,55 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 	return items, nil
 }
 
-const listTasksWithRepository = `-- name: ListTasksWithRepository :many
+const listTasksByWorkspace = `-- name: ListTasksByWorkspace :many
 SELECT
     t.id,
-    t.repository_id,
-    t.session_id,
+    t.workspace_id,
     t.title,
     t.intent,
-    t.promoted_snapshot,
     t.status,
     t.position,
     t.created_at,
     t.updated_at,
-    r.full_name as repository_name,
+    r.name as workspace_name,
     COALESCE((SELECT m.content FROM messages m WHERE m.task_id = t.id AND m.role = 'assistant' ORDER BY m.created_at DESC LIMIT 1), '') as last_assistant_message
 FROM tasks t
-LEFT JOIN repositories r ON t.repository_id = r.id
+LEFT JOIN workspaces r ON t.workspace_id = r.id
 ORDER BY t.status ASC, t.position ASC, t.created_at DESC
 `
 
-type ListTasksWithRepositoryRow struct {
+type ListTasksByWorkspaceRow struct {
 	ID                   string         `json:"id"`
-	RepositoryID         sql.NullString `json:"repository_id"`
-	SessionID            sql.NullString `json:"session_id"`
+	WorkspaceID          sql.NullString `json:"workspace_id"`
 	Title                string         `json:"title"`
 	Intent               string         `json:"intent"`
-	PromotedSnapshot     sql.NullString `json:"promoted_snapshot"`
 	Status               string         `json:"status"`
 	Position             sql.NullInt64  `json:"position"`
 	CreatedAt            int64          `json:"created_at"`
 	UpdatedAt            int64          `json:"updated_at"`
-	RepositoryName       sql.NullString `json:"repository_name"`
+	WorkspaceName        sql.NullString `json:"workspace_name"`
 	LastAssistantMessage interface{}    `json:"last_assistant_message"`
 }
 
-func (q *Queries) ListTasksWithRepository(ctx context.Context) ([]ListTasksWithRepositoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTasksWithRepository)
+func (q *Queries) ListTasksByWorkspace(ctx context.Context) ([]ListTasksByWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByWorkspace)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListTasksWithRepositoryRow{}
+	items := []ListTasksByWorkspaceRow{}
 	for rows.Next() {
-		var i ListTasksWithRepositoryRow
+		var i ListTasksByWorkspaceRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.RepositoryID,
-			&i.SessionID,
+			&i.WorkspaceID,
 			&i.Title,
 			&i.Intent,
-			&i.PromotedSnapshot,
 			&i.Status,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.RepositoryName,
+			&i.WorkspaceName,
 			&i.LastAssistantMessage,
 		); err != nil {
 			return nil, err

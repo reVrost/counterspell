@@ -35,8 +35,8 @@ func (s *Repository) GetGithubConnectionByID(ctx context.Context, githubConnecti
 
 }
 
-// Create creates a new task with validation.
-func (s *Repository) Create(ctx context.Context, repositoryID, intent string) (*models.Task, error) {
+// CreateTask creates a new task with validation.
+func (s *Repository) CreateTask(ctx context.Context, repositoryID, intent string) (*models.Task, error) {
 	id := shortuuid.New()
 	// Validate input
 	if intent == "" {
