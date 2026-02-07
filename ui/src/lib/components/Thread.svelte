@@ -29,11 +29,25 @@
   );
   const userInitial = $derived(getInitial(appState.githubLogin || appState.userEmail));
 
+  let expandedThinking = $state<Set<string>>(new Set());
+
+  function toggleThinking(id: string) {
+    const newSet = new Set(expandedThinking);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    expandedThinking = newSet;
+  }
+
   type ToolItem = { tool: string; call: string; result: string };
+
   type TaskDisplayItem =
-    | { type: 'message'; id: string; message: Message }
-    | { type: 'assistant'; id: string; message: Message; items: ToolItem[] }
-    | { type: 'thinking'; id: string; items: ToolItem[] };
+    | { type: 'user'; id: string; message: Message }
+    | { type: 'assistant_text'; id: string; content: string }
+    | { type: 'thinking'; id: string; content: string }
+    | { type: 'tool'; id: string; tool: string; call: string; result: string };
 
   type SessionDisplayItem =
     | { type: 'message'; id: string; message: SessionMessage }
@@ -169,105 +183,91 @@
 
       // User messages: render as-is
       if (msg.role === 'user') {
-        items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
+        items.push({ type: 'user', id: msg.id || `msg-${i}`, message: msg });
         i++;
         continue;
       }
 
-      // Assistant messages: group all parts (thinking + text + tools) together
+      // Assistant messages: parse parts and render each separately (flat)
       if (msg.role === 'assistant') {
         const blocks = parseParts(msg);
-        const toolItems: ToolItem[] = [];
 
-        // Extract thinking blocks
-        const thinkingBlocks = blocks.filter((b) => b.type === 'thinking');
-        for (const block of thinkingBlocks) {
-          toolItems.push({ tool: 'thinking', call: block.text || '', result: '' });
-        }
+        // Render each block as a separate item
+        for (const block of blocks) {
+          if (block.type === 'thinking') {
+            items.push({
+              type: 'thinking',
+              id: `${msg.id}-thinking-${items.length}`,
+              content: block.text || '',
+            });
+          } else if (block.type === 'text') {
+            items.push({
+              type: 'assistant_text',
+              id: `${msg.id}-text-${items.length}`,
+              content: block.text || '',
+            });
+          } else if (block.type === 'tool_use') {
+            // Look for matching tool result in subsequent messages
+            let result = '';
+            let resultIdx = i + 1;
 
-        // Extract tool uses and pair with results from subsequent tool messages
-        const toolUses = blocks.filter((b) => b.type === 'tool_use');
-        let resultIdx = i + 1;
+            while (resultIdx < taskMessages.length) {
+              const resultMsg = taskMessages[resultIdx];
+              if (resultMsg.role !== 'tool' && resultMsg.role !== 'tool_result') break;
 
-        for (const tool of toolUses) {
-          let result = '';
-          // Look for matching tool result in subsequent messages
-          while (resultIdx < taskMessages.length) {
-            const resultMsg = taskMessages[resultIdx];
-            if (resultMsg.role !== 'tool' && resultMsg.role !== 'tool_result') break;
+              const resultBlocks = parseParts(resultMsg);
+              const matchingResult = resultBlocks.find(
+                (b) => b.type === 'tool_result' && b.tool_use_id === block.id
+              );
 
-            const resultBlocks = parseParts(resultMsg);
-            const matchingResult = resultBlocks.find(
-              (b) => b.type === 'tool_result' && b.tool_use_id === tool.id
-            );
-
-            if (matchingResult) {
-              result = matchingResult.content || '';
+              if (matchingResult) {
+                result = matchingResult.content || '';
+                break;
+              } else if (resultMsg.content && !resultMsg.parts) {
+                result = resultMsg.content;
+                break;
+              }
               resultIdx++;
-              break;
-            } else if (resultMsg.content && !resultMsg.parts) {
-              // Legacy format: tool message with content
-              result = resultMsg.content;
-              resultIdx++;
-              break;
             }
-            resultIdx++;
+
+            items.push({
+              type: 'tool',
+              id: `${msg.id}-tool-${items.length}`,
+              tool: block.name || 'tool',
+              call: formatToolInput(block.input ?? block.content ?? block.text ?? ''),
+              result,
+            });
           }
-
-          toolItems.push({
-            tool: tool.name || 'tool',
-            call: formatToolInput(tool.input ?? tool.content ?? tool.text ?? ''),
-            result,
-          });
         }
 
-        // Consume tool messages that were matched
-        const consumedToolMessages = resultIdx - i - 1;
-
-        // Render as assistant item with all its parts
-        items.push({
-          type: 'assistant',
-          id: msg.id || `assistant-${i}`,
-          message: msg,
-          items: toolItems,
-        });
-
-        i += 1 + consumedToolMessages;
-        continue;
-      }
-
-      // Tool messages not consumed by assistant: render as standalone thinking items
-      if (msg.role === 'tool' || msg.role === 'tool_result') {
-        const toolItems: ToolItem[] = [];
-        let j = i;
-
-        while (j < taskMessages.length) {
-          const toolMsg = taskMessages[j];
-          if (toolMsg.role !== 'tool' && toolMsg.role !== 'tool_result') break;
-
-          const { tool, call } = parseToolMessage(toolMsg);
-          toolItems.push({
-            tool,
-            call,
-            result: toolMsg.content || '',
-          });
-          j++;
-        }
-
-        if (toolItems.length > 0) {
+        // If no parts parsed but has content, render as text
+        if (blocks.length === 0 && msg.content) {
           items.push({
-            type: 'thinking',
-            id: msg.id || `tools-${i}`,
-            items: toolItems,
+            type: 'assistant_text',
+            id: `${msg.id}-text-${items.length}`,
+            content: msg.content,
           });
         }
 
-        i = j;
+        i++;
         continue;
       }
 
-      // Other roles: render as message
-      items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
+      // Tool messages not consumed: render as tool items
+      if (msg.role === 'tool' || msg.role === 'tool_result') {
+        const { tool, call } = parseToolMessage(msg);
+        items.push({
+          type: 'tool',
+          id: msg.id || `tool-${i}`,
+          tool,
+          call,
+          result: msg.content || '',
+        });
+        i++;
+        continue;
+      }
+
+      // Other roles: skip
       i++;
     }
 
@@ -336,47 +336,6 @@
       });
     }
   });
-
-  function categorizeGroup(items: ToolItem[]): { label: string; color: string } {
-    if (items.length === 0) return { label: 'Thinking', color: 'text-zinc-500' };
-
-    const firstItem = items[0];
-
-    // If they are all similar, type the whole group
-    const isAllReading = items.every(
-      (item) =>
-        (item.tool || '').toLowerCase().includes('read') ||
-        (item.call || '').toLowerCase().includes('cat ') ||
-        (item.call || '').toLowerCase().includes('view_file') ||
-        (item.call || '').toLowerCase().includes('sed -n')
-    );
-    if (isAllReading) return { label: 'Reading', color: 'text-emerald-500/80' };
-
-    const isAllExploring = items.every(
-      (item) =>
-        (item.tool || '').toLowerCase().includes('ls') ||
-        (item.tool || '').toLowerCase().includes('list') ||
-        (item.call || '').toLowerCase().startsWith('ls ')
-    );
-    if (isAllExploring) return { label: 'Exploring', color: 'text-emerald-500/80' };
-
-    const isAllSearching = items.every(
-      (item) =>
-        (item.tool || '').toLowerCase().includes('search') ||
-        (item.tool || '').toLowerCase().includes('grep')
-    );
-    if (isAllSearching) return { label: 'Searching', color: 'text-emerald-500/80' };
-
-    const isAllEditing = items.every(
-      (item) =>
-        (item.tool || '').toLowerCase().includes('write') ||
-        (item.tool || '').toLowerCase().includes('edit') ||
-        (item.tool || '').toLowerCase().includes('patch')
-    );
-    if (isAllEditing) return { label: 'Editing', color: 'text-emerald-500/80' };
-
-    return { label: 'Thinking', color: 'text-zinc-500' };
-  }
 </script>
 
 <div>
@@ -386,151 +345,91 @@
     {:else}
       <div class={cn('space-y-1', className)}>
         {#each taskItems as item}
-          {#if item.type === 'message'}
-            {#if item.message.role === 'user'}
-              <div class="flex gap-3 px-4 py-2 items-start">
-                <div class="shrink-0 mt-1">
-                  {#if userAvatarUrl}
-                    <img
-                      src={userAvatarUrl}
-                      alt="User"
-                      class="w-8 h-8 rounded-full border border-white/10 shadow-sm"
-                    />
-                  {:else}
-                    <div
-                      class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300"
-                    >
-                      {userInitial}
-                    </div>
-                  {/if}
-                </div>
-                <div
-                  class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-lg"
-                >
-                  <p class="text-[13px] font-medium leading-relaxed">{item.message.content}</p>
-                </div>
-              </div>
-            {:else if item.message.role === 'assistant'}
-              <div class="px-12 py-2 pr-4">
-                <MarkdownRenderer
-                  content={item.message.content}
-                  class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans"
-                />
-              </div>
-            {:else}
-              <div class="px-12 py-2 pr-4 opacity-70">
-                <p class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans">
-                  {item.message.content}
-                </p>
-              </div>
-            {/if}
-          {:else if item.type === 'assistant'}
-            {@const blocks = parseParts(item.message)}
-            {@const textBlocks = blocks.filter((b) => b.type === 'text')}
-            {@const textContent = textBlocks.map((b) => b.text).join('')}
-            {@const hasThinking = item.items.some((it) => it.tool === 'thinking')}
-            {@const hasTools = item.items.some((it) => it.tool !== 'thinking')}
-
-            <div class="px-12 py-2 pr-4 space-y-2">
-              <!-- Thinking blocks (collapsible) -->
-              {#if hasThinking}
-                {@const cat = categorizeGroup(item.items)}
-                <details class="my-2 group" open>
-                  <summary
-                    class="flex items-center gap-2.5 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors list-none outline-none select-none py-1"
+          {#if item.type === 'user'}
+            <div class="flex gap-3 px-4 py-2 items-start">
+              <div class="shrink-0 mt-1">
+                {#if userAvatarUrl}
+                  <img
+                    src={userAvatarUrl}
+                    alt="User"
+                    class="w-8 h-8 rounded-full border border-white/10 shadow-sm"
+                  />
+                {:else}
+                  <div
+                    class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold text-gray-300"
                   >
-                    <div
-                      class="w-3.5 h-3.5 flex items-center justify-center group-open:rotate-90 transition-transform opacity-60"
-                    >
+                    {userInitial}
+                  </div>
+                {/if}
+              </div>
+              <div
+                class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-lg"
+              >
+                <p class="text-[13px] font-medium leading-relaxed">{item.message.content}</p>
+              </div>
+            </div>
+          {:else if item.type === 'assistant_text'}
+            <div class="px-12 py-2 pr-4">
+              <MarkdownRenderer
+                content={item.content}
+                class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans"
+              />
+            </div>
+          {:else if item.type === 'thinking'}
+            <div class="px-12 py-1 pr-4">
+              <div class="flex items-center gap-2 text-zinc-500/60">
+                <div class="w-1.5 h-1.5 rounded-full bg-zinc-500/40"></div>
+                <span class="text-xs uppercase tracking-wider font-bold">Thinking</span>
+              </div>
+              <div class="mt-1.5 pl-3.5 border-l border-white/[0.06]">
+                {#if item.content.split('\n').length > 3 || item.content.length > 200}
+                  {@const isExpanded = expandedThinking.has(item.id)}
+                  <p
+                    class="text-sm text-zinc-400/70 leading-relaxed whitespace-pre-wrap transition-all duration-200"
+                    class:line-clamp-3={!isExpanded}
+                  >
+                    {item.content}
+                  </p>
+                  <button
+                    type="button"
+                    class="mt-1.5 text-xs text-zinc-500/80 hover:text-zinc-400/80 font-medium transition-colors flex items-center gap-1"
+                    onclick={() => toggleThinking(item.id)}
+                  >
+                    {#if isExpanded}
                       <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
+                        class="w-3 h-3"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        stroke-width="3"
+                        stroke-width="2"
                         stroke-linecap="round"
-                        stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
+                        stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg
                       >
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span
-                        class={cn('text-[10px] font-black tracking-[0.15em] uppercase', cat.color)}
-                        >{cat.label}</span
+                      Show less
+                    {:else}
+                      <svg
+                        class="w-3 h-3"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg
                       >
-                      <span class="text-[10px] opacity-40 font-mono"
-                        >({item.items.filter((it) => it.tool === 'thinking').length})</span
-                      >
-                    </div>
-                  </summary>
-                  <div
-                    class="mt-2 space-y-1.5 border-l border-white/[0.06] ml-[6px] pl-4 transition-all"
-                  >
-                    {#each item.items.filter((it) => it.tool === 'thinking') as toolItem}
-                      <ToolBlock
-                        tool={toolItem.tool}
-                        call={toolItem.call}
-                        result={toolItem.result}
-                      />
-                    {/each}
-                  </div>
-                </details>
-              {/if}
-
-              <!-- Text content -->
-              {#if textContent.trim()}
-                <MarkdownRenderer
-                  content={textContent}
-                  class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans"
-                />
-              {/if}
-
-              <!-- Tool uses -->
-              {#if hasTools}
-                <div class="space-y-1.5">
-                  {#each item.items.filter((it) => it.tool !== 'thinking') as toolItem}
-                    <ToolBlock tool={toolItem.tool} call={toolItem.call} result={toolItem.result} />
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {:else}
-            {@const cat = categorizeGroup(item.items)}
-            <details class="my-2 group" open>
-              <summary
-                class="flex items-center gap-2.5 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors list-none outline-none select-none py-1"
-              >
-                <div
-                  class="w-3.5 h-3.5 flex items-center justify-center group-open:rotate-90 transition-transform opacity-60"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="3"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
-                  >
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class={cn('text-[10px] font-black tracking-[0.15em] uppercase', cat.color)}
-                    >{cat.label}</span
-                  >
-                  <span class="text-[10px] opacity-40 font-mono">({item.items.length})</span>
-                </div>
-              </summary>
-              <div
-                class="mt-2 space-y-1.5 border-l border-white/[0.06] ml-[6px] pl-4 transition-all"
-              >
-                {#each item.items as toolItem}
-                  <ToolBlock tool={toolItem.tool} call={toolItem.call} result={toolItem.result} />
-                {/each}
+                      Show more
+                    {/if}
+                  </button>
+                {:else}
+                  <p class="text-sm text-zinc-400/70 leading-relaxed whitespace-pre-wrap">
+                    {item.content}
+                  </p>
+                {/if}
               </div>
-            </details>
+            </div>
+          {:else if item.type === 'tool'}
+            <div class="px-12 py-1 pr-4">
+              <ToolBlock tool={item.tool} call={item.call} result={item.result} />
+            </div>
           {/if}
         {/each}
       </div>
@@ -563,13 +462,13 @@
               <div
                 class="flex-1 min-w-0 bg-violet-500/10 border border-white/5 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-sm"
               >
-                <div class="text-[13px] font-medium whitespace-pre-wrap break-words">
+                <div class="text-base font-medium whitespace-pre-wrap break-words">
                   {item.message.content || ''}
                 </div>
               </div>
             {:else}
               <div class="px-3 py-2 text-xs font-medium">
-                <div class="text-[13px] whitespace-pre-wrap break-words">
+                <div class="text-base whitespace-pre-wrap break-words">
                   {item.message.content || ''}
                 </div>
               </div>

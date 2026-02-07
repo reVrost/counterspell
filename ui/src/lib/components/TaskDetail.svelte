@@ -35,8 +35,16 @@
   let rawDiff = $state<string>('');
   let isLoadingDiff = $state<boolean>(false);
   let containerRef = $state<HTMLDivElement | null>(null);
+  let agentScrollRef = $state<HTMLDivElement | null>(null);
   let isDragging = $state(false);
   let startX = $state(0);
+  let scrollY = $state(0);
+  let showCompactHeader = $derived(scrollY > 60);
+
+  function handleScroll(e: Event) {
+    const target = e.target as HTMLDivElement;
+    scrollY = target.scrollTop;
+  }
 
   function handleTouchStart(e: TouchEvent) {
     isDragging = true;
@@ -173,8 +181,10 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="flex flex-col h-[100dvh] relative">
   <!-- Floating Controls Row -->
-  <div
-    class="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none"
+  <div 
+    class="absolute top-0 left-0 right-0 z-30 px-3 pt-3 pb-2 flex items-center justify-between pointer-events-none transition-all duration-200"
+    class:backdrop-blur-md={showCompactHeader}
+    style:background-color={showCompactHeader ? 'rgba(13, 17, 23, 0.8)' : 'transparent'}
   >
     <!-- Back Button -->
     <button
@@ -184,6 +194,17 @@
     >
       <ArrowLeftIcon class="w-4 h-4" />
     </button>
+
+    <!-- Title (shows when scrolled) -->
+    <div 
+      class="flex-1 mx-3 overflow-hidden transition-all duration-200 pointer-events-auto"
+      class:opacity-0={!showCompactHeader}
+      class:opacity-100={showCompactHeader}
+    >
+      <p class="text-sm font-medium text-white/90 truncate text-center">
+        {task.title}
+      </p>
+    </div>
 
     <!-- View Indicators & Status -->
     <div
@@ -226,20 +247,6 @@
     </div>
   </div>
 
-  <!-- Modal Header - Minimal -->
-  <div class="px-4 pt-16 pb-4 flex flex-col gap-2 shrink-0">
-    <!-- Workspace -->
-    <span class="text-gray-500 text-[11px] flex items-center gap-1.5">
-      <i class="fas fa-folder text-[10px]"></i>
-      {task.workspace_name || 'Unknown'}
-    </span>
-
-    <!-- Title -->
-    <h1 class="text-xl font-semibold text-white/95 leading-tight pr-2">
-      {task.title}
-    </h1>
-  </div>
-
   <!-- Floating Todo Indicator -->
   {#if taskStore.todos.length > 0}
     <TodoIndicator />
@@ -261,8 +268,27 @@
       style:transform="translateX({activeTab === 'agent' ? '0%' : '-100%'})"
     >
       <!-- Agent View -->
-      <div class="w-full h-full flex-shrink-0 overflow-y-auto" id="agent-scroll">
-        <div class="mt-4 space-y-1 pb-44">
+      <div 
+        bind:this={agentScrollRef}
+        class="w-full h-full flex-shrink-0 overflow-y-auto" 
+        id="agent-scroll"
+        onscroll={handleScroll}
+      >
+        <!-- Header - Scrolls with content -->
+        <div class="px-4 pt-20 pb-6 flex flex-col gap-2">
+          <!-- Workspace -->
+          <span class="text-gray-500 text-[11px] flex items-center gap-1.5">
+            <i class="fas fa-folder text-[10px]"></i>
+            {task.workspace_name || 'Unknown'}
+          </span>
+
+          <!-- Title -->
+          <h1 class="text-xl font-semibold text-white/95 leading-tight">
+            {task.title}
+          </h1>
+        </div>
+
+        <div class="space-y-1 pb-44">
           <Thread
             mode="task"
             {messages}
