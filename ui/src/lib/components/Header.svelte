@@ -23,8 +23,8 @@
       : ''
   );
 
-  // Check if on settings page
-  const isSettingsPage = $derived(appState.activeTab === 'settings');
+  // Check if on settings page - derive from URL
+  const isSettingsPage = $derived($page.url.pathname.startsWith('/app/settings'));
 
   $effect(() => {
     appState.githubLogin;
@@ -32,7 +32,6 @@
   });
 
   async function handleSettings() {
-    appState.activeTab = 'settings';
     await goto('/app/settings');
   }
 

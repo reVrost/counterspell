@@ -229,10 +229,7 @@
       </div>
     {:else}
       <div class="col-start-1 row-start-1 w-full relative z-10">
-        <Navigator
-          activeTab={appState.activeTab}
-          onNavigate={(tab) => (appState.activeTab = tab as any)}
-        />
+        <Navigator />
       </div>
     {/if}
   </div>

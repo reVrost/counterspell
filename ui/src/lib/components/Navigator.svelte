@@ -1,5 +1,7 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import InboxIcon from '@lucide/svelte/icons/inbox';
   import { CogIcon, MessagesSquareIcon, SquarePen } from '@lucide/svelte';
   import FolderIcon from '@lucide/svelte/icons/folder';
@@ -10,15 +12,22 @@
   import { taskStore } from '$lib/stores/tasks.svelte';
 
   interface Props {
-    activeTab?: 'inbox' | 'sessions' | 'focus' | 'layers' | 'settings';
-    onNavigate?: (tab: string) => void;
     onSearch?: () => void;
   }
 
-  let { activeTab = 'inbox', onNavigate, onSearch }: Props = $props();
+  let { onSearch }: Props = $props();
+
+  // Derive activeTab from URL, with fallback to appState for non-URL tabs like focus
+  const activeTab = $derived.by((): 'inbox' | 'focus' | 'settings' => {
+    const path = $page.url.pathname;
+    if (path.startsWith('/app/settings')) return 'settings';
+    if (path === '/app' || path === '/app/') return 'inbox';
+    // For focus (search), it doesn't have a dedicated route yet
+    return 'inbox';
+  });
 
   const tabs = ['inbox', 'focus', 'settings'];
-  const activeIndex = $derived(tabs.indexOf(activeTab || 'inbox'));
+  const activeIndex = $derived(tabs.indexOf(activeTab));
   const navIndex = $derived(activeIndex === -1 ? 0 : activeIndex);
   const navButtonSize = 64;
   const navBaseSize = 56;
@@ -26,8 +35,20 @@
   const navTop = (navButtonSize - navBaseSize) / 2 - 1;
 
   function handleTabClick(tab: string) {
-    if (onNavigate) {
-      onNavigate(tab);
+    // Navigate to the appropriate URL
+    switch (tab) {
+      case 'inbox':
+        goto('/app');
+        break;
+      case 'settings':
+        goto('/app/settings');
+        break;
+      case 'focus':
+        // Focus/Search doesn't have a dedicated page yet, just update state
+        appState.activeTab = 'focus';
+        break;
+      default:
+        goto('/app');
     }
   }
 
