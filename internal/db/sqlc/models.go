@@ -117,14 +117,15 @@ type Setting struct {
 }
 
 type Task struct {
-	ID          string         `json:"id"`
-	WorkspaceID sql.NullString `json:"workspace_id"`
-	Title       string         `json:"title"`
-	Intent      string         `json:"intent"`
-	Status      string         `json:"status"`
-	Position    sql.NullInt64  `json:"position"`
-	CreatedAt   int64          `json:"created_at"`
-	UpdatedAt   int64          `json:"updated_at"`
+	ID           string         `json:"id"`
+	WorkspaceID  sql.NullString `json:"workspace_id"`
+	Title        string         `json:"title"`
+	Intent       string         `json:"intent"`
+	Status       string         `json:"status"`
+	FailedReason sql.NullString `json:"failed_reason"`
+	Position     sql.NullInt64  `json:"position"`
+	CreatedAt    int64          `json:"created_at"`
+	UpdatedAt    int64          `json:"updated_at"`
 }
 
 type Workspace struct {

@@ -371,13 +371,13 @@
 
                 <!-- Workspaces List -->
                 <div class="max-h-64 overflow-y-auto py-2 px-1 scrollbar-thin">
-                  {#if appState.projects.length > 0}
+                  {#if appState.workspaces.length > 0}
                     <div
                       class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1"
                     >
                       Workspaces
                     </div>
-                    {#each appState.projects.filter((p) => p.name
+                    {#each appState.workspaces.filter((p) => p.name
                         .toLowerCase()
                         .includes(projectSearch.toLowerCase())) as p}
                       <button
@@ -411,7 +411,7 @@
                   </div>
                   {#each appState.repos.filter((r) => r.full_name
                         .toLowerCase()
-                        .includes(projectSearch.toLowerCase()) && !appState.projects.some((p) => p.name === r.full_name)) as r}
+                        .includes(projectSearch.toLowerCase()) && !appState.workspaces.some((p) => p.name === r.full_name)) as r}
                     <button
                       type="button"
                       onclick={() => appState.setActiveWorkspace(r.id.toString(), r.full_name)}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { appState } from '$lib/stores/app.svelte';
   import { tasksAPI, transcribeAPI } from '$lib/api';
-  import { slide, modalSlideUp, backdropFade, DURATIONS } from '$lib/utils/transitions';
+  import { slide, modalSlideUp, backdropFade } from '$lib/utils/transitions';
   import { cn } from '$lib/utils';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import XIcon from '@lucide/svelte/icons/x';
@@ -42,9 +42,9 @@
 
     isSubmitting = true;
     try {
-      const fullPrompt = title + (description ? '\n\n' + description : '');
       const response = await tasksAPI.create(
-        fullPrompt,
+        title,
+        description,
         appState.activeWorkspaceId,
         appState.activeModelId
       );
@@ -227,7 +227,7 @@
         <XIcon class="w-5 h-5" />
       </button>
 
-      {#if appState.projects.length > 0}
+      {#if appState.workspaces.length > 0}
         <WorkspaceSelectorDropdown bind:open={workspaceMenuOpen} contentClass="mt-2">
           <DropdownMenu.Trigger
             class="px-3 py-1 bg-white/5 rounded-full border border-white/5 text-sm font-medium flex items-center gap-1.5 text-zinc-100 hover:bg-white/10 transition outline-none"
@@ -251,7 +251,7 @@
 
     <!-- Main Form -->
     <div class="flex-1 flex flex-col px-6 pt-2 pb-6 overflow-y-auto">
-      {#if appState.projects.length === 0}
+      {#if appState.workspaces.length === 0}
         <div
           class="mb-5 rounded-xl border border-amber-400/25 bg-amber-500/5 p-3 text-sm text-amber-100 flex items-center justify-between gap-3"
         >

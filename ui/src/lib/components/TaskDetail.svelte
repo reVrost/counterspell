@@ -275,6 +275,22 @@
         {:else}
           <div class="text-sm text-gray-500 italic">No task description</div>
         {/if}
+
+        {#if task.status === 'failed' && task.failed_reason}
+          <div class="mt-6 px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+            <div class="flex items-start gap-3">
+              <div
+                class="w-5 h-5 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0 mt-0.5"
+              >
+                <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-medium text-red-400 mb-1">Error</p>
+                <p class="text-sm text-red-300/80 leading-relaxed">{task.failed_reason}</p>
+              </div>
+            </div>
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -337,7 +353,7 @@
   </div>
 
   <!-- Chat Input Overlay - Always visible -->
-  <div class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3 pb-safe">
+  <div class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3 mb-6 pb-safe">
     <div
       class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
     ></div>

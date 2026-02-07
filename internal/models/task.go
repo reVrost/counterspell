@@ -21,6 +21,7 @@ type Task struct {
 	Intent               string  `json:"intent"`
 	Status               string  `json:"status"`
 	Position             *int64  `json:"position,omitempty"`
+	FailedReason         *string `json:"failed_reason,omitempty"`
 	LastAssistantMessage *string `json:"last_assistant_message,omitempty"`
 	CreatedAt            int64   `json:"created_at"`
 	UpdatedAt            int64   `json:"updated_at"`

@@ -55,7 +55,7 @@
   <div class="flex justify-between items-start w-full gap-4">
     <!-- Left content (Shared) -->
     <div class="flex-1 min-w-0 space-y-1">
-      <h4 class="text-base font-semibold text-gray-100 leading-tight truncate">
+      <h4 class="text-lg font-semibold text-gray-100 leading-tight truncate">
         {task.title}
       </h4>
 

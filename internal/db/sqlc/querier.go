@@ -56,6 +56,7 @@ type Querier interface {
 	ListWorkspaces(ctx context.Context) ([]Workspace, error)
 	UpdateAgentRunBackendSessionID(ctx context.Context, arg UpdateAgentRunBackendSessionIDParams) error
 	UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error
+	UpdateFailedTask(ctx context.Context, arg UpdateFailedTaskParams) error
 	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)
 	UpdateMachineIdentityJWT(ctx context.Context, arg UpdateMachineIdentityJWTParams) error
 	UpdateMachineIdentityLastSeen(ctx context.Context, arg UpdateMachineIdentityLastSeenParams) error

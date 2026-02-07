@@ -1,14 +1,11 @@
+import { invalidate } from '$app/navigation';
 import type {
-  Project,
   Workspace,
   WorkspaceSetupResponse,
   CreateWorkspaceRequest,
-  Task,
   TaskResponse,
   FeedData,
   UserSettings,
-  Message,
-  LogEntry,
   GitHubRepo,
   SessionInfo,
   APIResponse,
@@ -38,56 +35,6 @@ async function fetchAPI<T>(path: string, options: RequestInit = {}): Promise<T> 
   }
 
   return response.json();
-}
-
-// Helper for POST with FormData
-async function postForm<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    body: formData,
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await response.text().catch(() => 'Unknown error');
-    const errMsg = `API error: ${response.status} - ${error}`;
-    throw new Error(errMsg);
-  }
-
-  return response.json().catch(() => ({}) as T);
-}
-
-// Helper for POST without response body
-async function postFormNoResponse(path: string, formData: FormData): Promise<void> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    body: formData,
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await response.text().catch(() => 'Unknown error');
-    const errMsg = `API error: ${response.status} - ${error}`;
-    throw new Error(errMsg);
-  }
-}
-
-// Helper for POST that returns structured APIResponse
-async function postFormWithResponse(path: string, formData: FormData): Promise<APIResponse> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    body: formData,
-    credentials: 'include',
-  });
-
-  const data = await response.json().catch(() => ({ status: 'error', message: 'Unknown error' }));
-
-  if (!response.ok) {
-    const errMsg = data.message || `API error: ${response.status}`;
-    throw new Error(errMsg);
-  }
-
-  return data as APIResponse;
 }
 
 // Helper for POST action that returns APIResponse (no form data)
@@ -179,30 +126,14 @@ export const workspacesAPI = {
   },
 
   async create(payload: CreateWorkspaceRequest): Promise<Workspace> {
-    return fetchAPI<Workspace>('/api/v1/workspaces', {
+    const response = await fetchAPI<Workspace>('/api/v1/workspaces', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-  },
-};
 
-// ==================== PROJECTS ====================
+    invalidate('/api/v1/workspaces');
 
-export const projectsAPI = {
-  async list(): Promise<Project[]> {
-    const feedData = await fetchAPI<{ projects: Record<string, Project> }>('/api/v1/tasks');
-    return Object.values(feedData.projects || {});
-  },
-
-  async getMap(): Promise<Record<string, Project>> {
-    const feedData = await fetchAPI<{ projects: Record<string, Project> }>('/api/v1/tasks');
-    return feedData.projects || {};
-  },
-  async activate(owner: string, repo: string): Promise<void> {
-    const formData = new FormData();
-    formData.append('owner', owner);
-    formData.append('repo', repo);
-    await postFormNoResponse('/api/v1/project/activate', formData);
+    return response;
   },
 };
 
@@ -229,8 +160,14 @@ export const tasksAPI = {
     return fetchAPI<{ git_diff: string }>(`/api/v1/tasks/${id}/diff`);
   },
 
-  async create(intent: string, workspaceId: string, modelId: string): Promise<APIResponse> {
+  async create(
+    title: string,
+    intent: string,
+    workspaceId: string,
+    modelId: string
+  ): Promise<APIResponse> {
     return postJsonWithResponse('/api/v1/tasks', {
+      title: title,
       intent: intent,
       workspace_id: workspaceId,
       model_id: modelId,

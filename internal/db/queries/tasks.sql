@@ -9,6 +9,7 @@ SELECT
     t.title,
     t.intent,
     t.status,
+    t.failed_reason,
     t.position,
     t.created_at,
     t.updated_at,
@@ -16,6 +17,9 @@ SELECT
 FROM tasks t
 LEFT JOIN workspaces r ON t.workspace_id = r.id
 WHERE t.id = ?;
+
+-- name: UpdateFailedTask :exec
+UPDATE tasks SET status = 'failed', failed_reason = ? WHERE id = ?;
 
 -- name: ListTasks :many
 SELECT * FROM tasks
@@ -33,6 +37,7 @@ SELECT
     t.title,
     t.intent,
     t.status,
+    t.failed_reason,
     t.position,
     t.created_at,
     t.updated_at,

@@ -26,7 +26,7 @@
   let workspaceSearch = $state('');
 
   const filteredWorkspaces = $derived(
-    appState.projects.filter((p) => p.name.toLowerCase().includes(workspaceSearch.toLowerCase()))
+    appState.workspaces.filter((p) => p.name.toLowerCase().includes(workspaceSearch.toLowerCase()))
   );
 
   $effect(() => {
@@ -117,7 +117,7 @@
       <div
         class="mt-1 px-3 py-2 bg-white/[0.02] border-t border-white/5 text-sm text-zinc-500 flex justify-between items-center rounded-b-xl"
       >
-        <span class="font-medium">{appState.projects.length} Workspaces</span>
+        <span class="font-medium">{appState.workspaces.length} Workspaces</span>
         <button
           onclick={openCreateWorkspaceModal}
           class="hover:text-violet-400 font-semibold cursor-pointer flex items-center gap-1 transition-colors"

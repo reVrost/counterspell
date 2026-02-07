@@ -1,6 +1,6 @@
 <script lang="ts">
   import { appState } from "$lib/stores/app.svelte";
-  import { slide, DURATIONS } from "$lib/utils/transitions";
+  import { fade, DURATIONS } from "$lib/utils/transitions";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import XCircleIcon from "@lucide/svelte/icons/x-circle";
   import InfoIcon from "@lucide/svelte/icons/info";
@@ -20,7 +20,7 @@
 
 {#if appState.toastOpen}
   <div
-    transition:slide|global={{ direction: "down", duration: DURATIONS.quick }}
+    transition:fade|global={{ duration: DURATIONS.quick }}
     class="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 border text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-sm font-medium {borderClasses[
       appState.toastType
     ]}"

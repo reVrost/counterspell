@@ -1,6 +1,6 @@
 import {
   MODELS,
-  type Project,
+  type Workspace,
   type UserSettings,
   type GitHubRepo,
   type ToastType,
@@ -28,7 +28,7 @@ class AppState {
   // Workspace State
   activeWorkspaceId = $state('');
   activeWorkspaceName = $state('');
-  projects = $state<Project[]>([]);
+  workspaces = $state<Workspace[]>([]);
   repos = $state<GitHubRepo[]>([]);
 
   // Model
@@ -87,7 +87,7 @@ class AppState {
       return;
     }
     // Load workspaces
-    await this.loadProjects();
+    await this.loadWorkspaces();
     // Load repos
     await this.loadRepos();
     // Load settings
@@ -110,9 +110,9 @@ class AppState {
     }
   }
 
-  async loadProjects() {
+  async loadWorkspaces() {
     try {
-      this.projects = await workspacesAPI.list();
+      this.workspaces = await workspacesAPI.list();
     } catch (err) {
       console.error('Failed to load workspaces:', err);
     }
@@ -158,6 +158,7 @@ class AppState {
   }
 
   showToast(msg: string, type: ToastType = 'success') {
+    console.log('showToast', msg, type);
     this.toastMsg = msg;
     this.toastType = type;
     this.toastOpen = true;
@@ -201,6 +202,7 @@ class AppState {
   }
 
   closeNewWorkspaceModal() {
+    console.log('closeNewWorkspaceModal');
     this.showNewWorkspaceModal = false;
   }
 
@@ -236,7 +238,7 @@ class AppState {
     // Reset Workspace State
     this.activeWorkspaceId = '';
     this.activeWorkspaceName = '';
-    this.projects = [];
+    this.workspaces = [];
     this.repos = [];
 
     // Reset Auth

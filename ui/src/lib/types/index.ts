@@ -1,11 +1,8 @@
-export interface Project {
+export interface Workspace {
   id: string;
   name: string;
   icon: string;
   color: string;
-}
-
-export interface Workspace extends Project {
   local_path?: string;
 }
 
@@ -42,6 +39,7 @@ export interface Task {
   intent: string;
   status: TaskStatus;
   position?: number;
+  failed_reason?: string;
   last_assistant_message?: string;
   created_at: number;
   updated_at: number;

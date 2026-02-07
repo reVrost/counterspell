@@ -679,7 +679,7 @@ func (o *Orchestrator) processResults() {
 				}
 			}
 		} else {
-			if err := o.repo.UpdateStatus(ctx, result.TaskID, "failed"); err != nil {
+			if err := o.repo.UpdateFailedTask(ctx, result.TaskID, fmt.Sprintf("failed to process task because: %s", result.Error)); err != nil {
 				slog.Error("[ORCHESTRATOR] Failed to update task status", "error", err)
 			}
 		}

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     title TEXT NOT NULL,
     intent TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('draft', 'planning', 'in_progress', 'review', 'done', 'failed')),
+    failed_reason TEXT,
     position INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
     updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli

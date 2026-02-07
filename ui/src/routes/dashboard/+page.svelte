@@ -38,12 +38,8 @@
       data.reviews = data.reviews || [];
       data.done = data.done || [];
       data.todo = data.todo || [];
-      data.projects = data.projects || {};
 
       feedData = data;
-
-      // Update projects in app state
-      appState.projects = Object.values(data.projects || {});
 
       // Update review count
       taskStore.reviewCount = data.reviews.length;

@@ -179,6 +179,13 @@ func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error 
 	return nil
 }
 
+func (s *Repository) UpdateFailedTask(ctx context.Context, id, reason string) error {
+	return s.Q.UpdateFailedTask(ctx, sqlc.UpdateFailedTaskParams{
+		FailedReason: sql.NullString{String: reason, Valid: reason != ""},
+		ID:           id,
+	})
+}
+
 // UpdateTaskTitleIntent updates a task title and intent.
 func (s *Repository) UpdateTaskTitleIntent(ctx context.Context, taskID, title, intent string) error {
 	if taskID == "" {
@@ -238,6 +245,7 @@ func sqlcTaskWithWorkspaceToModel(task *sqlc.ListTasksByWorkspaceRow) *models.Ta
 		Title:                task.Title,
 		Intent:               task.Intent,
 		Status:               task.Status,
+		FailedReason:         nullableString(task.FailedReason),
 		Position:             nullableInt64(task.Position),
 		LastAssistantMessage: lastMsg,
 		CreatedAt:            task.CreatedAt,
@@ -254,6 +262,7 @@ func sqlcGetTaskRowToModel(task *sqlc.GetTaskRow) *models.Task {
 		Title:         task.Title,
 		Intent:        task.Intent,
 		Status:        task.Status,
+		FailedReason:  nullableString(task.FailedReason),
 		Position:      nullableInt64(task.Position),
 		CreatedAt:     task.CreatedAt,
 		UpdatedAt:     task.UpdatedAt,

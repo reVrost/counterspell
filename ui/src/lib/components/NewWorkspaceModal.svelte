@@ -1,7 +1,7 @@
 <script lang="ts">
   import { appState } from '$lib/stores/app.svelte';
   import { workspacesAPI } from '$lib/api';
-  import { backdropFade, modalSlideUp } from '$lib/utils/transitions';
+  import { modalSlideUp } from '$lib/utils/transitions';
   import FolderIcon from '@lucide/svelte/icons/folder';
   import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
   import LoaderIcon from '@lucide/svelte/icons/loader-2';
@@ -78,10 +78,12 @@
       });
       await appState.loadProjects();
       await appState.setActiveWorkspace(workspace.id, workspace.name);
+      appState.closeNewWorkspaceModal();
       appState.showToast(`Workspace "${workspace.name}" created`, 'success');
       close(e);
     } catch (e) {
       console.error('Failed to create workspace:', e);
+      appState.closeNewWorkspaceModal();
       appState.showToast(e instanceof Error ? e.message : 'Failed to create workspace', 'error');
     } finally {
       creating = false;

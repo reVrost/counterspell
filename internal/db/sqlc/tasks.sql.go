@@ -54,6 +54,7 @@ SELECT
     t.title,
     t.intent,
     t.status,
+    t.failed_reason,
     t.position,
     t.created_at,
     t.updated_at,
@@ -69,6 +70,7 @@ type GetTaskRow struct {
 	Title         string         `json:"title"`
 	Intent        string         `json:"intent"`
 	Status        string         `json:"status"`
+	FailedReason  sql.NullString `json:"failed_reason"`
 	Position      sql.NullInt64  `json:"position"`
 	CreatedAt     int64          `json:"created_at"`
 	UpdatedAt     int64          `json:"updated_at"`
@@ -84,6 +86,7 @@ func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
 		&i.Title,
 		&i.Intent,
 		&i.Status,
+		&i.FailedReason,
 		&i.Position,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -93,7 +96,7 @@ func (q *Queries) GetTask(ctx context.Context, id string) (GetTaskRow, error) {
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, workspace_id, title, intent, status, position, created_at, updated_at FROM tasks
+SELECT id, workspace_id, title, intent, status, failed_reason, position, created_at, updated_at FROM tasks
 ORDER BY status ASC, position ASC, created_at DESC
 `
 
@@ -112,6 +115,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 			&i.Title,
 			&i.Intent,
 			&i.Status,
+			&i.FailedReason,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -130,7 +134,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, workspace_id, title, intent, status, position, created_at, updated_at FROM tasks
+SELECT id, workspace_id, title, intent, status, failed_reason, position, created_at, updated_at FROM tasks
 WHERE status = ?
 ORDER BY status ASC, position ASC, created_at DESC
 `
@@ -150,6 +154,7 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 			&i.Title,
 			&i.Intent,
 			&i.Status,
+			&i.FailedReason,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -174,6 +179,7 @@ SELECT
     t.title,
     t.intent,
     t.status,
+    t.failed_reason,
     t.position,
     t.created_at,
     t.updated_at,
@@ -190,6 +196,7 @@ type ListTasksByWorkspaceRow struct {
 	Title                string         `json:"title"`
 	Intent               string         `json:"intent"`
 	Status               string         `json:"status"`
+	FailedReason         sql.NullString `json:"failed_reason"`
 	Position             sql.NullInt64  `json:"position"`
 	CreatedAt            int64          `json:"created_at"`
 	UpdatedAt            int64          `json:"updated_at"`
@@ -212,6 +219,7 @@ func (q *Queries) ListTasksByWorkspace(ctx context.Context) ([]ListTasksByWorksp
 			&i.Title,
 			&i.Intent,
 			&i.Status,
+			&i.FailedReason,
 			&i.Position,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -229,6 +237,20 @@ func (q *Queries) ListTasksByWorkspace(ctx context.Context) ([]ListTasksByWorksp
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateFailedTask = `-- name: UpdateFailedTask :exec
+UPDATE tasks SET status = 'failed', failed_reason = ? WHERE id = ?
+`
+
+type UpdateFailedTaskParams struct {
+	FailedReason sql.NullString `json:"failed_reason"`
+	ID           string         `json:"id"`
+}
+
+func (q *Queries) UpdateFailedTask(ctx context.Context, arg UpdateFailedTaskParams) error {
+	_, err := q.db.ExecContext(ctx, updateFailedTask, arg.FailedReason, arg.ID)
+	return err
 }
 
 const updateTaskPosition = `-- name: UpdateTaskPosition :exec

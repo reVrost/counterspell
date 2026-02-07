@@ -153,7 +153,7 @@ func (s *SettingsService) GetAPIKeyForProvider(ctx context.Context, provider str
 		return "", "", "", err
 	}
 	if settings == nil {
-		return "", "", "", errors.New("settings not configured")
+		return "", "", "", fmt.Errorf("settings not configured %w", err)
 	}
 
 	// Use provided provider or default from settings
