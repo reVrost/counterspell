@@ -26,9 +26,9 @@ class AppState {
   toastMsg = $state("");
   toastType = $state<ToastType>("success");
 
-  // Project State
-  activeProjectId = $state("");
-  activeProjectName = $state("");
+  // Workspace State
+  activeWorkspaceId = $state("");
+  activeWorkspaceName = $state("");
   projects = $state<Project[]>([]);
   repos = $state<GitHubRepo[]>([]);
 
@@ -57,10 +57,10 @@ class AppState {
 
   constructor() {
     if (typeof window !== "undefined") {
-      this.activeProjectId =
-        localStorage.getItem("counterspell_active_project_id") || "";
-      this.activeProjectName =
-        localStorage.getItem("counterspell_active_project_name") || "";
+      this.activeWorkspaceId =
+        localStorage.getItem("counterspell_active_workspace_id") || "";
+      this.activeWorkspaceName =
+        localStorage.getItem("counterspell_active_workspace_name") || "";
       this.activeModelId =
         localStorage.getItem("counterspell_model") || MODELS[0].id;
 
@@ -90,7 +90,7 @@ class AppState {
     if (!this.isAuthenticated) {
       return;
     }
-    // Load projects
+    // Load workspaces
     await this.loadProjects();
     // Load repos
     await this.loadRepos();
@@ -118,7 +118,7 @@ class AppState {
     try {
       this.projects = await projectsAPI.list();
     } catch (err) {
-      console.error("Failed to load projects:", err);
+      console.error("Failed to load workspaces:", err);
     }
   }
 
@@ -147,7 +147,7 @@ class AppState {
 
   // ==================== ACTIONS ====================
 
-  async setActiveProject(id: string, name: string) {
+  async setActiveWorkspace(id: string, name: string) {
     // // If it's a repo ID (number as string), activate it first
     // if (id.match(/^\d+$/)) {
     // 	const repo = this.repos.find((r) => r.id.toString() === id);
@@ -169,10 +169,10 @@ class AppState {
     // 	}
     // }
 
-    this.activeProjectId = id;
-    this.activeProjectName = name;
-    localStorage.setItem("counterspell_active_project_id", id);
-    localStorage.setItem("counterspell_active_project_name", name);
+    this.activeWorkspaceId = id;
+    this.activeWorkspaceName = name;
+    localStorage.setItem("counterspell_active_workspace_id", id);
+    localStorage.setItem("counterspell_active_workspace_name", name);
     this.inputProjectMenuOpen = false;
     this.projectMenuOpen = false;
   }
@@ -247,9 +247,9 @@ class AppState {
     this.inputProjectMenuOpen = false;
     this.showNewTaskModal = false;
 
-    // Reset Project State
-    this.activeProjectId = "";
-    this.activeProjectName = "";
+    // Reset Workspace State
+    this.activeWorkspaceId = "";
+    this.activeWorkspaceName = "";
     this.projects = [];
     this.repos = [];
 
@@ -265,8 +265,8 @@ class AppState {
 
     // Clear local storage
     if (typeof window !== "undefined") {
-      localStorage.removeItem("counterspell_active_project_id");
-      localStorage.removeItem("counterspell_active_project_name");
+      localStorage.removeItem("counterspell_active_workspace_id");
+      localStorage.removeItem("counterspell_active_workspace_name");
       localStorage.removeItem("counterspell_model");
       // Clear any other app-specific keys if they exist
       sessionStorage.clear();
@@ -286,7 +286,7 @@ class AppState {
 
   async disconnect() {
     const confirmed = confirm(
-      "Are you sure you want to disconnect GitHub and DELETE all project data? This cannot be undone.",
+      "Are you sure you want to disconnect GitHub and DELETE all workspace data? This cannot be undone.",
     );
     if (!confirmed) return;
 

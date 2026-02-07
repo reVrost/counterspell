@@ -34,7 +34,7 @@
       const fullPrompt = title + (description ? '\n\n' + description : '');
       const response = await tasksAPI.create(
         fullPrompt,
-        appState.activeProjectId,
+        appState.activeWorkspaceId,
         appState.activeModelId
       );
       appState.showToast(response.message || 'Task created', 'success');

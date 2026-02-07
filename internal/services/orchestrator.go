@@ -54,12 +54,9 @@ type TaskResult struct {
 // TaskJob represents a job submitted to the worker pool.
 type TaskJob struct {
 	TaskID         string
-	ProjectID      string
+	WorkspaceID    string
 	Intent         string
 	ModelID        string // Format: "provider:model" e.g., "anthropic:claude-opus-4-5"
-	Owner          string
-	Repo           string
-	Token          string
 	MessageHistory string // Only for continuations
 	ResultCh       chan<- TaskResult
 }
@@ -143,24 +140,8 @@ func (o *Orchestrator) Shutdown() {
 
 // NewTask creates a task and begins execution.
 func (o *Orchestrator) NewTask(ctx context.Context, workspaceID, intent, modelID string) (string, error) {
-	// 1. Resolve projectID to a repository and ensure it's cloned
-	var token string
-	var owner, repoName string
 	if workspaceID == "" {
-		return "", fmt.Errorf("project_id is required")
-	}
-	// Look up repo in DB
-	repo, err := o.repo.GetRepository(ctx, workspaceID)
-	if err == nil {
-		// Get connection for token
-		conn, err := o.repo.GetGithubConnectionByID(ctx, repo.ConnectionID)
-		if err == nil {
-			token = conn.AccessToken
-			owner = repo.Owner
-			repoName = repo.Name
-			slog.Info("[ORCHESTRATOR] Found repository and connection", "repo", repo.FullName, "owner", owner)
-
-		}
+		return "", fmt.Errorf("workspace_id is required")
 	}
 
 	// Create task in database
@@ -170,9 +151,9 @@ func (o *Orchestrator) NewTask(ctx context.Context, workspaceID, intent, modelID
 	}
 	taskID := task.ID
 
-	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "project_id", workspaceID, "intent", intent)
+	slog.Info("[ORCHESTRATOR] Task created", "task_id", taskID, "workspace_id", workspaceID, "intent", intent)
 
-	if err := o.queueTaskJob(ctx, taskID, workspaceID, intent, modelID, owner, repoName, token, false); err != nil {
+	if err := o.queueTaskJob(ctx, taskID, workspaceID, intent, modelID, false); err != nil {
 		return "", fmt.Errorf("failed to queue task job: %w", err)
 	}
 
@@ -191,26 +172,15 @@ func (o *Orchestrator) PromptTask(ctx context.Context, taskID, followUpMsg, mode
 		return fmt.Errorf("task not found: %w", err)
 	}
 
-	// Get project info
-	var token, owner, repoName string
-	var projectID string
-	if task.RepositoryID != nil {
-		projectID = *task.RepositoryID
-		repo, err := o.repo.GetRepository(ctx, projectID)
-		if err == nil {
-			conn, err := o.repo.GetGithubConnectionByID(ctx, repo.ConnectionID)
-			if err == nil {
-				token = conn.AccessToken
-				owner = repo.Owner
-				repoName = repo.Name
-			}
-		}
+	workspaceID := ""
+	if task.WorkspaceID != nil {
+		workspaceID = *task.WorkspaceID
 	}
 
-	return o.queueTaskJob(ctx, taskID, projectID, followUpMsg, modelID, owner, repoName, token, true)
+	return o.queueTaskJob(ctx, taskID, workspaceID, followUpMsg, modelID, true)
 }
 
-func (o *Orchestrator) queueTaskJob(ctx context.Context, taskID, projectID, intent, modelID, owner, repoName, token string, isContinuation bool) error {
+func (o *Orchestrator) queueTaskJob(ctx context.Context, taskID, workspaceID, intent, modelID string, isContinuation bool) error {
 	messageHistoryJSON := ""
 	if isContinuation {
 		// Load existing messages for state restoration
@@ -229,12 +199,9 @@ func (o *Orchestrator) queueTaskJob(ctx context.Context, taskID, projectID, inte
 	// Submit job to worker pool
 	job := TaskJob{
 		TaskID:         taskID,
-		ProjectID:      projectID,
+		WorkspaceID:    workspaceID,
 		Intent:         intent,
 		ModelID:        modelID,
-		Owner:          owner,
-		Repo:           repoName,
-		Token:          token,
 		MessageHistory: messageHistoryJSON,
 		ResultCh:       o.resultCh,
 	}
@@ -845,24 +812,21 @@ func (o *Orchestrator) CreatePR(ctx context.Context, taskID string) (string, err
 		return "", fmt.Errorf("task not found: %w", err)
 	}
 
-	// Get project info
-	repos, err := o.github.GetRepos(ctx)
+	if task.WorkspaceID == nil || *task.WorkspaceID == "" {
+		return "", fmt.Errorf("workspace not set for task")
+	}
+
+	workspace, err := o.repo.GetWorkspace(ctx, *task.WorkspaceID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get projects: %w", err)
+		return "", fmt.Errorf("failed to load workspace: %w", err)
 	}
 
-	var owner, repoName string
-	for _, p := range repos {
-		if p.ID == *task.RepositoryID {
-			owner = p.Owner
-			repoName = p.Name
-			break
-		}
+	parts := strings.SplitN(workspace.Name, "/", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		return "", fmt.Errorf("workspace %q is not linked to a GitHub repository", workspace.Name)
 	}
-
-	if owner == "" {
-		return "", fmt.Errorf("project not found for task")
-	}
+	owner := strings.TrimSpace(parts[0])
+	repoName := strings.TrimSpace(parts[1])
 
 	// Get branch name from workspace
 	branchName, err := o.repoManager.GetCurrentBranch(ctx, taskID)
@@ -911,24 +875,24 @@ func (o *Orchestrator) CleanupTask(ctx context.Context, taskID string) error {
 	return o.repoManager.RemoveWorkspace(ctx, taskID)
 }
 
-// SearchProjectFiles searches for files in a project using fuzzy matching.
-// Returns a list of file paths relative to the repo root, sorted by match score.
-func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query string, limit int) ([]string, error) {
+// SearchWorkspaceFiles searches files in the source root using fuzzy matching.
+// Returns file paths relative to the source root, sorted by match score.
+func (o *Orchestrator) SearchWorkspaceFiles(ctx context.Context, workspaceID, query string, limit int) ([]string, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 
-	repoPath := o.repoManager.RootPath()
-	if repoPath == "" {
-		return nil, fmt.Errorf("repository root not found")
+	rootPath := o.repoManager.RootPath()
+	if rootPath == "" {
+		return nil, fmt.Errorf("workspace root not found")
 	}
-	if _, err := os.Stat(repoPath); err != nil {
-		return nil, fmt.Errorf("repository root not found: %w", err)
+	if _, err := os.Stat(rootPath); err != nil {
+		return nil, fmt.Errorf("workspace root not found: %w", err)
 	}
 
 	// Collect all file paths
 	var files []string
-	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
@@ -944,13 +908,13 @@ func (o *Orchestrator) SearchProjectFiles(ctx context.Context, projectID, query 
 		if strings.HasPrefix(name, ".") {
 			return nil
 		}
-		// Get relative path from repo root
-		relPath, _ := filepath.Rel(repoPath, path)
+		// Get relative path from source root
+		relPath, _ := filepath.Rel(rootPath, path)
 		files = append(files, relPath)
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to walk repo: %w", err)
+		return nil, fmt.Errorf("failed to walk workspace: %w", err)
 	}
 
 	// If no query, return first N files sorted alphabetically

@@ -163,7 +163,7 @@
         <div class="flex items-center gap-2">
           <span class="text-gray-500 text-[10px]">
             <i class="fas fa-folder"></i>
-            {task.repository_name || 'Unknown'}
+            {task.workspace_name || 'Unknown'}
           </span>
           <span class="text-[10px] text-gray-600 font-mono">#{task.id}</span>
         </div>
@@ -177,9 +177,9 @@
     <div
       class="flex items-center px-2 py-1 rounded-full bg-white/5 border border-white/10 gap-1.5 h-7"
     >
-      {#if task.status === 'pending'}
+      {#if task.status === 'draft'}
         <div class="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-        <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Pending</span>
+        <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Draft</span>
       {:else if task.status === 'in_progress'}
         <div class="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-glow"></div>
         <span class="text-xs uppercase font-bold tracking-wider text-orange-400">Running</span>

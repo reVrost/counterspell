@@ -4,7 +4,7 @@ package models
 type TaskStatus string
 
 const (
-	StatusPending    TaskStatus = "pending"
+	StatusDraft      TaskStatus = "draft"
 	StatusPlanning   TaskStatus = "planning"
 	StatusInProgress TaskStatus = "in_progress"
 	StatusReview     TaskStatus = "review"
@@ -15,12 +15,10 @@ const (
 // Task represents a work item.
 type Task struct {
 	ID                   string  `json:"id"`
-	RepositoryID         *string `json:"repository_id,omitempty"`
-	RepositoryName       *string `json:"repository_name,omitempty"`
-	SessionID            *string `json:"session_id,omitempty"`
+	WorkspaceID          *string `json:"workspace_id,omitempty"`
+	WorkspaceName        *string `json:"workspace_name,omitempty"`
 	Title                string  `json:"title"`
 	Intent               string  `json:"intent"`
-	PromotedSnapshot     *string `json:"promoted_snapshot,omitempty"`
 	Status               string  `json:"status"`
 	Position             *int64  `json:"position,omitempty"`
 	LastAssistantMessage *string `json:"last_assistant_message,omitempty"`
@@ -116,19 +114,4 @@ type TaskResponse struct {
 
 	// Git diff from the worktree (if available)
 	GitDiff string `json:"git_diff,omitempty"`
-}
-
-// Repository represents a GitHub repository.
-type Repository struct {
-	ID           string  `json:"id"`
-	ConnectionID string  `json:"connection_id"`
-	Name         string  `json:"name"`
-	FullName     string  `json:"full_name"`
-	Owner        string  `json:"owner"`
-	IsPrivate    bool    `json:"is_private"`
-	HTMLUrl      string  `json:"html_url"`
-	CloneUrl     string  `json:"clone_url"`
-	LocalPath    *string `json:"local_path,omitempty"`
-	CreatedAt    int64   `json:"created_at"`
-	UpdatedAt    int64   `json:"updated_at"`
 }

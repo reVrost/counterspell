@@ -13,7 +13,7 @@ import (
 // HandleListTask returns tasks.
 func (h *Handlers) HandleListTask(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tasks, err := h.repository.ListWithRepository(ctx)
+	tasks, err := h.repository.ListWithWorkspace(ctx)
 	if err != nil {
 		slog.Error("Failed to get tasks", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to load tasks", err))
@@ -30,7 +30,7 @@ func (h *Handlers) HandleListTask(w http.ResponseWriter, r *http.Request) {
 
 	for _, t := range tasks {
 		switch t.Status {
-		case "pending", "in_progress":
+		case "draft", "in_progress":
 			feed.Active = append(feed.Active, t)
 		case "planning":
 			feed.Planning = append(feed.Planning, t)

@@ -7,7 +7,7 @@
   interface Task {
     id: string;
     title: string;
-    repository_name?: string;
+    workspace_name?: string;
     status: TaskStatus;
     last_assistant_message?: string;
     updated_at: number;
@@ -19,7 +19,7 @@
   interface Props {
     task: Task;
     delay?: number;
-    variant: 'pending' | 'in_progress' | 'review' | 'done' | 'planning' | 'failed';
+    variant: 'draft' | 'in_progress' | 'review' | 'done' | 'planning' | 'failed';
   }
 
   let { task, delay, variant }: Props = $props();
@@ -34,7 +34,7 @@
     'w-full text-left bg-card border rounded-sm p-4 shadow-sm transition-all duration-200 ease-in-out active:scale-[0.98]';
 
   const variantClasses = {
-    pending: 'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
+    draft: 'border-gray-700/50 hover:border-primary/30 hover:bg-primary/5 active:bg-primary/10',
     planning:
       'border-violet-900/50 hover:border-violet-500/40 hover:bg-violet-500/5 active:bg-violet-500/10',
     in_progress:
@@ -61,7 +61,7 @@
 
       <div class="flex items-center gap-1.5 text-gray-500">
         <FolderIcon class="w-3 h-3" />
-        <span class="text-xs font-medium truncate">{task.repository_name || 'Unknown'}</span>
+        <span class="text-xs font-medium truncate">{task.workspace_name || 'Unknown'}</span>
       </div>
 
       {#if task.last_assistant_message}
@@ -95,12 +95,12 @@
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
-      {:else if variant === 'pending'}
+      {:else if variant === 'draft'}
         <div class="flex flex-col items-end gap-1.5">
           <span
             class="text-xs font-medium text-gray-500 px-2 py-0.5 rounded-full border border-gray-800 bg-gray-900/30 font-semibold uppercase tracking-wider"
           >
-            Pending
+            Draft
           </span>
           <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span

@@ -173,52 +173,6 @@ func (s *GitHubService) FetchRepos(ctx context.Context, accessToken string) ([]G
 	return repos, nil
 }
 
-func (s *GitHubService) SyncRepos(ctx context.Context, connectionID string) error {
-	// Get connection
-	conn, err := s.db.Queries.GetGithubConnectionByID(ctx, connectionID)
-	if err != nil {
-		return fmt.Errorf("failed to get connection: %w", err)
-	}
-
-	// Get repos from GitHub
-	repos, err := s.FetchRepos(ctx, conn.AccessToken)
-	if err != nil {
-		return fmt.Errorf("failed to get repos: %w", err)
-	}
-
-	// Sync repos - upsert based on connection_id and full_name
-	now := time.Now().UnixMilli()
-	for _, r := range repos {
-		// Use GitHub repo ID as our database ID for consistency
-		repoID := fmt.Sprintf("%d", r.ID)
-		if _, err := s.db.Queries.UpsertRepository(ctx, sqlc.UpsertRepositoryParams{
-			ID:           repoID,
-			ConnectionID: connectionID,
-			Name:         r.Name,
-			FullName:     r.FullName,
-			Owner:        r.Owner.Login,
-			IsPrivate:    r.Private,
-			HtmlUrl:      r.HTMLURL,
-			CloneUrl:     r.CloneURL,
-			LocalPath:    sql.NullString{},
-			CreatedAt:    now,
-			UpdatedAt:    now,
-		}); err != nil {
-			return fmt.Errorf("failed to upsert repo %s: %w", r.FullName, err)
-		}
-	}
-
-	return nil
-}
-
-func (s *GitHubService) GetRepos(ctx context.Context) ([]sqlc.Repository, error) {
-	conn, err := s.db.Queries.GetGithubConnection(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return s.db.Queries.ListRepositories(ctx, conn.ID)
-}
-
 func (s *GitHubService) GetConnection(ctx context.Context) (sqlc.GithubConnection, error) {
 	return s.db.Queries.GetGithubConnection(ctx)
 }
@@ -289,17 +243,6 @@ func (s *GitHubService) GetUserInfo(ctx context.Context) (*GitHubUser, error) {
 	}
 
 	return s.GetGitHubUser(ctx, conn.AccessToken)
-}
-
-// SyncConnection syncs the current connection's user info and repos.
-func (s *GitHubService) SyncConnection(ctx context.Context) error {
-	conn, err := s.db.Queries.GetGithubConnection(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get connection: %w", err)
-	}
-
-	// Sync repos
-	return s.SyncRepos(ctx, conn.ID)
 }
 
 // FetchUserRepos fetches repos from GitHub for the connected user.

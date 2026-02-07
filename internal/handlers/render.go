@@ -16,17 +16,17 @@ import (
 
 // AddTaskRequest is the request payload for adding a task.
 type AddTaskRequest struct {
-	VoiceInput string `json:"voice_input"`
-	ProjectID  string `json:"project_id"`
-	ModelID    string `json:"model_id"`
+	VoiceInput  string `json:"voice_input"`
+	WorkspaceID string `json:"workspace_id"`
+	ModelID     string `json:"model_id"`
 }
 
 func (a *AddTaskRequest) Bind(r *http.Request) error {
 	if a.VoiceInput == "" {
 		return errors.New("voice_input is required")
 	}
-	if a.ProjectID == "" {
-		return errors.New("project_id is required")
+	if a.WorkspaceID == "" {
+		return errors.New("workspace_id is required")
 	}
 	return nil
 }

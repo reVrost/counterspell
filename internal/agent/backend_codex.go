@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -278,6 +279,21 @@ func (b *CodexBackend) processCodexEvent(event map[string]any) {
 		}
 	default:
 		b.processCodexLegacyEvent(event)
+	}
+}
+
+// parseOutput is kept for test compatibility with line-delimited JSON fixtures.
+func (b *CodexBackend) parseOutput(scanner *bufio.Scanner) {
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var event map[string]any
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			continue
+		}
+		b.processCodexEvent(event)
 	}
 }
 

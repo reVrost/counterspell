@@ -173,14 +173,6 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 		return nil, err
 	}
 
-	existing, err := s.repo.GetTaskBySessionID(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return existing, nil
-	}
-
 	messages, err := s.repo.ListSessionMessages(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -188,11 +180,6 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 
 	if session.AgentBackend == "codex" {
 		return nil, ErrCodexUnsupported
-	}
-
-	snapshot, err := json.Marshal(messages)
-	if err != nil {
-		return nil, fmt.Errorf("failed to snapshot messages: %w", err)
 	}
 
 	summaryTitle, summaryIntent, err := s.summarizeSession(ctx, session, messages)
@@ -204,7 +191,7 @@ func (s *SessionService) Promote(ctx context.Context, sessionID string) (*models
 		return nil, fmt.Errorf("failed to summarize session: empty title or intent")
 	}
 
-	task, err := s.repo.CreateFromSession(ctx, sessionID, summaryTitle, summaryIntent, string(snapshot))
+	task, err := s.repo.CreateFromSession(ctx, summaryTitle, summaryIntent)
 	if err != nil {
 		return nil, err
 	}

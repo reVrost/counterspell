@@ -1,6 +1,6 @@
 <script lang="ts">
   import { appState } from '$lib/stores/app.svelte';
-  import { MODELS, type Project } from '$lib/types';
+  import { MODELS } from '$lib/types';
   import { cn } from '$lib/utils';
   import { tasksAPI, filesAPI } from '$lib/api';
   import { dropdownPop, slide, DURATIONS } from '$lib/utils/transitions';
@@ -94,10 +94,10 @@
   }
 
   async function searchFiles(query: string) {
-    const projectId = appState.activeProjectId;
-    if (!projectId) return;
+    const workspaceId = appState.activeWorkspaceId;
+    if (!workspaceId) return;
     try {
-      files = await filesAPI.search(projectId, query);
+      files = await filesAPI.search(workspaceId, query);
       selectedIndex = 0;
     } catch (e) {
       console.error('File search failed:', e);
@@ -153,8 +153,8 @@
 
   async function submit() {
     if (!text.trim()) return;
-    if (mode === 'create' && !appState.activeProjectId) {
-      appState.showToast('Select a project first', 'error');
+    if (mode === 'create' && !appState.activeWorkspaceId) {
+      appState.showToast('Select a workspace first', 'error');
       return;
     }
 
@@ -169,7 +169,7 @@
       try {
         const response = await tasksAPI.create(
           msg,
-          appState.activeProjectId,
+          appState.activeWorkspaceId,
           appState.activeModelId
         );
         appState.showToast(response.message || 'Task created', 'success');
@@ -316,14 +316,14 @@
             <XIcon class="w-5 h-5" />
           </button>
 
-          <!-- Project Selector -->
+          <!-- Workspace Selector -->
           <div class="relative" bind:this={projectMenuRef}>
             <button
               type="button"
               onclick={() => (appState.inputProjectMenuOpen = !appState.inputProjectMenuOpen)}
               class={cn(
                 'flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border shadow-sm',
-                appState.activeProjectId
+                appState.activeWorkspaceId
                   ? 'bg-[#1C1C1C] hover:bg-[#252525] border-[#333] text-gray-200'
                   : 'bg-[#1C1C1C] hover:bg-[#252525] border-[#333] text-gray-400'
               )}
@@ -331,20 +331,20 @@
               <div
                 class={cn(
                   'flex items-center justify-center w-3.5 h-3.5 rounded-full',
-                  appState.activeProjectId ? 'bg-primary/20' : 'bg-gray-700/50'
+                  appState.activeWorkspaceId ? 'bg-primary/20' : 'bg-gray-700/50'
                 )}
               >
                 <FolderIcon
                   class={cn(
                     'w-2.5 h-2.5',
-                    appState.activeProjectId ? 'text-primary' : 'text-gray-400'
+                    appState.activeWorkspaceId ? 'text-primary' : 'text-gray-400'
                   )}
                 />
               </div>
               <span class="max-w-[120px] truncate">
-                {appState.activeProjectName
-                  ? appState.activeProjectName.split('/').pop()
-                  : 'Select project'}
+                {appState.activeWorkspaceName
+                  ? appState.activeWorkspaceName.split('/').pop()
+                  : 'Select workspace'}
               </span>
               <ChevronDownIcon class="w-2.5 h-2.5 opacity-50 ml-0.5" />
             </button>
@@ -363,29 +363,29 @@
                     <input
                       bind:value={projectSearch}
                       type="text"
-                      placeholder="Search repositories..."
+                      placeholder="Search workspaces..."
                       class="w-full bg-black/40 border border-gray-700 rounded-xl pl-8 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary placeholder-gray-600 transition-all font-medium"
                     />
                   </div>
                 </div>
 
-                <!-- Projects/Repos List -->
+                <!-- Workspaces List -->
                 <div class="max-h-64 overflow-y-auto py-2 px-1 scrollbar-thin">
                   {#if appState.projects.length > 0}
                     <div
                       class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1"
                     >
-                      Active Projects
+                      Workspaces
                     </div>
                     {#each appState.projects.filter((p) => p.name
                         .toLowerCase()
                         .includes(projectSearch.toLowerCase())) as p}
                       <button
                         type="button"
-                        onclick={() => appState.setActiveProject(p.id, p.name)}
+                        onclick={() => appState.setActiveWorkspace(p.id, p.name)}
                         class={cn(
                           'w-full px-3 py-2 rounded-xl flex items-center justify-between group transition-all duration-150',
-                          appState.activeProjectId === p.id
+                          appState.activeWorkspaceId === p.id
                             ? 'bg-primary/10 text-white'
                             : 'text-gray-400 hover:bg-white/5 hover:text-white'
                         )}
@@ -396,7 +396,7 @@
                           ></div>
                           <span class="text-sm font-medium truncate">{p.name}</span>
                         </div>
-                        {#if appState.activeProjectId === p.id}
+                        {#if appState.activeWorkspaceId === p.id}
                           <CheckIcon class="w-3 h-3 text-primary" />
                         {/if}
                       </button>
@@ -407,14 +407,14 @@
                   <div
                     class="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1"
                   >
-                    All Repositories
+                    Other Repositories
                   </div>
                   {#each appState.repos.filter((r) => r.full_name
                         .toLowerCase()
                         .includes(projectSearch.toLowerCase()) && !appState.projects.some((p) => p.name === r.full_name)) as r}
                     <button
                       type="button"
-                      onclick={() => appState.setActiveProject(r.id.toString(), r.full_name)}
+                      onclick={() => appState.setActiveWorkspace(r.id.toString(), r.full_name)}
                       class="w-full px-3 py-2 rounded-xl flex items-center gap-3 text-gray-400 hover:bg-white/5 hover:text-white group transition-all duration-150"
                     >
                       <div
@@ -424,7 +424,7 @@
                     </button>
                   {:else}
                     <div class="px-4 py-8 text-center text-gray-600 text-[11px] italic">
-                      No repositories found matching "{projectSearch}"
+                      No workspaces found matching "{projectSearch}"
                     </div>
                   {/each}
                 </div>

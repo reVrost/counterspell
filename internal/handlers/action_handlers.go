@@ -14,9 +14,9 @@ func (h *Handlers) HandleNewTask(w http.ResponseWriter, r *http.Request) {
 	//	userID := "default"
 
 	var req struct {
-		Intent    string `json:"intent"`
-		ProjectID string `json:"project_id"`
-		ModelID   string `json:"model_id"`
+		Intent      string `json:"intent"`
+		WorkspaceID string `json:"workspace_id"`
+		ModelID     string `json:"model_id"`
 	}
 	if err := render.DecodeJSON(r.Body, &req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -28,8 +28,8 @@ func (h *Handlers) HandleNewTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("[HANDLER] Starting task submission", "project_id", req.ProjectID, "intent", req.Intent, "model_id", req.ModelID)
-	taskID, err := h.orchestrator.NewTask(ctx, req.ProjectID, req.Intent, req.ModelID)
+	slog.Info("[HANDLER] Starting task submission", "workspace_id", req.WorkspaceID, "intent", req.Intent, "model_id", req.ModelID)
+	taskID, err := h.orchestrator.NewTask(ctx, req.WorkspaceID, req.Intent, req.ModelID)
 	if err != nil {
 		slog.Error("Failed to start task", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start task", err))

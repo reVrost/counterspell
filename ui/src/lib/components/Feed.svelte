@@ -16,7 +16,7 @@
   // Derived Values
   const projects = $derived(Object.values(feedData?.projects || {}));
 
-  // Unified Active Tasks (combines reviews, in_progress, planning, pending)
+  // Unified Active Tasks (combines reviews, in_progress, planning, draft)
   const activeTasks = $derived.by(() => {
     const all = [
       ...(feedData?.reviews || []),
@@ -34,7 +34,7 @@
       const project = projects.find((p) => p.id === selectedWorkspaceId);
       if (project) {
         tasks = tasks.filter(
-          (t) => t.repository_id === project.id || t.repository_name === project.name
+          (t) => t.workspace_id === project.id || t.workspace_name === project.name
         );
       }
     }
@@ -125,7 +125,7 @@
           </div>
           <h3 class="text-sm font-medium text-zinc-300 mb-1">All Caught Up</h3>
           <p class="text-xs text-zinc-500 max-w-[200px]">
-            {selectedWorkspaceId ? 'No pending items in this workspace' : 'Your inbox is empty'}
+            {selectedWorkspaceId ? 'No draft items in this workspace' : 'Your inbox is empty'}
           </p>
         </div>
       {/if}

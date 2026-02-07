@@ -235,7 +235,7 @@
           </h3>
           <div class="p-4 rounded-xl border border-red-500/20 bg-red-500/5">
             <p class="text-sm text-gray-400 mb-4 leading-relaxed">
-              This will disconnect your GitHub account and <strong>permanently delete</strong> all repositories
+              This will disconnect your GitHub account and <strong>permanently delete</strong> all workspaces
               and tasks from the server.
             </p>
             <Button

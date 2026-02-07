@@ -26,8 +26,12 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 	return &Repository{Q: queries}
 }
 
-func (s *Repository) GetRepository(ctx context.Context, projectID string) (sqlc.Repository, error) {
-	return s.Q.GetRepository(ctx, projectID)
+func (s *Repository) GetWorkspace(ctx context.Context, workspaceID string) (sqlc.Workspace, error) {
+	return s.Q.GetWorkspace(ctx, workspaceID)
+}
+
+func (s *Repository) ListWorkspaces(ctx context.Context) ([]sqlc.Workspace, error) {
+	return s.Q.ListWorkspaces(ctx)
 }
 
 func (s *Repository) GetGithubConnectionByID(ctx context.Context, githubConnectionID string) (sqlc.GithubConnection, error) {
@@ -36,7 +40,7 @@ func (s *Repository) GetGithubConnectionByID(ctx context.Context, githubConnecti
 }
 
 // CreateTask creates a new task with validation.
-func (s *Repository) CreateTask(ctx context.Context, repositoryID, intent string) (*models.Task, error) {
+func (s *Repository) CreateTask(ctx context.Context, workspaceID, intent string) (*models.Task, error) {
 	id := shortuuid.New()
 	// Validate input
 	if intent == "" {
@@ -45,15 +49,13 @@ func (s *Repository) CreateTask(ctx context.Context, repositoryID, intent string
 
 	now := time.Now().UnixMilli()
 	if err := s.Q.CreateTask(ctx, sqlc.CreateTaskParams{
-		ID:               id,
-		RepositoryID:     sql.NullString{String: repositoryID, Valid: repositoryID != ""},
-		SessionID:        sql.NullString{},
-		Title:            intent, // Use intent as title for now
-		Intent:           intent,
-		PromotedSnapshot: sql.NullString{},
-		Status:           "pending",
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:          id,
+		WorkspaceID: sql.NullString{String: workspaceID, Valid: workspaceID != ""},
+		Title:       intent, // Use intent as title for now
+		Intent:      intent,
+		Status:      "draft",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to create task with id %s: %w", id, err)
 	}
@@ -62,7 +64,7 @@ func (s *Repository) CreateTask(ctx context.Context, repositoryID, intent string
 }
 
 // CreateFromSession creates a task from a session promotion.
-func (s *Repository) CreateFromSession(ctx context.Context, sessionID, title, intent, snapshot string) (*models.Task, error) {
+func (s *Repository) CreateFromSession(ctx context.Context, title, intent string) (*models.Task, error) {
 	id := shortuuid.New()
 	if title == "" {
 		title = "Promoted session"
@@ -73,15 +75,13 @@ func (s *Repository) CreateFromSession(ctx context.Context, sessionID, title, in
 
 	now := time.Now().UnixMilli()
 	if err := s.Q.CreateTask(ctx, sqlc.CreateTaskParams{
-		ID:               id,
-		RepositoryID:     sql.NullString{},
-		SessionID:        sql.NullString{String: sessionID, Valid: sessionID != ""},
-		Title:            title,
-		Intent:           intent,
-		PromotedSnapshot: sql.NullString{String: snapshot, Valid: snapshot != ""},
-		Status:           "pending",
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:          id,
+		WorkspaceID: sql.NullString{},
+		Title:       title,
+		Intent:      intent,
+		Status:      "draft",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to create task with id %s: %w", id, err)
 	}
@@ -112,16 +112,16 @@ func (s *Repository) List(ctx context.Context) ([]*models.Task, error) {
 	return result, nil
 }
 
-// ListWithRepository retrieves all tasks with repository names.
-func (s *Repository) ListWithRepository(ctx context.Context) ([]*models.Task, error) {
-	tasks, err := s.Q.ListTasksWithRepository(ctx)
+// ListWithWorkspace retrieves all tasks with workspace names.
+func (s *Repository) ListWithWorkspace(ctx context.Context) ([]*models.Task, error) {
+	tasks, err := s.Q.ListTasksByWorkspace(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]*models.Task, len(tasks))
 	for i := range tasks {
-		result[i] = sqlcTaskWithRepoToModel(&tasks[i])
+		result[i] = sqlcTaskWithWorkspaceToModel(&tasks[i])
 	}
 	return result, nil
 }
@@ -143,7 +143,7 @@ func (s *Repository) ListByStatus(ctx context.Context, status string) ([]*models
 // UpdateStatus updates task status with validation.
 func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error {
 	// Validate status
-	validStatuses := []string{"pending", "planning", "in_progress", "review", "done", "failed"}
+	validStatuses := []string{"draft", "planning", "in_progress", "review", "done", "failed"}
 	if !slices.Contains(validStatuses, status) {
 		return fmt.Errorf("invalid status: %s", status)
 	}
@@ -155,21 +155,6 @@ func (s *Repository) UpdateStatus(ctx context.Context, id, status string) error 
 		return err
 	}
 	return nil
-}
-
-// GetTaskBySessionID retrieves a task by session ID.
-func (s *Repository) GetTaskBySessionID(ctx context.Context, sessionID string) (*models.Task, error) {
-	if sessionID == "" {
-		return nil, nil
-	}
-	task, err := s.Q.GetTaskBySessionID(ctx, sql.NullString{String: sessionID, Valid: true})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return sqlcTaskToModel(&task), nil
 }
 
 // UpdateTaskTitleIntent updates a task title and intent.
@@ -192,9 +177,9 @@ func (s *Repository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetPendingTasks retrieves all pending tasks for execution.
+// GetPendingTasks retrieves all draft tasks for execution.
 func (s *Repository) GetPendingTasks(ctx context.Context) ([]*models.Task, error) {
-	return s.ListByStatus(ctx, "pending")
+	return s.ListByStatus(ctx, "draft")
 }
 
 // GetInProgressTasks retrieves all in-progress tasks.
@@ -205,21 +190,19 @@ func (s *Repository) GetInProgressTasks(ctx context.Context) ([]*models.Task, er
 // sqlcTaskToModel converts sqlc task to model.
 func sqlcTaskToModel(task *sqlc.Task) *models.Task {
 	return &models.Task{
-		ID:               task.ID,
-		RepositoryID:     nullableString(task.RepositoryID),
-		SessionID:        nullableString(task.SessionID),
-		Title:            task.Title,
-		Intent:           task.Intent,
-		PromotedSnapshot: nullableString(task.PromotedSnapshot),
-		Status:           task.Status,
-		Position:         nullableInt64(task.Position),
-		CreatedAt:        task.CreatedAt,
-		UpdatedAt:        task.UpdatedAt,
+		ID:          task.ID,
+		WorkspaceID: nullableString(task.WorkspaceID),
+		Title:       task.Title,
+		Intent:      task.Intent,
+		Status:      task.Status,
+		Position:    nullableInt64(task.Position),
+		CreatedAt:   task.CreatedAt,
+		UpdatedAt:   task.UpdatedAt,
 	}
 }
 
-// sqlcTaskWithRepoToModel converts sqlc task with repository to model.
-func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task {
+// sqlcTaskWithWorkspaceToModel converts sqlc task with workspace to model.
+func sqlcTaskWithWorkspaceToModel(task *sqlc.ListTasksByWorkspaceRow) *models.Task {
 	var lastMsg *string
 	if msg, ok := task.LastAssistantMessage.(string); ok && msg != "" {
 		copyMsg := msg
@@ -228,12 +211,10 @@ func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task
 
 	return &models.Task{
 		ID:                   task.ID,
-		RepositoryID:         nullableString(task.RepositoryID),
-		RepositoryName:       nullableString(task.RepositoryName),
-		SessionID:            nullableString(task.SessionID),
+		WorkspaceID:          nullableString(task.WorkspaceID),
+		WorkspaceName:        nullableString(task.WorkspaceName),
 		Title:                task.Title,
 		Intent:               task.Intent,
-		PromotedSnapshot:     nullableString(task.PromotedSnapshot),
 		Status:               task.Status,
 		Position:             nullableInt64(task.Position),
 		LastAssistantMessage: lastMsg,
@@ -245,17 +226,15 @@ func sqlcTaskWithRepoToModel(task *sqlc.ListTasksWithRepositoryRow) *models.Task
 // sqlcGetTaskRowToModel converts sqlc GetTaskRow to model.
 func sqlcGetTaskRowToModel(task *sqlc.GetTaskRow) *models.Task {
 	return &models.Task{
-		ID:               task.ID,
-		RepositoryID:     nullableString(task.RepositoryID),
-		RepositoryName:   nullableString(task.RepositoryName),
-		SessionID:        nullableString(task.SessionID),
-		Title:            task.Title,
-		Intent:           task.Intent,
-		PromotedSnapshot: nullableString(task.PromotedSnapshot),
-		Status:           task.Status,
-		Position:         nullableInt64(task.Position),
-		CreatedAt:        task.CreatedAt,
-		UpdatedAt:        task.UpdatedAt,
+		ID:            task.ID,
+		WorkspaceID:   nullableString(task.WorkspaceID),
+		WorkspaceName: nullableString(task.WorkspaceName),
+		Title:         task.Title,
+		Intent:        task.Intent,
+		Status:        task.Status,
+		Position:      nullableInt64(task.Position),
+		CreatedAt:     task.CreatedAt,
+		UpdatedAt:     task.UpdatedAt,
 	}
 }
 

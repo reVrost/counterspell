@@ -20,8 +20,8 @@ export interface GitHubRepo {
 
 export interface Task {
   id: string;
-  repository_id?: string;
-  repository_name?: string;
+  workspace_id?: string;
+  workspace_name?: string;
   title: string;
   intent: string;
   status: TaskStatus;
@@ -33,8 +33,8 @@ export interface Task {
   git_diff?: string;
 }
 
-// Task Status Flow: pending → planning → in_progress → review → done (or failed)
-export type TaskStatus = 'pending' | 'planning' | 'in_progress' | 'review' | 'done' | 'failed';
+// Task Status Flow: draft → planning → in_progress → review → done (or failed)
+export type TaskStatus = 'draft' | 'planning' | 'in_progress' | 'review' | 'done' | 'failed';
 
 export interface Message {
   id: string;

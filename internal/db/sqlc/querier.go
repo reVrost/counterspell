@@ -45,12 +45,14 @@ type Querier interface {
 	GetSessionNextSequence(ctx context.Context, sessionID string) (int64, error)
 	GetSettings(ctx context.Context) (GetSettingsRow, error)
 	GetTask(ctx context.Context, id string) (GetTaskRow, error)
+	GetWorkspace(ctx context.Context, id string) (Workspace, error)
 	ListAgentRunsByTask(ctx context.Context, taskID string) ([]AgentRun, error)
 	ListSessionMessages(ctx context.Context, sessionID string) ([]SessionMessage, error)
 	ListSessions(ctx context.Context) ([]Session, error)
 	ListTasks(ctx context.Context) ([]Task, error)
 	ListTasksByStatus(ctx context.Context, status string) ([]Task, error)
 	ListTasksByWorkspace(ctx context.Context) ([]ListTasksByWorkspaceRow, error)
+	ListWorkspaces(ctx context.Context) ([]Workspace, error)
 	UpdateAgentRunBackendSessionID(ctx context.Context, arg UpdateAgentRunBackendSessionIDParams) error
 	UpdateAgentRunCompleted(ctx context.Context, arg UpdateAgentRunCompletedParams) error
 	UpdateGithubConnection(ctx context.Context, arg UpdateGithubConnectionParams) (GithubConnection, error)

@@ -121,7 +121,7 @@ const tasks = await getTasks();
 // Create a new task
 const task = await createTask({
   intent: "Add user authentication",
-  project_id: ".",
+  workspace_id: ".",
   model_id: "gpt-4"
 });
 

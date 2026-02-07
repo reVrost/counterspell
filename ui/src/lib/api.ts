@@ -207,10 +207,10 @@ export const tasksAPI = {
     return fetchAPI<{ git_diff: string }>(`/api/v1/tasks/${id}/diff`);
   },
 
-  async create(intent: string, projectId: string, modelId: string): Promise<APIResponse> {
+  async create(intent: string, workspaceId: string, modelId: string): Promise<APIResponse> {
     return postJsonWithResponse('/api/v1/tasks', {
       intent: intent,
-      project_id: projectId,
+      workspace_id: workspaceId,
       model_id: modelId,
     });
   },
@@ -296,10 +296,10 @@ export const settingsAPI = {
 // ==================== FILES ====================
 
 export const filesAPI = {
-  async search(projectId: string, query: string): Promise<string[]> {
+  async search(workspaceId: string, query: string): Promise<string[]> {
     if (!query || query.length < 2) return [];
     const params = new URLSearchParams({
-      project_id: projectId,
+      workspace_id: workspaceId,
       q: query,
     });
     return fetchAPI<string[]>(`/api/v1/files/search?${params}`);

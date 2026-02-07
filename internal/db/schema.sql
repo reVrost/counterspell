@@ -11,8 +11,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     status TEXT NOT NULL CHECK(status IN ('draft', 'planning', 'in_progress', 'review', 'done', 'failed')),
     position INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL, -- timestampz replacement is unix in milli,
-    updated_at INTEGER NOT NULL, -- timestampz replacement is unix in milli
-    UNIQUE(session_id)
+    updated_at INTEGER NOT NULL -- timestampz replacement is unix in milli
 );
 
 CREATE TRIGGER IF NOT EXISTS update_tasks_updated_at

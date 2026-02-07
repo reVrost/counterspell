@@ -61,7 +61,7 @@
 <header
   class="h-16 flex items-center justify-between px-6 z-30 shrink-0 fixed top-0 left-0 right-0 backdrop-blur-lg bg-zinc-950/30 transition-all duration-300"
 >
-  <!-- Left: Project Selector -->
+  <!-- Left: Workspace Selector -->
   <div class="flex items-center">
     <DropdownMenu.Root bind:open={appState.projectMenuOpen}>
       <DropdownMenu.Trigger
@@ -88,7 +88,7 @@
               <input
                 bind:value={projectSearch}
                 type="text"
-                placeholder="Filter repositories..."
+                placeholder="Filter workspaces..."
                 class="w-full bg-white/[0.03] border border-white/5 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-violet-500/50 focus:bg-white/[0.05] placeholder-zinc-600 transition-all"
               />
             </div>
@@ -99,15 +99,15 @@
             <DropdownMenu.Item
               class="w-full px-3 py-2 hover:bg-white/5 cursor-pointer text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1 text-left focus:bg-white/5 outline-none"
             >
-              All Projects
+              All Workspaces
             </DropdownMenu.Item>
 
             {#each filteredProjects as p}
               <DropdownMenu.Item
-                onSelect={() => appState.setActiveProject(p.id, p.name)}
+                onSelect={() => appState.setActiveWorkspace(p.id, p.name)}
                 class={cn(
                   'w-full px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg flex items-center gap-3 group transition text-left focus:bg-white/5 outline-none mb-0.5',
-                  appState.activeProjectId === p.id && 'bg-white/[0.08] text-white'
+                  appState.activeWorkspaceId === p.id && 'bg-white/[0.08] text-white'
                 )}
               >
                 <div
@@ -122,14 +122,14 @@
                     {p.name}
                   </div>
                 </div>
-                {#if appState.activeProjectId === p.id}
+                {#if appState.activeWorkspaceId === p.id}
                   <CheckIcon class="w-3.5 h-3.5 text-violet-400" />
                 {/if}
               </DropdownMenu.Item>
             {/each}
 
             {#if filteredProjects.length === 0}
-              <div class="px-4 py-8 text-center text-zinc-600 text-sm">No projects found.</div>
+              <div class="px-4 py-8 text-center text-zinc-600 text-sm">No workspaces found.</div>
             {/if}
           </div>
 
@@ -137,7 +137,7 @@
           <div
             class="mt-1 px-3 py-2 bg-white/[0.02] border-t border-white/5 text-[10px] text-zinc-500 flex justify-between items-center rounded-b-xl"
           >
-            <span class="font-medium">{appState.projects.length} Repositories</span>
+            <span class="font-medium">{appState.projects.length} Workspaces</span>
             <button
               class="hover:text-violet-400 font-semibold cursor-pointer flex items-center gap-1 transition-colors"
             >
