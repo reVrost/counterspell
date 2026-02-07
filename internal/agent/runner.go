@@ -54,6 +54,13 @@ func WithRunnerSystemPrompt(prompt string) RunnerOption {
 	}
 }
 
+// WithTaskDone sets the callback to mark the task as done.
+func WithTaskDone(done func() error) RunnerOption {
+	return func(r *Runner) {
+		r.toolCtx.TaskDone = done
+	}
+}
+
 // Runner executes agent tasks with streaming output.
 type Runner struct {
 	provider       llm.Provider
@@ -77,17 +84,18 @@ func NewRunner(provider llm.Provider, workDir string, opts ...RunnerOption) *Run
 		todoState:    tools.NewTodoState(),
 	}
 
-	for _, opt := range opts {
-		opt(r)
-	}
-
-	// Create tool registry with context
+	// Create tool registry with context BEFORE applying options
+	// (options may need to access r.toolCtx, e.g., WithTaskDone)
 	toolCtx := &tools.Context{
 		WorkDir:   workDir,
 		TodoState: r.todoState,
 	}
 	r.toolCtx = toolCtx
 	r.toolRegistry = tools.NewRegistry(toolCtx)
+
+	for _, opt := range opts {
+		opt(r)
+	}
 
 	return r
 }

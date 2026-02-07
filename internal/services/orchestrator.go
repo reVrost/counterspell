@@ -476,10 +476,22 @@ func (o *Orchestrator) executeTask(ctx context.Context, job TaskJob) {
 
 		// Default to native
 		slog.Info("[ORCHESTRATOR] Initializing Native backend", "task_id", job.TaskID)
+
+		// Create taskDone callback to mark task as done when agent calls mark_done tool
+		taskDone := func() error {
+			if err := o.repo.UpdateStatus(ctx, job.TaskID, "done"); err != nil {
+				return fmt.Errorf("failed to update task status: %w", err)
+			}
+			o.eventBus.Publish(models.Event{TaskID: job.TaskID, Type: string(EventTypeTaskUpdated), Data: ""})
+			slog.Info("[ORCHESTRATOR] Task marked as done via mark_done tool", "task_id", job.TaskID)
+			return nil
+		}
+
 		backend, err = agent.NewNativeBackend(
 			agent.WithProvider(llmProvider),
 			agent.WithWorkDir(workspacePath),
 			agent.WithSystemPrompt(systemPrompt),
+			agent.WithTaskDoneCallback(taskDone),
 		)
 	}
 
@@ -688,30 +700,28 @@ func (o *Orchestrator) processResults() {
 	}
 }
 
-// MergeTask merges task branch to main and pushes.
+// MergeTask prompts the agent to merge task changes to main using the merge skill.
 func (o *Orchestrator) MergeTask(ctx context.Context, taskID string) error {
-	// Get task info
+	// Get task info to verify it exists
 	if _, err := o.repo.Get(ctx, taskID); err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
-	// Merge to main
-	_, err := o.repoManager.MergeToMain(ctx, taskID)
-	if err != nil {
-		// Check for merge conflict
-		if _, isConflict := err.(*ErrMergeConflict); isConflict {
-			return err
-		}
-		return fmt.Errorf("failed to merge: %w", err)
-	}
+	// Prompt the agent to use the merge skill
+	// The agent will call recall-skill tool with name="merge" to get detailed instructions
+	mergePrompt := "Please merge these changes to the main branch. Use the recall-skill tool with argument 'merge' to get the detailed merge instructions, then follow those instructions carefully."
 
-	// Update task status to done
-	if err := o.repo.UpdateStatus(ctx, taskID, "done"); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
-	}
+	slog.Info("[ORCHESTRATOR] Starting merge via skill-based agent", "task_id", taskID)
 
-	// Publish task_updated event
-	o.eventBus.Publish(models.Event{TaskID: taskID, Type: string(EventTypeTaskUpdated), Data: ""})
+	// TODO: Get model ID from the original task instead of hardcoding
+	// Currently hardcoded to zai#glm-4.7 for testing - should use the same model as the original task
+	modelID := "zai#glm-4.7"
+
+	// Use PromptTask to have the agent execute the merge skill
+	// This reuses the existing agent infrastructure and streams progress to the UI
+	if err := o.PromptTask(ctx, taskID, mergePrompt, modelID); err != nil {
+		return fmt.Errorf("failed to start merge task: %w", err)
+	}
 
 	return nil
 }

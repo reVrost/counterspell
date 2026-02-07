@@ -35,6 +35,7 @@ type nativeBackendConfig struct {
 	provider     llm.Provider
 	workDir      string
 	systemPrompt string
+	taskDone     func() error
 }
 
 // WithProvider sets the LLM provider.
@@ -58,6 +59,13 @@ func WithSystemPrompt(prompt string) NativeBackendOption {
 	}
 }
 
+// WithTaskDone sets the callback to mark the task as done.
+func WithTaskDoneCallback(done func() error) NativeBackendOption {
+	return func(c *nativeBackendConfig) {
+		c.taskDone = done
+	}
+}
+
 // NewNativeBackend creates a native Go agent backend.
 //
 // Example:
@@ -78,7 +86,14 @@ func NewNativeBackend(opts ...NativeBackendOption) (*NativeBackend, error) {
 		return nil, ErrProviderRequired
 	}
 
-	runner := NewRunner(cfg.provider, cfg.workDir, WithRunnerSystemPrompt(cfg.systemPrompt))
+	runnerOpts := []RunnerOption{WithRunnerSystemPrompt(cfg.systemPrompt)}
+	if cfg.taskDone != nil {
+		// WithTaskDone is defined in runner.go - it takes func() error
+		runnerOpts = append(runnerOpts, func(r *Runner) {
+			r.toolCtx.TaskDone = cfg.taskDone
+		})
+	}
+	runner := NewRunner(cfg.provider, cfg.workDir, runnerOpts...)
 
 	return &NativeBackend{runner: runner}, nil
 }

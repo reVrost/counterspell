@@ -38,6 +38,8 @@ type Context struct {
 	TodoState *TodoState
 	// TodoEvents receives the latest todo list when it changes.
 	TodoEvents chan<- []TodoItem
+	// TaskDone is called when the task is complete (e.g., successful merge)
+	TaskDone func() error
 }
 
 // Registry holds all available tools.
@@ -78,6 +80,8 @@ func (r *Registry) registerAll() {
 	r.tools["bash"] = r.makeBashTool()
 	r.tools["ls"] = r.makeLsTool()
 	r.tools["todos"] = r.makeTodoTool()
+	r.tools["recall-skill"] = r.makeSkillTool()
+	r.tools["mark_done"] = r.makeMarkDoneTool()
 }
 
 // resolvePath resolves a path relative to the work directory.
