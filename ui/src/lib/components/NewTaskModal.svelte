@@ -153,7 +153,7 @@
   function updateAudioLevels() {
     if (!appState.isRecording) return;
 
-    analyser.getByteFrequencyData(dataArray);
+    analyser.getByteFrequencyData(dataArray as Uint8Array<ArrayBuffer>);
 
     // Calculate average volume for visualization
     let sum = 0;

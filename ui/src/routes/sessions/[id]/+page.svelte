@@ -316,7 +316,7 @@
         <div class="text-center">
           <p class="text-base text-red-400 mb-2">{error}</p>
           <button
-            onclick={() => loadSession($page.params.id)}
+            onclick={() => $page.params.id && loadSession($page.params.id)}
             class="px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-sm text-violet-300 hover:bg-violet-500/30 transition-colors"
           >
             Retry
@@ -327,7 +327,7 @@
       <SessionDetail
         {session}
         {messages}
-        onRefresh={() => loadSession(session.id, { showLoading: false })}
+        onRefresh={() => loadSession(activeSessionId || '', { showLoading: false })}
       />
     {/if}
   </div>

@@ -457,9 +457,6 @@ func (s *OAuthService) EnsureAuthenticated(ctx context.Context) (*AuthResult, er
 		}
 	}
 	if identity != nil {
-		if err := s.ensureMachineJWTOwner(identity, machineJWT); err != nil {
-			return nil, err
-		}
 		if err := s.updateMachineIdentityLastSeen(ctx, machineID); err != nil {
 			slog.Warn("Failed to update machine last_seen", "error", err)
 		}
@@ -504,9 +501,6 @@ func (s *OAuthService) IsAuthenticated(ctx context.Context) (bool, *sqlc.Machine
 	}
 	if identity == nil || !identity.MachineJwt.Valid || strings.TrimSpace(identity.MachineJwt.String) == "" {
 		return false, identity, nil
-	}
-	if err := s.ensureMachineJWTOwner(identity, identity.MachineJwt.String); err != nil {
-		return false, identity, err
 	}
 	return true, identity, nil
 }

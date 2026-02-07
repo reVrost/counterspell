@@ -103,7 +103,7 @@
         ensureStreamMessage(id, event.role);
         const state = streamState.get(id);
         if (!state) return;
-        state.current = event.block || { type: event.block_type || 'text' };
+        state.current = (event.block || { type: (event.block_type || 'text') as ContentBlock['type'] }) as ContentBlock;
         state.args = '';
         updateStreamMessage(id);
         break;
@@ -113,10 +113,10 @@
         const state = streamState.get(id);
         if (!state) return;
         if (!state.current || state.current.type !== event.block_type) {
-          state.current = { type: event.block_type || 'text' };
+          state.current = { type: (event.block_type || 'text') as ContentBlock['type'] };
           state.args = '';
         }
-        if (event.block_type === 'text' || event.block_type === 'thinking') {
+        if (state.current && (event.block_type === 'text' || event.block_type === 'thinking')) {
           state.current.text = (state.current.text || '') + (event.delta || '');
         } else if (event.block_type === 'tool_use') {
           state.args = (state.args || '') + (event.delta || '');
@@ -322,7 +322,7 @@
         <div class="text-center">
           <p class="text-base text-red-400 mb-2">{error}</p>
           <button
-            onclick={() => loadTask($page.params.id)}
+            onclick={() => $page.params.id && loadTask($page.params.id)}
             class="px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-sm text-violet-300 hover:bg-violet-500/30 transition-colors"
           >
             Retry

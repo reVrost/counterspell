@@ -14,6 +14,7 @@
     reviews: [],
     done: [],
     todo: [],
+    planning: [],
     projects: {},
   });
 

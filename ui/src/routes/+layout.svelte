@@ -50,14 +50,17 @@
   }
 
   // Initialize app state
-  $effect(async () => {
-    // Initialize global error handlers first
-    initGlobalErrorHandlers();
+  $effect(() => {
+    const init = async () => {
+      // Initialize global error handlers first
+      initGlobalErrorHandlers();
 
-    console.log('🚀 App layout mounting...');
-    await appState.init();
-    isInitialized = true;
-    console.log('✅ App state initialized, isAuth:', appState.isAuthenticated);
+      console.log('🚀 App layout mounting...');
+      await appState.init();
+      isInitialized = true;
+      console.log('✅ App state initialized, isAuth:', appState.isAuthenticated);
+    };
+    init();
   });
 
   // Auth guard - handle authentication

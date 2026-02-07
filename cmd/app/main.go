@@ -125,7 +125,7 @@ func main() {
 	}
 
 	sessionService := services.NewSessionService(repo, settingsService, eventBus, cfg.DataDir)
-	oauthService := services.NewOAuthService(database, cfg)
+	oauthService := authService
 
 	// Create handlers with shared database
 	h, err := handlers.NewHandlers(cfg, repo, eventBus, settingsService, sessionService, oauthService, orchestrator)

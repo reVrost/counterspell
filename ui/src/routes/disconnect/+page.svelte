@@ -1,20 +1,23 @@
 <script lang="ts">
 	import { appState } from '$lib/stores/app.svelte';
 
-	$effect(async () => {
-		// Clear auth state
-		appState.isAuthenticated = false;
-		appState.userEmail = '';
+	$effect(() => {
+		const disconnect = async () => {
+			// Clear auth state
+			appState.isAuthenticated = false;
+			appState.userEmail = '';
 
-		try {
-			// Call backend disconnect endpoint
-			await fetch('/disconnect', { method: 'POST', credentials: 'include' });
-		} catch (err) {
-			console.error('Disconnect failed:', err);
-		} finally {
-			// Always redirect to home
-			window.location.href = '/';
-		}
+			try {
+				// Call backend disconnect endpoint
+				await fetch('/disconnect', { method: 'POST', credentials: 'include' });
+			} catch (err) {
+				console.error('Disconnect failed:', err);
+			} finally {
+				// Always redirect to home
+				window.location.href = '/';
+			}
+		};
+		disconnect();
 	});
 </script>
 

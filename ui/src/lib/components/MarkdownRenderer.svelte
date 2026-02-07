@@ -30,9 +30,9 @@
 
   const defaultLinkRenderer =
     markdown.renderer.rules.link_open ??
-    ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+    ((tokens: any, idx: number, options: any, env: any, self: any) => self.renderToken(tokens, idx, options));
 
-  markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  markdown.renderer.rules.link_open = (tokens: any, idx: number, options: any, env: any, self: any) => {
     const hrefIndex = tokens[idx].attrIndex('href');
     if (hrefIndex >= 0) {
       const href = tokens[idx].attrs?.[hrefIndex]?.[1] ?? '';
@@ -47,9 +47,9 @@
 
   const defaultImageRenderer =
     markdown.renderer.rules.image ??
-    ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+    ((tokens: any, idx: number, options: any, env: any, self: any) => self.renderToken(tokens, idx, options));
 
-  markdown.renderer.rules.image = (tokens, idx, options, env, self) => {
+  markdown.renderer.rules.image = (tokens: any, idx: number, options: any, env: any, self: any) => {
     const srcIndex = tokens[idx].attrIndex('src');
     if (srcIndex >= 0) {
       const src = tokens[idx].attrs?.[srcIndex]?.[1] ?? '';

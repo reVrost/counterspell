@@ -260,6 +260,10 @@ export const tasksAPI = {
   async discard(taskId: string): Promise<APIResponse> {
     return postAction(`/api/v1/tasks/${taskId}/discard`);
   },
+
+  async retry(taskId: string): Promise<APIResponse> {
+    return postAction(`/api/v1/tasks/${taskId}/retry`);
+  },
 };
 
 // ==================== SESSIONS ====================
