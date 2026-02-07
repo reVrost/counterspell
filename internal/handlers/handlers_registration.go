@@ -14,6 +14,7 @@ type Handlers struct {
 	settingsService *services.SettingsService
 	fileService     *services.FileService
 	oauthService    *services.OAuthService
+	openAIConnector *services.OpenAIConnectorService
 	orchestrator    *services.Orchestrator
 	eventBus        *services.EventBus
 }
@@ -26,6 +27,7 @@ func NewHandlers(
 	settingsService *services.SettingsService,
 	sessionService *services.SessionService,
 	oauthService *services.OAuthService,
+	openAIConnector *services.OpenAIConnectorService,
 	orchestrator *services.Orchestrator) (*Handlers, error) {
 
 	return &Handlers{
@@ -36,6 +38,7 @@ func NewHandlers(
 		settingsService: settingsService,
 		fileService:     services.NewFileService(cfg.DataDir),
 		oauthService:    oauthService,
+		openAIConnector: openAIConnector,
 		orchestrator:    orchestrator,
 	}, nil
 }

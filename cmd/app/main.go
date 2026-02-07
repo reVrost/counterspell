@@ -126,9 +126,10 @@ func main() {
 
 	sessionService := services.NewSessionService(repo, settingsService, eventBus, cfg.DataDir)
 	oauthService := authService
+	openAIConnectorService := services.NewOpenAIConnectorService(database)
 
 	// Create handlers with shared database
-	h, err := handlers.NewHandlers(cfg, repo, eventBus, settingsService, sessionService, oauthService, orchestrator)
+	h, err := handlers.NewHandlers(cfg, repo, eventBus, settingsService, sessionService, oauthService, openAIConnectorService, orchestrator)
 	if err != nil {
 		logger.Error("Failed to create handlers", "error", err)
 		os.Exit(1)
@@ -184,6 +185,7 @@ func main() {
 		r.Get("/api/v1/session", h.HandleGetSession)
 		r.Get("/api/v1/auth/login", h.HandleAuthLogin)
 		r.Post("/api/v1/logout", h.HandleLogout)
+		r.Get("/api/v1/connectors/{connector}/callback", h.HandleConnectorCallback)
 	})
 
 	// Protected routes (require machine auth)
@@ -219,6 +221,9 @@ func main() {
 		r.Post("/api/v1/sessions/{id}/promote", h.HandlePromoteSession)
 		r.Get("/api/v1/settings", h.HandleGetSettings)
 		r.Get("/api/v1/files/search", h.HandleFileSearch)
+		r.Get("/api/v1/connectors/{connector}/status", h.HandleConnectorStatus)
+		r.Post("/api/v1/connectors/{connector}/connect", h.HandleConnectorConnect)
+		r.Post("/api/v1/connectors/{connector}/disconnect", h.HandleConnectorDisconnect)
 
 		// Settings and transcription
 		r.Post("/api/v1/settings", h.HandleSaveSettings)

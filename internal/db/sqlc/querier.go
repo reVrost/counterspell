@@ -9,9 +9,11 @@ import (
 )
 
 type Querier interface {
+	CleanupExpiredConnectorOAuthAttempts(ctx context.Context, arg CleanupExpiredConnectorOAuthAttemptsParams) error
 	CleanupExpiredOAuthAttempts(ctx context.Context, createdAt int64) error
 	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) error
 	CreateArtifact(ctx context.Context, arg CreateArtifactParams) error
+	CreateConnectorOAuthAttempt(ctx context.Context, arg CreateConnectorOAuthAttemptParams) error
 	CreateGithubConnection(ctx context.Context, arg CreateGithubConnectionParams) (GithubConnection, error)
 	CreateMachineIdentity(ctx context.Context, arg CreateMachineIdentityParams) error
 	CreateMessage(ctx context.Context, arg CreateMessageParams) error
@@ -23,6 +25,8 @@ type Querier interface {
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	DeleteAgentRunsByTask(ctx context.Context, taskID string) error
 	DeleteArtifactsByRun(ctx context.Context, runID string) error
+	DeleteConnectorAuth(ctx context.Context, connector string) error
+	DeleteConnectorOAuthAttempt(ctx context.Context, arg DeleteConnectorOAuthAttemptParams) error
 	DeleteGithubConnection(ctx context.Context, id string) error
 	DeleteMessagesByTask(ctx context.Context, taskID string) error
 	DeleteOAuthLoginAttempt(ctx context.Context, state string) error
@@ -31,6 +35,8 @@ type Querier interface {
 	GetArtifact(ctx context.Context, id string) (Artifact, error)
 	GetArtifactsByRun(ctx context.Context, runID string) ([]Artifact, error)
 	GetArtifactsByTask(ctx context.Context, taskID string) ([]Artifact, error)
+	GetConnectorAuth(ctx context.Context, connector string) (ConnectorAuth, error)
+	GetConnectorOAuthAttempt(ctx context.Context, arg GetConnectorOAuthAttemptParams) (GetConnectorOAuthAttemptRow, error)
 	GetGithubConnection(ctx context.Context) (GithubConnection, error)
 	GetGithubConnectionByID(ctx context.Context, id string) (GithubConnection, error)
 	GetLatestRun(ctx context.Context, taskID string) (AgentRun, error)
@@ -67,6 +73,7 @@ type Querier interface {
 	UpdateTaskPositionAndStatus(ctx context.Context, arg UpdateTaskPositionAndStatusParams) error
 	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error
 	UpdateTaskTitleIntent(ctx context.Context, arg UpdateTaskTitleIntentParams) error
+	UpsertConnectorAuth(ctx context.Context, arg UpsertConnectorAuthParams) error
 	UpsertMachineIdentity(ctx context.Context, arg UpsertMachineIdentityParams) (MachineIdentity, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) error
 }

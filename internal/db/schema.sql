@@ -149,6 +149,28 @@ CREATE TABLE IF NOT EXISTS oauth_login_attempts (
     code_verifier TEXT NOT NULL,
     created_at INTEGER NOT NULL -- Unix ms
 );
+
+-- Connector OAuth attempts (PKCE state for connector login flows)
+CREATE TABLE IF NOT EXISTS connector_oauth_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    connector TEXT NOT NULL,
+    state TEXT NOT NULL,
+    code_verifier TEXT NOT NULL,
+    created_at INTEGER NOT NULL, -- Unix ms
+    UNIQUE(connector, state)
+);
+
+-- Connector auth state (single row per connector)
+CREATE TABLE IF NOT EXISTS connector_auth (
+    connector TEXT PRIMARY KEY,
+    access_token TEXT,
+    refresh_token TEXT,
+    account_id TEXT,
+    metadata_json TEXT,
+    expires_at INTEGER, -- Unix ms
+    connected_at INTEGER NOT NULL, -- Unix ms
+    updated_at INTEGER NOT NULL -- Unix ms
+);
 -- Machine Identity: Stores machine credentials and tunnel info
 CREATE TABLE IF NOT EXISTS machine_identity (
     machine_id TEXT PRIMARY KEY,

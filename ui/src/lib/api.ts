@@ -12,6 +12,7 @@ import type {
   ConflictResponse,
   Session,
   SessionResponse,
+  OpenAIConnectorStatus,
 } from '$lib/types';
 
 // API base URL - uses proxy in dev, relative path in prod
@@ -253,6 +254,27 @@ export const settingsAPI = {
         openai_key: settings.openai_key || '',
       }),
     });
+  },
+};
+
+// ==================== CONNECTORS ====================
+
+export const connectorsAPI = {
+  async getStatus(connector: string): Promise<OpenAIConnectorStatus> {
+    return fetchAPI<OpenAIConnectorStatus>(`/api/v1/connectors/${connector}/status`);
+  },
+
+  async startConnect(connector: string, redirectURI?: string): Promise<{ auth_url: string }> {
+    return fetchAPI<{ auth_url: string }>(`/api/v1/connectors/${connector}/connect`, {
+      method: 'POST',
+      body: JSON.stringify({
+        redirect_uri: redirectURI || '',
+      }),
+    });
+  },
+
+  async disconnect(connector: string): Promise<void> {
+    await fetchAPI(`/api/v1/connectors/${connector}/disconnect`, { method: 'POST' });
   },
 };
 

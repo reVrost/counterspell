@@ -144,6 +144,15 @@ export interface UserSettings {
   openai_key?: string;
 }
 
+export interface OpenAIConnectorStatus {
+  connected: boolean;
+  account_id?: string;
+  expires_at?: number;
+  connected_at?: number;
+  token_expired: boolean;
+  needs_reconnect: boolean;
+}
+
 export interface Session {
   id: string;
   agent_backend: string;

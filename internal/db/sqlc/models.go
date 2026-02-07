@@ -36,6 +36,25 @@ type Artifact struct {
 	UpdatedAt int64  `json:"updated_at"`
 }
 
+type ConnectorAuth struct {
+	Connector    string         `json:"connector"`
+	AccessToken  sql.NullString `json:"access_token"`
+	RefreshToken sql.NullString `json:"refresh_token"`
+	AccountID    sql.NullString `json:"account_id"`
+	MetadataJson sql.NullString `json:"metadata_json"`
+	ExpiresAt    sql.NullInt64  `json:"expires_at"`
+	ConnectedAt  int64          `json:"connected_at"`
+	UpdatedAt    int64          `json:"updated_at"`
+}
+
+type ConnectorOauthAttempt struct {
+	ID           int64  `json:"id"`
+	Connector    string `json:"connector"`
+	State        string `json:"state"`
+	CodeVerifier string `json:"code_verifier"`
+	CreatedAt    int64  `json:"created_at"`
+}
+
 type GithubConnection struct {
 	ID           string         `json:"id"`
 	GithubUserID string         `json:"github_user_id"`

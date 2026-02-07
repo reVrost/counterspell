@@ -1,7 +1,8 @@
 <script lang="ts">
   import { appState } from '$lib/stores/app.svelte';
   import { cn } from '$lib/utils';
-  import type { UserSettings } from '$lib/types';
+  import { connectorsAPI } from '$lib/api';
+  import type { OpenAIConnectorStatus, UserSettings } from '$lib/types';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import BotIcon from '@lucide/svelte/icons/bot';
@@ -18,6 +19,12 @@
   let anthropicKey = $state(appState.settings?.anthropic_key || '');
   let openAiKey = $state(appState.settings?.openai_key || '');
   let saving = $state(false);
+  let connectorLoading = $state(false);
+  let connectorStatus = $state<OpenAIConnectorStatus>({
+    connected: false,
+    token_expired: false,
+    needs_reconnect: true,
+  });
 
   // Update state when settings change
   $effect(() => {
@@ -52,9 +59,81 @@
     }
   }
 
-  function handleConnectOpenAI() {
-    console.log('Triggering OpenAI OAuth flow...');
-    // TODO: hit backend to trigger oauth
+  function connectorExpiryText(expiresAt?: number): string {
+    if (!expiresAt) return '';
+    return new Date(expiresAt).toLocaleString();
+  }
+
+  async function loadOpenAIConnectorStatus() {
+    try {
+      connectorStatus = await connectorsAPI.getStatus('openai');
+    } catch (err) {
+      console.error('Failed to load OpenAI connector status:', err);
+    }
+  }
+
+  $effect(() => {
+    void loadOpenAIConnectorStatus();
+  });
+
+  async function handleConnectOpenAI() {
+    connectorLoading = true;
+    try {
+      const redirectURI = `${window.location.origin}/api/v1/connectors/openai/callback`;
+      const { auth_url } = await connectorsAPI.startConnect('openai', redirectURI);
+
+      const popup = window.open(
+        auth_url,
+        'counterspell-openai-connector',
+        'width=560,height=760,noopener,noreferrer'
+      );
+      if (!popup) {
+        window.location.href = auth_url;
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        const interval = setInterval(async () => {
+          if (popup.closed) {
+            clearInterval(interval);
+            resolve();
+            return;
+          }
+          try {
+            const status = await connectorsAPI.getStatus('openai');
+            if (status.connected) {
+              popup.close();
+              connectorStatus = status;
+              clearInterval(interval);
+              appState.showToast('OpenAI subscription connected');
+              resolve();
+            }
+          } catch {
+            // Keep polling while OAuth redirect completes.
+          }
+        }, 1200);
+      });
+    } catch (err) {
+      console.error('OpenAI connector start failed:', err);
+      appState.showToast('Failed to start OpenAI connection', 'error');
+    } finally {
+      connectorLoading = false;
+      await loadOpenAIConnectorStatus();
+    }
+  }
+
+  async function handleDisconnectOpenAI() {
+    connectorLoading = true;
+    try {
+      await connectorsAPI.disconnect('openai');
+      await loadOpenAIConnectorStatus();
+      appState.showToast('OpenAI subscription disconnected');
+    } catch (err) {
+      console.error('OpenAI connector disconnect failed:', err);
+      appState.showToast('Failed to disconnect OpenAI connector', 'error');
+    } finally {
+      connectorLoading = false;
+    }
   }
 </script>
 
@@ -78,17 +157,49 @@
           </div>
           <div>
             <h3 class="font-medium text-foreground">OpenAI Subscription</h3>
-            <p class="text-sm text-muted-foreground">Connect your account for premium models</p>
+            {#if connectorStatus.connected}
+              <p class="text-sm text-muted-foreground">
+                Connected
+                {#if connectorStatus.account_id}
+                  <span class="font-mono text-xs text-emerald-400"
+                    >{connectorStatus.account_id}</span
+                  >
+                {/if}
+                {#if connectorStatus.expires_at}
+                  · expires {connectorExpiryText(connectorStatus.expires_at)}
+                {/if}
+              </p>
+            {:else}
+              <p class="text-sm text-muted-foreground">Connect your account for premium models</p>
+            {/if}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onclick={handleConnectOpenAI}
-          class="rounded-full px-5 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
-        >
-          Connect
-        </Button>
+        <div class="flex items-center gap-2">
+          {#if connectorStatus.connected}
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={handleDisconnectOpenAI}
+              disabled={connectorLoading}
+              class="rounded-full px-5 border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              Disconnect
+            </Button>
+          {/if}
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={handleConnectOpenAI}
+            disabled={connectorLoading}
+            class="rounded-full px-5 border-emerald-500/20 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+          >
+            {connectorLoading
+              ? 'Connecting...'
+              : connectorStatus.connected
+                ? 'Reconnect'
+                : 'Connect'}
+          </Button>
+        </div>
       </div>
     </div>
   </section>
