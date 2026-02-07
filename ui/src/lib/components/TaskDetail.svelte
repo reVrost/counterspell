@@ -181,7 +181,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="flex flex-col h-[100dvh] relative">
   <!-- Floating Controls Row -->
-  <div 
+  <div
     class="absolute top-0 left-0 right-0 z-30 px-3 pt-3 pb-2 flex items-center justify-between pointer-events-none transition-all duration-200"
     class:backdrop-blur-md={showCompactHeader}
     style:background-color={showCompactHeader ? 'rgba(13, 17, 23, 0.8)' : 'transparent'}
@@ -196,7 +196,7 @@
     </button>
 
     <!-- Title (shows when scrolled) -->
-    <div 
+    <div
       class="flex-1 mx-3 overflow-hidden transition-all duration-200 pointer-events-auto"
       class:opacity-0={!showCompactHeader}
       class:opacity-100={showCompactHeader}
@@ -268,9 +268,9 @@
       style:transform="translateX({activeTab === 'agent' ? '0%' : '-100%'})"
     >
       <!-- Agent View -->
-      <div 
+      <div
         bind:this={agentScrollRef}
-        class="w-full h-full flex-shrink-0 overflow-y-auto" 
+        class="w-full h-full flex-shrink-0 overflow-y-auto"
         id="agent-scroll"
         onscroll={handleScroll}
       >
@@ -299,7 +299,7 @@
 
           {#if isInProgress}
             <div class="flex items-center gap-3 px-8 py-4">
-              <p class="text-base font-medium shimmer">Thinking...</p>
+              <p class="text-base font-medium shimmer text-violet-300">Thinking...</p>
               <p class="text-base text-gray-600">Analyzing context</p>
             </div>
           {/if}

@@ -326,12 +326,14 @@
     mode === 'task' ? taskItems.length == 0 : sessionItems.length == 0
   );
 
+  // Auto-scroll to bottom when messages change
   $effect(() => {
-    if (scrollContainerId) {
+    const messageCount = messages.length;
+    if (scrollContainerId && messageCount > 0) {
       tick().then(() => {
         const container = document.getElementById(scrollContainerId);
         if (container) {
-          container.scrollTo({ top: container.scrollHeight });
+          container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         }
       });
     }
