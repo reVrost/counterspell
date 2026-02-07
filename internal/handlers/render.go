@@ -195,6 +195,15 @@ func ErrUnauthorized(msg string) render.Renderer {
 	}
 }
 
+// ErrForbidden returns a 403 Forbidden error.
+func ErrForbidden(msg string) render.Renderer {
+	return &ErrResponse{
+		HTTPStatusCode: http.StatusForbidden,
+		Status:         "error",
+		Message:        msg,
+	}
+}
+
 // ------------------------------------------------------------------
 // Helper constructors
 // ------------------------------------------------------------------

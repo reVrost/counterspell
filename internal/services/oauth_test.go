@@ -1,10 +1,15 @@
 package services
 
 import (
+	"errors"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/revrost/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/db/sqlc"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOAuthService_GenerateCodeVerifier(t *testing.T) {
@@ -42,6 +47,59 @@ func TestOAuthService_GenerateCodeChallenge(t *testing.T) {
 func TestOAuthService_StartLoginFlow(t *testing.T) {
 	// TODO: Fix setupTestDB usage and test with real database
 	_ = t
+}
+
+func TestMachineJWTUserID(t *testing.T) {
+	t.Run("reads user_id claim", func(t *testing.T) {
+		token := testMachineJWT(t, "owner-user-id", "")
+
+		userID, err := machineJWTUserID(token)
+		require.NoError(t, err)
+		assert.Equal(t, "owner-user-id", userID)
+	})
+
+	t.Run("falls back to subject claim", func(t *testing.T) {
+		token := testMachineJWT(t, "", "owner-subject")
+
+		userID, err := machineJWTUserID(token)
+		require.NoError(t, err)
+		assert.Equal(t, "owner-subject", userID)
+	})
+}
+
+func TestOAuthService_EnsureMachineJWTOwner(t *testing.T) {
+	svc := NewOAuthService(nil, config.Load())
+	identity := &sqlc.MachineIdentity{UserID: "owner-id"}
+
+	t.Run("accepts matching owner", func(t *testing.T) {
+		err := svc.ensureMachineJWTOwner(identity, testMachineJWT(t, "owner-id", ""))
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects mismatched owner", func(t *testing.T) {
+		err := svc.ensureMachineJWTOwner(identity, testMachineJWT(t, "other-id", ""))
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, ErrForbiddenLoginIdentityMismatch))
+	})
+}
+
+func testMachineJWT(t *testing.T, userID, subject string) string {
+	t.Helper()
+
+	claims := &machineJWTClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "test",
+			Subject:   subject,
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+		UserID: userID,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte("test-secret"))
+	require.NoError(t, err)
+	return signed
 }
 
 // Note: More comprehensive database tests (CreateOAuthLoginAttempt, GetOAuthLoginAttempt,

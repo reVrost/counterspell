@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/revrost/counterspell/internal/config"
 	"github.com/revrost/counterspell/internal/db"
@@ -118,6 +120,13 @@ const (
 	oauthAttemptTTL   = 10 * time.Minute
 	oauthPollInterval = 2 * time.Second
 )
+
+var ErrForbiddenLoginIdentityMismatch = errors.New("authenticated account does not own this counterspell instance")
+
+type machineJWTClaims struct {
+	jwt.RegisteredClaims
+	UserID string `json:"user_id"`
+}
 
 // NewOAuthService creates a new OAuth service.
 func NewOAuthService(database *db.DB, cfg *config.Config) *OAuthService {
@@ -389,6 +398,9 @@ func (s *OAuthService) CompleteLoginWithJWT(ctx context.Context, machineJWT stri
 	}
 
 	if identity != nil {
+		if err := s.ensureMachineJWTOwner(identity, machineJWT); err != nil {
+			return nil, err
+		}
 		if err := s.storeMachineJWT(ctx, machineID, machineJWT); err != nil {
 			return nil, fmt.Errorf("failed to store machine jwt: %w", err)
 		}
@@ -445,6 +457,9 @@ func (s *OAuthService) EnsureAuthenticated(ctx context.Context) (*AuthResult, er
 		}
 	}
 	if identity != nil {
+		if err := s.ensureMachineJWTOwner(identity, machineJWT); err != nil {
+			return nil, err
+		}
 		if err := s.updateMachineIdentityLastSeen(ctx, machineID); err != nil {
 			slog.Warn("Failed to update machine last_seen", "error", err)
 		}
@@ -489,6 +504,9 @@ func (s *OAuthService) IsAuthenticated(ctx context.Context) (bool, *sqlc.Machine
 	}
 	if identity == nil || !identity.MachineJwt.Valid || strings.TrimSpace(identity.MachineJwt.String) == "" {
 		return false, identity, nil
+	}
+	if err := s.ensureMachineJWTOwner(identity, identity.MachineJwt.String); err != nil {
+		return false, identity, err
 	}
 	return true, identity, nil
 }
@@ -811,4 +829,44 @@ func isLoopback(addr string) bool {
 func (s *OAuthService) CleanupExpiredOAuthAttempts(ctx context.Context) error {
 	cutoff := time.Now().Add(-oauthAttemptTTL).UnixMilli()
 	return s.db.Queries.CleanupExpiredOAuthAttempts(ctx, cutoff)
+}
+
+func (s *OAuthService) ensureMachineJWTOwner(identity *sqlc.MachineIdentity, machineJWT string) error {
+	if identity == nil {
+		return nil
+	}
+
+	expectedUserID := strings.TrimSpace(identity.UserID)
+	if expectedUserID == "" {
+		return nil
+	}
+
+	actualUserID, err := machineJWTUserID(machineJWT)
+	if err != nil {
+		return fmt.Errorf("failed to read machine jwt owner: %w", err)
+	}
+	if actualUserID == "" {
+		return fmt.Errorf("machine jwt is missing user id claim")
+	}
+	if actualUserID != expectedUserID {
+		return fmt.Errorf("%w: expected owner %q but got %q", ErrForbiddenLoginIdentityMismatch, expectedUserID, actualUserID)
+	}
+
+	return nil
+}
+
+func machineJWTUserID(machineJWT string) (string, error) {
+	claims := &machineJWTClaims{}
+	token, _, err := jwt.NewParser(jwt.WithoutClaimsValidation()).ParseUnverified(machineJWT, claims)
+	if err != nil {
+		return "", err
+	}
+	if token == nil || claims == nil {
+		return "", fmt.Errorf("invalid machine jwt")
+	}
+
+	if strings.TrimSpace(claims.UserID) != "" {
+		return strings.TrimSpace(claims.UserID), nil
+	}
+	return strings.TrimSpace(claims.Subject), nil
 }

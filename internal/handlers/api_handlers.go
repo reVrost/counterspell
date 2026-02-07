@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -87,7 +88,21 @@ func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	authenticated, identity, err := h.oauthService.IsAuthenticated(ctx)
-	if err != nil || !authenticated {
+	if err != nil {
+		if errors.Is(err, services.ErrForbiddenLoginIdentityMismatch) {
+			_ = render.Render(w, r, ErrForbidden("This Counterspell instance belongs to a different account"))
+			return
+		}
+
+		// Treat transient auth errors as unauthenticated.
+		render.JSON(w, r, map[string]any{
+			"authenticated":   false,
+			"githubConnected": false,
+			"needsGitHubAuth": true,
+		})
+		return
+	}
+	if !authenticated {
 		// No machine JWT found - not authenticated
 		render.JSON(w, r, map[string]any{
 			"authenticated":   false,

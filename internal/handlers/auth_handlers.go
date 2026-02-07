@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/go-chi/render"
+	"github.com/revrost/counterspell/internal/services"
 )
 
 // HandleAuthLogin starts the browser OAuth flow via the Invoker control plane.
@@ -15,6 +17,14 @@ func (h *Handlers) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 
 	if authenticated, _, err := h.oauthService.IsAuthenticated(ctx); err == nil && authenticated {
 		http.Redirect(w, r, "/dashboard", http.StatusTemporaryRedirect)
+		return
+	} else if err != nil {
+		if errors.Is(err, services.ErrForbiddenLoginIdentityMismatch) {
+			_ = render.Render(w, r, ErrForbidden("This Counterspell instance belongs to a different account"))
+			return
+		}
+		slog.Error("Auth check failed", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Authentication failed", err))
 		return
 	}
 
@@ -70,6 +80,10 @@ func (h *Handlers) RequireMachineAuth(next http.Handler) http.Handler {
 		ctx := r.Context()
 		authenticated, _, err := h.oauthService.IsAuthenticated(ctx)
 		if err != nil {
+			if errors.Is(err, services.ErrForbiddenLoginIdentityMismatch) {
+				_ = render.Render(w, r, ErrForbidden("This Counterspell instance belongs to a different account"))
+				return
+			}
 			slog.Error("Auth check failed", "error", err)
 			_ = render.Render(w, r, ErrInternalServer("Authentication failed", err))
 			return
