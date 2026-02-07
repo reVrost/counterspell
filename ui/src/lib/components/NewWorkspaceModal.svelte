@@ -49,7 +49,9 @@
     }
   }
 
-  function close() {
+  function close(e: any) {
+    e.stopPropagation();
+
     if (creating) return;
     appState.closeNewWorkspaceModal();
   }
@@ -61,7 +63,7 @@
     }
   }
 
-  async function createWorkspace() {
+  async function createWorkspace(e: any) {
     const name = workspaceName.trim();
     if (!name) {
       appState.showToast('Workspace name is required', 'error');
@@ -77,7 +79,7 @@
       await appState.loadProjects();
       await appState.setActiveWorkspace(workspace.id, workspace.name);
       appState.showToast(`Workspace "${workspace.name}" created`, 'success');
-      close();
+      close(e);
     } catch (e) {
       console.error('Failed to create workspace:', e);
       appState.showToast(e instanceof Error ? e.message : 'Failed to create workspace', 'error');
@@ -88,11 +90,11 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      close();
+      close(e);
       return;
     }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      void createWorkspace();
+      void createWorkspace(e);
     }
   }
 </script>
@@ -106,18 +108,18 @@
 >
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    transition:backdropFade
-    onclick={close}
-    class="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto"
-  ></div>
+  <!-- <div -->
+  <!--   transition:backdropFade -->
+  <!--   onclick={close} -->
+  <!--   class="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto" -->
+  <!-- ></div> -->
 
   <div
     transition:modalSlideUp
     class="pointer-events-auto relative w-full h-[100dvh] bg-[#0C0E12] flex flex-col sm:h-auto sm:max-w-xl sm:rounded-2xl sm:border sm:border-white/10 shadow-2xl overflow-hidden"
   >
     <div class="px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0">
-      <h2 class="text-base font-semibold text-zinc-100">New Workspace</h2>
+      <h2 class="text-xl font-semibold text-zinc-100">New Workspace</h2>
       <button
         onclick={close}
         class="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition"
@@ -128,18 +130,18 @@
 
     <div class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
       <div class="space-y-2">
-        <label for="workspace-name" class="text-sm text-zinc-300">Workspace Name</label>
+        <label for="workspace-name" class="text-base text-zinc-300">Workspace Name</label>
         <input
           id="workspace-name"
           type="text"
           bind:value={workspaceName}
           placeholder="workspace-name"
-          class="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-violet-500/60"
+          class="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-base text-zinc-100 focus:outline-none focus:border-violet-500/60"
         />
       </div>
 
       <div class="space-y-2">
-        <p class="text-sm text-zinc-300">Workspace Path</p>
+        <p class="text-base text-zinc-300">Workspace Path</p>
 
         <button
           type="button"
@@ -151,8 +153,10 @@
         >
           <FolderIcon class="w-4 h-4 mt-0.5 text-zinc-300" />
           <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-100">Import current workspace</p>
-            <p class="text-xs text-zinc-400 break-all">Use the running app path: {cwdPath || 'Loading...'}</p>
+            <p class="text-base font-medium text-zinc-100">Import current workspace</p>
+            <p class="text-base text-zinc-400 break-all">
+              Use the running app path: {cwdPath || 'Loading...'}
+            </p>
           </div>
         </button>
 
@@ -166,8 +170,8 @@
         >
           <FolderPlusIcon class="w-4 h-4 mt-0.5 text-zinc-300" />
           <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-100">New folder</p>
-            <p class="text-xs text-zinc-400 break-all">
+            <p class="text-base font-medium text-zinc-100">New folder</p>
+            <p class="text-base text-zinc-400 break-all">
               Create a folder under current path using the workspace name.
             </p>
           </div>
@@ -175,13 +179,13 @@
       </div>
 
       <div class="space-y-2">
-        <label for="workspace-path" class="text-sm text-zinc-300">Resolved Path</label>
+        <label for="workspace-path" class="text-base text-zinc-300">Resolved Path</label>
         <input
           id="workspace-path"
           type="text"
           value={resolvedPath}
           readonly
-          class="w-full bg-white/[0.02] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-zinc-400 focus:outline-none"
+          class="w-full bg-white/[0.02] border border-white/10 rounded-xl px-3 py-2.5 text-base text-zinc-400 focus:outline-none"
         />
       </div>
     </div>
@@ -190,7 +194,7 @@
       <button
         type="button"
         onclick={close}
-        class="px-4 py-2 rounded-xl border border-white/10 text-sm text-zinc-200 hover:bg-white/5 transition"
+        class="px-4 py-2 rounded-xl border border-white/10 text-base text-zinc-200 hover:bg-white/5 transition"
       >
         Cancel
       </button>
@@ -198,7 +202,7 @@
         type="button"
         onclick={createWorkspace}
         disabled={creating || loadingSetup || !workspaceName.trim() || !resolvedPath}
-        class="px-4 py-2 rounded-xl text-sm font-semibold text-white transition flex items-center gap-2 {creating ||
+        class="px-4 py-2 rounded-xl text-base font-semibold text-white transition flex items-center gap-2 {creating ||
         loadingSetup ||
         !workspaceName.trim() ||
         !resolvedPath

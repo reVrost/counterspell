@@ -8,17 +8,11 @@
   import ChatInput from '$lib/components/ChatInput.svelte';
   import NewTaskModal from '$lib/components/NewTaskModal.svelte';
   import NewWorkspaceModal from '$lib/components/NewWorkspaceModal.svelte';
-  import Skeleton from '$lib/components/Skeleton.svelte';
   import { appState } from '$lib/stores/app.svelte';
   import { taskStore } from '$lib/stores/tasks.svelte';
   import { tasksAPI } from '$lib/api';
   import { createTaskSSE } from '$lib/utils/sse';
-  import {
-    modalSlideUp,
-    backdropFade,
-    DURATIONS,
-    prefersReducedMotion,
-  } from '$lib/utils/transitions';
+  import { modalSlideUp, backdropFade, DURATIONS } from '$lib/utils/transitions';
   import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
   import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
   import type { Project, Task, Message, LogEntry } from '$lib/types';

@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -29,11 +30,13 @@ import (
 
 // OAuthService handles OAuth login flow for Counterspell.
 type OAuthService struct {
-	db          *db.DB
-	cfg         *config.Config
-	httpClient  *http.Client
-	loginServer *http.Server
-	callbackCh  chan *OAuthCallbackResult
+	db               *db.DB
+	cfg              *config.Config
+	httpClient       *http.Client
+	loginServer      *http.Server
+	callbackCh       chan *OAuthCallbackResult
+	mu               sync.RWMutex
+	lastLoginErrCode string
 }
 
 // OAuthCallbackResult represents the result of OAuth callback.
@@ -117,8 +120,9 @@ type AuthResult struct {
 }
 
 const (
-	oauthAttemptTTL   = 10 * time.Minute
-	oauthPollInterval = 2 * time.Second
+	oauthAttemptTTL         = 10 * time.Minute
+	oauthPollInterval       = 2 * time.Second
+	LoginErrorOwnerMismatch = "OWNER_MISMATCH"
 )
 
 var ErrForbiddenLoginIdentityMismatch = errors.New("authenticated account does not own this counterspell instance")
@@ -203,6 +207,7 @@ func (s *OAuthService) StartWebLogin(ctx context.Context) (*OAuthLoginAttempt, e
 
 // StartWebLoginWithReturnTo starts web OAuth and includes a return destination for browser redirect after callback.
 func (s *OAuthService) StartWebLoginWithReturnTo(ctx context.Context, returnTo string) (*OAuthLoginAttempt, error) {
+	s.setLastLoginErrorCode("")
 	attempt, err := s.startLoginFlow(ctx, returnTo)
 	if err != nil {
 		return nil, err
@@ -219,9 +224,13 @@ func (s *OAuthService) StartWebLoginWithReturnTo(ctx context.Context, returnTo s
 		}
 
 		if _, err := s.CompleteLoginWithJWT(pollCtx, machineJWT); err != nil {
+			if errors.Is(err, ErrForbiddenLoginIdentityMismatch) {
+				s.setLastLoginErrorCode(LoginErrorOwnerMismatch)
+			}
 			slog.Error("OAuth web login completion failed", "error", err)
 			return
 		}
+		s.setLastLoginErrorCode("")
 		slog.Info("OAuth web login completed")
 	}(attempt.State)
 
@@ -823,6 +832,18 @@ func isLoopback(addr string) bool {
 func (s *OAuthService) CleanupExpiredOAuthAttempts(ctx context.Context) error {
 	cutoff := time.Now().Add(-oauthAttemptTTL).UnixMilli()
 	return s.db.Queries.CleanupExpiredOAuthAttempts(ctx, cutoff)
+}
+
+func (s *OAuthService) LastLoginErrorCode() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastLoginErrCode
+}
+
+func (s *OAuthService) setLastLoginErrorCode(code string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastLoginErrCode = code
 }
 
 func (s *OAuthService) ensureMachineJWTOwner(identity *sqlc.MachineIdentity, machineJWT string) error {

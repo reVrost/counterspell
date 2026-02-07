@@ -79,6 +79,12 @@
           window.location.href = '/dashboard';
         } else {
           console.log('❓ Not authenticated, staying on landing page');
+          if (session.authErrorCode === 'OWNER_MISMATCH') {
+            errorMsg =
+              session.authErrorMessage ||
+              'Wrong account for this machine. Please sign in again with the original owner account.';
+            showError = true;
+          }
         }
       } catch (e) {
         console.log('❌ Auth check failed:', e);

@@ -19,6 +19,7 @@
       ...(feedData?.reviews || []),
       ...(feedData?.active || []),
       ...(feedData?.planning || []),
+      ...(feedData?.done || []),
     ];
     return all.slice().sort((a, b) => b.updated_at - a.updated_at);
   });

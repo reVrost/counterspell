@@ -1,12 +1,16 @@
 package services
 
 import (
+	"context"
+	"database/sql"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/revrost/counterspell/internal/config"
+	"github.com/revrost/counterspell/internal/db"
 	"github.com/revrost/counterspell/internal/db/sqlc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,6 +87,38 @@ func TestOAuthService_EnsureMachineJWTOwner(t *testing.T) {
 	})
 }
 
+func TestOAuthService_CompleteLoginWithJWT_DoesNotOverwriteOnOwnerMismatch(t *testing.T) {
+	ctx := context.Background()
+	database := setupOAuthTestDB(t)
+	defer database.Close()
+
+	svc := NewOAuthService(database, &config.Config{})
+	machineID, err := svc.getMachineID()
+	require.NoError(t, err)
+
+	originalJWT := testMachineJWT(t, "owner-id", "")
+	_, err = database.Queries.UpsertMachineIdentity(ctx, sqlc.UpsertMachineIdentityParams{
+		MachineID:      machineID,
+		MachineJwt:     sql.NullString{String: originalJWT, Valid: true},
+		UserID:         "owner-id",
+		Subdomain:      "owner",
+		TunnelProvider: "cloudflare",
+		TunnelToken:    "token",
+		CreatedAt:      time.Now().UnixMilli(),
+		LastSeenAt:     sql.NullInt64{Int64: time.Now().UnixMilli(), Valid: true},
+	})
+	require.NoError(t, err)
+
+	_, err = svc.CompleteLoginWithJWT(ctx, testMachineJWT(t, "other-id", ""))
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrForbiddenLoginIdentityMismatch)
+
+	identity, err := database.Queries.GetMachineIdentity(ctx, machineID)
+	require.NoError(t, err)
+	require.True(t, identity.MachineJwt.Valid)
+	assert.Equal(t, originalJWT, identity.MachineJwt.String)
+}
+
 func testMachineJWT(t *testing.T, userID, subject string) string {
 	t.Helper()
 
@@ -100,6 +136,19 @@ func testMachineJWT(t *testing.T, userID, subject string) string {
 	signed, err := token.SignedString([]byte("test-secret"))
 	require.NoError(t, err)
 	return signed
+}
+
+func setupOAuthTestDB(t *testing.T) *db.DB {
+	t.Helper()
+
+	dbPath := filepath.Join(t.TempDir(), "oauth-test.db")
+	database, err := db.Connect(context.Background(), dbPath)
+	require.NoError(t, err)
+
+	err = database.RunMigrations(context.Background())
+	require.NoError(t, err)
+
+	return database
 }
 
 // Note: More comprehensive database tests (CreateOAuthLoginAttempt, GetOAuthLoginAttempt,

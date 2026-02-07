@@ -182,6 +182,8 @@ export interface SessionInfo {
   githubConnected: boolean;
   githubLogin?: string;
   needsGitHubAuth: boolean;
+  authErrorCode?: string;
+  authErrorMessage?: string;
 }
 
 export interface FeedData {

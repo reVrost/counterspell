@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -89,11 +88,6 @@ func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 
 	authenticated, identity, err := h.oauthService.IsAuthenticated(ctx)
 	if err != nil {
-		if errors.Is(err, services.ErrForbiddenLoginIdentityMismatch) {
-			_ = render.Render(w, r, ErrForbidden("This Counterspell instance belongs to a different account"))
-			return
-		}
-
 		// Treat transient auth errors as unauthenticated.
 		render.JSON(w, r, map[string]any{
 			"authenticated":   false,
@@ -103,11 +97,19 @@ func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !authenticated {
+		authErrorCode := h.oauthService.LastLoginErrorCode()
+		authErrorMessage := ""
+		if authErrorCode == services.LoginErrorOwnerMismatch {
+			authErrorMessage = "This Counterspell instance belongs to a different account. Sign in again with the original owner account."
+		}
+
 		// No machine JWT found - not authenticated
 		render.JSON(w, r, map[string]any{
-			"authenticated":   false,
-			"githubConnected": false,
-			"needsGitHubAuth": true,
+			"authenticated":    false,
+			"githubConnected":  false,
+			"needsGitHubAuth":  true,
+			"authErrorCode":    authErrorCode,
+			"authErrorMessage": authErrorMessage,
 		})
 		return
 	}

@@ -1,12 +1,11 @@
 import {
   MODELS,
-  type Model,
   type Project,
   type UserSettings,
   type GitHubRepo,
   type ToastType,
-} from "$lib/types";
-import { authAPI, workspacesAPI, settingsAPI, githubAPI } from "$lib/api";
+} from '$lib/types';
+import { authAPI, workspacesAPI, settingsAPI, githubAPI } from '$lib/api';
 
 // Reactive app state using Svelte 5 runes
 class AppState {
@@ -23,17 +22,17 @@ class AppState {
 
   // Toast
   toastOpen = $state(false);
-  toastMsg = $state("");
-  toastType = $state<ToastType>("success");
+  toastMsg = $state('');
+  toastType = $state<ToastType>('success');
 
   // Workspace State
-  activeWorkspaceId = $state("");
-  activeWorkspaceName = $state("");
+  activeWorkspaceId = $state('');
+  activeWorkspaceName = $state('');
   projects = $state<Project[]>([]);
   repos = $state<GitHubRepo[]>([]);
 
   // Model
-  activeModelId = $state("");
+  activeModelId = $state('');
 
   // Voice Recording
   isRecording = $state(false);
@@ -47,24 +46,21 @@ class AppState {
 
   // Auth
   isAuthenticated = $state(false);
-  userEmail = $state("");
+  userEmail = $state('');
   githubConnected = $state(false);
-  githubLogin = $state("");
+  githubLogin = $state('');
   needsGitHubAuth = $state(false);
 
   // Settings
   settings = $state<UserSettings | null>(null);
 
   constructor() {
-    if (typeof window !== "undefined") {
-      this.activeWorkspaceId =
-        localStorage.getItem("counterspell_active_workspace_id") || "";
-      this.activeWorkspaceName =
-        localStorage.getItem("counterspell_active_workspace_name") || "";
-      this.activeModelId =
-        localStorage.getItem("counterspell_model") || MODELS[0].id;
+    if (typeof window !== 'undefined') {
+      this.activeWorkspaceId = localStorage.getItem('counterspell_active_workspace_id') || '';
+      this.activeWorkspaceName = localStorage.getItem('counterspell_active_workspace_name') || '';
+      this.activeModelId = localStorage.getItem('counterspell_model') || MODELS[0].id;
 
-      window.addEventListener("beforeinstallprompt", (e) => {
+      window.addEventListener('beforeinstallprompt', (e) => {
         // Prevent the mini-infobar from appearing on mobile
         e.preventDefault();
         // Stash the event so it can be triggered later.
@@ -73,11 +69,11 @@ class AppState {
         this.canInstallPWA = true;
       });
 
-      window.addEventListener("appinstalled", () => {
+      window.addEventListener('appinstalled', () => {
         // Clear the deferredPrompt so it can be garbage collected
         this.deferredPrompt = null;
         this.canInstallPWA = false;
-        console.log("PWA was installed");
+        console.log('PWA was installed');
       });
     }
   }
@@ -102,12 +98,12 @@ class AppState {
     try {
       const session = await authAPI.checkSession();
       this.isAuthenticated = session.authenticated;
-      this.userEmail = session.email || "";
+      this.userEmail = session.email || '';
       this.githubConnected = session.githubConnected;
-      this.githubLogin = session.githubLogin || "";
+      this.githubLogin = session.githubLogin || '';
       this.needsGitHubAuth = session.needsGitHubAuth;
     } catch (err) {
-      console.error("Auth check failed:", err);
+      console.error('Auth check failed:', err);
       this.isAuthenticated = false;
       this.githubConnected = false;
       this.needsGitHubAuth = false;
@@ -118,7 +114,7 @@ class AppState {
     try {
       this.projects = await workspacesAPI.list();
     } catch (err) {
-      console.error("Failed to load workspaces:", err);
+      console.error('Failed to load workspaces:', err);
     }
   }
 
@@ -126,7 +122,7 @@ class AppState {
     try {
       this.repos = await githubAPI.listRepos();
     } catch (err) {
-      console.error("Failed to load repos:", err);
+      console.error('Failed to load repos:', err);
     }
   }
 
@@ -134,7 +130,7 @@ class AppState {
     try {
       this.settings = await settingsAPI.get();
     } catch (err) {
-      console.error("Failed to load settings:", err);
+      console.error('Failed to load settings:', err);
     }
   }
 
@@ -142,47 +138,26 @@ class AppState {
 
   get modelName(): string {
     const m = MODELS.find((m) => m.id === this.activeModelId);
-    return m ? m.name.split(" ")[1] : this.activeModelId.split("#")[1];
+    return m ? m.name.split(' ')[1] : this.activeModelId.split('#')[1];
   }
 
   // ==================== ACTIONS ====================
 
   async setActiveWorkspace(id: string, name: string) {
-    // // If it's a repo ID (number as string), activate it first
-    // if (id.match(/^\d+$/)) {
-    // 	const repo = this.repos.find((r) => r.id.toString() === id);
-    // 	if (repo) {
-    // 		try {
-    // 			await projectsAPI.activate(repo.owner, repo.name);
-    // 			// After activation, we need to reload projects to get the actual project ID
-    // 			await this.loadProjects();
-    // 			const project = this.projects.find((p) => p.name === repo.full_name);
-    // 			if (project) {
-    // 				id = project.id;
-    // 				name = project.name;
-    // 			}
-    // 		} catch (err) {
-    // 			console.error('Failed to activate project:', err);
-    // 			this.showToast('Failed to activate project', 'error');
-    // 			return;
-    // 		}
-    // 	}
-    // }
-
     this.activeWorkspaceId = id;
     this.activeWorkspaceName = name;
-    localStorage.setItem("counterspell_active_workspace_id", id);
-    localStorage.setItem("counterspell_active_workspace_name", name);
+    localStorage.setItem('counterspell_active_workspace_id', id);
+    localStorage.setItem('counterspell_active_workspace_name', name);
     this.inputProjectMenuOpen = false;
     this.projectMenuOpen = false;
   }
 
   setModel(id: string) {
     this.activeModelId = id;
-    localStorage.setItem("counterspell_model", id);
+    localStorage.setItem('counterspell_model', id);
   }
 
-  showToast(msg: string, type: ToastType = "success") {
+  showToast(msg: string, type: ToastType = 'success') {
     this.toastMsg = msg;
     this.toastType = type;
     this.toastOpen = true;
@@ -190,7 +165,7 @@ class AppState {
       () => {
         this.toastOpen = false;
       },
-      type === "error" ? 5000 : 3000,
+      type === 'error' ? 5000 : 3000
     );
   }
 
@@ -232,15 +207,15 @@ class AppState {
   openModal(taskId: string) {
     this.modalTaskId = taskId;
     this.modalOpen = true;
-    history.pushState({ modal: true }, "");
+    history.pushState({ modal: true }, '');
   }
 
   installPWA() {
     if (!this.deferredPrompt) return;
     this.deferredPrompt.prompt();
     this.deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === "accepted") {
-        this.showToast("Installing app...");
+      if (choiceResult.outcome === 'accepted') {
+        this.showToast('Installing app...');
       }
       this.deferredPrompt = null;
       this.canInstallPWA = false;
@@ -259,26 +234,26 @@ class AppState {
     this.showNewWorkspaceModal = false;
 
     // Reset Workspace State
-    this.activeWorkspaceId = "";
-    this.activeWorkspaceName = "";
+    this.activeWorkspaceId = '';
+    this.activeWorkspaceName = '';
     this.projects = [];
     this.repos = [];
 
     // Reset Auth
     this.isAuthenticated = false;
-    this.userEmail = "";
+    this.userEmail = '';
     this.githubConnected = false;
-    this.githubLogin = "";
+    this.githubLogin = '';
     this.needsGitHubAuth = false;
 
     // Reset Settings
     this.settings = null;
 
     // Clear local storage
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("counterspell_active_workspace_id");
-      localStorage.removeItem("counterspell_active_workspace_name");
-      localStorage.removeItem("counterspell_model");
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('counterspell_active_workspace_id');
+      localStorage.removeItem('counterspell_active_workspace_name');
+      localStorage.removeItem('counterspell_model');
       // Clear any other app-specific keys if they exist
       sessionStorage.clear();
     }
@@ -297,7 +272,7 @@ class AppState {
 
   async disconnect() {
     const confirmed = confirm(
-      "Are you sure you want to disconnect GitHub and DELETE all workspace data? This cannot be undone.",
+      'Are you sure you want to disconnect GitHub and DELETE all workspace data? This cannot be undone.'
     );
     if (!confirmed) return;
 
@@ -305,8 +280,8 @@ class AppState {
     try {
       await authAPI.disconnect();
     } catch (err) {
-      console.error("Failed to disconnect:", err);
-      this.showToast("Failed to disconnect properly", "error");
+      console.error('Failed to disconnect:', err);
+      this.showToast('Failed to disconnect properly', 'error');
     }
   }
 
@@ -325,10 +300,10 @@ class AppState {
       await settingsAPI.save(newSettings);
       this.settings = newSettings;
       this.closeSettings();
-      this.showToast("Settings saved");
+      this.showToast('Settings saved');
     } catch (err) {
-      console.error("Failed to save settings:", err);
-      this.showToast("Failed to save settings", "error");
+      console.error('Failed to save settings:', err);
+      this.showToast('Failed to save settings', 'error');
     }
   }
 }
@@ -338,5 +313,5 @@ export const appState = new AppState();
 // PWA event types
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }

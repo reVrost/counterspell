@@ -61,7 +61,7 @@
 
       <div class="flex items-center gap-1.5 text-gray-500">
         <FolderIcon class="w-3 h-3" />
-        <span class="text-xs font-medium truncate">{task.workspace_name || 'Unknown'}</span>
+        <span class="text-sm font-medium truncate">{task.workspace_name || 'Unknown'}</span>
       </div>
 
       {#if task.last_assistant_message}
@@ -91,25 +91,25 @@
             {/if}
             <ChevronRight class="w-3.5 h-3.5 text-gray-700" />
           </div>
-          <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
+          <span class="text-sm font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
       {:else if variant === 'draft'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs font-medium text-gray-500 px-2 py-0.5 rounded-full border border-gray-800 bg-gray-900/30 font-semibold uppercase tracking-wider"
+            class="text-sm font-medium text-gray-500 px-2 py-0.5 rounded-full border border-gray-800 bg-gray-900/30 font-semibold uppercase tracking-wider"
           >
             Draft
           </span>
-          <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
+          <span class="text-sm font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
       {:else if variant === 'planning'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs font-medium text-violet-400 px-2 py-0.5 rounded-full border border-violet-900/40 bg-violet-950/20 font-semibold uppercase tracking-wider"
+            class="text-sm font-medium text-violet-400 px-2 py-0.5 rounded-full border border-violet-900/40 bg-violet-950/20 font-semibold uppercase tracking-wider"
           >
             Planning
           </span>
@@ -120,15 +120,15 @@
       {:else if variant === 'in_progress'}
         <div class="flex flex-col items-end gap-1.5">
           <span
-            class="text-xs font-medium text-orange-400 px-2 py-0.5 rounded-full border border-orange-900/40 bg-orange-950/20 font-semibold uppercase tracking-wider whitespace-nowrap"
+            class="text-sm font-medium text-orange-400 px-2 py-0.5 rounded-full border border-orange-900/40 bg-orange-950/20 font-semibold uppercase tracking-wider whitespace-nowrap"
           >
             In Progress
           </span>
           <div class="flex items-center gap-1.5">
-            <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
+            <span class="text-sm font-medium text-gray-500/70 font-medium tracking-tight"
               >{formatRelativeTime(task.updated_at)}</span
             >
-            <span class="text-xs font-medium text-orange-500/40 font-mono tabular-nums"
+            <span class="text-sm font-medium text-orange-500/40 font-mono tabular-nums"
               >· {elapsed}s</span
             >
           </div>
@@ -137,13 +137,13 @@
         <div class="flex flex-col items-end gap-1.5">
           <div class="flex items-center gap-2">
             <span
-              class="text-xs font-medium text-blue-400 px-2 py-0.5 rounded-full border border-blue-900/40 bg-blue-950/20 font-semibold uppercase tracking-wider"
+              class="text-sm font-medium text-blue-400 px-2 py-0.5 rounded-full border border-blue-900/40 bg-blue-950/20 font-semibold uppercase tracking-wider"
             >
               Review
             </span>
             <ChevronRight class="w-3.5 h-3.5 text-gray-600" />
           </div>
-          <span class="text-xs font-medium text-gray-500/70 font-medium tracking-tight"
+          <span class="text-sm font-medium text-gray-500/70 font-medium tracking-tight"
             >{formatRelativeTime(task.updated_at)}</span
           >
         </div>
