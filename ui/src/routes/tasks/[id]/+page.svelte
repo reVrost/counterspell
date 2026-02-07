@@ -2,7 +2,14 @@
   import { taskStore } from '$lib/stores/tasks.svelte';
   import { tasksAPI } from '$lib/api';
   import { createTaskSSE } from '$lib/utils/sse';
-  import type { TaskResponse, Message, Task, LogEntry, AgentStreamEvent, ContentBlock } from '$lib/types';
+  import type {
+    TaskResponse,
+    Message,
+    Task,
+    LogEntry,
+    AgentStreamEvent,
+    ContentBlock,
+  } from '$lib/types';
   import TaskDetail from '$lib/components/TaskDetail.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import { page } from '$app/stores';
@@ -13,11 +20,13 @@
   let error = $state<string | null>(null);
   let messages = $state<Message[]>([]);
   let diffContent = $state('');
-  let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
   let sseTaskId = $state<string | null>(null);
   const streamIndex = new Map<string, number>();
-  const streamState = new Map<string, { blocks: ContentBlock[]; current?: ContentBlock; args?: string }>();
+  const streamState = new Map<
+    string,
+    { blocks: ContentBlock[]; current?: ContentBlock; args?: string }
+  >();
 
   function resetStreamState() {
     streamIndex.clear();
@@ -30,7 +39,6 @@
     diffContent = taskData.git_diff
       ? renderDiffHTML(taskData.git_diff)
       : '<div class="text-gray-500 italic">No changes made</div>';
-    logContent = [];
     taskStore.currentTask = taskData.task;
     resetStreamState();
   }
@@ -51,7 +59,10 @@
   }
 
   function concatText(blocks: ContentBlock[]): string {
-    return blocks.filter((b) => b.type === 'text' && b.text).map((b) => b.text).join('');
+    return blocks
+      .filter((b) => b.type === 'text' && b.text)
+      .map((b) => b.text)
+      .join('');
   }
 
   function ensureStreamMessage(messageId: string, role?: string) {
@@ -103,7 +114,9 @@
         ensureStreamMessage(id, event.role);
         const state = streamState.get(id);
         if (!state) return;
-        state.current = (event.block || { type: (event.block_type || 'text') as ContentBlock['type'] }) as ContentBlock;
+        state.current = (event.block || {
+          type: (event.block_type || 'text') as ContentBlock['type'],
+        }) as ContentBlock;
         state.args = '';
         updateStreamMessage(id);
         break;
@@ -155,7 +168,7 @@
 
   async function loadTask(
     taskId: string,
-    options: { showLoading?: boolean; showError?: boolean } = {},
+    options: { showLoading?: boolean; showError?: boolean } = {}
   ) {
     const showLoading = options.showLoading ?? true;
     const showError = options.showError ?? showLoading;
@@ -215,7 +228,6 @@
       },
       onLog: (html: string) => {
         // Do nothing
-        // logContent = [...logContent, html];
       },
       onStatus: (html: string) => {},
       onComplete: (status: string) => {
@@ -330,12 +342,7 @@
         </div>
       </div>
     {:else if task}
-      <TaskDetail
-        task={task.task}
-        {messages}
-        {logContent}
-        isInProgress={task.task.status === 'in_progress'}
-      />
+      <TaskDetail task={task.task} {messages} isInProgress={task.task.status === 'in_progress'} />
     {/if}
   </div>
 </div>

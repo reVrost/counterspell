@@ -79,24 +79,6 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        diff: {
-          add: {
-            bg: 'rgba(63, 185, 80, 0.15)',
-            bgNum: 'rgba(63, 185, 80, 0.2)',
-            text: '#aff5b4',
-            num: '#3fb950',
-          },
-          del: {
-            bg: 'rgba(248, 81, 73, 0.15)',
-            bgNum: 'rgba(248, 81, 73, 0.2)',
-            text: '#ffa198',
-            num: '#f85149',
-          },
-          hunk: {
-            bg: 'rgba(56, 139, 253, 0.15)',
-            text: '#79c0ff',
-          },
-        },
         chart: {
           1: 'hsl(var(--chart-1))',
           2: 'hsl(var(--chart-2))',

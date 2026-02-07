@@ -29,10 +29,11 @@
   );
   const userInitial = $derived(getInitial(appState.githubLogin || appState.userEmail));
 
-  type ThinkingItem = { tool: string; call: string; result: string };
+  type ToolItem = { tool: string; call: string; result: string };
   type TaskDisplayItem =
     | { type: 'message'; id: string; message: Message }
-    | { type: 'thinking'; id: string; items: ThinkingItem[] };
+    | { type: 'assistant'; id: string; message: Message; items: ToolItem[] }
+    | { type: 'thinking'; id: string; items: ToolItem[] };
 
   type SessionDisplayItem =
     | { type: 'message'; id: string; message: SessionMessage }
@@ -165,105 +166,108 @@
 
     while (i < taskMessages.length) {
       const msg = taskMessages[i];
-      const blocks = parseParts(msg);
-      const text = concatText(blocks);
-      const hasContent = text.trim().length > 0;
 
-      if (hasContent) {
+      // User messages: render as-is
+      if (msg.role === 'user') {
         items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
+        i++;
+        continue;
       }
 
-      // Collect consecutive tool/thinking sequences
-      const thinkingItems: ThinkingItem[] = [];
-      const groupId = msg.id || `thinking-${i}`;
+      // Assistant messages: group all parts (thinking + text + tools) together
+      if (msg.role === 'assistant') {
+        const blocks = parseParts(msg);
+        const toolItems: ToolItem[] = [];
 
-      // Lookahead loop to group all consecutive purely functional messages
-      let j = i;
-      while (j < taskMessages.length) {
-        const currentMsg = taskMessages[j];
-        const currentBlocks = parseParts(currentMsg);
-        const currentText = concatText(currentBlocks).trim();
-
-        // If this message has actual text output from assistant (and it's not the first iteration with text handled above)
-        // or it's a user message, we stop grouping.
-        if (j > i && (currentText.length > 0 || currentMsg.role === 'user')) {
-          break;
-        }
-
-        const thinkingBlocks = currentBlocks.filter((b) => b.type === 'thinking');
-        const toolUses = currentBlocks.filter((b) => b.type === 'tool_use');
-        const toolResults = currentBlocks.filter((b) => b.type === 'tool_result');
-        const hasToolRole = currentMsg.role === 'tool' || currentMsg.role === 'tool_result';
-
-        // Add thinking
+        // Extract thinking blocks
+        const thinkingBlocks = blocks.filter((b) => b.type === 'thinking');
         for (const block of thinkingBlocks) {
-          thinkingItems.push({ tool: 'thinking', call: block.text || '', result: '' });
+          toolItems.push({ tool: 'thinking', call: block.text || '', result: '' });
         }
 
-        // Add tool uses + results
-        const remainingResults = [...toolResults];
+        // Extract tool uses and pair with results from subsequent tool messages
+        const toolUses = blocks.filter((b) => b.type === 'tool_use');
+        let resultIdx = i + 1;
+
         for (const tool of toolUses) {
           let result = '';
-          if (remainingResults.length > 0) {
-            const match = remainingResults.shift();
-            result = match?.content || '';
-          } else if (j + 1 < taskMessages.length) {
-            // Peek at next message for result
-            const next = taskMessages[j + 1];
-            const nextBlocks = parseParts(next);
-            const nextResult = nextBlocks.find((b) => b.type === 'tool_result');
-            if (next.role === 'tool_result' || nextResult) {
-              result = nextResult?.content || next.content || '';
-              j++; // Consume the result message
+          // Look for matching tool result in subsequent messages
+          while (resultIdx < taskMessages.length) {
+            const resultMsg = taskMessages[resultIdx];
+            if (resultMsg.role !== 'tool' && resultMsg.role !== 'tool_result') break;
+
+            const resultBlocks = parseParts(resultMsg);
+            const matchingResult = resultBlocks.find(
+              (b) => b.type === 'tool_result' && b.tool_use_id === tool.id
+            );
+
+            if (matchingResult) {
+              result = matchingResult.content || '';
+              resultIdx++;
+              break;
+            } else if (resultMsg.content && !resultMsg.parts) {
+              // Legacy format: tool message with content
+              result = resultMsg.content;
+              resultIdx++;
+              break;
             }
+            resultIdx++;
           }
-          thinkingItems.push({
+
+          toolItems.push({
             tool: tool.name || 'tool',
             call: formatToolInput(tool.input ?? tool.content ?? tool.text ?? ''),
             result,
           });
         }
 
-        for (const block of remainingResults) {
-          thinkingItems.push({ tool: 'tool result', call: '', result: block.content || '' });
-        }
+        // Consume tool messages that were matched
+        const consumedToolMessages = resultIdx - i - 1;
 
-        if (
-          hasToolRole &&
-          toolUses.length === 0 &&
-          toolResults.length === 0 &&
-          currentMsg.content
-        ) {
-          if (currentMsg.role === 'tool') {
-            const { tool, call } = parseToolMessage(currentMsg);
-            thinkingItems.push({ tool, call, result: '' });
-          } else {
-            thinkingItems.push({ tool: 'tool result', call: '', result: currentMsg.content });
-          }
-        }
+        // Render as assistant item with all its parts
+        items.push({
+          type: 'assistant',
+          id: msg.id || `assistant-${i}`,
+          message: msg,
+          items: toolItems,
+        });
 
-        if (thinkingItems.length === 0 && j === i && !hasContent) {
-          // If we're here, it's a message with neither text nor identifiable tools/thinking
-          // But avoid infinite loop, increment j
-        }
-
-        j++;
-        // If the next message has text or is user, stop merging
-        if (j < taskMessages.length) {
-          const nextMsg = taskMessages[j];
-          const nextBlocks = parseParts(nextMsg);
-          const nextText = concatText(nextBlocks).trim();
-          if (nextText.length > 0 || nextMsg.role === 'user') {
-            break;
-          }
-        }
+        i += 1 + consumedToolMessages;
+        continue;
       }
 
-      if (thinkingItems.length > 0) {
-        items.push({ type: 'thinking', id: groupId, items: thinkingItems });
-        i = j - 1; // Sync outer loop index
+      // Tool messages not consumed by assistant: render as standalone thinking items
+      if (msg.role === 'tool' || msg.role === 'tool_result') {
+        const toolItems: ToolItem[] = [];
+        let j = i;
+
+        while (j < taskMessages.length) {
+          const toolMsg = taskMessages[j];
+          if (toolMsg.role !== 'tool' && toolMsg.role !== 'tool_result') break;
+
+          const { tool, call } = parseToolMessage(toolMsg);
+          toolItems.push({
+            tool,
+            call,
+            result: toolMsg.content || '',
+          });
+          j++;
+        }
+
+        if (toolItems.length > 0) {
+          items.push({
+            type: 'thinking',
+            id: msg.id || `tools-${i}`,
+            items: toolItems,
+          });
+        }
+
+        i = j;
+        continue;
       }
 
+      // Other roles: render as message
+      items.push({ type: 'message', id: msg.id || `msg-${i}`, message: msg });
       i++;
     }
 
@@ -333,7 +337,7 @@
     }
   });
 
-  function categorizeGroup(items: ThinkingItem[]): { label: string; color: string } {
+  function categorizeGroup(items: ToolItem[]): { label: string; color: string } {
     if (items.length === 0) return { label: 'Thinking', color: 'text-zinc-500' };
 
     const firstItem = items[0];
@@ -375,7 +379,7 @@
   }
 </script>
 
-<div class="px-4">
+<div>
   {#if mode === 'task'}
     {#if isEmpty}
       <div class={cn('text-xs text-gray-500', emptyClass)}>{emptyText}</div>
@@ -420,6 +424,77 @@
                 </p>
               </div>
             {/if}
+          {:else if item.type === 'assistant'}
+            {@const blocks = parseParts(item.message)}
+            {@const textBlocks = blocks.filter((b) => b.type === 'text')}
+            {@const textContent = textBlocks.map((b) => b.text).join('')}
+            {@const hasThinking = item.items.some((it) => it.tool === 'thinking')}
+            {@const hasTools = item.items.some((it) => it.tool !== 'thinking')}
+
+            <div class="px-12 py-2 pr-4 space-y-2">
+              <!-- Thinking blocks (collapsible) -->
+              {#if hasThinking}
+                {@const cat = categorizeGroup(item.items)}
+                <details class="my-2 group" open>
+                  <summary
+                    class="flex items-center gap-2.5 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors list-none outline-none select-none py-1"
+                  >
+                    <div
+                      class="w-3.5 h-3.5 flex items-center justify-center group-open:rotate-90 transition-transform opacity-60"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
+                      >
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span
+                        class={cn('text-[10px] font-black tracking-[0.15em] uppercase', cat.color)}
+                        >{cat.label}</span
+                      >
+                      <span class="text-[10px] opacity-40 font-mono"
+                        >({item.items.filter((it) => it.tool === 'thinking').length})</span
+                      >
+                    </div>
+                  </summary>
+                  <div
+                    class="mt-2 space-y-1.5 border-l border-white/[0.06] ml-[6px] pl-4 transition-all"
+                  >
+                    {#each item.items.filter((it) => it.tool === 'thinking') as toolItem}
+                      <ToolBlock
+                        tool={toolItem.tool}
+                        call={toolItem.call}
+                        result={toolItem.result}
+                      />
+                    {/each}
+                  </div>
+                </details>
+              {/if}
+
+              <!-- Text content -->
+              {#if textContent.trim()}
+                <MarkdownRenderer
+                  content={textContent}
+                  class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans"
+                />
+              {/if}
+
+              <!-- Tool uses -->
+              {#if hasTools}
+                <div class="space-y-1.5">
+                  {#each item.items.filter((it) => it.tool !== 'thinking') as toolItem}
+                    <ToolBlock tool={toolItem.tool} call={toolItem.call} result={toolItem.result} />
+                  {/each}
+                </div>
+              {/if}
+            </div>
           {:else}
             {@const cat = categorizeGroup(item.items)}
             <details class="my-2 group" open>

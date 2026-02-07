@@ -4,13 +4,13 @@
   import { taskStore } from '$lib/stores/tasks.svelte';
   import { tasksAPI } from '$lib/api';
   import { cn } from '$lib/utils';
-  import { modalSlideUp, backdropFade, slide, DURATIONS } from '$lib/utils/transitions';
+  import { modalSlideUp, backdropFade, DURATIONS } from '$lib/utils/transitions';
   import type { Message, Task } from '$lib/types';
-  import ChatInput from './ChatInput.svelte';
-  import MarkdownRenderer from './MarkdownRenderer.svelte';
+  import TaskActionInput from './TaskActionInput.svelte';
   import TodoIndicator from './TodoIndicator.svelte';
   import Thread from './Thread.svelte';
   import DiffSkeleton from './DiffSkeleton.svelte';
+  import DiffRenderer from './DiffRenderer.svelte';
   import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
   import TrashIcon from '@lucide/svelte/icons/trash';
   import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
@@ -22,27 +22,73 @@
   interface Props {
     task: Task;
     messages: Message[];
-    logContent: string[];
     isInProgress?: boolean;
   }
 
-  let { task, messages, logContent, isInProgress }: Props = $props();
+  let { task, messages, isInProgress }: Props = $props();
 
   // Thread rendering handled by Thread component
 
-  function escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  // State declarations first
+  let activeTab = $state<'agent' | 'diff'>('agent');
+  let confirmAction = $state<string | null>(null);
+  let rawDiff = $state<string>('');
+  let isLoadingDiff = $state<boolean>(false);
+  let containerRef = $state<HTMLDivElement | null>(null);
+  let isDragging = $state(false);
+  let startX = $state(0);
+
+  function handleTouchStart(e: TouchEvent) {
+    isDragging = true;
+    startX = e.touches[0].pageX;
   }
 
-  let activeTab = $state<'task' | 'agent' | 'diff'>('task');
-  let confirmAction = $state<string | null>(null);
-  let diffContent = $state<string>('');
-  let isLoadingDiff = $state<boolean>(false);
+  function handleTouchMove(e: TouchEvent) {
+    if (!isDragging) return;
+    // Touch events are passive by default, can't preventDefault
+  }
+
+  function handleTouchEnd(e: TouchEvent) {
+    if (!isDragging) return;
+    isDragging = false;
+    const endX = e.changedTouches[0].pageX;
+    const diff = startX - endX;
+    const threshold = 50;
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0 && activeTab === 'agent') {
+        activeTab = 'diff';
+      } else if (diff < 0 && activeTab === 'diff') {
+        activeTab = 'agent';
+      }
+    }
+  }
+
+  function handleMouseDown(e: MouseEvent) {
+    isDragging = true;
+    startX = e.pageX;
+  }
+
+  function handleMouseUp(e: MouseEvent) {
+    if (!isDragging) return;
+    isDragging = false;
+    const diff = startX - e.pageX;
+    const threshold = 50;
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0 && activeTab === 'agent') {
+        activeTab = 'diff';
+      } else if (diff < 0 && activeTab === 'diff') {
+        activeTab = 'agent';
+      }
+    }
+  }
+
+  interface FileStat {
+    filename: string;
+    additions: number;
+    deletions: number;
+  }
 
   function handleBack() {
     goto('/app');
@@ -105,7 +151,7 @@
   }
 
   $effect(() => {
-    if (activeTab === 'diff' && diffContent === '' && !isLoadingDiff) {
+    if (activeTab === 'diff' && rawDiff === '' && !isLoadingDiff) {
       loadDiff();
     }
   });
@@ -114,147 +160,84 @@
     isLoadingDiff = true;
     try {
       const response = await tasksAPI.getDiff(task.id);
-      const rawDiff = response.git_diff || '';
-      diffContent = rawDiff
-        ? renderDiffHTML(rawDiff)
-        : '<div class="text-gray-500 italic">No changes made</div>';
+      rawDiff = response.git_diff || '';
     } catch (err) {
       console.error('Failed to load diff:', err);
-      diffContent = '<div class="p-4 text-red-400">Failed to load diff</div>';
+      rawDiff = '';
     } finally {
       isLoadingDiff = false;
     }
   }
-
-  function renderDiffHTML(diff: string): string {
-    if (!diff) return '<div class="text-gray-500 italic">No changes made</div>';
-
-    let html = '';
-    for (const line of diff.split('\n')) {
-      const escapedLine = escapeHtml(line);
-      if (line.startsWith('+')) {
-        html += `<div class="px-3 py-1 bg-green-500/10 text-green-400 font-mono text-sm border-l-2 border-green-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith('-')) {
-        html += `<div class="px-3 py-1 bg-red-500/10 text-red-400 font-mono text-sm border-l-2 border-red-500/50">${escapedLine.substring(1)}</div>`;
-      } else if (line.startsWith('@@')) {
-        html += `<div class="px-3 py-1 bg-gray-800 text-gray-500 font-mono text-sm">${escapedLine}</div>`;
-      } else if (line.trim() !== '') {
-        html += `<div class="px-3 py-1 text-gray-400 font-mono text-sm">${escapedLine}</div>`;
-      }
-    }
-    return html;
-  }
 </script>
 
-<div class="flex flex-col h-[100dvh]">
-  <!-- Modal Header -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="flex flex-col h-[100dvh] relative">
+  <!-- Floating Controls Row -->
   <div
-    class="px-4 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-popover"
+    class="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none"
   >
-    <div class="flex items-center gap-3">
-      <button
-        onclick={handleBack}
-        class="w-11 h-11 rounded-full hover:bg-white/5 flex items-center justify-center text-gray-400 focus:outline-none"
-        aria-label="Go back"
-      >
-        <ArrowLeftIcon class="w-5 h-5" />
-      </button>
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="text-gray-500 text-[10px]">
-            <i class="fas fa-folder"></i>
-            {task.workspace_name || 'Unknown'}
-          </span>
-          <span class="text-[10px] text-gray-600 font-mono">#{task.id}</span>
-        </div>
-        <h2 class="text-sm font-bold text-[#FFFFFF] line-clamp-1 w-48">
-          {task.title}
-        </h2>
-      </div>
-    </div>
-
-    <!-- Status Badge -->
-    <div
-      class="flex items-center px-2 py-1 rounded-full bg-white/5 border border-white/10 gap-1.5 h-7"
+    <!-- Back Button -->
+    <button
+      onclick={handleBack}
+      class="pointer-events-auto w-9 h-9 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all focus:outline-none"
+      aria-label="Go back"
     >
+      <ArrowLeftIcon class="w-4 h-4" />
+    </button>
+
+    <!-- View Indicators & Status -->
+    <div
+      class="pointer-events-auto flex items-center gap-2.5 bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-2.5 py-1.5"
+    >
+      <!-- Swipe Indicators -->
+      <div class="flex items-center gap-1">
+        <button
+          onclick={() => (activeTab = 'agent')}
+          class={cn(
+            'w-1 h-1 rounded-full transition-all duration-200',
+            activeTab === 'agent' ? 'bg-white/70 w-2' : 'bg-white/20 hover:bg-white/40'
+          )}
+          aria-label="Agent view"
+        ></button>
+        <button
+          onclick={() => (activeTab = 'diff')}
+          class={cn(
+            'w-1 h-1 rounded-full transition-all duration-200',
+            activeTab === 'diff' ? 'bg-white/70 w-2' : 'bg-white/20 hover:bg-white/40'
+          )}
+          aria-label="Diff view"
+        ></button>
+      </div>
+
+      <div class="w-px h-3 bg-white/10"></div>
+
+      <!-- Status Dot -->
       {#if task.status === 'draft'}
-        <div class="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-        <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Draft</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-gray-400" title="Draft"></div>
       {:else if task.status === 'in_progress'}
-        <div class="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-glow"></div>
-        <span class="text-xs uppercase font-bold tracking-wider text-orange-400">Running</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-orange-400 pulse-glow" title="Running"></div>
       {:else if task.status === 'review'}
-        <div class="w-1.5 h-1.5 rounded-full bg-blue-400 pulse-glow"></div>
-        <span class="text-xs uppercase font-bold tracking-wider text-blue-400">Ready</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-blue-400 pulse-glow" title="Ready"></div>
       {:else if task.status === 'done'}
-        <div class="w-1.5 h-1.5 rounded-full bg-green-400"></div>
-        <span class="text-xs uppercase font-bold tracking-wider text-green-400">Merged</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-green-400" title="Merged"></div>
       {:else if task.status === 'failed'}
-        <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
-        <span class="text-xs uppercase font-bold tracking-wider text-red-400">Failed</span>
+        <div class="w-1.5 h-1.5 rounded-full bg-red-400" title="Failed"></div>
       {/if}
     </div>
   </div>
 
-  <!-- Tabs Container -->
-  <div
-    class="flex items-center justify-between p-2 px-7 bg-popover shrink-0 border-b border-white/5"
-  >
-    <div class="flex bg-gray-900 rounded-lg p-0.5 border border-gray-700/50">
-      {#each ['task', 'agent', 'diff'] as tab}
-        <button
-          onclick={() => (activeTab = tab as typeof activeTab)}
-          class={cn(
-            'px-4 py-2 text-[11px] font-medium rounded-md transition-all focus:outline-none relative overflow-hidden',
-            activeTab === tab ? 'bg-gray-800 text-[#FFFFFF] shadow' : 'text-gray-500'
-          )}
-        >
-          {#if activeTab === tab}
-            <span
-              class="absolute inset-0 bg-violet-500/10"
-              style:transition="opacity 200ms ease-out"
-            ></span>
-          {/if}
-          <span class="relative z-10">
-            {tab === 'task' ? 'Task' : tab === 'agent' ? 'Agent' : tab === 'diff' ? 'Diff' : 'Log'}
-          </span>
-        </button>
-      {/each}
-    </div>
+  <!-- Modal Header - Minimal -->
+  <div class="px-4 pt-16 pb-4 flex flex-col gap-2 shrink-0">
+    <!-- Workspace -->
+    <span class="text-gray-500 text-[11px] flex items-center gap-1.5">
+      <i class="fas fa-folder text-[10px]"></i>
+      {task.workspace_name || 'Unknown'}
+    </span>
 
-    <!-- Status Indicator -->
-
-    <div class="flex items-center justify-end gap-2">
-      <button
-        onclick={() => (confirmAction = 'discard')}
-        class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-400 transition focus:outline-none rounded-lg"
-        aria-label="Discard task"
-      >
-        <TrashIcon class="w-4 h-4" />
-      </button>
-      <!-- Action Buttons -->
-      {#if task.status !== 'in_progress' && task.status !== 'done'}
-        <div class="flex items-center gap-2">
-          <button
-            onclick={() => (confirmAction = 'merge')}
-            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-[#FFFFFF] transition-all shadow-sm flex items-center gap-2"
-            title="Merge directly to main"
-          >
-            <GithubIcon class="w-3.5 h-3.5 opacity-70" />
-            <span class="hidden sm:inline">Merge</span>
-          </button>
-
-          <button
-            onclick={() => (confirmAction = 'pr')}
-            class="h-8 pl-2.5 pr-3 rounded-md bg-[#1C1C1C] hover:bg-[#252525] border border-[#333] text-[11px] font-medium text-[#FFFFFF] transition-all shadow-sm flex items-center gap-2"
-            title="Create a Pull Request"
-          >
-            <GitMergeIcon class="w-3.5 h-3.5 opacity-70" />
-            <span>PR</span>
-          </button>
-        </div>
-      {/if}
-    </div>
+    <!-- Title -->
+    <h1 class="text-xl font-semibold text-white/95 leading-tight pr-2">
+      {task.title}
+    </h1>
   </div>
 
   <!-- Floating Todo Indicator -->
@@ -262,105 +245,83 @@
     <TodoIndicator />
   {/if}
 
-  <!-- Main Content Area -->
-  <div class="flex-1 overflow-y-auto relative w-full h-full" id="content-scroll">
-    <!-- Task Tab -->
-    {#if activeTab === 'task'}
-      <div class="px-6 py-4 pb-32">
-        {#if task.intent?.trim()}
-          <MarkdownRenderer
-            content={task.intent}
-            class="text-base text-[#FFFFFF] font-medium leading-relaxed font-sans"
+  <!-- Main Content Area - Swipeable -->
+  <div
+    bind:this={containerRef}
+    class="flex-1 relative w-full h-full overflow-hidden"
+    ontouchstart={handleTouchStart}
+    ontouchmove={handleTouchMove}
+    ontouchend={handleTouchEnd}
+    onmousedown={handleMouseDown}
+    onmouseup={handleMouseUp}
+    onmouseleave={() => (isDragging = false)}
+  >
+    <div
+      class="flex h-full transition-transform duration-300 ease-out"
+      style:transform="translateX({activeTab === 'agent' ? '0%' : '-100%'})"
+    >
+      <!-- Agent View -->
+      <div class="w-full h-full flex-shrink-0 overflow-y-auto" id="agent-scroll">
+        <div class="mt-4 space-y-1 pb-44">
+          <Thread
+            mode="task"
+            {messages}
+            emptyText="No agent output"
+            emptyClass="p-5 text-gray-500 italic text-xs"
+            scrollContainerId="agent-scroll"
           />
-        {:else}
-          <div class="text-sm text-gray-500 italic">No task description</div>
-        {/if}
 
-        {#if task.status === 'failed' && task.failed_reason}
-          <div class="mt-6 px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-            <div class="flex items-start gap-3">
-              <div
-                class="w-5 h-5 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0 mt-0.5"
-              >
-                <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-xs font-medium text-red-400 mb-1">Error</p>
-                <p class="text-sm text-red-300/80 leading-relaxed">{task.failed_reason}</p>
-              </div>
+          {#if isInProgress}
+            <div class="flex items-center gap-3 px-8 py-4">
+              <p class="text-base font-medium shimmer">Thinking...</p>
+              <p class="text-base text-gray-600">Analyzing context</p>
             </div>
-          </div>
-        {/if}
-      </div>
-    {/if}
-
-    <!-- Agent Tab -->
-    {#if activeTab === 'agent'}
-      <div id="agent-content" class="mt-4 space-y-1 pb-32">
-        <Thread
-          mode="task"
-          {messages}
-          emptyText="No agent output"
-          emptyClass="p-5 text-gray-500 italic text-xs"
-          scrollContainerId="content-scroll"
-        />
-
-        {#if isInProgress}
-          <div class="flex items-center gap-3 px-12 py-3">
-            <div class="relative shrink-0">
-              <div
-                class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center"
-              >
-                <i class="fas fa-robot text-base text-violet-400 pulse-glow"></i>
-              </div>
-              <div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
-                <div
-                  class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"
-                ></div>
-              </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium shimmer text-gray-300">Agent is thinking...</p>
-              <p class="text-sm text-gray-600">Analyzing context</p>
-            </div>
-          </div>
-        {/if}
-      </div>
-    {/if}
-
-    <!-- Diff Tab -->
-    {#if activeTab === 'diff'}
-      <div class="p-0 min-h-full pb-32">
-        <div
-          class="px-4 py-3 border-b border-gray-800 sticky top-0 bg-[#0D1117] z-10 flex justify-between"
-        >
-          <span class="text-sm text-gray-400 font-mono">changes</span>
-          <span class="text-xs text-green-500 font-mono">git diff</span>
-        </div>
-        <div class="p-3 diff-container">
-          {#if isLoadingDiff}
-            <DiffSkeleton />
-          {:else if diffContent}
-            {@html diffContent}
-          {:else}
-            <div class="p-4 text-gray-500 italic">No changes</div>
           {/if}
         </div>
       </div>
-    {/if}
+
+      <!-- Diff View -->
+      <div class="w-full h-full flex-shrink-0 overflow-y-auto" id="diff-scroll">
+        <div class="min-h-full pb-32">
+          <div class="p-3 diff-container">
+            {#if isLoadingDiff}
+              <DiffSkeleton />
+            {:else}
+              <DiffRenderer diff={rawDiff} class="w-full" />
+            {/if}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Swipe Hint - Shows briefly on first load -->
+    <div
+      class="absolute bottom-24 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 transition-opacity duration-500"
+      class:opacity-100={activeTab === 'agent'}
+    >
+      <div class="flex items-center gap-2 text-[10px] text-white/30 uppercase tracking-wider">
+        <span>Swipe for diff</span>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </div>
   </div>
 
-  <!-- Chat Input Overlay - Always visible -->
+  <!-- Unified Action Input - Mobile native design -->
   <div class="absolute bottom-0 inset-x-0 z-20 pb-6 px-3 mb-6 pb-safe">
     <div
       class="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-[#0D1117]/95 to-transparent pointer-events-none"
     ></div>
     <div class="relative mx-auto max-w-4xl">
-      <ChatInput
-        mode="chat"
+      <TaskActionInput
         taskId={task.id}
-        placeholder="Continue the conversation..."
+        taskStatus={task.status}
+        placeholder={task.status === 'done' ? 'Task completed' : 'Ask for changes or approve...'}
         onSubmit={handleChatSubmit}
+        onMerge={() => (confirmAction = 'merge')}
+        onCreatePR={() => (confirmAction = 'pr')}
+        onDelete={() => (confirmAction = 'discard')}
       />
     </div>
   </div>

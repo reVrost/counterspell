@@ -24,7 +24,6 @@
   let loadingTask = $state(false);
   let taskError = $state<string | null>(null);
   let currentMessages = $state<Message[]>([]);
-  let logContent = $state<string[]>([]);
   let eventSource: EventSource | null = null;
 
   function parseError(err: string) {
@@ -83,7 +82,6 @@
       if (!isPrefetch) {
         currentTask = cached.task;
         currentMessages = cached.messages;
-        logContent = cached.logs.map((log) => renderLogEntryHTML(log));
         setupSSE(taskId);
       }
       return;
@@ -107,7 +105,6 @@
         currentTask = data.task;
         taskStore.currentTask = data.task;
         currentMessages = data.messages || [];
-        logContent = data.logs?.map((log) => renderLogEntryHTML(log)) || [];
 
         // Set up SSE for real-time updates
         setupSSE(taskId);
@@ -144,9 +141,7 @@
       onDiffUpdate: (html: string) => {
         // Diff is now loaded on-demand in TaskDetail
       },
-      onLog: (html: string) => {
-        logContent = [...logContent, html];
-      },
+      onLog: (html: string) => {},
       onStatus: (html: string) => {
         // Status indicator updated
       },
@@ -190,7 +185,6 @@
         eventSource.close();
         eventSource = null;
       }
-      logContent = [];
       currentMessages = [];
       currentTask = null;
     } else {
@@ -313,7 +307,6 @@
           <TaskDetail
             task={currentTask}
             messages={currentMessages}
-            {logContent}
             isInProgress={currentTask.status === 'in_progress'}
           />
         {/if}

@@ -198,19 +198,20 @@ func (m *GitManager) GetDiff(ctx context.Context, taskID string) (string, error)
 	currentBranch := strings.TrimSpace(string(branchOutput))
 
 	// Try origin/main first (remote tracking branch)
-	cmd := exec.CommandContext(ctx, "git", "diff", "origin/main", currentBranch)
+	// Use --no-pager to bypass any configured diff tool/pager (like delta, diff-so-fancy)
+	cmd := exec.CommandContext(ctx, "git", "--no-pager", "diff", "--no-color", "origin/main", currentBranch)
 	cmd.Dir = workspacePath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// slog.Warn("[GIT] GetDiff origin/main failed, trying main", "error", err)
 		// Fallback to local main branch
-		cmd = exec.CommandContext(ctx, "git", "diff", "main", currentBranch)
+		cmd = exec.CommandContext(ctx, "git", "--no-pager", "diff", "--no-color", "main", currentBranch)
 		cmd.Dir = workspacePath
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			// slog.Warn("[GIT] GetDiff main failed, trying master", "error", err)
 			// Try master branch
-			cmd = exec.CommandContext(ctx, "git", "diff", "master", currentBranch)
+			cmd = exec.CommandContext(ctx, "git", "--no-pager", "diff", "--no-color", "master", currentBranch)
 			cmd.Dir = workspacePath
 			output, err = cmd.CombinedOutput()
 			if err != nil {

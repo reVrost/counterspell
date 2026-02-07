@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -152,7 +153,9 @@ func (m *JJManager) GetDiff(ctx context.Context, taskID string) (string, error) 
 		return "", nil
 	}
 
-	output, err := m.runner.Run(ctx, workspacePath, "jj", "diff", "-r", "@")
+	cmd := exec.CommandContext(ctx, "jj", "--config", "ui.diff-formatter=\":git\"", "diff", "--color=never", "-r", "@")
+	cmd.Dir = workspacePath
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("jj diff failed: %w\nOutput: %s", err, string(output))
 	}
