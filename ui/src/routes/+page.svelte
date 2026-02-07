@@ -4,6 +4,7 @@
   import KeyIcon from '@lucide/svelte/icons/key';
   import XIcon from '@lucide/svelte/icons/x';
   import { browser } from '$app/environment';
+  import Logo from '$lib/components/Logo.svelte';
 
   let loading = $state(false);
   let errorMsg = $state('');
@@ -148,10 +149,8 @@
         </div>
       {:else}
         <div class="space-y-4">
-          <div
-            class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6"
-          >
-            <KeyIcon class="w-8 h-8 text-white" />
+          <div class="mb-6 flex justify-center">
+            <Logo class="w-16 h-16" />
           </div>
           <h1 class="text-3xl font-bold text-white tracking-tight">Welcome to Counterspell</h1>
           <p class="text-gray-400 text-sm leading-relaxed">

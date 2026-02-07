@@ -23,7 +23,9 @@
   );
   const accountName = $derived(appState.githubLogin || appState.userEmail);
   const avatarSrc = $derived(
-    appState.githubLogin ? `https://avatars.githubusercontent.com/${appState.githubLogin}?size=64` : ''
+    appState.githubLogin
+      ? `https://avatars.githubusercontent.com/${appState.githubLogin}?size=64`
+      : ''
   );
 
   $effect(() => {
@@ -71,12 +73,15 @@
         <span
           class="text-lg font-semibold tracking-tight text-white/90 group-hover:text-white transition-colors"
         >
-          {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+          {appState.activeWorkspaceName || 'All Workspaces'}
         </span>
+        <ChevronDownIcon
+          class="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors"
+        />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          class="w-72 bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col mt-2 z-50 p-1"
+          class="w-72 bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col mt-2 ml-6 z-50 p-1"
           sideOffset={8}
         >
           <!-- Search Header -->
@@ -97,9 +102,20 @@
           <!-- Scrollable List -->
           <div class="max-h-[320px] overflow-y-auto py-1 custom-scrollbar">
             <DropdownMenu.Item
-              class="w-full px-3 py-2 hover:bg-white/5 cursor-pointer text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1 text-left focus:bg-white/5 outline-none"
+              onSelect={() => appState.setActiveWorkspace('', '')}
+              class={cn(
+                'w-full px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg flex items-center justify-between group transition text-left focus:bg-white/5 outline-none mb-0.5',
+                !appState.activeWorkspaceId && 'bg-white/[0.08] text-white'
+              )}
             >
-              All Workspaces
+              <span
+                class="text-sm {appState.activeWorkspaceId
+                  ? 'text-zinc-400'
+                  : 'text-zinc-100'} group-hover:text-zinc-100 transition">All Workspaces</span
+              >
+              {#if !appState.activeWorkspaceId}
+                <CheckIcon class="w-3.5 h-3.5 text-violet-400" />
+              {/if}
             </DropdownMenu.Item>
 
             {#each filteredProjects as p}
@@ -135,7 +151,7 @@
 
           <!-- Footer -->
           <div
-            class="mt-1 px-3 py-2 bg-white/[0.02] border-t border-white/5 text-[10px] text-zinc-500 flex justify-between items-center rounded-b-xl"
+            class="mt-1 px-3 py-2 bg-white/[0.02] border-t border-white/5 text-sm text-zinc-500 flex justify-between items-center rounded-b-xl"
           >
             <span class="font-medium">{appState.projects.length} Workspaces</span>
             <button
@@ -247,7 +263,8 @@
               data-testid="logout-button"
               class="w-full px-2.5 py-2 hover:bg-red-500/10 rounded-lg text-sm text-red-400 hover:text-red-300 flex items-center gap-3 transition-colors text-left cursor-pointer focus:bg-red-500/10 outline-none disabled:opacity-50"
             >
-              <LogOutIcon class="w-4 h-4" /> {signingOut ? 'Logging out...' : 'Logout'}
+              <LogOutIcon class="w-4 h-4" />
+              {signingOut ? 'Logging out...' : 'Logout'}
             </DropdownMenu.Item>
           </DropdownMenu.Group>
         </DropdownMenu.Content>

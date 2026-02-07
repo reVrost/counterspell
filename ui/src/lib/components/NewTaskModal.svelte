@@ -192,6 +192,8 @@
   aria-modal="true"
 >
   <!-- Backdrop -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     transition:backdropFade
     onclick={close}
@@ -212,10 +214,8 @@
         <XIcon class="w-5 h-5" />
       </button>
 
-      <div
-        class="px-3 py-1 bg-white/5 rounded-full border border-white/5 text-xs font-medium text-gray-300"
-      >
-        Counterspell
+      <div class="px-3 py-1 bg-white/5 rounded-full border border-white/5 text-sm font-medium">
+        Select Workspace
       </div>
 
       <div class="w-8"></div>
