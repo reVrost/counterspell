@@ -4,6 +4,7 @@
   import { slide, modalSlideUp, backdropFade } from '$lib/utils/transitions';
   import { cn } from '$lib/utils';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+  import ModelSelector from './ModelSelector.svelte';
   import XIcon from '@lucide/svelte/icons/x';
   import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
   import MicIcon from '@lucide/svelte/icons/mic';
@@ -386,6 +387,9 @@
           >
             <MicIcon class={cn('w-5 h-5', appState.isRecording && 'animate-pulse')} />
           </button>
+
+          <!-- Model Selector -->
+          <ModelSelector position="right" />
 
           <!-- Submit -->
           <button

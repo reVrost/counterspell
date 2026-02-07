@@ -206,7 +206,7 @@ func (h *Handlers) HandleNewTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fullPrompt := "#" + req.Title + "\n\n" + req.Intent
+	fullPrompt := "# " + req.Title + "\n\n" + req.Intent
 
 	slog.Info("[HANDLER] Starting task submission", "workspace_id", req.WorkspaceID, "intent", req.Intent, "model_id", req.ModelID)
 	taskID, err := h.orchestrator.NewTask(ctx, req.WorkspaceID, fullPrompt, req.ModelID)

@@ -109,10 +109,4 @@ type TaskResponse struct {
 	Task      Task       `json:"task"`
 	Messages  []Message  `json:"messages"`
 	Artifacts []Artifact `json:"artifacts"`
-
-	// All agent runs with nested messages and artifacts
-	AgentRuns []AgentRunWithDetails `json:"agent_runs,omitempty"`
-
-	// Git diff from the worktree (if available)
-	GitDiff string `json:"git_diff,omitempty"`
 }

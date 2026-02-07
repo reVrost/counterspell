@@ -296,37 +296,35 @@
 
     <!-- Agent Tab -->
     {#if activeTab === 'agent'}
-      <div class="pb-32">
-        <div id="agent-content" class="mt-1 space-y-1">
-          <Thread
-            mode="task"
-            {messages}
-            emptyText="No agent output"
-            emptyClass="p-5 text-gray-500 italic text-xs"
-            scrollContainerId="content-scroll"
-          />
+      <div id="agent-content" class="mt-4 space-y-1 pb-32">
+        <Thread
+          mode="task"
+          {messages}
+          emptyText="No agent output"
+          emptyClass="p-5 text-gray-500 italic text-xs"
+          scrollContainerId="content-scroll"
+        />
 
-          {#if isInProgress}
-            <div class="flex items-center gap-3 px-12 py-3">
-              <div class="relative shrink-0">
-                <div
-                  class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center"
-                >
-                  <i class="fas fa-robot text-base text-violet-400 pulse-glow"></i>
-                </div>
-                <div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
-                  <div
-                    class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"
-                  ></div>
-                </div>
+        {#if isInProgress}
+          <div class="flex items-center gap-3 px-12 py-3">
+            <div class="relative shrink-0">
+              <div
+                class="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center"
+              >
+                <i class="fas fa-robot text-base text-violet-400 pulse-glow"></i>
               </div>
-              <div>
-                <p class="text-sm font-medium shimmer text-gray-300">Agent is thinking...</p>
-                <p class="text-sm text-gray-600">Analyzing context</p>
+              <div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
+                <div
+                  class="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-violet-400 rounded-full"
+                ></div>
               </div>
             </div>
-          {/if}
-        </div>
+            <div>
+              <p class="text-sm font-medium shimmer text-gray-300">Agent is thinking...</p>
+              <p class="text-sm text-gray-600">Analyzing context</p>
+            </div>
+          </div>
+        {/if}
       </div>
     {/if}
 

@@ -375,129 +375,133 @@
   }
 </script>
 
-{#if mode === 'task'}
-  {#if isEmpty}
-    <div class={cn('text-xs text-gray-500', emptyClass)}>{emptyText}</div>
+<div class="px-4">
+  {#if mode === 'task'}
+    {#if isEmpty}
+      <div class={cn('text-xs text-gray-500', emptyClass)}>{emptyText}</div>
+    {:else}
+      <div class={cn('space-y-1', className)}>
+        {#each taskItems as item}
+          {#if item.type === 'message'}
+            {#if item.message.role === 'user'}
+              <div class="flex gap-3 px-4 py-2 items-start">
+                <div class="shrink-0 mt-1">
+                  {#if userAvatarUrl}
+                    <img
+                      src={userAvatarUrl}
+                      alt="User"
+                      class="w-8 h-8 rounded-full border border-white/10 shadow-sm"
+                    />
+                  {:else}
+                    <div
+                      class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300"
+                    >
+                      {userInitial}
+                    </div>
+                  {/if}
+                </div>
+                <div
+                  class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-lg"
+                >
+                  <p class="text-[13px] font-medium leading-relaxed">{item.message.content}</p>
+                </div>
+              </div>
+            {:else if item.message.role === 'assistant'}
+              <div class="px-12 py-2 pr-4">
+                <MarkdownRenderer
+                  content={item.message.content}
+                  class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans"
+                />
+              </div>
+            {:else}
+              <div class="px-12 py-2 pr-4 opacity-70">
+                <p class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans">
+                  {item.message.content}
+                </p>
+              </div>
+            {/if}
+          {:else}
+            {@const cat = categorizeGroup(item.items)}
+            <details class="my-2 group" open>
+              <summary
+                class="flex items-center gap-2.5 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors list-none outline-none select-none py-1"
+              >
+                <div
+                  class="w-3.5 h-3.5 flex items-center justify-center group-open:rotate-90 transition-transform opacity-60"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
+                  >
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class={cn('text-[10px] font-black tracking-[0.15em] uppercase', cat.color)}
+                    >{cat.label}</span
+                  >
+                  <span class="text-[10px] opacity-40 font-mono">({item.items.length})</span>
+                </div>
+              </summary>
+              <div
+                class="mt-2 space-y-1.5 border-l border-white/[0.06] ml-[6px] pl-4 transition-all"
+              >
+                {#each item.items as toolItem}
+                  <ToolBlock tool={toolItem.tool} call={toolItem.call} result={toolItem.result} />
+                {/each}
+              </div>
+            </details>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  {:else if isEmpty}
+    <div class={cn('text-xs font-medium text-gray-500', emptyClass)}>{emptyText}</div>
   {:else}
     <div class={cn('space-y-1', className)}>
-      {#each taskItems as item}
-        {#if item.type === 'message'}
-          {#if item.message.role === 'user'}
-            <div class="flex gap-3 px-4 py-2 items-start">
+      {#each sessionItems as item}
+        {#if item.type === 'tool'}
+          <ToolBlock tool={item.tool} call={item.call} result={item.result} />
+        {:else}
+          <div class="flex gap-3 px-2 py-6 items-start">
+            {#if item.message.role === 'user'}
               <div class="shrink-0 mt-1">
                 {#if userAvatarUrl}
                   <img
                     src={userAvatarUrl}
                     alt="User"
-                    class="w-8 h-8 rounded-full border border-white/10 shadow-sm"
+                    class="w-7 h-7 rounded-full border border-white/10 shadow-sm"
                   />
                 {:else}
                   <div
-                    class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300"
+                    class="w-7 h-7 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[9px] font-bold text-gray-300"
                   >
                     {userInitial}
                   </div>
                 {/if}
               </div>
               <div
-                class="flex-1 min-w-0 bg-[#1e1e1e]/60 border border-white/10 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-lg"
+                class="flex-1 min-w-0 bg-violet-500/10 border border-white/5 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-sm"
               >
-                <p class="text-[13px] font-medium leading-relaxed">{item.message.content}</p>
+                <div class="text-[13px] font-medium whitespace-pre-wrap break-words">
+                  {item.message.content || ''}
+                </div>
               </div>
-            </div>
-          {:else if item.message.role === 'assistant'}
-            <div class="px-12 py-2 pr-4">
-              <MarkdownRenderer
-                content={item.message.content}
-                class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans"
-              />
-            </div>
-          {:else}
-            <div class="px-12 py-2 pr-4 opacity-70">
-              <p class="text-[13px] text-[#FFFFFF] font-medium leading-relaxed font-sans">
-                {item.message.content}
-              </p>
-            </div>
-          {/if}
-        {:else}
-          {@const cat = categorizeGroup(item.items)}
-          <details class="ml-12 mr-4 my-2 group" open>
-            <summary
-              class="flex items-center gap-2.5 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors list-none outline-none select-none py-1"
-            >
-              <div
-                class="w-3.5 h-3.5 flex items-center justify-center group-open:rotate-90 transition-transform opacity-60"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg
-                >
+            {:else}
+              <div class="px-3 py-2 text-xs font-medium">
+                <div class="text-[13px] whitespace-pre-wrap break-words">
+                  {item.message.content || ''}
+                </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span class={cn('text-[10px] font-black tracking-[0.15em] uppercase', cat.color)}
-                  >{cat.label}</span
-                >
-                <span class="text-[10px] opacity-40 font-mono">({item.items.length})</span>
-              </div>
-            </summary>
-            <div class="mt-2 space-y-1.5 border-l border-white/[0.06] ml-[6px] pl-4 transition-all">
-              {#each item.items as toolItem}
-                <ToolBlock tool={toolItem.tool} call={toolItem.call} result={toolItem.result} />
-              {/each}
-            </div>
-          </details>
+            {/if}
+          </div>
         {/if}
       {/each}
     </div>
   {/if}
-{:else if isEmpty}
-  <div class={cn('text-xs font-medium text-gray-500', emptyClass)}>{emptyText}</div>
-{:else}
-  <div class={cn('space-y-1', className)}>
-    {#each sessionItems as item}
-      {#if item.type === 'tool'}
-        <ToolBlock tool={item.tool} call={item.call} result={item.result} />
-      {:else}
-        <div class="flex gap-3 px-2 py-6 items-start">
-          {#if item.message.role === 'user'}
-            <div class="shrink-0 mt-1">
-              {#if userAvatarUrl}
-                <img
-                  src={userAvatarUrl}
-                  alt="User"
-                  class="w-7 h-7 rounded-full border border-white/10 shadow-sm"
-                />
-              {:else}
-                <div
-                  class="w-7 h-7 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-[9px] font-bold text-gray-300"
-                >
-                  {userInitial}
-                </div>
-              {/if}
-            </div>
-            <div
-              class="flex-1 min-w-0 bg-violet-500/10 border border-white/5 rounded-2xl px-4 py-3 text-[#FFFFFF] shadow-sm"
-            >
-              <div class="text-[13px] font-medium whitespace-pre-wrap break-words">
-                {item.message.content || ''}
-              </div>
-            </div>
-          {:else}
-            <div class="px-3 py-2 text-xs font-medium">
-              <div class="text-[13px] whitespace-pre-wrap break-words">
-                {item.message.content || ''}
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    {/each}
-  </div>
-{/if}
+</div>

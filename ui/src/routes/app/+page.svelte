@@ -70,6 +70,13 @@
 
 <svelte:head>
   <title>Dashboard | Counterspell</title>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      });
+    }
+  </script>
 </svelte:head>
 
 {#if appState.activeTab === 'sessions'}

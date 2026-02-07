@@ -356,70 +356,6 @@ func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*mo
 		return nil, err
 	}
 
-	// Get all agent runs for the task
-	agentRuns, err := s.Q.ListAgentRunsByTask(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build agent runs with nested messages and artifacts
-	agentRunsWithDetails := make([]models.AgentRunWithDetails, len(agentRuns))
-	for i, ar := range agentRuns {
-		// Find messages for this run
-		runMessages := make([]models.Message, 0)
-		for _, msg := range messages {
-			if msg.RunID == ar.ID {
-				runMessages = append(runMessages, models.Message{
-					ID:         msg.ID,
-					TaskID:     msg.TaskID,
-					RunID:      &msg.RunID,
-					Role:       msg.Role,
-					Parts:      msg.Parts,
-					Model:      nullableString(msg.Model),
-					Provider:   nullableString(msg.Provider),
-					Content:    msg.Content,
-					ToolID:     nullableString(msg.ToolID),
-					CreatedAt:  msg.CreatedAt,
-					UpdatedAt:  msg.UpdatedAt,
-					FinishedAt: nullableInt64(msg.FinishedAt),
-				})
-			}
-		}
-
-		// Find artifacts for this run
-		runArtifacts := make([]models.Artifact, 0)
-		for _, art := range artifacts {
-			if art.RunID == ar.ID {
-				runArtifacts = append(runArtifacts, models.Artifact{
-					ID:        art.ID,
-					RunID:     art.RunID,
-					Path:      art.Path,
-					Content:   art.Content,
-					Version:   art.Version,
-					CreatedAt: art.CreatedAt,
-					UpdatedAt: art.UpdatedAt,
-				})
-			}
-		}
-
-		agentRunsWithDetails[i] = models.AgentRunWithDetails{
-			ID:               ar.ID,
-			TaskID:           ar.TaskID,
-			Prompt:           ar.Prompt,
-			AgentBackend:     ar.AgentBackend,
-			SummaryMessageID: nullableString(ar.SummaryMessageID),
-			Cost:             ar.Cost,
-			MessageCount:     ar.MessageCount,
-			PromptTokens:     ar.PromptTokens,
-			CompletionTokens: ar.CompletionTokens,
-			CompletedAt:      nullableInt64FromTime(ar.CompletedAt),
-			CreatedAt:        ar.CreatedAt,
-			UpdatedAt:        ar.UpdatedAt,
-			Messages:         runMessages,
-			Artifacts:        runArtifacts,
-		}
-	}
-
 	// Top-level messages should include ALL messages for the task
 	taskMessages := make([]models.Message, len(messages))
 	for i, msg := range messages {
@@ -457,7 +393,6 @@ func (s *Repository) GetTaskWithDetails(ctx context.Context, taskID string) (*mo
 		Task:      *sqlcGetTaskRowToModel(&task),
 		Messages:  taskMessages,
 		Artifacts: taskArtifacts,
-		AgentRuns: agentRunsWithDetails,
 	}, nil
 }
 
