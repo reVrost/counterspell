@@ -86,6 +86,39 @@ func TestNativeBackend_Events(t *testing.T) {
 	})
 }
 
+func TestNativeBackend_WithTaskDoneCallback(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockProvider := &mockLLMProvider{}
+	taskDoneCalled := false
+	taskDone := func() error {
+		taskDoneCalled = true
+		return nil
+	}
+
+	backend, err := NewNativeBackend(
+		WithProvider(mockProvider),
+		WithTaskDoneCallback(taskDone),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create backend: %v", err)
+	}
+
+	if backend.Runner().toolCtx == nil {
+		t.Fatal("toolCtx should not be nil after NewNativeBackend with WithTaskDoneCallback")
+	}
+
+	if backend.Runner().toolCtx.TaskDone == nil {
+		t.Fatal("TaskDone callback should be set")
+	}
+
+	backend.Runner().toolCtx.TaskDone()
+	if !taskDoneCalled {
+		t.Error("TaskDone callback should have been called")
+	}
+}
+
 func makeLLMStream(events []LLMEvent) *LLMStream {
 	eventCh := make(chan LLMEvent, len(events))
 	doneCh := make(chan error, 1)

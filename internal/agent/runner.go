@@ -440,7 +440,11 @@ func emitEvent(ctx context.Context, events chan<- StreamEvent, event StreamEvent
 func (r *Runner) runTool(name string, args map[string]any, allTools map[string]tools.Tool) string {
 	tool, ok := allTools[name]
 	if !ok {
-		return fmt.Sprintf("error: unknown tool %s", name)
+		var toolNames []string
+		for t := range allTools {
+			toolNames = append(toolNames, t)
+		}
+		return fmt.Sprintf("error: unknown tool %s. The available tools are: %s", name, strings.Join(toolNames, ", "))
 	}
 	defer func() {
 		if rec := recover(); rec != nil {

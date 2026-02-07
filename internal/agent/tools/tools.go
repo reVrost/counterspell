@@ -80,7 +80,7 @@ func (r *Registry) registerAll() {
 	r.tools["bash"] = r.makeBashTool()
 	r.tools["ls"] = r.makeLsTool()
 	r.tools["todos"] = r.makeTodoTool()
-	r.tools["recall-skill"] = r.makeSkillTool()
+	r.tools["skill"] = r.makeSkillTool()
 	r.tools["mark_done"] = r.makeMarkDoneTool()
 }
 

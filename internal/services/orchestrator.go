@@ -681,8 +681,15 @@ func (o *Orchestrator) processResults() {
 		ctx := context.Background()
 
 		if result.Success {
-			if err := o.repo.UpdateStatus(ctx, result.TaskID, "review"); err != nil {
-				slog.Error("[ORCHESTRATOR] Failed to update task status", "error", err)
+			task, err := o.repo.Get(ctx, result.TaskID)
+			if err != nil {
+				slog.Error("[ORCHESTRATOR] Failed to get task", "error", err)
+			} else {
+				if task.Status != "done" {
+					if err := o.repo.UpdateStatus(ctx, result.TaskID, "review"); err != nil {
+						slog.Error("[ORCHESTRATOR] Failed to update task status", "error", err)
+					}
+				}
 			}
 			// Update agent run as completed
 			if run, err := o.repo.GetLatestAgentRun(ctx, result.TaskID); err == nil && run != nil {

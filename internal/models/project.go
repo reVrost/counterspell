@@ -10,11 +10,11 @@ type Project struct {
 
 // GitHubConnection represents a connected GitHub account.
 type GitHubConnection struct {
-	ID           string
-	Type         string // "org" or "user"
-	Login        string
-	AvatarURL    string
-	Token        string // encrypted
-	Scope        string
-	CreatedAt    int64
+	ID        string
+	Type      string // "org" or "user"
+	Login     string
+	AvatarURL string
+	Token     string // encrypted
+	Scope     string
+	CreatedAt int64
 }

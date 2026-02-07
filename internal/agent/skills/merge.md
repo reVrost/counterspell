@@ -153,7 +153,7 @@ jj bookmark delete <task-bookmark-name>
 jj workspace forget <workspace-name>
 
 # Delete the workspace directory (it's in parent of project root)
-rm -rf ../jjws-<reponame>-<task>
+rm -rf ../<workspace-name>
 ```
 
 **JJ Quick Reference:**

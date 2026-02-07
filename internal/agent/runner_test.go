@@ -116,3 +116,30 @@ func (m *mockLLMProvider) Model() string         { return "test-model" }
 func (m *mockLLMProvider) APIURL() string        { return "" }
 func (m *mockLLMProvider) APIKey() string        { return "" }
 func (m *mockLLMProvider) APIVersion() string    { return "" }
+
+func TestRunner_WithTaskDone(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockProvider := &mockLLMProvider{}
+	taskDoneCalled := false
+	taskDone := func() error {
+		taskDoneCalled = true
+		return nil
+	}
+
+	r := NewRunner(mockProvider, ".", WithTaskDone(taskDone))
+
+	if r.toolCtx == nil {
+		t.Fatal("toolCtx should not be nil after NewRunner with WithTaskDone")
+	}
+
+	if r.toolCtx.TaskDone == nil {
+		t.Fatal("TaskDone callback should be set")
+	}
+
+	r.toolCtx.TaskDone()
+	if !taskDoneCalled {
+		t.Error("TaskDone callback should have been called")
+	}
+}

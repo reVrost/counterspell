@@ -33,7 +33,7 @@ type RepoManager interface {
 
 // TaskBranchName returns the branch/workspace name for a task.
 func TaskBranchName(taskID string) string {
-	return "agent/task-" + taskID
+	return "cs-task-" + taskID
 }
 
 // ErrRepoRootNotFound is returned when no repo root is discovered.
