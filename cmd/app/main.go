@@ -183,6 +183,7 @@ func main() {
 		// Auth + session endpoints (needed before auth)
 		r.Get("/api/v1/session", h.HandleGetSession)
 		r.Get("/api/v1/auth/login", h.HandleAuthLogin)
+		r.Post("/api/v1/logout", h.HandleLogout)
 	})
 
 	// Protected routes (require machine auth)

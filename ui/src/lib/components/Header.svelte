@@ -15,6 +15,7 @@
   let projectSearch = $state('');
   let userMenuOpen = $state(false);
   let avatarImageFailed = $state(false);
+  let signingOut = $state(false);
   let { activeTab } = $props();
 
   const filteredProjects = $derived(
@@ -31,7 +32,14 @@
   });
 
   async function handleSignOut() {
-    await appState.logout();
+    if (signingOut) return;
+    signingOut = true;
+    try {
+      await appState.logout();
+    } catch (e) {
+      signingOut = false;
+      console.error('Failed to sign out:', e);
+    }
   }
 
   let syncing = $state(false);
@@ -235,9 +243,11 @@
           <DropdownMenu.Group class="px-1.5 pb-1">
             <DropdownMenu.Item
               onSelect={handleSignOut}
-              class="w-full px-2.5 py-2 hover:bg-red-500/10 rounded-lg text-sm text-red-400 hover:text-red-300 flex items-center gap-3 transition-colors text-left cursor-pointer focus:bg-red-500/10 outline-none"
+              disabled={signingOut}
+              data-testid="logout-button"
+              class="w-full px-2.5 py-2 hover:bg-red-500/10 rounded-lg text-sm text-red-400 hover:text-red-300 flex items-center gap-3 transition-colors text-left cursor-pointer focus:bg-red-500/10 outline-none disabled:opacity-50"
             >
-              <LogOutIcon class="w-4 h-4" /> Sign Out
+              <LogOutIcon class="w-4 h-4" /> {signingOut ? 'Logging out...' : 'Logout'}
             </DropdownMenu.Item>
           </DropdownMenu.Group>
         </DropdownMenu.Content>

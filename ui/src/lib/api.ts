@@ -140,7 +140,8 @@ export const authAPI = {
   },
 
   async loginWithInvoker() {
-    window.location.href = '/api/v1/auth/login';
+    const returnTo = `${window.location.origin}/dashboard`;
+    window.location.href = `/api/v1/auth/login?return_to=${encodeURIComponent(returnTo)}`;
   },
 
   async logout() {

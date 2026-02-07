@@ -17,7 +17,8 @@ const proxyApi: Handle = async ({ event, resolve }) => {
 			const response = await fetch(apiUrl.toString(), {
 				method,
 				headers,
-				credentials: 'include'
+				credentials: 'include',
+				redirect: 'manual'
 			});
 
 			return new Response(response.body, {
@@ -33,7 +34,8 @@ const proxyApi: Handle = async ({ event, resolve }) => {
 			method,
 			headers,
 			body,
-			credentials: 'include'
+			credentials: 'include',
+			redirect: 'manual'
 		});
 
 		return new Response(response.body, {

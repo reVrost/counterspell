@@ -3,6 +3,8 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/go-chi/render"
 )
@@ -16,7 +18,8 @@ func (h *Handlers) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attempt, err := h.oauthService.StartWebLogin(ctx)
+	returnTo := sanitizeReturnTo(r.URL.Query().Get("return_to"))
+	attempt, err := h.oauthService.StartWebLoginWithReturnTo(ctx, returnTo)
 	if err != nil {
 		slog.Error("Failed to start OAuth login", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to start login", err))
@@ -24,6 +27,41 @@ func (h *Handlers) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, attempt.AuthURL, http.StatusTemporaryRedirect)
+}
+
+func sanitizeReturnTo(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || !parsed.IsAbs() {
+		return ""
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return ""
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "counterspell.io" || strings.HasSuffix(host, ".counterspell.app") {
+		return parsed.String()
+	}
+
+	return ""
+}
+
+// HandleLogout clears local machine authentication for this Counterspell instance.
+func (h *Handlers) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := h.oauthService.Logout(ctx); err != nil {
+		slog.Error("Failed to logout", "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to logout", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]any{"ok": true})
 }
 
 // RequireMachineAuth blocks API access until the machine is authenticated.

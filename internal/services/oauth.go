@@ -132,6 +132,10 @@ func NewOAuthService(database *db.DB, cfg *config.Config) *OAuthService {
 // StartLoginFlow initiates the OAuth 2.0 Authorization Code Flow with PKCE.
 // This is called during CLI startup (not an HTTP handler).
 func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginAttempt, error) {
+	return s.startLoginFlow(ctx, "")
+}
+
+func (s *OAuthService) startLoginFlow(ctx context.Context, returnTo string) (*OAuthLoginAttempt, error) {
 	// 1. Generate PKCE code_verifier
 	codeVerifier, err := s.generateCodeVerifier()
 	if err != nil {
@@ -165,9 +169,12 @@ func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginAttempt, 
 		q := parsedRedirect.Query()
 		if q.Get("cs_state") == "" {
 			q.Set("cs_state", state)
-			parsedRedirect.RawQuery = q.Encode()
-			redirectURI = parsedRedirect.String()
 		}
+		if returnTo != "" {
+			q.Set("return_to", returnTo)
+		}
+		parsedRedirect.RawQuery = q.Encode()
+		redirectURI = parsedRedirect.String()
 	}
 	slog.Info("OAuth login start", "redirect_uri", redirectURI, "invoker_base", s.cfg.InvokerBaseURL)
 	authURL, err := s.callInvokerAuthURL(ctx, codeChallenge, state, redirectURI)
@@ -182,7 +189,12 @@ func (s *OAuthService) StartLoginFlow(ctx context.Context) (*OAuthLoginAttempt, 
 // StartWebLogin starts a browser-driven OAuth flow without opening a local browser.
 // It returns the auth URL and completes the login asynchronously via polling.
 func (s *OAuthService) StartWebLogin(ctx context.Context) (*OAuthLoginAttempt, error) {
-	attempt, err := s.StartLoginFlow(ctx)
+	return s.StartWebLoginWithReturnTo(ctx, "")
+}
+
+// StartWebLoginWithReturnTo starts web OAuth and includes a return destination for browser redirect after callback.
+func (s *OAuthService) StartWebLoginWithReturnTo(ctx context.Context, returnTo string) (*OAuthLoginAttempt, error) {
+	attempt, err := s.startLoginFlow(ctx, returnTo)
 	if err != nil {
 		return nil, err
 	}
@@ -479,6 +491,20 @@ func (s *OAuthService) IsAuthenticated(ctx context.Context) (bool, *sqlc.Machine
 		return false, identity, nil
 	}
 	return true, identity, nil
+}
+
+// Logout clears the locally stored machine JWT for this machine.
+func (s *OAuthService) Logout(ctx context.Context) error {
+	machineID, err := s.getMachineID()
+	if err != nil {
+		return fmt.Errorf("failed to get machine id: %w", err)
+	}
+
+	if err := s.storeMachineJWT(ctx, machineID, ""); err != nil {
+		return fmt.Errorf("failed to clear machine jwt: %w", err)
+	}
+
+	return nil
 }
 
 func (s *OAuthService) login(ctx context.Context) (string, error) {
