@@ -18,6 +18,7 @@ class AppState {
   projectMenuOpen = $state(false);
   inputProjectMenuOpen = $state(false);
   showChatInput = $state(false);
+  showNewTaskModal = $state(false);
   activeTab = $state<'inbox' | 'sessions' | 'projects' | 'focus' | 'layers'>('inbox');
 
   // Toast
@@ -210,6 +211,14 @@ class AppState {
     this.showChatInput = false;
   }
 
+  toggleNewTaskModal() {
+    this.showNewTaskModal = !this.showNewTaskModal;
+  }
+
+  closeNewTaskModal() {
+    this.showNewTaskModal = false;
+  }
+
   openModal(taskId: string) {
     this.modalTaskId = taskId;
     this.modalOpen = true;
@@ -234,7 +243,9 @@ class AppState {
     this.modalTaskId = null;
     this.settingsOpen = false;
     this.projectMenuOpen = false;
+    this.projectMenuOpen = false;
     this.inputProjectMenuOpen = false;
+    this.showNewTaskModal = false;
 
     // Reset Project State
     this.activeProjectId = "";

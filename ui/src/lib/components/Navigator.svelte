@@ -124,7 +124,7 @@
     >
       <button
         type="button"
-        onclick={() => appState.toggleChatInput()}
+        onclick={() => appState.toggleNewTaskModal()}
         class="relative z-10 w-16 h-14 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 hover:bg-white/[0.04] transition-all duration-200"
         aria-label="New Task"
       >
