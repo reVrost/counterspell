@@ -14,7 +14,7 @@ package handlers
 // func (h *Handlers) HandleGitHubLogin(w http.ResponseWriter, r *http.Request) {
 // 	redirectURL := r.URL.Query().Get("redirect_url")
 // 	if redirectURL == "" {
-// 		redirectURL = "/dashboard"
+// 		redirectURL = "/app"
 // 	}
 //
 // 	// Build the callback URL - this is where GitHub will redirect after auth
@@ -72,7 +72,7 @@ package handlers
 // 	if state != "" {
 // 		http.Redirect(w, r, state, http.StatusTemporaryRedirect)
 // 	} else {
-// 		http.Redirect(w, r, "/dashboard", http.StatusTemporaryRedirect)
+// 		http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
 // 	}
 // }
 //

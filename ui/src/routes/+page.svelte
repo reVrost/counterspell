@@ -76,7 +76,7 @@
 
         if (session.authenticated) {
           console.log('🚀 Redirecting to dashboard...');
-          window.location.href = '/dashboard';
+          window.location.href = '/app';
         } else {
           console.log('❓ Not authenticated, staying on landing page');
           if (session.authErrorCode === 'OWNER_MISMATCH') {

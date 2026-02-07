@@ -33,7 +33,7 @@
 
   async function handleSettings() {
     appState.activeTab = 'settings';
-    await goto('/dashboard/settings');
+    await goto('/app/settings');
   }
 
   async function handleSignOut() {
@@ -70,7 +70,7 @@
   <div class="flex items-center">
     {#if isSettingsPage}
       <button
-        onclick={() => goto('/dashboard')}
+        onclick={() => goto('/app')}
         class="flex items-center gap-2 cursor-pointer group hover:bg-white/[0.04] active:bg-white/[0.06] px-2 py-1.5 rounded-xl transition-all duration-200"
       >
         <ChevronLeftIcon class="w-5 h-5 text-zinc-400 group-hover:text-white transition-colors" />

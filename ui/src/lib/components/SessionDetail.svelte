@@ -35,7 +35,7 @@
   }
 
   function handleBack() {
-    goto('/dashboard');
+    goto('/app');
   }
 
   async function handlePromote() {

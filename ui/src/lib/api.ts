@@ -90,7 +90,7 @@ export const authAPI = {
   },
 
   async loginWithInvoker() {
-    const returnTo = `${window.location.origin}/dashboard`;
+    const returnTo = `${window.location.origin}/app`;
     window.location.href = `/api/v1/auth/login?return_to=${encodeURIComponent(returnTo)}`;
   },
 

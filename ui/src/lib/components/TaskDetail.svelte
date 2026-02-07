@@ -45,7 +45,7 @@
   let isLoadingDiff = $state<boolean>(false);
 
   function handleBack() {
-    goto('/dashboard');
+    goto('/app');
   }
 
   async function handleChatSubmit(message: string, modelId: string) {
@@ -96,7 +96,7 @@
       } else if (action === 'discard') {
         const response = await tasksAPI.discard(task.id);
         appState.showToast(response.message || 'Task discarded', 'success');
-        goto('/dashboard');
+        goto('/app');
       }
     } catch (err) {
       console.error(`Failed to ${action}:`, err);

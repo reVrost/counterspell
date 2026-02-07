@@ -16,7 +16,7 @@ func (h *Handlers) HandleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if authenticated, _, err := h.oauthService.IsAuthenticated(ctx); err == nil && authenticated {
-		http.Redirect(w, r, "/dashboard", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
 		return
 	} else if err != nil {
 		if errors.Is(err, services.ErrForbiddenLoginIdentityMismatch) {

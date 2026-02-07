@@ -80,7 +80,7 @@
     );
 
     // Dashboard requires authentication (GitHub connected)
-    if (path.startsWith('/dashboard')) {
+    if (path.startsWith('/app')) {
       if (!appState.isAuthenticated) {
         console.log('🔒 Not authenticated, redirecting to home...');
         hasRedirected = true;
@@ -94,7 +94,7 @@
       if (appState.isAuthenticated) {
         console.log('✅ Authenticated, redirecting to dashboard...');
         hasRedirected = true;
-        window.location.href = '/dashboard';
+        window.location.href = '/app';
       }
     }
   });

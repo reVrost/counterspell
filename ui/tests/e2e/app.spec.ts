@@ -4,13 +4,13 @@ test.describe('Dashboard', () => {
   test('page loads without errors', async ({ page }) => {
     const consoleErrors: string[] = [];
 
-    page.on('console', msg => {
+    page.on('console', (msg) => {
       if (msg.type() === 'error') {
         consoleErrors.push(msg.text());
       }
     });
 
-    await page.goto('/dashboard');
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
     expect(consoleErrors).toEqual([]);
@@ -20,7 +20,7 @@ test.describe('Dashboard', () => {
   });
 
   test('feed section is visible', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
     const feedContent = page.locator('#feed-content');
@@ -28,7 +28,7 @@ test.describe('Dashboard', () => {
   });
 
   test('loading state appears initially', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/app');
 
     const loadingText = page.getByTestId('loading-state').getByText('Loading feed...');
     await expect(loadingText).toBeVisible();
@@ -37,14 +37,14 @@ test.describe('Dashboard', () => {
   test('console logs contain no uncaught errors', async ({ page }) => {
     const uncaughtErrors: any[] = [];
 
-    page.on('pageerror', error => {
+    page.on('pageerror', (error) => {
       uncaughtErrors.push({
         message: error.message,
         name: error.name,
       });
     });
 
-    await page.goto('/dashboard');
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
     if (uncaughtErrors.length > 0) {
@@ -55,7 +55,7 @@ test.describe('Dashboard', () => {
   });
 
   test('page has accessible heading', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
     const heading = page.locator('h1, h2').first();
@@ -63,7 +63,7 @@ test.describe('Dashboard', () => {
   });
 
   test('feed loaded state appears', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/app');
     await page.waitForLoadState('networkidle');
 
     const feedLoaded = page.getByTestId('feed-loaded');

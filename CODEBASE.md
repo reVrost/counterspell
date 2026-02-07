@@ -31,7 +31,7 @@
 ### Frontend Components
 - **Feed:** `ui/src/lib/components/Feed.svelte`
 - **Task:** `ui/src/lib/components/Task.svelte`
-- **Dashboard layout:** `ui/src/routes/dashboard/+layout.svelte`
+- **Dashboard layout:** `ui/src/routes/app/+layout.svelte`
 
 ## Architecture Flow
 

@@ -139,8 +139,8 @@ for (let i = 0; i < argv.length; i += 1) {
 
 async function detectUrl() {
   const candidates = [
-    'http://localhost:5173/dashboard',
-    'http://localhost:8710/dashboard',
+    'http://localhost:5173/app',
+    'http://localhost:8710/app',
     'http://localhost:5173/',
     'http://localhost:8710/',
   ];
@@ -165,10 +165,7 @@ if (!opts.url) {
 
 const availableDevices = Object.keys(devices);
 const fallbackDevice =
-  devices['Pixel 7'] ||
-  devices['Pixel 5'] ||
-  devices['iPhone 13'] ||
-  devices[availableDevices[0]];
+  devices['Pixel 7'] || devices['Pixel 5'] || devices['iPhone 13'] || devices[availableDevices[0]];
 const deviceDescriptor = devices[opts.device] || fallbackDevice;
 if (!devices[opts.device]) {
   const fallbackName = availableDevices.find((name) => devices[name] === deviceDescriptor);
@@ -217,7 +214,7 @@ if (steps.length === 0) {
     { type: 'label', label: 'Inbox' },
     { type: 'label', label: 'Sessions' },
     { type: 'label', label: 'Search' },
-    { type: 'label', label: 'Layers' },
+    { type: 'label', label: 'Layers' }
   );
 }
 
