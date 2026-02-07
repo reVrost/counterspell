@@ -1,5 +1,8 @@
 import type {
   Project,
+  Workspace,
+  WorkspaceSetupResponse,
+  CreateWorkspaceRequest,
   Task,
   TaskResponse,
   FeedData,
@@ -161,6 +164,25 @@ export const authAPI = {
       throw e;
     }
     window.location.href = '/';
+  },
+};
+
+// ==================== WORKSPACES ====================
+
+export const workspacesAPI = {
+  async list(): Promise<Workspace[]> {
+    return fetchAPI<Workspace[]>('/api/v1/workspaces');
+  },
+
+  async getSetup(): Promise<WorkspaceSetupResponse> {
+    return fetchAPI<WorkspaceSetupResponse>('/api/v1/workspaces/setup');
+  },
+
+  async create(payload: CreateWorkspaceRequest): Promise<Workspace> {
+    return fetchAPI<Workspace>('/api/v1/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 };
 

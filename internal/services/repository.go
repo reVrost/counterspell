@@ -34,9 +34,35 @@ func (s *Repository) ListWorkspaces(ctx context.Context) ([]sqlc.Workspace, erro
 	return s.Q.ListWorkspaces(ctx)
 }
 
+func (s *Repository) GetGithubConnection(ctx context.Context) (sqlc.GithubConnection, error) {
+	return s.Q.GetGithubConnection(ctx)
+}
+
 func (s *Repository) GetGithubConnectionByID(ctx context.Context, githubConnectionID string) (sqlc.GithubConnection, error) {
 	return s.Q.GetGithubConnectionByID(ctx, githubConnectionID)
 
+}
+
+func (s *Repository) CreateWorkspace(ctx context.Context, name, localPath string) (sqlc.Workspace, error) {
+	connection, err := s.Q.GetGithubConnection(ctx)
+	if err != nil {
+		return sqlc.Workspace{}, fmt.Errorf("failed to load github connection: %w", err)
+	}
+
+	now := time.Now().UnixMilli()
+	workspace, err := s.Q.CreateWorkspace(ctx, sqlc.CreateWorkspaceParams{
+		ID:                 shortuuid.New(),
+		GithubConnectionID: connection.ID,
+		Name:               name,
+		LocalPath:          localPath,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	})
+	if err != nil {
+		return sqlc.Workspace{}, fmt.Errorf("failed to create workspace %q: %w", name, err)
+	}
+
+	return workspace, nil
 }
 
 // CreateTask creates a new task with validation.

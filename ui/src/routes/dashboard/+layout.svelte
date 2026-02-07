@@ -7,6 +7,7 @@
   import TaskDetailSkeleton from '$lib/components/TaskDetailSkeleton.svelte';
   import ChatInput from '$lib/components/ChatInput.svelte';
   import NewTaskModal from '$lib/components/NewTaskModal.svelte';
+  import NewWorkspaceModal from '$lib/components/NewWorkspaceModal.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import { appState } from '$lib/stores/app.svelte';
   import { taskStore } from '$lib/stores/tasks.svelte';
@@ -251,6 +252,10 @@
   <!-- New Task Modal -->
   {#if appState.showNewTaskModal}
     <NewTaskModal />
+  {/if}
+
+  {#if appState.showNewWorkspaceModal}
+    <NewWorkspaceModal />
   {/if}
 
   <!-- Task Detail Modal -->

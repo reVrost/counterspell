@@ -5,6 +5,22 @@ export interface Project {
   color: string;
 }
 
+export interface Workspace extends Project {
+  local_path?: string;
+}
+
+export type WorkspaceCreateMode = 'import_current' | 'new_folder';
+
+export interface WorkspaceSetupResponse {
+  cwd_path: string;
+  cwd_name: string;
+}
+
+export interface CreateWorkspaceRequest {
+  name: string;
+  mode: WorkspaceCreateMode;
+}
+
 export interface GitHubRepo {
   id: number;
   name: string;

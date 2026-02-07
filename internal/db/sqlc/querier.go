@@ -20,6 +20,7 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSessionMessage(ctx context.Context, arg CreateSessionMessageParams) error
 	CreateTask(ctx context.Context, arg CreateTaskParams) error
+	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	DeleteAgentRunsByTask(ctx context.Context, taskID string) error
 	DeleteArtifactsByRun(ctx context.Context, runID string) error
 	DeleteGithubConnection(ctx context.Context, id string) error

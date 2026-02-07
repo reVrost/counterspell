@@ -196,6 +196,9 @@ func main() {
 
 		// Unified SSE endpoint
 		r.Get("/api/v1/events", h.HandleSSE)
+		r.Get("/api/v1/workspaces", h.HandleListWorkspaces)
+		r.Get("/api/v1/workspaces/setup", h.HandleWorkspaceSetup)
+		r.Post("/api/v1/workspaces", h.HandleCreateWorkspace)
 		r.Get("/api/v1/tasks", h.HandleListTask)
 		r.Post("/api/v1/tasks", h.HandleNewTask)
 		r.Get("/api/v1/tasks/{id}", h.HandleGetTask)

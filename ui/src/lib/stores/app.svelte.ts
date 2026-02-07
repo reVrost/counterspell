@@ -6,8 +6,7 @@ import {
   type GitHubRepo,
   type ToastType,
 } from "$lib/types";
-import { authAPI, projectsAPI, settingsAPI, githubAPI } from "$lib/api";
-import { pushState } from "$app/navigation";
+import { authAPI, workspacesAPI, settingsAPI, githubAPI } from "$lib/api";
 
 // Reactive app state using Svelte 5 runes
 class AppState {
@@ -19,6 +18,7 @@ class AppState {
   inputProjectMenuOpen = $state(false);
   showChatInput = $state(false);
   showNewTaskModal = $state(false);
+  showNewWorkspaceModal = $state(false);
   activeTab = $state<'inbox' | 'sessions' | 'projects' | 'focus' | 'layers'>('inbox');
 
   // Toast
@@ -116,7 +116,7 @@ class AppState {
 
   async loadProjects() {
     try {
-      this.projects = await projectsAPI.list();
+      this.projects = await workspacesAPI.list();
     } catch (err) {
       console.error("Failed to load workspaces:", err);
     }
@@ -219,6 +219,16 @@ class AppState {
     this.showNewTaskModal = false;
   }
 
+  openNewWorkspaceModal() {
+    this.showNewWorkspaceModal = true;
+    this.projectMenuOpen = false;
+    this.inputProjectMenuOpen = false;
+  }
+
+  closeNewWorkspaceModal() {
+    this.showNewWorkspaceModal = false;
+  }
+
   openModal(taskId: string) {
     this.modalTaskId = taskId;
     this.modalOpen = true;
@@ -246,6 +256,7 @@ class AppState {
     this.projectMenuOpen = false;
     this.inputProjectMenuOpen = false;
     this.showNewTaskModal = false;
+    this.showNewWorkspaceModal = false;
 
     // Reset Workspace State
     this.activeWorkspaceId = "";

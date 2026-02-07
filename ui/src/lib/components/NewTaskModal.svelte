@@ -3,23 +3,30 @@
   import { tasksAPI, transcribeAPI } from '$lib/api';
   import { slide, modalSlideUp, backdropFade, DURATIONS } from '$lib/utils/transitions';
   import { cn } from '$lib/utils';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import XIcon from '@lucide/svelte/icons/x';
   import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
   import MicIcon from '@lucide/svelte/icons/mic';
   import LoaderIcon from '@lucide/svelte/icons/loader-2';
+  import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import PlusIcon from '@lucide/svelte/icons/plus';
   import ImageIcon from '@lucide/svelte/icons/image';
   import AtSignIcon from '@lucide/svelte/icons/at-sign';
   import ListIcon from '@lucide/svelte/icons/list';
   import CodeIcon from '@lucide/svelte/icons/code';
   import QuoteIcon from '@lucide/svelte/icons/quote';
+  import WorkspaceSelectorDropdown from './WorkspaceSelectorDropdown.svelte';
 
   // State
   let title = $state('');
   let description = $state('');
   let isSubmitting = $state(false);
+  let workspaceMenuOpen = $state(false);
   let mediaRecorder: MediaRecorder | null = null;
   let audioChunks: Blob[] = [];
+  const canSubmit = $derived(
+    Boolean((title.trim() || description.trim()) && appState.activeWorkspaceId && !isSubmitting)
+  );
 
   // Actions
   function close() {
@@ -28,6 +35,10 @@
 
   async function submit() {
     if (!title.trim() && !description.trim()) return;
+    if (!appState.activeWorkspaceId) {
+      appState.showToast('Create or select a workspace first', 'error');
+      return;
+    }
 
     isSubmitting = true;
     try {
@@ -178,7 +189,9 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      submit();
+      if (canSubmit) {
+        submit();
+      }
     }
     if (e.key === 'Escape') {
       close();
@@ -214,9 +227,23 @@
         <XIcon class="w-5 h-5" />
       </button>
 
-      <div class="px-3 py-1 bg-white/5 rounded-full border border-white/5 text-sm font-medium">
-        Select Workspace
-      </div>
+      {#if appState.projects.length > 0}
+        <WorkspaceSelectorDropdown bind:open={workspaceMenuOpen} contentClass="mt-2">
+          <DropdownMenu.Trigger
+            class="px-3 py-1 bg-white/5 rounded-full border border-white/5 text-sm font-medium flex items-center gap-1.5 text-zinc-100 hover:bg-white/10 transition outline-none"
+          >
+            {appState.activeWorkspaceName || 'Select Workspace'}
+            <ChevronDownIcon class="w-3.5 h-3.5 text-zinc-400" />
+          </DropdownMenu.Trigger>
+        </WorkspaceSelectorDropdown>
+      {:else}
+        <button
+          onclick={() => appState.openNewWorkspaceModal()}
+          class="px-3 py-1 bg-white/5 rounded-full border border-white/5 text-sm font-medium text-zinc-100 hover:bg-white/10 transition"
+        >
+          Create Workspace
+        </button>
+      {/if}
 
       <div class="w-8"></div>
       <!-- Spacer -->
@@ -224,6 +251,20 @@
 
     <!-- Main Form -->
     <div class="flex-1 flex flex-col px-6 pt-2 pb-6 overflow-y-auto">
+      {#if appState.projects.length === 0}
+        <div
+          class="mb-5 rounded-xl border border-amber-400/25 bg-amber-500/5 p-3 text-sm text-amber-100 flex items-center justify-between gap-3"
+        >
+          <p>Create your first workspace to start creating tasks.</p>
+          <button
+            onclick={() => appState.openNewWorkspaceModal()}
+            class="shrink-0 rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-400/20 transition"
+          >
+            New Workspace
+          </button>
+        </div>
+      {/if}
+
       <!-- Title Input -->
       <input
         type="text"
@@ -349,10 +390,10 @@
           <!-- Submit -->
           <button
             onclick={submit}
-            disabled={!title && !description}
+            disabled={!canSubmit}
             class={cn(
               'flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 shadow-lg',
-              (title || description) && !isSubmitting
+              canSubmit
                 ? 'bg-violet-600 text-white hover:bg-violet-500 shadow-violet-500/20'
                 : 'bg-gray-800 text-gray-500 cursor-not-allowed'
             )}

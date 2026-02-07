@@ -9,6 +9,44 @@ import (
 	"context"
 )
 
+const createWorkspace = `-- name: CreateWorkspace :one
+INSERT INTO workspaces (
+    id, github_connection_id, name, local_path, created_at, updated_at
+) VALUES (
+    ?, ?, ?, ?, ?, ?
+) RETURNING id, github_connection_id, name, local_path, created_at, updated_at
+`
+
+type CreateWorkspaceParams struct {
+	ID                 string `json:"id"`
+	GithubConnectionID string `json:"github_connection_id"`
+	Name               string `json:"name"`
+	LocalPath          string `json:"local_path"`
+	CreatedAt          int64  `json:"created_at"`
+	UpdatedAt          int64  `json:"updated_at"`
+}
+
+func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error) {
+	row := q.db.QueryRowContext(ctx, createWorkspace,
+		arg.ID,
+		arg.GithubConnectionID,
+		arg.Name,
+		arg.LocalPath,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.GithubConnectionID,
+		&i.Name,
+		&i.LocalPath,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getWorkspace = `-- name: GetWorkspace :one
 SELECT id, github_connection_id, name, local_path, created_at, updated_at FROM workspaces WHERE id = ?
 `
