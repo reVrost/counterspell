@@ -1,7 +1,7 @@
 .PHONY: dev build test clean tidy generate lint docker-build docker-run run ui preprod kill-dev verify
 
 # Variables
-PROJECT_NAME := counterspell
+PROJECT_NAME := cspell
 TARGET_MAIN := ./cmd/app
 BINARY_PATH := $(PROJECT_NAME)
 
@@ -43,7 +43,7 @@ run: build
 
 ##@ Build
 
-build:
+build: build-ui
 	@echo "Building $(PROJECT_NAME)..."
 	@go build -o $(BINARY_PATH) $(TARGET_MAIN)
 	@echo "Binary built: $(BINARY_PATH)"
@@ -51,8 +51,8 @@ build:
 build-macos-arm64: build-ui tidy
 	@echo "Building $(PROJECT_NAME) for macOS Apple Silicon..."
 	@mkdir -p release
-	@GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o release/counterspell-macos-arm64 $(TARGET_MAIN)
-	@echo "macOS Apple Silicon binary built: release/counterspell-macos-arm64"
+	@GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o release/cspell-macos-arm64 $(TARGET_MAIN)
+	@echo "macOS Apple Silicon binary built: release/cspell-macos-arm64"
 
 build-prod: tidy
 	@echo "Building $(PROJECT_NAME) for production..."

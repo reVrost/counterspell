@@ -4,12 +4,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/revrost/counterspell/internal/db/sqlc"
 )
@@ -135,4 +138,136 @@ func workspaceToProjectResponse(workspace sqlc.Workspace) ProjectResponse {
 		Icon:  workspaceIcon,
 		Color: workspaceColor,
 	}
+}
+
+func (h *Handlers) HandleListWorkspaceFiles(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	workspaceID := chi.URLParam(r, "id")
+	if workspaceID == "" {
+		_ = render.Render(w, r, ErrInvalidRequest(errors.New("workspace ID required")))
+		return
+	}
+
+	path := r.URL.Query().Get("path")
+	filter := r.URL.Query().Get("filter")
+	if filter == "" {
+		filter = "all"
+	}
+
+	limit := 200
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 1000 {
+			limit = parsedLimit
+		}
+	}
+
+	workspace, err := h.repository.GetWorkspace(ctx, workspaceID)
+	if err != nil {
+		slog.Error("Failed to get workspace", "workspace_id", workspaceID, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get workspace", err))
+		return
+	}
+
+	files, err := h.fileService.ListWorkspaceFiles(ctx, workspace.LocalPath, path, limit, filter)
+	if err != nil {
+		slog.Error("Failed to list workspace files", "workspace_id", workspaceID, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to list workspace files", err))
+		return
+	}
+
+	render.JSON(w, r, files)
+}
+
+func (h *Handlers) HandleUploadWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	workspaceID := chi.URLParam(r, "id")
+	if workspaceID == "" {
+		_ = render.Render(w, r, ErrInvalidRequest(errors.New("workspace ID required")))
+		return
+	}
+
+	if r.Method != "POST" {
+		_ = render.Render(w, r, ErrInvalidRequest(errors.New("method not allowed")))
+		return
+	}
+
+	err := r.ParseMultipartForm(32 << 20)
+	if err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(fmt.Errorf("failed to parse multipart form: %w", err)))
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		_ = render.Render(w, r, ErrInvalidRequest(fmt.Errorf("failed to get file from form: %w", err)))
+		return
+	}
+	defer file.Close()
+
+	const maxFileSize = 25 * 1024 * 1024
+	if header.Size > maxFileSize {
+		_ = render.Render(w, r, ErrInvalidRequest(fmt.Errorf("file size exceeds 25MB limit")))
+		return
+	}
+
+	workspace, err := h.repository.GetWorkspace(ctx, workspaceID)
+	if err != nil {
+		slog.Error("Failed to get workspace", "workspace_id", workspaceID, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get workspace", err))
+		return
+	}
+
+	targetPath := r.FormValue("path")
+	if targetPath == "" {
+		targetPath = filepath.Join("uploads", header.Filename)
+	}
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		_ = render.Render(w, r, ErrInternalServer("Failed to read file", err))
+		return
+	}
+
+	savedPath, err := h.fileService.UploadWorkspaceFile(ctx, workspace.LocalPath, targetPath, content)
+	if err != nil {
+		slog.Error("Failed to upload workspace file", "workspace_id", workspaceID, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to upload file", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]string{"path": savedPath})
+}
+
+func (h *Handlers) HandleReadWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	workspaceID := chi.URLParam(r, "id")
+	if workspaceID == "" {
+		_ = render.Render(w, r, ErrInvalidRequest(errors.New("workspace ID required")))
+		return
+	}
+
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		_ = render.Render(w, r, ErrInvalidRequest(errors.New("path parameter required")))
+		return
+	}
+
+	workspace, err := h.repository.GetWorkspace(ctx, workspaceID)
+	if err != nil {
+		slog.Error("Failed to get workspace", "workspace_id", workspaceID, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get workspace", err))
+		return
+	}
+
+	fileInfo, preview, err := h.fileService.ReadWorkspaceFile(ctx, workspace.LocalPath, path)
+	if err != nil {
+		slog.Error("Failed to read workspace file", "workspace_id", workspaceID, "path", path, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to read file", err))
+		return
+	}
+
+	render.JSON(w, r, map[string]any{
+		"file_info": fileInfo,
+		"preview":   preview,
+	})
 }

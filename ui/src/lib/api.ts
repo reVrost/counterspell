@@ -13,6 +13,10 @@ import type {
   Session,
   SessionResponse,
   OpenAIConnectorStatus,
+  WorkspaceFile,
+  WorkspaceFileRead,
+  UploadWorkspaceFileResponse,
+  WorkspaceFileFilter,
 } from '$lib/types';
 
 // API base URL - uses proxy in dev, relative path in prod
@@ -135,6 +139,50 @@ export const workspacesAPI = {
     invalidate('/api/v1/workspaces');
 
     return response;
+  },
+
+  async listFiles(
+    workspaceId: string,
+    path: string = '',
+    filter: WorkspaceFileFilter = 'all',
+    limit: number = 200
+  ): Promise<WorkspaceFile[]> {
+    const params = new URLSearchParams({
+      path,
+      filter,
+      limit: limit.toString(),
+    });
+    return fetchAPI<WorkspaceFile[]>(`/api/v1/workspaces/${workspaceId}/files?${params}`);
+  },
+
+  async uploadFile(
+    workspaceId: string,
+    file: File,
+    path?: string
+  ): Promise<UploadWorkspaceFileResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (path) {
+      formData.append('path', path);
+    }
+
+    const response = await fetch(`${API_BASE}/api/v1/workspaces/${workspaceId}/files/upload`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Upload failed: ${response.status} - ${error}`);
+    }
+
+    return response.json();
+  },
+
+  async readFile(workspaceId: string, path: string): Promise<WorkspaceFileRead> {
+    const params = new URLSearchParams({ path });
+    return fetchAPI<WorkspaceFileRead>(`/api/v1/workspaces/${workspaceId}/files/read?${params}`);
   },
 };
 
@@ -283,6 +331,7 @@ export const connectorsAPI = {
 export const filesAPI = {
   async search(workspaceId: string, query: string): Promise<string[]> {
     if (!query || query.length < 2) return [];
+    if (!workspaceId) return [];
     const params = new URLSearchParams({
       workspace_id: workspaceId,
       q: query,

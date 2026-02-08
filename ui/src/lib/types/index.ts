@@ -6,6 +6,26 @@ export interface Workspace {
   local_path?: string;
 }
 
+export interface WorkspaceFile {
+  path: string;
+  name: string;
+  size: number;
+  mod_time: string;
+  is_dir: boolean;
+  extension?: string;
+}
+
+export interface WorkspaceFileRead {
+  file_info: WorkspaceFile;
+  preview: string;
+}
+
+export type WorkspaceFileFilter = 'all' | 'recent' | 'images' | 'docs';
+
+export interface UploadWorkspaceFileResponse {
+  path: string;
+}
+
 export type WorkspaceCreateMode = 'import_current' | 'new_folder';
 
 export interface WorkspaceSetupResponse {

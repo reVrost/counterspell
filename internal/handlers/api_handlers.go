@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -134,18 +135,31 @@ func (h *Handlers) HandleGetSession(w http.ResponseWriter, r *http.Request) {
 
 // HandleFileSearch searches files.
 func (h *Handlers) HandleFileSearch(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query().Get("q")
-	directory := r.URL.Query().Get("directory")
-
 	ctx := r.Context()
-	files, err := h.fileService.Search(ctx, query, directory, 50)
+	query := r.URL.Query().Get("q")
+	workspaceID := r.URL.Query().Get("workspace_id")
+
+	if workspaceID == "" {
+		slog.Error("Workspace ID required for file search")
+		_ = render.Render(w, r, ErrInvalidRequest(errors.New("workspace_id parameter required")))
+		return
+	}
+
+	workspace, err := h.repository.GetWorkspace(ctx, workspaceID)
 	if err != nil {
-		slog.Error("Failed to search files", "error", err)
+		slog.Error("Failed to get workspace for file search", "workspace_id", workspaceID, "error", err)
+		_ = render.Render(w, r, ErrInternalServer("Failed to get workspace", err))
+		return
+	}
+
+	filePaths, err := h.fileService.SearchWorkspaceFiles(ctx, workspace.LocalPath, query, 50)
+	if err != nil {
+		slog.Error("Failed to search workspace files", "error", err)
 		_ = render.Render(w, r, ErrInternalServer("Failed to search files", err))
 		return
 	}
 
-	render.JSON(w, r, files)
+	render.JSON(w, r, filePaths)
 }
 
 // HandleGetSettings returns settings.

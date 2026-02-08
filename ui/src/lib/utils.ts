@@ -35,3 +35,32 @@ export function formatRelativeTime(timestamp: number): string {
 	if (seconds > 0) return `${seconds}s ago`;
 	return 'Just now';
 }
+
+export function formatBytes(bytes: number): string {
+	if (bytes === 0) return '0 B';
+	const k = 1024;
+	const sizes = ['B', 'KB', 'MB', 'GB'];
+	const i = Math.floor(Math.log(bytes) / Math.log(k));
+	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+export function formatDate(timestamp: string): string {
+	if (!timestamp) return '';
+	const date = new Date(timestamp);
+	const now = new Date();
+	const diff = now.getTime() - date.getTime();
+	const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+	if (days === 0) {
+		const hours = Math.floor(diff / (1000 * 60 * 60));
+		if (hours === 0) {
+			const minutes = Math.floor(diff / (1000 * 60));
+			if (minutes === 0) return 'Just now';
+			return `${minutes}m ago`;
+		}
+		return `${hours}h ago`;
+	}
+	if (days === 1) return 'Yesterday';
+	if (days < 7) return `${days}d ago`;
+	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}

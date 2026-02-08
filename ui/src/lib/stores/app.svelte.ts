@@ -18,7 +18,7 @@ class AppState {
   showChatInput = $state(false);
   showNewTaskModal = $state(false);
   showNewWorkspaceModal = $state(false);
-  activeTab = $state<'inbox' | 'sessions' | 'search' | 'layers' | 'settings'>('inbox');
+  activeTab = $state<'inbox' | 'sessions' | 'search' | 'workspace' | 'settings'>('inbox');
 
   // Toast
   toastOpen = $state(false);

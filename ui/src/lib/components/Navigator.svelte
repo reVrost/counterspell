@@ -18,15 +18,16 @@
   let { onSearch }: Props = $props();
 
   // Derive activeTab from URL, with fallback to appState for non-URL tabs like search
-  const activeTab = $derived.by((): 'inbox' | 'search' | 'settings' => {
+  const activeTab = $derived.by((): 'inbox' | 'search' | 'settings' | 'workspace' => {
     const path = $page.url.pathname;
+    if (path.startsWith('/app/workspace')) return 'workspace';
     if (path.startsWith('/app/settings')) return 'settings';
     if (path.startsWith('/app/search')) return 'search';
     if (path === '/app' || path === '/app/') return 'inbox';
     return 'inbox';
   });
 
-  const tabs = ['inbox', 'search', 'settings'];
+  const tabs = ['inbox', 'search', 'workspace', 'settings'];
   const activeIndex = $derived(tabs.indexOf(activeTab));
   const navIndex = $derived(activeIndex === -1 ? 0 : activeIndex);
   const navButtonSize = 64;
@@ -45,6 +46,9 @@
         break;
       case 'search':
         goto('/app/search');
+        break;
+      case 'workspace':
+        goto('/app/workspace');
         break;
       default:
         goto('/app');
@@ -119,6 +123,21 @@
         aria-label="Search"
       >
         <SearchIcon class="w-7 h-7" strokeWidth={activeTab === 'search' ? 2.5 : 2} />
+      </button>
+
+      <!-- Workspace -->
+      <button
+        type="button"
+        onclick={() => handleTabClick('workspace')}
+        class={cn(
+          'relative z-10 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200',
+          activeTab === 'workspace'
+            ? 'text-white'
+            : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
+        )}
+        aria-label="Workspace"
+      >
+        <LayersIcon class="w-7 h-7" strokeWidth={activeTab === 'workspace' ? 2.5 : 2} />
       </button>
 
       <!-- Settings -->

@@ -18,6 +18,7 @@ data/
 local/
 deploy/
 counterspell
+cspell
 
 # IDE
 .vscode/
