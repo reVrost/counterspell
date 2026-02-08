@@ -28,21 +28,30 @@ Counterspell is an AI agent that helps you work on your code. Here's how to get 
 
 **For macOS Apple Silicon (M1/M2/M3 Macs):**
 
-1. **Download the binary**
-   ```bash
-   curl -L https://github.com/counterspell-io/cs-platform/releases/latest/download/counterspell-macos-arm64 -o counterspell
-   ```
-   or download them from the [releases page](https://github.com/counterspell-io/cs-platform/releases)
+ 1. **Download the binary**
+    - Using curl (automatic rename to `counterspell`):
+      ```bash
+      curl -L https://github.com/counterspell-io/cs-platform/releases/latest/download/counterspell-macos-arm64 -o counterspell
+      ```
+    - Or download manually from the [releases page](https://github.com/counterspell-io/cs-platform/releases) and rename:
+      ```bash
+      mv counterspell-macos-arm64 counterspell
+      ```
 
 2. **Make it executable**
    ```bash
    chmod +x counterspell
    ```
 
-3. **Run Counterspell**
-   ```bash
-   ./counterspell
-   ```
+ 3. **Run Counterspell**
+    - On first run, macOS will show a security warning. Right-click the file and choose "Open", or run:
+      ```bash
+      xattr -d com.apple.quarantine counterspell
+      ```
+    - Then run:
+      ```bash
+      ./counterspell
+      ```
 
 ### Option 2: Building from Source (For Developers)
 

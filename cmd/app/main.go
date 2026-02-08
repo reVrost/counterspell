@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
@@ -30,6 +31,18 @@ import (
 type contextKey string
 
 const subdomainKey contextKey = "subdomain"
+
+const (
+	colorReset  = "\033[0m"
+	colorBold   = "\033[1m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorCyan   = "\033[36m"
+)
+
+func printColoredMessage(color, message string) {
+	fmt.Fprintf(os.Stdout, "%s%s%s\n", color, message, colorReset)
+}
 
 func main() {
 	// Parse flags
@@ -265,6 +278,12 @@ func main() {
 		} else {
 			tunnelProc = proc
 			logger.Info("Tunnel started", "url", "https://"+authResult.Subdomain+".counterspell.app", "local_url", localURL)
+
+			// Print colored startup message
+			fmt.Fprintln(os.Stdout)
+			printColoredMessage(colorBold+colorGreen, "✓ Your command center is hosted: https://"+authResult.Subdomain+".counterspell.app")
+			printColoredMessage(colorCyan, "  Go there with your mobile!")
+			fmt.Fprintln(os.Stdout)
 		}
 	}
 

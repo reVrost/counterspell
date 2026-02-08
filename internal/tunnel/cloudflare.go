@@ -69,7 +69,7 @@ func logPipe(logger *slog.Logger, label string, pipe io.Reader) {
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if line != "" {
-				logger.Info("tunnel", "provider", label, "line", line)
+				logger.Debug("tunnel", "provider", label, "line", line)
 			}
 		}
 	}()
