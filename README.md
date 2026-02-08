@@ -30,8 +30,9 @@ Counterspell is an AI agent that helps you work on your code. Here's how to get 
 
 1. **Download the binary**
    ```bash
-   curl -L https://github.com/your-repo/cs-platform/releases/latest/download/counterspell-macos-arm64 -o counterspell
+   curl -L https://github.com/counterspell-io/cs-platform/releases/latest/download/counterspell-macos-arm64 -o counterspell
    ```
+   or download them from the [releases page](https://github.com/counterspell-io/cs-platform/releases)
 
 2. **Make it executable**
    ```bash
