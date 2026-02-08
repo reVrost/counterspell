@@ -4,6 +4,7 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -48,9 +49,11 @@ type Config struct {
 
 // Load loads configuration from environment variables.
 func Load() *Config {
+	defaultDataDir := getDefaultDataDir()
+
 	cfg := &Config{
 		// Database
-		DatabasePath: getEnvString("DATABASE_PATH", "./data/counterspell.db"),
+		DatabasePath: getEnvString("DATABASE_PATH", filepath.Join(defaultDataDir, "counterspell.db")),
 
 		// Native allowlist
 		NativeAllowlist: getEnvStringSlice("NATIVE_ALLOWLIST", []string{
@@ -66,7 +69,7 @@ func Load() *Config {
 		SandboxOutputLimit: getEnvInt64("SANDBOX_OUTPUT_LIMIT", 1048576), // 1MB
 
 		// Data directory
-		DataDir: getEnvString("DATA_DIR", "./data"),
+		DataDir: getEnvString("DATA_DIR", defaultDataDir),
 
 		// GitHub OAuth
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
@@ -113,6 +116,14 @@ func (e *ConfigError) Error() string {
 }
 
 // Helper functions
+
+func getDefaultDataDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "./data"
+	}
+	return filepath.Join(home, ".counterspell", "data")
+}
 
 func getEnvInt(key string, defaultVal int) int {
 	val := os.Getenv(key)

@@ -39,7 +39,7 @@ air:
 
 run: build
 	@echo "Starting $(PROJECT_NAME)..."
-	@direnv exec $(BINARY_PATH) -addr :8710 -db ./data/$(PROJECT_NAME).db
+	@./$(BINARY_PATH) -addr :8710
 
 ##@ Build
 
@@ -103,6 +103,7 @@ deps:
 	@go install github.com/a-h/templ/cmd/templ@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+	@go install -tags 'sqlite3' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 ##@ Code Generation
 
@@ -131,7 +132,7 @@ docker-build:
 
 docker-run: docker-build
 	@echo "Running Docker container..."
-	@docker run -p 3000:3000 -v $(PWD)/data:/app/data $(PROJECT_NAME):latest
+	@docker run -p 3000:3000 $(PROJECT_NAME):latest
 
 ##@ Cleanup
 
@@ -140,16 +141,35 @@ clean-all:
 	@echo "Cleaning all generated files..."
 	@rm -rf data/*.db data/*.db-shm data/*.db-wal
 	@rm -rf worktree-*
+	@if [ -d "$$HOME/.counterspell" ]; then \
+		echo "Note: User data in $$HOME/.counterspell was not removed"; \
+	fi
 
 ##@ Database
 
 migrate-up:
 	@echo "Running database migrations..."
-	@sqlite3 data/$(PROJECT_NAME).db < internal/db/schema.sql
+	@migrate -path internal/db/migrations -database "sqlite3:$$(getenv DATABASE_PATH ~/.counterspell/data/counterspell.db)" up
 
 migrate-down:
-	@echo "Dropping database..."
-	@rm -f data/$(PROJECT_NAME).db
+	@echo "Rolling back one migration..."
+	@migrate -path internal/db/migrations -database "sqlite3:$$(getenv DATABASE_PATH ~/.counterspell/data/counterspell.db)" down 1
+
+migrate-create:
+	@echo "Creating new migration..."
+	@read -p "Migration name: " name; \
+	timestamp=$$(date +%s%N | cut -b1-13); \
+	touch internal/db/migrations/$${timestamp}_$${name}.up.sql internal/db/migrations/$${timestamp}_$${name}.down.sql; \
+	echo "Created internal/db/migrations/$${timestamp}_$${name}.up.sql and .down.sql"
+
+db-reset:
+	@echo "Resetting database..."
+	@migrate -path internal/db/migrations -database "sqlite3:$$(getenv DATABASE_PATH ~/.counterspell/data/counterspell.db)" drop
+	@$(MAKE) migrate-up
+
+db-status:
+	@echo "Database migration status..."
+	@migrate -path internal/db/migrations -database "sqlite3:$$(getenv DATABASE_PATH ~/.counterspell/data/counterspell.db)" version
 
 ##@ Help
 help: ## Display this help screen

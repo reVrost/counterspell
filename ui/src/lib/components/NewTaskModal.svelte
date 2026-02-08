@@ -254,14 +254,22 @@
     <div class="flex-1 flex flex-col px-6 pt-2 pb-6 overflow-y-auto">
       {#if appState.workspaces.length === 0}
         <div
-          class="mb-5 rounded-xl border border-amber-400/25 bg-amber-500/5 p-3 text-sm text-amber-100 flex items-center justify-between gap-3"
+          class="mb-6 rounded-lg border border-violet-500/10 bg-violet-500/[0.03] p-4 flex items-center justify-between"
         >
-          <p>Create your first workspace to start creating tasks.</p>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+              <span class="text-violet-400 text-sm">+</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-sm font-medium text-white/90">No workspace yet</span>
+              <span class="text-xs text-white/40">Create one to start working</span>
+            </div>
+          </div>
           <button
             onclick={() => appState.openNewWorkspaceModal()}
-            class="shrink-0 rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-400/20 transition"
+            class="shrink-0 rounded-md bg-violet-600/20 hover:bg-violet-600/30 px-4 py-2 text-xs font-medium text-violet-300 transition-colors"
           >
-            New Workspace
+            Create workspace
           </button>
         </div>
       {/if}

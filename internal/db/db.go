@@ -6,26 +6,43 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"os"
+	"path/filepath"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/revrost/counterspell/internal/db/sqlc"
 	_ "modernc.org/sqlite"
 )
 
-//go:embed schema.sql
-var schemaFS embed.FS
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 // DB wraps database/sql and sqlc queries.
 type DB struct {
 	db      *sql.DB
+	path    string
 	Queries *sqlc.Queries
 }
 
 // Connect creates a new SQLite database connection.
-// If dbPath is empty, uses "./data/counterspell.db".
+// If dbPath is empty, uses "~/.counterspell/data/counterspell.db".
 func Connect(ctx context.Context, dbPath string) (*DB, error) {
 	if dbPath == "" {
-		dbPath = "./data/counterspell.db"
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("unable to get home directory: %w", err)
+		}
+		dbPath = filepath.Join(home, ".counterspell", "data", "counterspell.db")
+	}
+
+	// Ensure parent directory exists
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return nil, fmt.Errorf("unable to create database directory: %w", err)
 	}
 
 	// Open SQLite database
@@ -48,24 +65,49 @@ func Connect(ctx context.Context, dbPath string) (*DB, error) {
 
 	return &DB{
 		db:      sqlDB,
+		path:    dbPath,
 		Queries: sqlc.New(sqlDB),
 	}, nil
 }
 
-// RunMigrations executes the schema.
+// RunMigrations runs database migrations using golang-migrate.
 func (db *DB) RunMigrations(ctx context.Context) error {
-	// Read schema from embedded filesystem
-	schemaBytes, err := schemaFS.ReadFile("schema.sql")
+	// Strip the "migrations/" prefix from embedded FS
+	sqlFS, err := fs.Sub(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("failed to read schema: %w", err)
+		return fmt.Errorf("unable to create migrations sub-filesystem: %w", err)
 	}
 
-	// Execute schema
-	if _, err := db.db.ExecContext(ctx, string(schemaBytes)); err != nil {
-		return fmt.Errorf("failed to execute schema: %w", err)
+	// Create migration source from embedded FS
+	sourceDriver, err := iofs.New(sqlFS, ".")
+	if err != nil {
+		return fmt.Errorf("failed to create migration source: %w", err)
 	}
 
-	slog.Info("Database schema initialized")
+	// Create database driver from existing DB connection
+	dbDriver, err := sqlite3.WithInstance(db.db, &sqlite3.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to create database driver: %w", err)
+	}
+
+	// Create migrate instance with both drivers
+	m, err := migrate.NewWithInstance("iofs", sourceDriver, "sqlite3", dbDriver)
+	if err != nil {
+		return fmt.Errorf("failed to create migrate instance: %w", err)
+	}
+
+	// Run migrations
+	// Note: We don't call m.Close() because it closes the underlying *sql.DB
+	// connection when using WithInstance. See: https://github.com/golang-migrate/migrate/issues/97
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	if err == migrate.ErrNoChange {
+		slog.Info("Database migrations up to date")
+	} else {
+		slog.Info("Database migrations applied successfully")
+	}
 
 	return nil
 }

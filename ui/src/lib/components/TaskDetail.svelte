@@ -299,8 +299,8 @@
 
           {#if isInProgress}
             <div class="flex items-center gap-3 px-8 py-4">
-              <p class="text-base font-medium shimmer text-violet-300">Thinking...</p>
-              <p class="text-base text-gray-600">Analyzing context</p>
+              <p class="text-base font-medium shimmer" style="color: #7950f2;">Thinking...</p>
+              <p class="text-base" style="color: #7950f2; opacity: 0.6;">Analyzing context</p>
             </div>
           {/if}
         </div>

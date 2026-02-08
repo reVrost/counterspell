@@ -76,7 +76,7 @@
         name,
         mode: workspaceMode,
       });
-      await appState.loadProjects();
+      await appState.loadWorkspaces();
       await appState.setActiveWorkspace(workspace.id, workspace.name);
       appState.closeNewWorkspaceModal();
       appState.showToast(`Workspace "${workspace.name}" created`, 'success');

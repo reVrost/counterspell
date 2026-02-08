@@ -1,0 +1,266 @@
+-- Counterspell Initial Schema
+-- Up migration
+
+-- Tasks: Core unit of work
+-- Status flow: planning -> in_progress -> review -> done | failed
+CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    intent TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('draft', 'planning', 'in_progress', 'review', 'done', 'failed')),
+    failed_reason TEXT,
+    position INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TRIGGER IF NOT EXISTS update_tasks_updated_at
+AFTER UPDATE ON tasks
+BEGIN
+UPDATE tasks SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Agent Runs: One row per agent execution within a task
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    prompt TEXT NOT NULL,
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    provider TEXT,
+    model TEXT,
+    summary_message_id TEXT,
+    backend_session_id TEXT,
+    cost REAL NOT NULL DEFAULT 0.0 CHECK (cost >= 0.0),
+    message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
+    prompt_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),
+    completion_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (completion_tokens>= 0),
+    completed_at DATETIME,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_created_at ON agent_runs (created_at);
+CREATE TRIGGER IF NOT EXISTS update_agent_runs_updated_at
+AFTER UPDATE ON agent_runs
+BEGIN
+UPDATE agent_runs SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Artifacts: Files uploaded by agents
+CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    content TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(path, run_id, version)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_artifacts_updated_at
+AFTER UPDATE ON artifacts
+BEGIN
+UPDATE artifacts SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+CREATE INDEX IF NOT EXISTS idx_artifacts_created_at ON artifacts (created_at);
+
+-- Messages: Chat messages for agent conversation history
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('system', 'developer', 'user', 'assistant', 'tool')),
+    parts TEXT NOT NULL default '[]',
+    model TEXT,
+    provider TEXT,
+    content TEXT NOT NULL,
+    tool_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    finished_at INTEGER
+);
+
+CREATE TRIGGER IF NOT EXISTS update_messages_updated_at
+AFTER UPDATE ON messages
+BEGIN
+UPDATE messages SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id);
+CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_insert
+AFTER INSERT ON messages
+BEGIN
+UPDATE agent_runs SET
+    message_count = message_count + 1
+WHERE id = new.run_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_run_message_count_on_delete
+AFTER DELETE ON messages
+BEGIN
+UPDATE agent_runs SET
+    message_count = message_count - 1
+WHERE id = old.run_id;
+END;
+
+-- Settings: API keys and configuration (no user_id - single-tenant)
+CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    openrouter_key TEXT,
+    zai_key TEXT,
+    anthropic_key TEXT,
+    openai_key TEXT,
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    provider TEXT,
+    model TEXT,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TRIGGER IF NOT EXISTS update_settings_updated_at
+AFTER UPDATE ON settings
+BEGIN
+UPDATE settings SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+INSERT OR IGNORE INTO settings (id, agent_backend, provider, model) VALUES (1, 'native', 'anthropic', 'claude-opus-4-5');
+CREATE INDEX IF NOT EXISTS idx_messages_task ON messages(task_id);
+CREATE INDEX IF NOT EXISTS idx_messages_task_created ON messages(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id);
+
+-- OAuth/Tunnel/Handshake Login Attempts: Temporary PKCE state for OAuth flow
+CREATE TABLE IF NOT EXISTS oauth_login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    state TEXT NOT NULL UNIQUE,
+    code_verifier TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+-- Connector OAuth attempts (PKCE state for connector login flows)
+CREATE TABLE IF NOT EXISTS connector_oauth_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    connector TEXT NOT NULL,
+    state TEXT NOT NULL,
+    code_verifier TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(connector, state)
+);
+
+-- Connector auth state (single row per connector)
+CREATE TABLE IF NOT EXISTS connector_auth (
+    connector TEXT PRIMARY KEY,
+    access_token TEXT,
+    refresh_token TEXT,
+    account_id TEXT,
+    metadata_json TEXT,
+    expires_at INTEGER,
+    connected_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Machine Identity: Stores machine credentials and tunnel info
+CREATE TABLE IF NOT EXISTS machine_identity (
+    machine_id TEXT PRIMARY KEY,
+    machine_jwt TEXT,
+    user_id TEXT NOT NULL,
+    subdomain TEXT NOT NULL UNIQUE,
+    tunnel_provider TEXT NOT NULL CHECK(tunnel_provider IN ('cloudflare')),
+    tunnel_token TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER
+);
+
+-- GitHub Connections: Store OAuth tokens (single connection for now)
+CREATE TABLE IF NOT EXISTS github_connections (
+    id TEXT PRIMARY KEY,
+    github_user_id TEXT UNIQUE NOT NULL,
+    access_token TEXT NOT NULL,
+    username TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Workspaces: Available workspace for selection
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    github_connection_id TEXT NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    local_path TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(name)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_workspaces_updated_at
+AFTER UPDATE ON workspaces
+BEGIN
+UPDATE workspaces SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Sessions: imported chat threads from third party
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    agent_backend TEXT NOT NULL CHECK(agent_backend IN ('native', 'claude-code', 'codex')),
+    external_id TEXT,
+    backend_session_id TEXT,
+    title TEXT,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    last_message_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    UNIQUE(agent_backend, external_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS update_sessions_updated_at
+AFTER UPDATE ON sessions
+BEGIN
+UPDATE sessions SET updated_at = strftime('%s', 'now')
+WHERE id = new.id;
+END;
+
+-- Session Messages: raw conversation events
+CREATE TABLE IF NOT EXISTS session_messages (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    sequence INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    content TEXT,
+    tool_name TEXT,
+    tool_call_id TEXT,
+    raw_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(session_id, sequence)
+);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_message_at ON sessions(last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id, sequence);
+
+CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_insert
+AFTER INSERT ON session_messages
+BEGIN
+UPDATE sessions SET
+    message_count = message_count + 1,
+    last_message_at = CASE
+        WHEN last_message_at IS NULL OR new.created_at > last_message_at THEN new.created_at
+        ELSE last_message_at
+    END,
+    updated_at = strftime('%s', 'now')
+WHERE id = new.session_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_session_message_count_on_delete
+AFTER DELETE ON session_messages
+BEGIN
+UPDATE sessions SET
+    message_count = message_count - 1,
+    updated_at = strftime('%s', 'now')
+WHERE id = old.session_id;
+END;
