@@ -22,6 +22,7 @@ linters:
     errcheck:
       exclude-functions:
         - (*.Close)
+        - (io.Closer).Close
         - (*net/http.Response).Body.Close
         - (*database/sql.DB).Close
         - (io.ReadCloser).Close
