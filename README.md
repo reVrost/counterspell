@@ -35,12 +35,7 @@ cspell
 
 **For macOS Apple Silicon (M1/M2/M3 Macs):**
 
- 1. **Download the binary**
-     - Using curl:
-       ```bash
-       curl -L https://github.com/counterspell-io/cs-platform/releases/latest/download/cspell-macos-arm64 -o cspell
-       ```
-     - Or download manually from the [releases page](https://github.com/counterspell-io/cs-platform/releases)
+ 1. **Download** binary from the [releases page](https://github.com/revrost/counterspell/releases)
 
  2. **Make it executable**
     ```bash
@@ -48,7 +43,7 @@ cspell
     ```
 
  3. **Run Counterspell**
-     - On first run, macOS will show a security warning. Right-click the file and choose "Open", or run:
+     - On first run, macOS may show a security warning. Right-click the file and choose "Open", or run:
        ```bash
        xattr -d com.apple.quarantine cspell
        ```
@@ -58,6 +53,38 @@ cspell
        ```
 
 ### Option 3: Building from Source (For Developers)
+
+If you have Go installed:
+
+```bash
+make dev
+```
+
+---
+
+## 🚢 Release Process (For Maintainers)
+
+This repo is a public subtree of the private `cs-platform` monorepo. To create a release:
+
+1. **Sync subtree** from `cs-platform`:
+   ```bash
+   cd ../cs-platform
+   make subtree-push
+   ```
+
+2. **Create and push a tag** (triggers automated release + Homebrew update):
+   ```bash
+   cd ../counterspell
+   git tag v0.1.7
+   git push origin v0.1.7
+   ```
+
+3. The GitHub Actions workflow automatically:
+   - Builds binary
+   - Creates GitHub release
+   - Updates Homebrew formula
+
+---
 
 If you have Go installed:
 
