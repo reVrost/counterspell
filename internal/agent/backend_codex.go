@@ -283,6 +283,8 @@ func (b *CodexBackend) processCodexEvent(event map[string]any) {
 }
 
 // parseOutput is kept for test compatibility with line-delimited JSON fixtures.
+//
+//nolint:unused
 func (b *CodexBackend) parseOutput(scanner *bufio.Scanner) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())

@@ -110,7 +110,6 @@ func (c *OpenAICaller) Stream(ctx context.Context, messages []Message, allTools 
 			}
 			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 			if data == "[DONE]" {
-				completed = true
 				break
 			}
 

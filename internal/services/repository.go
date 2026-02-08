@@ -520,15 +520,6 @@ func ConvertMessagesToJSON(messages []sqlc.Message) (string, error) {
 	return string(jsonData), nil
 }
 
-// nullableInt64FromTime converts sql.NullTime to *int64.
-func nullableInt64FromTime(t sql.NullTime) *int64 {
-	if t.Valid {
-		unixMillis := t.Time.UnixMilli()
-		return &unixMillis
-	}
-	return nil
-}
-
 // --- Session Operations ---
 
 // CreateSession inserts a new session.

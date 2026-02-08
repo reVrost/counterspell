@@ -257,9 +257,6 @@ func (s *SessionService) buildBackend(
 			case "zai":
 				baseURL = "https://api.z.ai/api/coding/paas/v4"
 			case "openai", "":
-				if provider == "" {
-					provider = "openai"
-				}
 			default:
 				return nil, func() {}, fmt.Errorf("unsupported provider for codex backend: %s", provider)
 			}
