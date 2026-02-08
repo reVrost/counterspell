@@ -689,6 +689,7 @@ func (o *Orchestrator) processResults() {
 					if err := o.repo.UpdateStatus(ctx, result.TaskID, "review"); err != nil {
 						slog.Error("[ORCHESTRATOR] Failed to update task status", "error", err)
 					}
+					o.eventBus.Publish(models.Event{TaskID: result.TaskID, Type: string(EventTypeTaskUpdated), Data: ""})
 				}
 			}
 			// Update agent run as completed
