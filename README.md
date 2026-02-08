@@ -24,46 +24,9 @@
 
 Counterspell is an AI agent that helps you work on your code. Here's how to get started:
 
-### Option 1: Using Homebrew (Recommended for macOS)
-
 ```bash
 brew install counterspell-io/tap/cspell
 cspell
-```
-
-### Option 2: Using the Pre-built Binary
-
-**For macOS Apple Silicon (M1/M2/M3 Macs):**
-
- 1. **Download the binary**
-     - Using curl:
-       ```bash
-       curl -L https://github.com/counterspell-io/cs-platform/releases/latest/download/cspell-macos-arm64 -o cspell
-       ```
-     - Or download manually from the [releases page](https://github.com/counterspell-io/cs-platform/releases)
-
- 2. **Make it executable**
-    ```bash
-    chmod +x cspell
-    ```
-
- 3. **Run Counterspell**
-     - On first run, macOS will show a security warning. Right-click the file and choose "Open", or run:
-       ```bash
-       xattr -d com.apple.quarantine cspell
-       ```
-     - Then run:
-       ```bash
-       ./cspell
-       ```
-
-### Option 3: Building from Source (For Developers)
-
-If you have Go installed:
-
-```bash
-make dev
-```
 
 ### Step 2: Register Your Machine (First Time Only)
 
@@ -180,7 +143,3 @@ counterspell/
 This project is licensed under the Functional Source License (FSL) - see the [LICENSE](LICENSE) file for details.
 
 ---
-
-**Made with ❤️ by the Counterspell Team**
-
-**WE REACHED THE SUMMIT OF MOUNT DOOM!** 🏔️✨
