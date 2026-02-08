@@ -48,6 +48,12 @@ build:
 	@go build -o $(BINARY_PATH) $(TARGET_MAIN)
 	@echo "Binary built: $(BINARY_PATH)"
 
+build-macos-arm64: build-ui tidy
+	@echo "Building $(PROJECT_NAME) for macOS Apple Silicon..."
+	@mkdir -p release
+	@GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o release/counterspell-macos-arm64 $(TARGET_MAIN)
+	@echo "macOS Apple Silicon binary built: release/counterspell-macos-arm64"
+
 build-prod: tidy
 	@echo "Building $(PROJECT_NAME) for production..."
 	@mkdir -p deploy

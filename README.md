@@ -24,15 +24,32 @@
 
 Counterspell is an AI agent that helps you work on your code. Here's how to get started:
 
-### Step 1: Run Counterspell
+### Option 1: Using the Pre-built Binary (Recommended)
 
-Open your terminal and navigate to the Counterspell directory, then run:
+**For macOS Apple Silicon (M1/M2/M3 Macs):**
+
+1. **Download the binary**
+   ```bash
+   curl -L https://github.com/your-repo/counterspell/releases/latest/download/counterspell-macos-arm64 -o counterspell
+   ```
+
+2. **Make it executable**
+   ```bash
+   chmod +x counterspell
+   ```
+
+3. **Run Counterspell**
+   ```bash
+   ./counterspell
+   ```
+
+### Option 2: Building from Source (For Developers)
+
+If you have Go installed:
 
 ```bash
 go run cmd/app/main.go
 ```
-
-You'll see the server start up.
 
 ### Step 2: Register Your Machine (First Time Only)
 
@@ -64,11 +81,11 @@ When you visit your Counterspell URL for the first time:
 2. Click "Sign in with Google" (or use your preferred provider)
 3. Approve the access request
 
+![Auth Screen](docs/images/cs2.png)
+
 ### Step 5: Start Creating Tasks
 
-![Home Screen](docs/images/cs2.png)
-
-Now you're ready to use Counterspell! You'll see the main dashboard (like the image above) :
+Now you're ready to use Counterspell!
 
 1. **Navigate to Tasks** - Click on "Tasks" in the sidebar or navigation
 2. **Create a Task** - Click the "New Task" button
@@ -97,20 +114,11 @@ Counterspell is now running on your machine and accessible at your unique URL. Y
 ### Development Commands
 
 ```bash
-# Start backend (includes embedded UI)
-make dev
-
-# Start frontend dev server separately
-make ui
-
-# Run tests
-make test
-
-# Run E2E tests
-make test-e2e
-
 # Format code
 make format
+
+# Build release binary for macOS Apple Silicon
+make build-macos-arm64
 ```
 
 ---
