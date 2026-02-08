@@ -41,7 +41,7 @@ const (
 )
 
 func printColoredMessage(color, message string) {
-	fmt.Fprintf(os.Stdout, "%s%s%s\n", color, message, colorReset)
+	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n", color, message, colorReset)
 }
 
 func main() {
@@ -280,10 +280,10 @@ func main() {
 			logger.Info("Tunnel started", "url", "https://"+authResult.Subdomain+".counterspell.app", "local_url", localURL)
 
 			// Print colored startup message
-			fmt.Fprintln(os.Stdout)
+			_, _ = fmt.Fprintln(os.Stdout)
 			printColoredMessage(colorBold+colorGreen, "✓ Your command center is hosted: https://"+authResult.Subdomain+".counterspell.app")
 			printColoredMessage(colorCyan, "  Go there with your mobile!")
-			fmt.Fprintln(os.Stdout)
+			_, _ = fmt.Fprintln(os.Stdout)
 		}
 	}
 
