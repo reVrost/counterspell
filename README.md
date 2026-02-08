@@ -20,39 +20,97 @@
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started (Step-by-Step)
+
+Counterspell is an AI agent that helps you work on your code. Here's how to get started:
+
+### Step 1: Run Counterspell
+
+Open your terminal and navigate to the Counterspell directory, then run:
+
+```bash
+go run cmd/app/main.go
+```
+
+You'll see the server start up.
+
+### Step 2: Register Your Machine (First Time Only)
+
+When you run Counterspell for the first time, it will prompt you to authenticate. This registers your machine with the control plane.
+
+1. A browser window will open automatically with an OAuth login
+2. Sign in with your Google account (or click your profile if already logged in)
+3. Allow the application to access your account
+
+![Login Screen](docs/images/cs1.png)
+
+Counterspell will generate a unique URL for your machine (e.g., `username.counterspell.app`) and set up a secure tunnel to it.
+
+### Step 3: Open Your Counterspell URL
+
+Once registered, Counterspell will display your unique URL in the terminal:
+
+```
+Authenticated: https://yourusername.counterspell.app
+```
+
+Click this URL or open it in your browser.
+
+### Step 4: Authenticate as Yourself
+
+When you visit your Counterspell URL for the first time:
+
+1. You'll be asked to authenticate again - this is to verify your identity
+2. Click "Sign in with Google" (or use your preferred provider)
+3. Approve the access request
+
+### Step 5: Start Creating Tasks
+
+![Home Screen](docs/images/cs2.png)
+
+Now you're ready to use Counterspell! You'll see the main dashboard (like the image above) :
+
+1. **Navigate to Tasks** - Click on "Tasks" in the sidebar or navigation
+2. **Create a Task** - Click the "New Task" button
+3. **Describe Your Task** - Tell Counterspell what you want to do (e.g., "Add a new feature to handle user authentication")
+4. **Watch it Work** - Counterspell will break down the task and start working on it
+
+![Task Interface](docs/images/cs3.png)
+
+### That's It!
+
+Counterspell is now running on your machine and accessible at your unique URL. You can:
+- Create and manage AI-powered development tasks
+- Browse and edit files directly in the interface
+- View and manage Git changes
+- Monitor real-time task progress
+
+---
+
+## 🛠️ For Developers
 
 ### Prerequisites
 - Go 1.21+ for backend
 - Node.js 18+ for frontend
 - Git (for Git operations)
 
-### Installation
+### Development Commands
 
-1. **Clone the repository**
 ```bash
-git clone https://github.com/your-repo/counterspell.git
-cd counterspell
-```
+# Start backend (includes embedded UI)
+make dev
 
-2. **Start the backend**
-```bash
-cd cmd/app
-go run main.go
-```
-Backend runs on `http://localhost:8080`
+# Start frontend dev server separately
+make ui
 
-3. **Start the frontend**
-```bash
-cd ui
-npm install
-npm run dev
-```
-Frontend runs on `http://localhost:5173`
+# Run tests
+make test
 
-4. **Open in browser**
-```
-http://localhost:5173
+# Run E2E tests
+make test-e2e
+
+# Format code
+make format
 ```
 
 ---
