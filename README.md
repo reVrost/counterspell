@@ -26,6 +26,7 @@ Counterspell is an AI agent that helps you work on your code. Here's how to get 
 
 ```bash
 brew install counterspell-io/tap/cspell
+```
 cspell
 
 ### Step 2: Register Your Machine (First Time Only)
