@@ -43,7 +43,14 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: counterspell-io/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TOKEN }}
+          path: /tmp/homebrew-tap
 
       - name: Update Homebrew formula
         run: |
@@ -53,8 +60,6 @@ jobs:
           # Download tar.gz to get SHA256
           curl -L "https://github.com/revrost/counterspell/archive/refs/tags/v${VERSION}.tar.gz" -o /tmp/cspell.tar.gz
           SHA256=$(shasum -a 256 /tmp/cspell.tar.gz | awk '{print $1}')
-          # Clone and update homebrew-tap
-          git clone https://github.com/counterspell-io/homebrew-tap.git /tmp/homebrew-tap
           cd /tmp/homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -63,4 +68,4 @@ jobs:
           rm Formula/cspell.rb.bak
           git add Formula/cspell.rb
           git commit -m "Update cspell to v${VERSION}"
-          git push https://${{ secrets.HOMEBREW_TOKEN }}@github.com/counterspell-io/homebrew-tap.git
+          git push
