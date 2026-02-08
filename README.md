@@ -1,6 +1,6 @@
 # Counterspell 🧙‍♂️
 
-**An auth-free, local-first AI development agent with GitHub-style UI**
+**An auth-free, mobile-first, local-first AI development agent with GitHub-style UI**
 
 [![Go](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/)
 [![Svelte](https://img.shields.io/badge/Svelte-5.0+-ff3e00.svg)](https://svelte.dev/)
