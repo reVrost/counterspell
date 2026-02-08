@@ -50,7 +50,7 @@ jobs:
         with:
           repository: counterspell-io/homebrew-tap
           token: ${{ secrets.HOMEBREW_TOKEN }}
-          path: /tmp/homebrew-tap
+          path: homebrew-tap
 
       - name: Update Homebrew formula
         run: |
@@ -60,7 +60,7 @@ jobs:
           # Download tar.gz to get SHA256
           curl -L "https://github.com/revrost/counterspell/archive/refs/tags/v${VERSION}.tar.gz" -o /tmp/cspell.tar.gz
           SHA256=$(shasum -a 256 /tmp/cspell.tar.gz | awk '{print $1}')
-          cd /tmp/homebrew-tap
+          cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           sed -i.bak "s|url \".*\"|url \"https://github.com/revrost/counterspell/archive/refs/tags/v${VERSION}.tar.gz\"|" Formula/cspell.rb
