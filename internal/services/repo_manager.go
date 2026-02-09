@@ -63,7 +63,9 @@ func NewRepoManager(dataDir string) (RepoManager, error) {
 	}
 	root, kind, err := findRepoRoot(cwd)
 	if err != nil {
-		return nil, err
+		// If repo root is not found just retunr a git manager
+		// TODO: when trying to merge, we need to instantialize a git
+		return NewGitManager(root, dataDir), nil
 	}
 	switch kind {
 	case RepoKindJJ:
@@ -71,7 +73,8 @@ func NewRepoManager(dataDir string) (RepoManager, error) {
 	case RepoKindGit:
 		return NewGitManager(root, dataDir), nil
 	default:
-		return nil, fmt.Errorf("unsupported repo kind: %s", kind)
+		fmt.Printf("Unknown repo kind: %s\n", kind)
+		return NewGitManager(root, dataDir), nil
 	}
 }
 
